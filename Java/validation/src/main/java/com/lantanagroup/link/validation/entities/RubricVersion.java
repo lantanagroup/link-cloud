@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.entities;
 
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -70,6 +71,15 @@ public class RubricVersion {
 
     @Column(name = "retired_by", length = 128)
     private String retiredBy;
+
+    // set when a $dry-run completes for this version. publish checks these when
+    // link.rubric.dry-run.required-for-publish is on, null means no dry run yet
+    @Column(name = "dry_run_completed_at")
+    private OffsetDateTime dryRunCompletedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dry_run_status", length = 32)
+    private RubricResultStatus dryRunStatus;
 
     @Column(length = 64, nullable = false)
     private String checksum;

@@ -78,13 +78,15 @@ public class RubricController {
         this.strictYamlMapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
-    @Operation(summary = "List rubrics (paged), each with all its versions and their status")
+    @Operation(summary = "List rubrics (paged), each with its versions. Optional status filter: only rubrics "
+            + "having a version in that status are returned, and their versions are trimmed to it")
     @GetMapping
     public ResponseEntity<ApiResponse<PagedData<RubricSummaryDto>>> listRubrics(
+            @RequestParam(required = false) RubricVersionStatus status,
             @PageableDefault(size = 20, sort = "rubricId") Pageable pageable) {
-        var rubricPage = registry.listRubrics(pageable);
+        var rubricPage = registry.listRubrics(status, pageable);
         List<String> rubricIds = rubricPage.getContent().stream().map(Rubric::getRubricId).toList();
-        Map<String, List<RubricVersion>> versionsByRubric = registry.versionsByRubricId(rubricIds);
+        Map<String, List<RubricVersion>> versionsByRubric = registry.versionsByRubricId(rubricIds, status);
         PagedData<RubricSummaryDto> page = PagedData.from(rubricPage, r ->
                 RubricSummaryDto.from(r, versionSummaries(versionsByRubric.getOrDefault(r.getRubricId(), List.of()))));
         return ResponseEntity.ok(ApiResponse.ok("Rubrics fetched successfully", page));
@@ -124,12 +126,13 @@ public class RubricController {
         return ResponseEntity.ok(ApiResponse.ok("Rubric version fetched successfully", dto));
     }
 
-    @Operation(summary = "Register a new rubric version (status = DRAFT); a semver can be registered exactly once. "
+    @Operation(summary = "Register a rubric version (status = DRAFT). Re-registering a semver that is still a "
+            + "DRAFT replaces its definition and checks in place; a PUBLISHED or RETIRED semver is immutable. "
             + "The payload may be submitted as JSON or YAML (Content-Type: application/yaml).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "This semver is already registered (even with identical content)")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "This semver is already PUBLISHED or RETIRED and cannot be re-registered")
     })
     @PostMapping(value = "/{rubricId}/versions",
             consumes = {MediaType.APPLICATION_JSON_VALUE, APPLICATION_YAML_VALUE, APPLICATION_X_YAML_VALUE, TEXT_YAML_VALUE})
@@ -226,7 +229,7 @@ public class RubricController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already published, or retired")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already published or retired, or dry-run enforcement is enabled and no acceptable dry run exists for this version")
     })
     @PostMapping("/{rubricId}/versions/{semver}/$publish")
     public ResponseEntity<ApiResponse<RubricVersionSummaryDto>> publish(
@@ -238,11 +241,11 @@ public class RubricController {
                 RubricVersionSummaryDto.from(version, objectMapper)));
     }
 
-    @Operation(summary = "Mark a PUBLISHED version RETIRED (the only legal transition into RETIRED)")
+    @Operation(summary = "Mark a version RETIRED. Both DRAFT (abandon without publishing) and PUBLISHED versions can be retired")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired, or still a draft")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired")
     })
     @PostMapping("/{rubricId}/versions/{semver}/$retire")
     public ResponseEntity<ApiResponse<RubricVersionSummaryDto>> retire(

@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
+import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.enums.Severity;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class RubricExecutionService {
 
     private final RubricVersionResolver versionResolver;
     private final RubricCheckRepository rubricCheckRepository;
+    private final RubricVersionRepository rubricVersionRepository;
     private final CheckExecutorRegistry executorRegistry;
     private final ResultEnvelopeAssembler envelopeAssembler;
     private final RubricResultPersister resultPersister;
@@ -45,7 +47,9 @@ public class RubricExecutionService {
         RubricVersion version = versionResolver.resolve(rubricId, semver, persist);
         log.debug("Resolved rubric {} v{} ({})", version.getRubricId(), version.getSemver(), version.getRubricVersionId());
 
-        List<RubricCheck> checks = rubricCheckRepository.findByRubricVersionIdOrderByOrdinalAsc(version.getRubricVersionId());
+        // soft-deleted checks are excluded here
+        List<RubricCheck> checks =
+                rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(version.getRubricVersionId());
 
         SubjectDto subject = request.getSubject();
 
@@ -103,6 +107,13 @@ public class RubricExecutionService {
 
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
+        } else {
+            // no result row for dry runs, but the outcome is stored on the version
+            // so the publish gate can check it later
+            rubricVersionRepository.recordDryRun(
+                    version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);
+            log.info("Recorded dry run for rubric {} v{}: {}",
+                    version.getRubricId(), version.getSemver(), out.resultEntity().getStatus());
         }
         return out.envelope();
     }
