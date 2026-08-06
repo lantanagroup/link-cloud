@@ -2135,6 +2135,12 @@
           "Workleap.Extensions.Configuration.Substitution": "[1.2.25, )"
         }
       },
+      "dmrp": {
+        "type": "Project",
+        "dependencies": {
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
       "link.authorization": {
         "type": "Project",
         "dependencies": {

@@ -129,7 +129,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
         timeZone: new FormControl('', Validators.required),
-        vendor: new FormControl<IVendorVersion | null>(null, Validators.required),
+        vendor: new FormControl<IVendorVersion | null>(null),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
