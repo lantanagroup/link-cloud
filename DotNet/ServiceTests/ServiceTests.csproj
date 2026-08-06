@@ -59,6 +59,7 @@
     <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
     <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
+    <ProjectReference Include="..\DMRP\DMRP.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />

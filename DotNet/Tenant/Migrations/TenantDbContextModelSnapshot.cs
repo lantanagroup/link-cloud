@@ -568,6 +568,38 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.ToTable("QRTZ_TRIGGERS", "quartz");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DMRP.Data.Entities.FacilityReportingPlan", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FacilityReportingPlans", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DMRP.Data.Entities.MeasureMapping", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MeasureMappings", (string)null);
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>
                 {
                     b.Property<Guid>("Id")

@@ -1,0 +1,95 @@
+﻿using Flurl.Http;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.Extensions.Options;
+
+namespace LantanaGroup.Link.Sdk.Clients;
+
+public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
+{
+    public DmrpServiceClient(
+        IOptions<ServiceRegistry> serviceRegistry,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        // DMRP is a module hosted by the Tenant service rather than a service of its own, so its
+        // endpoints are served from the Tenant service's base address.
+        : base(
+            serviceRegistry.Value.TenantServiceApiUrl
+                ?? throw new InvalidOperationException("Tenant service URL is not configured in ServiceRegistry."),
+            bearerOptions, tokenServiceSettings, tokenService)
+    {
+    }
+
+    public Task<LinkApiResponse<MeasureMappingModel>> CreateMeasureMappingAsync(
+        MeasureMappingModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<MeasureMappingModel>(() => Request("/dmrp/measure-mappings")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<MeasureMappingModel>> GetMeasureMappingAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<MeasureMappingModel>(() => Request($"/dmrp/measure-mappings/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<MeasureMappingModel>> UpdateMeasureMappingAsync(
+        string id,
+        MeasureMappingModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<MeasureMappingModel>(() => Request($"/dmrp/measure-mappings/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteMeasureMappingAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/dmrp/measure-mappings/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(
+        FacilityReportingPlanModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityReportingPlanModel>(() => Request("/dmrp/reporting-plans")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityReportingPlanModel>> GetFacilityReportingPlanAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(
+        string id,
+        FacilityReportingPlanModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityReportingPlanAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/dmrp/reporting-plans/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityReportingPlanModel>>(() => Request("/dmrp/reporting-plans")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
+}

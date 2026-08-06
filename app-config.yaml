@@ -704,6 +704,10 @@ services:
       description: "Boolean flag to restrict facility IDs to numeric values only."
       required: false
       defaultValue: "false"
+    - key: "DMRP:Enabled"
+      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
+      required: false
+      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
