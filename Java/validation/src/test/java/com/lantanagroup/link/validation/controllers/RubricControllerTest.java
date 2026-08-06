@@ -4,6 +4,7 @@ import com.lantanagroup.link.validation.entities.Rubric;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
+import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
@@ -447,6 +448,14 @@ class RubricControllerTest {
                             RubricVersionStatus.PUBLISHED, "publish"));
             expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$publish"), 409);
         }
+
+        @Test
+        @DisplayName("dry-run enforcement blocks publish -> 409 (documented)")
+        void publish_dryRunRequired() throws Exception {
+            when(registry.publish(any(), any(), any()))
+                    .thenThrow(new RubricDryRunRequiredException("piqi.core", "1.0.0", null));
+            expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$publish"), 409);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -475,11 +484,11 @@ class RubricControllerTest {
         }
 
         @Test
-        @DisplayName("still a draft -> 409 (documented)")
+        @DisplayName("already retired -> 409 (documented)")
         void retire_wrongState() throws Exception {
             when(registry.retire(any(), any(), any()))
                     .thenThrow(new RubricLifecycleException("piqi.core", "1.0.0",
-                            RubricVersionStatus.DRAFT, "retire"));
+                            RubricVersionStatus.RETIRED, "retire"));
             expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$retire"), 409);
         }
     }
@@ -495,13 +504,33 @@ class RubricControllerTest {
         @DisplayName("list rubrics -> 200 paged envelope")
         void listRubrics() throws Exception {
             Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
-            when(registry.listRubrics(any())).thenReturn(page);
-            when(registry.versionsByRubricId(any()))
+            when(registry.listRubrics(isNull(), any())).thenReturn(page);
+            when(registry.versionsByRubricId(any(), isNull()))
                     .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT))));
 
             mockMvc.perform(get(BASE))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content[0].rubricId").value("piqi.core"));
+        }
+
+        @Test
+        @DisplayName("list rubrics filtered by status -> 200, filter passed through")
+        void listRubrics_statusFilter() throws Exception {
+            Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
+            when(registry.listRubrics(eq(RubricVersionStatus.PUBLISHED), any())).thenReturn(page);
+            when(registry.versionsByRubricId(any(), eq(RubricVersionStatus.PUBLISHED)))
+                    .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED))));
+
+            mockMvc.perform(get(BASE + "?status=PUBLISHED"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[0].rubricId").value("piqi.core"))
+                    .andExpect(jsonPath("$.data.content[0].versions[0].status").value("PUBLISHED"));
+        }
+
+        @Test
+        @DisplayName("list rubrics with an invalid status value -> 400")
+        void listRubrics_invalidStatus() throws Exception {
+            expectStatus(get(BASE + "?status=NOPE"), 400);
         }
 
         @Test

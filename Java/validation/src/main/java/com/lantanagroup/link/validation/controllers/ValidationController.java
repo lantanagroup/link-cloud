@@ -227,7 +227,7 @@ public class ValidationController {
         return rubricExecutionService.evaluate(rubricId, version, request, true);
     }
 
-    @Operation(summary = "Dry-run a rubric without persisting a result (v2)")
+    @Operation(summary = "Dry-run a rubric: no result is persisted, but the outcome is recorded on the version (v2)")
     @PostMapping("/v2/rubrics/{rubricId}/versions/{semver}/$dry-run")
     public ValidationResultEnvelope dryRun(
             @PathVariable String rubricId,

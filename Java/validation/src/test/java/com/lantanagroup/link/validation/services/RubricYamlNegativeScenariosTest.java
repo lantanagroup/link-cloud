@@ -122,6 +122,15 @@ class RubricYamlNegativeScenariosTest {
 
 
     @Test
+    @DisplayName("YAML with every ordinal omitted passes every layer")
+    void omittedOrdinalsPass() {
+        String yaml = VALID_YAML.replace("    ordinal: 0\n", "").replace("    ordinal: 1\n", "");
+        assertThat(yaml).doesNotContain("ordinal");
+        assertThat(beanViolations(yaml)).isEmpty();
+        domainValidator.validate(parse(yaml));
+    }
+
+    @Test
     @DisplayName("unknown top-level key (typo 'cheks') rejected by strict parsing")
     void unknownTopLevelKey() {
         String yaml = VALID_YAML.replace("checks:", "cheks:");

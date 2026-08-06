@@ -39,8 +39,9 @@ public class CheckDto {
     @NotNull
     private Severity severityOverride;
 
+    // optional. explicit ordinals must be unique per rubric (see RubricDefinitionValidator)
     @PositiveOrZero
-    private int ordinal;
+    private Integer ordinal;
 
     @Builder.Default
     private boolean enabled = true;

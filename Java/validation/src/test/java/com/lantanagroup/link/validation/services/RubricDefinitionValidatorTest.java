@@ -241,6 +241,103 @@ class RubricDefinitionValidatorTest {
     }
 
     @Test
+    @DisplayName("multiple checks without an ordinal are allowed")
+    void nullOrdinalsAllowed() {
+        var p = payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(null)
+                        .parameters(params("{\"expression\":\"x\"}")).build(),
+                check("c2", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(null)
+                        .parameters(params("{\"expression\":\"y\"}")).build()
+        ).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("mixing checks with and without ordinals is allowed")
+    void mixedNullAndExplicitOrdinals() {
+        var p = payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(null)
+                        .parameters(params("{\"expression\":\"x\"}")).build(),
+                check("c2", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(0)
+                        .parameters(params("{\"expression\":\"y\"}")).build(),
+                check("c3", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(1)
+                        .parameters(params("{\"expression\":\"z\"}")).build()
+        ).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("duplicate explicit ordinal is still rejected when null ordinals are present")
+    void duplicateExplicitOrdinalAmongNulls() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(null)
+                        .parameters(params("{\"expression\":\"x\"}")).build(),
+                check("c2", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(1)
+                        .parameters(params("{\"expression\":\"y\"}")).build(),
+                check("c3", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(1)
+                        .parameters(params("{\"expression\":\"z\"}")).build()
+        ).build()));
+        assertThat(errors).anyMatch(e -> e.contains("duplicate ordinal 1"));
+        assertThat(errors).noneMatch(e -> e.contains("checks[c1]"));
+    }
+
+    @Test
+    @DisplayName("negative ordinal -> rejected by the domain validator")
+    void negativeOrdinalRejected() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(-1)
+                        .parameters(params("{\"expression\":\"x\"}")).build()
+        ).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c1]: ordinal must be >= 0"));
+    }
+
+    @Test
+    @DisplayName("two checks with the same type, dimension, and no parameters are duplicates")
+    void duplicateDefinitionWithNullParameters() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.FHIR_CONFORMANCE, PiqiDimension.CONFORMANCE).ordinal(0).build(),
+                check("c2", CheckType.FHIR_CONFORMANCE, PiqiDimension.CONFORMANCE).ordinal(1).build()
+        ).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c2]: duplicate of check 'c1'"));
+    }
+
+    @Test
+    @DisplayName("two checks with the same type, dimension, and parameters -> rejected")
+    void duplicateDefinition() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(0)
+                        .parameters(params("{\"expression\":\"Patient.name.exists()\"}")).build(),
+                check("c2", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(1)
+                        .parameters(params("{\"expression\":\"Patient.name.exists()\"}")).build()
+        ).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c2]: duplicate of check 'c1'"));
+    }
+
+    @Test
+    @DisplayName("duplicate detection is structural — parameter key order does not evade it")
+    void duplicateDefinitionIgnoresKeyOrder() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(0)
+                        .parameters(params("{\"expression\":\"x\",\"code\":\"k\"}")).build(),
+                check("c2", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(1)
+                        .parameters(params("{\"code\":\"k\",\"expression\":\"x\"}")).build()
+        ).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c2]: duplicate of check 'c1'"));
+    }
+
+    @Test
+    @DisplayName("same parameters under a different type or dimension are not duplicates")
+    void sameParametersDifferentTypeAllowed() {
+        var p = payload(
+                check("c1", CheckType.FHIRPATH, PiqiDimension.CONFORMANCE).ordinal(0)
+                        .parameters(params("{\"expression\":\"Patient.name.exists()\"}")).build(),
+                check("c2", CheckType.COMPLETENESS, PiqiDimension.COMPLETENESS).ordinal(1)
+                        .parameters(params("{\"expression\":\"Patient.name.exists()\"}")).build()
+        ).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("more than max checks -> rejected; exactly max passes")
     void maxChecksCap() {
         var small = new RubricDefinitionValidator(customCheckExecutor, FHIR_PATH,
@@ -248,7 +345,7 @@ class RubricDefinitionValidatorTest {
         List<CheckDto> three = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             three.add(check("c" + i, CheckType.FHIRPATH, PiqiDimension.CONFORMANCE)
-                    .ordinal(i).parameters(params("{\"expression\":\"x\"}")).build());
+                    .ordinal(i).parameters(params("{\"expression\":\"x" + i + "\"}")).build());
         }
         var over = payload().checks(three).build();
         var errors = errorsOf(() -> small.validate(over));
