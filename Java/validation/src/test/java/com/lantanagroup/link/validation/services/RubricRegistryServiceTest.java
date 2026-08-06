@@ -305,6 +305,43 @@ class RubricRegistryServiceTest {
                 .isInstanceOf(RubricLifecycleException.class);
     }
 
+    @Test
+    @DisplayName("retire a DRAFT -> allowed, version goes straight to RETIRED")
+    void retire_draftAllowed() {
+        stubVersion(draftVersion());
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+        assertThat(retired.getRetiredAt()).isNotNull();
+        assertThat(retired.getRetiredBy()).isEqualTo("qa");
+        verify(eventRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("retire a PUBLISHED version -> RETIRED")
+    void retire_publishedAllowed() {
+        RubricVersion version = draftVersion();
+        version.setStatus(RubricVersionStatus.PUBLISHED);
+        stubVersion(version);
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+    }
+
+    @Test
+    @DisplayName("retire an already RETIRED version -> 409 lifecycle error")
+    void retire_alreadyRetiredRejected() {
+        RubricVersion version = draftVersion();
+        version.setStatus(RubricVersionStatus.RETIRED);
+        stubVersion(version);
+
+        assertThatThrownBy(() -> service().retire("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricLifecycleException.class);
+        verify(eventRepository, never()).save(any());
+    }
+
     private RubricVersion versionOf(String rubricId, String semver, RubricVersionStatus status) {
         return RubricVersion.builder()
                 .rubricVersionId(UUID.randomUUID())

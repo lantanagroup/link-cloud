@@ -241,11 +241,11 @@ public class RubricController {
                 RubricVersionSummaryDto.from(version, objectMapper)));
     }
 
-    @Operation(summary = "Mark a PUBLISHED version RETIRED (the only legal transition into RETIRED)")
+    @Operation(summary = "Mark a version RETIRED. Both DRAFT (abandon without publishing) and PUBLISHED versions can be retired")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired, or still a draft")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired")
     })
     @PostMapping("/{rubricId}/versions/{semver}/$retire")
     public ResponseEntity<ApiResponse<RubricVersionSummaryDto>> retire(

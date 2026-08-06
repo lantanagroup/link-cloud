@@ -180,9 +180,11 @@ public class RubricRegistryService {
     public RubricVersion retire(String rubricId, String semver, String retiredBy) {
         RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
                 .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
-//        if (v.getStatus() != RubricVersionStatus.PUBLISHED) {
-//            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
-//        }
+        // drafts can be retired directly (abandoned without ever publishing), only
+        // re-retiring is blocked so retiredAt/retiredBy and the audit trail stay intact
+        if (v.getStatus() == RubricVersionStatus.RETIRED) {
+            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
+        }
         v.setStatus(RubricVersionStatus.RETIRED);
         v.setRetiredAt(OffsetDateTime.now());
         v.setRetiredBy(retiredBy);

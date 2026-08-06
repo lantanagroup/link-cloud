@@ -484,11 +484,11 @@ class RubricControllerTest {
         }
 
         @Test
-        @DisplayName("still a draft -> 409 (documented)")
+        @DisplayName("already retired -> 409 (documented)")
         void retire_wrongState() throws Exception {
             when(registry.retire(any(), any(), any()))
                     .thenThrow(new RubricLifecycleException("piqi.core", "1.0.0",
-                            RubricVersionStatus.DRAFT, "retire"));
+                            RubricVersionStatus.RETIRED, "retire"));
             expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$retire"), 409);
         }
     }
