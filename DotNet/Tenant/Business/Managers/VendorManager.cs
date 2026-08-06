@@ -46,15 +46,18 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         private readonly ILogger<VendorManager> _logger;
         private readonly TenantDbContext _dbContext;
         private readonly INormalizationServiceClient _normalizationServiceClient;
+        private readonly CreateAuditEventCommand _createAuditEventCommand;
 
         public VendorManager(
             ILogger<VendorManager> logger,
             TenantDbContext dbContext,
-            INormalizationServiceClient normalizationServiceClient)
+            INormalizationServiceClient normalizationServiceClient,
+            CreateAuditEventCommand createAuditEventCommand)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _normalizationServiceClient = normalizationServiceClient ?? throw new ArgumentNullException(nameof(normalizationServiceClient));
+            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
         }
 
         public async Task<VendorModel> CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default)
@@ -89,6 +92,10 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             await _dbContext.Vendors.AddAsync(vendorEntity, cancellationToken);
             await _dbContext.VendorVersions.AddAsync(vendorVersionEntity, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _createAuditEventCommand.Execute(
+                vendorEntity.Id.ToString(), Helper.CreateVendorAuditEvent(vendorEntity), cancellationToken);
+
             return new VendorModel
             {
                 Id = vendorEntity.Id,
@@ -148,7 +155,16 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
             }
 
+            var vendor = await _dbContext.Vendors.AsNoTracking()
+                .FirstOrDefaultAsync(v => v.Id == vendorId, cancellationToken);
+
             await _dbContext.Vendors.Where(q => q.Id == vendorId).ExecuteDeleteAsync(cancellationToken);
+
+            if (vendor != null)
+            {
+                _createAuditEventCommand.Execute(
+                    vendor.Id.ToString(), Helper.DeleteVendorAuditEvent(vendor), cancellationToken);
+            }
         }
 
         public async Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default)
@@ -187,12 +203,23 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 throw new InvalidOperationException($"Vendor with ID '{id}' does not exist.");
             }
             
+            string? previousName = existingVendor.Name;
+            string? previousSigningKeySecretId = existingVendor.Authentication?.SigningKeySecretId;
+
             existingVendor.Name = vendor.Name ?? existingVendor.Name;
 
             existingVendor.Authentication = vendor.Authentication ?? existingVendor.Authentication;
 
             _dbContext.Vendors.Update(existingVendor);
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            AuditEventMessage? auditEvent =
+                Helper.UpdateVendorAuditEvent(existingVendor, previousName, previousSigningKeySecretId);
+            if (auditEvent != null)
+            {
+                _createAuditEventCommand.Execute(existingVendor.Id.ToString(), auditEvent, cancellationToken);
+            }
+
             return new VendorModel
             {
                 Id = existingVendor.Id,
