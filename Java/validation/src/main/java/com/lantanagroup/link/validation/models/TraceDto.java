@@ -21,5 +21,6 @@ public class TraceDto {
     private OffsetDateTime completedAt;
     private long durationMs;
     private Map<String, Long> checkDurationsMs;
+    private Long checkWorkMs;
     private String validatorVersion;
 }

@@ -30,6 +30,9 @@ public class ResultEnvelopeAssembler {
 
         long durationMs = completedAt.toInstant().toEpochMilli() - ctx.getRequestedAt().toInstant().toEpochMilli();
 
+        long checkWorkMs = checkDurationsMs == null ? 0L
+                : checkDurationsMs.values().stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+
         ScoreCardDto score = scoreAggregator.aggregate(raw);
 
         SummaryDto summary = SummaryDto.builder()
@@ -84,6 +87,7 @@ public class ResultEnvelopeAssembler {
                         .completedAt(completedAt)
                         .durationMs(durationMs)
                         .checkDurationsMs(checkDurationsMs)
+                        .checkWorkMs(checkWorkMs)
                         .validatorVersion("vaas-0.2.0")
                         .build())
                 .build();
