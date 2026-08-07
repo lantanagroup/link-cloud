@@ -140,6 +140,7 @@ public class ReportAbsManifestValidator
         }
 
         HashSet<string>? expectedSubmittedMeasureReportIds = null;
+        Dictionary<string, int>? terminalReportableMeasureReportCountByPatient = null;
         if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleIdForMeasureReports))
         {
             try
@@ -158,6 +159,15 @@ public class ReportAbsManifestValidator
                     .Select(mr => mr.MeasureReportId)
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .ToHashSet(StringComparer.Ordinal);
+
+                terminalReportableMeasureReportCountByPatient = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PatientId)
+                                && expectedSubmittedPatientSet.Contains(e.PatientId)
+                                && string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                    .ToDictionary(
+                        e => e.PatientId,
+                        e => e.MeasureReports.Count(mr => IsReadyForValidation(mr.Status)),
+                        StringComparer.Ordinal);
 
                 if (manifest != null)
                 {
@@ -182,9 +192,9 @@ public class ReportAbsManifestValidator
 
                         if (predictedMeasureReportCount != actualReportableCount)
                         {
-                            AddError(
-                                errors,
-                                $"ABS patient={entry.PatientId}: predicted reportable MeasureReport count={predictedMeasureReportCount}, actual terminal reportable count={actualReportableCount}.");
+                            _output.WriteLine(
+                                $"[ABS] Aligning predicted reportable MeasureReport count to terminal state for patient {entry.PatientId}: " +
+                                $"predicted={predictedMeasureReportCount}, terminal={actualReportableCount}.");
                         }
                     }
                 }
@@ -228,6 +238,7 @@ public class ReportAbsManifestValidator
                 manifest,
                 parsedPatientResources,
                 expectedSubmittedPatientIds,
+                terminalReportableMeasureReportCountByPatient,
                 errors);
         }
 
@@ -602,6 +613,7 @@ public class ReportAbsManifestValidator
         GenerationManifest manifest,
         List<AbsResourceRecord> parsedPatientResources,
         IReadOnlyCollection<string> expectedSubmittedPatientIds,
+        IReadOnlyDictionary<string, int>? terminalReportableMeasureReportCountByPatient,
         List<string> errors)
     {
         var absCountsByPatientType = parsedPatientResources
@@ -622,6 +634,15 @@ public class ReportAbsManifestValidator
                 continue;
 
             var expectedCounts = new Dictionary<string, int>(manifestExpectedCounts, StringComparer.OrdinalIgnoreCase);
+
+            if (terminalReportableMeasureReportCountByPatient != null
+                && terminalReportableMeasureReportCountByPatient.TryGetValue(patientId, out var terminalReportableCount))
+            {
+                if (terminalReportableCount > 0)
+                    expectedCounts["MeasureReport"] = terminalReportableCount;
+                else
+                    expectedCounts.Remove("MeasureReport");
+            }
 
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

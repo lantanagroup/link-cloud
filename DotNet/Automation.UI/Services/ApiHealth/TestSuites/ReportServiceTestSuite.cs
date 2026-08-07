@@ -268,12 +268,9 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
         results.Add(await RunStepAsync(StepNames.ResourcesBySchedulePatient400BadGuid, 400, async () =>
             await _client.GetResourcesByScheduleAndPatientAsync("not-a-valid-guid", fakePatientId, ct), ct: ct));
 
-        await AddSeededOrSkipAsync(
-            seededPatientId != null,
+        results.Add(SkipStepAsync(
             StepNames.ResourcesByPatient200HasData,
-            200,
-            () => _client.GetResourcesByPatientAsync(seededPatientId!, ct),
-            seededDataUnavailableReason);
+            "ReportResource rows are no longer populated, so this endpoint cannot be validated against seeded data."));
 
         await AddSeededOrSkipAsync(
             scheduleFacilityId != null && scheduleId != null,
