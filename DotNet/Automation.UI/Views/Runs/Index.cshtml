@@ -836,7 +836,7 @@
         var url = quickLaunchMetadataUrl + '?id=' + encodeURIComponent(id);
 
         fetch(url)
-             then(function (response) {
+            .then(function (response) {
                 if (!response.ok) {
                     throw new Error(
                         'Unable to reload saved scenario metadata. HTTP ' +
