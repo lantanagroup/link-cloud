@@ -20,6 +20,9 @@ public class ScoreAggregator {
             byDim.put(d, RubricResultStatus.ACCEPTABLE);
         }
         for (RawFinding f : findings) {
+            if (f.getDimension() == null) {
+                continue;
+            }
             RubricResultStatus current = byDim.get(f.getDimension());
             byDim.put(f.getDimension(), upgrade(current, f.getSeverity()));
         }

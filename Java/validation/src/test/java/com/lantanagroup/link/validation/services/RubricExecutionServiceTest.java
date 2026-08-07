@@ -49,9 +49,11 @@ class RubricExecutionServiceTest {
     private final FhirContext fhirContext = FhirContext.forR4();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Sequential mode (parallel=false), so the pool is never touched — a synchronous executor suffices.
     private final RubricExecutionService service = new RubricExecutionService(
             resolver, checkRepository, versionRepository, registry, assembler,
-            resultPersister, fhirContext, objectMapper);
+            resultPersister, fhirContext, objectMapper,
+            Runnable::run, false);
 
     private final UUID versionId = UUID.randomUUID();
     private final RubricVersion version = RubricVersion.builder()
@@ -183,5 +185,3 @@ class RubricExecutionServiceTest {
         assertThat(captor.getValue()).allSatisfy(f -> assertThat(f.getCheckId()).isEqualTo(c.getCheckId()));
     }
 }
-
-

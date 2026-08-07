@@ -5,6 +5,7 @@ import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.rest.client.api.IRestfulClientFactory;
 import ca.uhn.fhir.validation.FhirValidator;
+import com.lantanagroup.link.validation.services.execution.ThreadLocalFhirPath;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
@@ -55,10 +56,13 @@ public class FhirConfig {
     /**
      * FHIRPath engine used by custom checks (e.g. {@code future-date}, {@code numeric-range}) to
      * evaluate FHIRPath expressions against resources. Derived from the shared {@link FhirContext}.
+     *
+     * <p>FHIRPath is evaluated concurrently by the rubric check pool, and HAPI's engine is not safe to
+     * share across threads, so hand each thread its own.
      */
     @Bean
     public IFhirPath fhirPath(FhirContext fhirContext) {
-        return fhirContext.newFhirPath();
+        return new ThreadLocalFhirPath(fhirContext);
     }
 
     /**
