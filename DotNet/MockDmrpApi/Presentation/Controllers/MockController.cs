@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
 /// </para>
 /// </remarks>
 [ApiController]
-[Route("mock")]
+[Route("api/mock-dmrp")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [Produces("application/json")]
 public class MockController : ControllerBase
@@ -54,7 +54,7 @@ public class MockController : ControllerBase
     // ------------------------------------------------------------------ reads
 
     /// <summary>Gets one entry by identifier.</summary>
-    [HttpGet("{id}")]
+    [HttpGet("entries/{id}")]
     [ProducesResponseType(typeof(MockEntryModel), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -78,14 +78,15 @@ public class MockController : ControllerBase
     /// <remarks>
     /// 404 rather than 204 because the facility is named in the path. An identifier in a URL
     /// that matches nothing is an absent resource, not an empty collection —
-    /// <c>/mock/search</c> takes its filters as query parameters and does answer 204.
+    /// <c>/api/mock-dmrp/entries/search</c> takes its filters as query parameters and does
+    /// answer 204.
     /// <para>
     /// This service keeps no facility registry, so "a facility with no entries" and "a
     /// facility that does not exist" are the same observation. The 404 makes no claim beyond
     /// the one it can support: nothing is stored under that identifier.
     /// </para>
     /// </remarks>
-    [HttpGet("facilities/{facilityId}")]
+    [HttpGet("facilities/{facilityId}/entries")]
     [ProducesResponseType(typeof(MockEntryPage), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -124,7 +125,7 @@ public class MockController : ControllerBase
     /// path — the filters are query parameters, so "no matches" is an empty result set rather
     /// than an absent resource.
     /// </remarks>
-    [HttpGet("search")]
+    [HttpGet("entries/search")]
     [ProducesResponseType(typeof(MockEntryPage), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -168,7 +169,7 @@ public class MockController : ControllerBase
     // ----------------------------------------------------------------- writes
 
     /// <summary>Creates an entry.</summary>
-    [HttpPost]
+    [HttpPost("entries")]
     [ProducesResponseType(typeof(MockEntryModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -196,7 +197,7 @@ public class MockController : ControllerBase
     }
 
     /// <summary>Updates an existing entry. Never creates one.</summary>
-    [HttpPut("{id}")]
+    [HttpPut("entries/{id}")]
     [ProducesResponseType(typeof(MockEntryModel), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -249,7 +250,7 @@ public class MockController : ControllerBase
     // ---------------------------------------------------------------- deletes
 
     /// <summary>Deletes one entry.</summary>
-    [HttpDelete("{id}")]
+    [HttpDelete("entries/{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -265,7 +266,7 @@ public class MockController : ControllerBase
     }
 
     /// <summary>Deletes a facility's entries. Idempotent.</summary>
-    [HttpDelete("facilities/{facilityId}")]
+    [HttpDelete("facilities/{facilityId}/entries")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteByFacility(string facilityId, CancellationToken cancellationToken = default)
@@ -281,7 +282,7 @@ public class MockController : ControllerBase
     }
 
     /// <summary>Deletes every entry.</summary>
-    [HttpDelete]
+    [HttpDelete("entries")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAll(CancellationToken cancellationToken = default)
     {
@@ -311,7 +312,7 @@ public class MockController : ControllerBase
     /// is written, and the body is the state now in force.
     /// </para>
     /// <para>
-    /// The delay never reaches <c>/mock</c>, so this endpoint and its counterparts stay
+    /// The delay never reaches <c>/api</c>, so this endpoint and its counterparts stay
     /// responsive no matter how long a delay is configured.
     /// </para>
     /// </remarks>

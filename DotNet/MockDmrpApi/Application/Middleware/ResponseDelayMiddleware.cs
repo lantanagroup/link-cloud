@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 /// <b>The delay applies to the contract surface only.</b> That is not a detail -- it is what
 /// keeps the feature from being a trap:
 /// <list type="bullet">
-/// <item>Delaying <c>/mock</c> would mean a five-minute delay takes five minutes to turn off,
+/// <item>Delaying <c>/api/mock-dmrp</c> would mean a five-minute delay takes five minutes to turn off,
 /// because the endpoint that clears it would be delayed too. The escape hatch has to stay
 /// fast.</item>
 /// <item>Delaying <c>/health</c> would push the container past its probe timeout and get it
@@ -29,9 +29,12 @@ public class ResponseDelayMiddleware
 {
     /// <summary>
     /// Path prefixes that are never delayed: our support surface, and the operational
-    /// endpoints a delay must not be able to take down.
+    /// endpoints a delay must not be able to take down. "/api" covers the whole support
+    /// surface, including the endpoints that clear the delay -- a delay must never be able
+    /// to make itself unremovable. What is left delayed is the contract surface at the
+    /// root, which is the only thing worth delaying.
     /// </summary>
-    private static readonly string[] NeverDelayed = ["/mock", "/health", "/api", "/swagger"];
+    private static readonly string[] NeverDelayed = ["/health", "/api", "/swagger"];
 
     private readonly RequestDelegate _next;
 

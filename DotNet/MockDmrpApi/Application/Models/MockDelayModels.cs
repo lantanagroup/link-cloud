@@ -45,7 +45,7 @@ public class MockDelayModel
             IsActive = delay.IsActive,
             ConfiguredOn = delay.ConfiguredOn,
             AppliesTo = "The contract endpoints only (GET /msc, GET /ps/annual). "
-                        + "/mock, /health and /api are never delayed."
+                        + "/api, /health and /swagger are never delayed."
         };
     }
 }

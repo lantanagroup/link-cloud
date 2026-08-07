@@ -26,8 +26,8 @@ public class ReportingPlanEntryMap : IEntityTypeConfiguration<ReportingPlanEntry
         builder.Property(e => e.ReportingMonth);
 
         // One composite index does three jobs:
-        //   * GET /mock/facilities/{facilityId}  -- seek on the leading column
-        //   * GET /msc and GET /ps/annual        -- seek on the leading columns
+        //   * GET /api/mock-dmrp/facilities/{facilityId}/entries  -- seek on the leading column
+        //   * GET /msc and GET /ps/annual                         -- seek on the leading columns
         //   * natural-key uniqueness
         //
         // Column order is (FacilityId, Component, Year, Month, Measure) rather than the

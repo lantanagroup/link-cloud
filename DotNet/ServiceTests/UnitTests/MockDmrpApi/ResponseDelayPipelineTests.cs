@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -185,9 +185,9 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
         // five minutes, so the margin between passing and failing is enormous.
         _delays.Set(ResponseDelay.MaxMilliseconds);
 
-        await ElapsedAsync(() => _client.GetAsync("/mock/delay"));
+        await ElapsedAsync(() => _client.GetAsync("/api/mock-dmrp/delay"));
 
-        var cleared = await _client.DeleteAsync("/mock/delay").WaitAsync(NotDelayedBudget);
+        var cleared = await _client.DeleteAsync("/api/mock-dmrp/delay").WaitAsync(NotDelayedBudget);
         cleared.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         _delays.Current.IsActive.Should().BeFalse();
@@ -200,7 +200,7 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
         // the scenario it wants to observe timing out.
         _delays.Set(ResponseDelay.MaxMilliseconds);
 
-        await ElapsedAsync(() => _client.GetAsync("/mock/search"));
+        await ElapsedAsync(() => _client.GetAsync("/api/mock-dmrp/entries/search"));
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     public async Task ClearingTheDelay_RestoresNormalResponseTime()
     {
         _delays.Set(ResponseDelay.MaxMilliseconds);
-        await _client.DeleteAsync("/mock/delay");
+        await _client.DeleteAsync("/api/mock-dmrp/delay");
 
         var elapsed = await ElapsedAsync(GetPlanAsync);
 
@@ -269,7 +269,7 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     [Fact]
     public async Task GetDelay_ReportsNoDelayByDefault()
     {
-        var response = await _client.GetAsync("/mock/delay");
+        var response = await _client.GetAsync("/api/mock-dmrp/delay");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var model = await response.Content.ReadFromJsonAsync<MockDelayModel>();
@@ -282,7 +282,7 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     [Fact]
     public async Task SetDelay_Returns200WithTheStateNowInForce()
     {
-        var response = await _client.PutAsJsonAsync("/mock/delay", new { milliseconds = 4_000 });
+        var response = await _client.PutAsJsonAsync("/api/mock-dmrp/delay", new { milliseconds = 4_000 });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var model = await response.Content.ReadFromJsonAsync<MockDelayModel>();
@@ -290,16 +290,16 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
         model.IsActive.Should().BeTrue();
         model.ConfiguredOn.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
 
-        var read = await (await _client.GetAsync("/mock/delay")).Content.ReadFromJsonAsync<MockDelayModel>();
+        var read = await (await _client.GetAsync("/api/mock-dmrp/delay")).Content.ReadFromJsonAsync<MockDelayModel>();
         read!.Milliseconds.Should().Be(4_000);
     }
 
     [Fact]
     public async Task SetDelayToZero_TurnsItOff()
     {
-        await _client.PutAsJsonAsync("/mock/delay", new { milliseconds = 4_000 });
+        await _client.PutAsJsonAsync("/api/mock-dmrp/delay", new { milliseconds = 4_000 });
 
-        var response = await _client.PutAsJsonAsync("/mock/delay", new { milliseconds = 0 });
+        var response = await _client.PutAsJsonAsync("/api/mock-dmrp/delay", new { milliseconds = 0 });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var model = await response.Content.ReadFromJsonAsync<MockDelayModel>();
@@ -311,7 +311,7 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     [InlineData(ResponseDelay.MaxMilliseconds + 1)]
     public async Task SetDelay_OutsideTheAllowedRange_Returns400(int milliseconds)
     {
-        var response = await _client.PutAsJsonAsync("/mock/delay", new { milliseconds });
+        var response = await _client.PutAsJsonAsync("/api/mock-dmrp/delay", new { milliseconds });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         _delays.Current.IsActive.Should().BeFalse("a rejected value must not take effect");
@@ -322,15 +322,15 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     {
         _delays.Set(5_000);
 
-        (await _client.DeleteAsync("/mock/delay")).StatusCode.Should().Be(HttpStatusCode.NoContent);
-        (await _client.DeleteAsync("/mock/delay")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await _client.DeleteAsync("/api/mock-dmrp/delay")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await _client.DeleteAsync("/api/mock-dmrp/delay")).StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]
     public async Task TheDelayRouteIsNotReadAsAnEntryIdentifier()
     {
-        // /mock/{id} would otherwise swallow it and answer "Invalid Id format".
-        var response = await _client.GetAsync("/mock/delay");
+        // /api/mock-dmrp/entries/{id} would otherwise swallow it and answer "Invalid Id format".
+        var response = await _client.GetAsync("/api/mock-dmrp/delay");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).Should().NotContain("Invalid Id format");

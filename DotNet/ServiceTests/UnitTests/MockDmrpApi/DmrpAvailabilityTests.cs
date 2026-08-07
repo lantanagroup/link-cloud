@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -107,11 +107,15 @@ public class DmrpAvailabilityTests
     }
 
     [Theory]
-    [InlineData("/dmrp/mock")]
-    [InlineData("/dmrp/mock/search")]
-    [InlineData("/dmrp/mock/reporting-plans")]
-    [InlineData("/dmrp/mock/oauth2/token")]
-    [InlineData("/dmrp/mock/auth-test")]
+    [InlineData("/msc")]
+    [InlineData("/ps/annual")]
+    // These four share the /api/mock-dmrp prefix with the info endpoint above and must
+    // still be blocked -- only .../info is exempt, not the whole support surface.
+    [InlineData("/api/mock-dmrp")]
+    [InlineData("/api/mock-dmrp/entries")]
+    [InlineData("/api/mock-dmrp/entries/search")]
+    [InlineData("/api/mock-dmrp/oauth2/token")]
+    [InlineData("/api/mock-dmrp/delay")]
     [InlineData("/swagger")]
     [InlineData("/healthy-looking-but-not-health")]
     public void IsAlwaysAvailable_DoesNotCoverTheApiSurface(string path)

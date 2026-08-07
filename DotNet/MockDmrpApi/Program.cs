@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
@@ -41,8 +41,9 @@ builder.Services.AddSingleton<IAuthTokenService, AuthTokenService>();
 // not persisted -- a restart clears it.
 builder.Services.AddSingleton<IResponseDelayService, ResponseDelayService>();
 
-// Link's own authentication, guarding the support surface at /mock. The contract endpoints
-// take the third party's token instead and opt out with [AllowAnonymous]; see DmrpController.
+// Link's own authentication, guarding the support surface at /api/mock-dmrp. The contract
+// endpoints take the third party's token instead and opt out with [AllowAnonymous]; see
+// DmrpController.
 var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
 builder.Services.AddLinkBearerServiceAuthentication(options =>
 {
@@ -116,11 +117,11 @@ else
 
 // Reflected from the controllers, so it shows both surfaces as this service hosts them.
 // It is NOT the contract: Contracts/dmrp-openapi.yaml describes only the two third-party
-// endpoints, and says nothing about the support surface at /mock.
+// endpoints, and says nothing about the support surface at /api/mock-dmrp.
 app.ConfigureSwagger();
 
-// Guards /mock. The contract endpoints opt out with [AllowAnonymous] and check the third
-// party's token themselves, so this scheme never sees them.
+// Guards /api/mock-dmrp. The contract endpoints opt out with [AllowAnonymous] and check the
+// third party's token themselves, so this scheme never sees them.
 if (!allowAnonymousAccess)
 {
     app.UseAuthentication();

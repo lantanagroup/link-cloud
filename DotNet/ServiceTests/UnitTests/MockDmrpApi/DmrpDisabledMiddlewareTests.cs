@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
@@ -65,10 +65,10 @@ public class DmrpDisabledMiddlewareTests
     {
         using var host = await StartHostAsync("Development", "true");
 
-        var response = await host.GetTestClient().GetAsync("/dmrp/mock/search");
+        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).Should().Be("reached:/dmrp/mock/search");
+        (await response.Content.ReadAsStringAsync()).Should().Be("reached:/api/mock-dmrp/entries/search");
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class DmrpDisabledMiddlewareTests
     {
         using var host = await StartHostAsync("Development", "false");
 
-        var response = await host.GetTestClient().GetAsync("/dmrp/mock/search");
+        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
@@ -90,7 +90,7 @@ public class DmrpDisabledMiddlewareTests
     {
         using var host = await StartHostAsync("Development", "false");
 
-        var response = await host.GetTestClient().GetAsync("/dmrp/mock/search");
+        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
 
@@ -99,7 +99,7 @@ public class DmrpDisabledMiddlewareTests
 
         root.GetProperty("status").GetInt32().Should().Be(503);
         root.GetProperty("title").GetString().Should().Contain("disabled");
-        root.GetProperty("instance").GetString().Should().Be("/dmrp/mock/search");
+        root.GetProperty("instance").GetString().Should().Be("/api/mock-dmrp/entries/search");
         root.TryGetProperty("traceId", out var traceId).Should().BeTrue();
         traceId.GetString().Should().NotBeNullOrWhiteSpace();
     }
@@ -126,7 +126,7 @@ public class DmrpDisabledMiddlewareTests
         // -- App Configuration does -- cannot turn the mock on.
         using var host = await StartHostAsync("Production", "true");
 
-        var response = await host.GetTestClient().GetAsync("/dmrp/mock/search");
+        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         (await response.Content.ReadAsStringAsync()).Should().NotContain("reached:");
@@ -147,7 +147,7 @@ public class DmrpDisabledMiddlewareTests
     {
         using var host = await StartHostAsync("Development", enabled: null);
 
-        var response = await host.GetTestClient().GetAsync("/dmrp/mock/search");
+        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }

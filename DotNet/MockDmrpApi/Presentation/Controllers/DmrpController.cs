@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
 /// </para>
 /// <para>
 /// Authentication here is the <em>third party's</em>, not Link's. The bearer token is one
-/// issued by <c>POST /mock/oauth2/token</c>, which stands in for the reporting system's
+/// issued by <c>POST /api/mock-dmrp/oauth2/token</c>, which stands in for the reporting system's
 /// authorization server. Link's own authentication guards the support surface instead.
 /// </para>
 /// </remarks>

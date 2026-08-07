@@ -1,4 +1,4 @@
-# MockDmrpApi
+﻿# MockDmrpApi
 
 > **The contract in this project is provisional.** DMRP (Digital Monthly Reporting Plan) is
 > being developed by **Leidos for CDC**, and no OpenAPI description has been published to
@@ -29,7 +29,7 @@ mistake most likely to waste someone's week.
 
 | | **Contract surface** | **Support surface** |
 |---|---|---|
-| Routes | `GET /msc`, `GET /ps/annual` | everything under `/mock` |
+| Routes | `GET /msc`, `GET /ps/annual` | everything under `/api/mock-dmrp` |
 | Whose API is it? | The third party's | Ours |
 | In `Contracts/dmrp-openapi.yaml`? | Yes — it describes *only* these | No, deliberately |
 | Authentication | The third party's bearer token | **Link's standard scheme** |
@@ -138,7 +138,7 @@ This is the part worth reading before changing anything.
 
 `Contracts/dmrp-openapi.yaml` describes **the two contract endpoints and nothing else**. It
 uses production operation names; the words "test" and "mock" appear nowhere in it. The support
-surface at `/mock` is hand-written and deliberately absent from it (§1.1).
+surface at `/api/mock-dmrp` is hand-written and deliberately absent from it (§1.1).
 
 The server URL carries **no path component**:
 
@@ -152,7 +152,7 @@ root. `DmrpController` therefore declares **no `[Route]` of its own** — routin
 from the generated base. Repointing a consumer at another instance, or eventually at real
 DMRP, is a change to that one server URL and nothing else.
 
-That is the point of putting the contract endpoints at the root and our own under `/mock`:
+That is the point of putting the contract endpoints at the root and our own under `/api/mock-dmrp`:
 the base URL is the only thing that has to change, because none of our paths would come with
 it. `TheContractEndpointsSitAtTheRootWithNoPrefix` in `DmrpControllerTests` pins it.
 
@@ -283,7 +283,7 @@ spec — those belong on `MockController`.
 
 ### Contract surface — in the spec, this is DMRP
 
-Authenticated with the **third party's** bearer token, from `POST /mock/oauth2/token`.
+Authenticated with the **third party's** bearer token, from `POST /api/mock-dmrp/oauth2/token`.
 
 | Route | Purpose |
 |---|---|
@@ -303,18 +303,18 @@ Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
 
 | Route | Purpose |
 |---|---|
-| `POST /mock/oauth2/token` | Issues the third-party token the contract surface accepts |
-| `POST /mock` | Create an entry → `201` + `Location` |
-| `GET /mock/{id}` | One entry. `400` on a non-GUID, `404` if absent |
-| `PUT /mock/{id}` | Update → `202`. **Never creates**; `404` if absent |
-| `GET /mock/facilities/{facilityId}` | A facility's entries across both components, paged. `404` when it has none |
-| `GET /mock/search` | Filtered search, paged. `204` when none |
-| `DELETE /mock/{id}` | `204`, or `404` if absent |
-| `DELETE /mock/facilities/{facilityId}` | Idempotent `204` |
-| `DELETE /mock` | Removes **every** entry. No confirmation step |
-| `GET /mock/delay` | The artificial delay currently in force |
-| `PUT /mock/delay` | Sets an artificial delay on the contract endpoints. See §4.3 |
-| `DELETE /mock/delay` | Removes it. Idempotent |
+| `POST /api/mock-dmrp/oauth2/token` | Issues the third-party token the contract surface accepts |
+| `POST /api/mock-dmrp/entries` | Create an entry → `201` + `Location` |
+| `GET /api/mock-dmrp/entries/{id}` | One entry. `400` on a non-GUID, `404` if absent |
+| `PUT /api/mock-dmrp/entries/{id}` | Update → `202`. **Never creates**; `404` if absent |
+| `GET /api/mock-dmrp/facilities/{facilityId}/entries` | A facility's entries across both components, paged. `404` when it has none |
+| `GET /api/mock-dmrp/entries/search` | Filtered search, paged. `204` when none |
+| `DELETE /api/mock-dmrp/entries/{id}` | `204`, or `404` if absent |
+| `DELETE /api/mock-dmrp/facilities/{facilityId}/entries` | Idempotent `204` |
+| `DELETE /api/mock-dmrp/entries` | Removes **every** entry. No confirmation step |
+| `GET /api/mock-dmrp/delay` | The artificial delay currently in force |
+| `PUT /api/mock-dmrp/delay` | Sets an artificial delay on the contract endpoints. See §4.3 |
+| `DELETE /api/mock-dmrp/delay` | Removes it. Idempotent |
 
 ### Unauthenticated
 
@@ -357,9 +357,9 @@ The caller concludes "not enrolled in HTCDI" from its absence. `reporting` is on
 
 A facility enrolled in nothing returns **`200` with `"plans": []`** — not `204`, not `404`
 — because an empty plan is a meaningful answer rather than an absent resource. This
-deliberately differs from `/mock/search`, which returns `204` when nothing matches.
+deliberately differs from `/api/mock-dmrp/entries/search`, which returns `204` when nothing matches.
 
-`GET /mock/facilities/{id}` returns **`404`**, not `204`. The distinction is where the
+`GET /api/mock-dmrp/facilities/{id}/entries` returns **`404`**, not `204`. The distinction is where the
 identifier sits: a facility named in the path that matches nothing is an absent resource,
 while a search whose query-parameter filters match nothing is an empty result set. This
 service keeps no facility registry, so "a facility with no entries" and "a facility that does
@@ -410,19 +410,19 @@ A caller's timeout and retry path only gets exercised against an upstream that i
 slow, so the service can be told to hold contract requests:
 
 ```bash
-curl -X PUT $B/mock/delay -H 'Content-Type: application/json' -d '{"milliseconds":5000}'
-curl $B/mock/delay          # what is in force
-curl -X DELETE $B/mock/delay
+curl -X PUT $B/api/mock-dmrp/delay -H 'Content-Type: application/json' -d '{"milliseconds":5000}'
+curl $B/api/mock-dmrp/delay          # what is in force
+curl -X DELETE $B/api/mock-dmrp/delay
 ```
 
 **In memory, never persisted.** A restart always returns the service to answering immediately.
 That is deliberate: the delay describes what a test is doing right now, not how the service is
 configured, so a forgotten delay must not outlive the run that set it.
 
-⚠️ **The delay reaches the contract endpoints only.** `/mock`, `/health` and `/api` are never
+⚠️ **The delay reaches the contract endpoints only.** `/api`, `/health` and `/swagger` are never
 delayed, and that scoping is load-bearing rather than tidy:
 
-- If `/mock` were delayed, turning a five-minute delay off would take five minutes, because
+- If `/api/mock-dmrp` were delayed, turning a five-minute delay off would take five minutes, because
   the endpoint that clears it would be delayed too. The escape hatch has to stay fast.
 - If `/health` were delayed, the container would miss its probe timeout and be restarted —
   which reads as an outage rather than a test in progress.
@@ -454,18 +454,18 @@ With the service running (see §7):
 B=http://localhost:6159
 
 # Start clean
-curl -X DELETE $B/mock
+curl -X DELETE $B/api/mock-dmrp/entries
 
 # Enrol facility 100 in HOB for February 2020 -- monthly, so a month is required
-curl -X POST $B/mock -H 'Content-Type: application/json' \
+curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
   -d '{"facilityId":"100","component":"MSC","measure":"HOB","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
 # ...and in HAI for 2020 -- annual, so a month must be omitted
-curl -X POST $B/mock -H 'Content-Type: application/json' \
+curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
   -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingYear":2020,"isReporting":"Y"}'
 
 # Acquire a third-party token
-TOKEN=$(curl -s -X POST $B/mock/oauth2/token -H 'Content-Type: application/json' \
+TOKEN=$(curl -s -X POST $B/api/mock-dmrp/oauth2/token -H 'Content-Type: application/json' \
   -d '{"grant_type":"client_credentials","client_id":"link-cloud-dev","client_secret":"link-cloud-dev-secret","scope":"dmrp.read"}' \
   | jq -r .access_token)
 
@@ -477,7 +477,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?nhsnorgid=100&year=2020"
 curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100" | jq
 ```
 
-Against a deployed instance the `/mock` calls also need a Link bearer token; locally
+Against a deployed instance the `/api/mock-dmrp` calls also need a Link bearer token; locally
 docker-compose sets `Authentication:EnableAnonymousAccess`, as it does for every Link service
 (§6).
 
@@ -538,7 +538,7 @@ in `app-config.yaml`: `Authentication:EnableAnonymousAccess`,
 other service in the local stack — only `admin-bff` and `automation-ui` carry Link token
 config in docker-compose, so enforcing it here would make seeding locally require a token
 nothing in the stack conveniently issues. It is unset elsewhere, so deployed environments
-enforce. The `401` behaviour of every `/mock` endpoint is covered by `MockControllerTests`
+enforce. The `401` behaviour of every `/api/mock-dmrp` endpoint is covered by `MockControllerTests`
 rather than by the local stack.
 
 ⚠️ **`SigningKey` must be the same value on every replica.** Tokens are validated by the same
@@ -585,7 +585,7 @@ naming the service; it is otherwise off outside Development.
 
 Two things worth knowing:
 
-- **`POST /mock/oauth2/token` is the one exception.** It answers with the OAuth 2.0 error shape
+- **`POST /api/mock-dmrp/oauth2/token` is the one exception.** It answers with the OAuth 2.0 error shape
   (`{"error": "invalid_client", …}`) rather than problem details, because it stands in for an
   authorization server and client libraries parse those codes.
 - **This applies to the contract endpoints too.** The real DMRP API has not been observed to
@@ -599,8 +599,8 @@ They are separate on purpose, mirroring the real topology.
 
 | | Guards | Scheme |
 |---|---|---|
-| **Link's** | the support surface at `/mock` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
-| **The third party's** | `GET /msc`, `GET /ps/annual` | HS512 JWT minted by `POST /mock/oauth2/token`, validated by `AuthTokenService` |
+| **Link's** | the support surface at `/api/mock-dmrp` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
+| **The third party's** | `GET /msc`, `GET /ps/annual` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
 
 `DmrpController` carries `[AllowAnonymous]` so Link's middleware never sees it, and checks the
 third-party token itself. That is not a hole: those endpoints impersonate an external service,
@@ -662,7 +662,7 @@ pointing schema changes at a server.
 
 `/swagger` is available when `EnableSwagger` is true. It is a Swashbuckle-reflected document
 generated from the controllers, so it shows **both** surfaces — including everything under
-`/mock`, which is not part of DMRP at all. `Contracts/dmrp-openapi.yaml` is the actual
+`/api/mock-dmrp`, which is not part of DMRP at all. `Contracts/dmrp-openapi.yaml` is the actual
 contract, and it describes only the two endpoints in §3. **Read the yaml, not the Swagger
 page**, when you need the contract; the Swagger page is useful for exercising the support
 surface.

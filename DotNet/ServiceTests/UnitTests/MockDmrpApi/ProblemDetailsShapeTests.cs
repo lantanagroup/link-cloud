@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -179,7 +179,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     [Fact]
     public async Task MalformedId_IsAWellFormedProblem()
     {
-        var problem = await ProblemAsync(await _client.GetAsync("/mock/not-a-guid"));
+        var problem = await ProblemAsync(await _client.GetAsync("/api/mock-dmrp/entries/not-a-guid"));
 
         ShouldBeAWellFormedProblem(problem, 400, "Invalid Id");
         problem.GetProperty("detail").GetString().Should().Contain("Invalid Id format");
@@ -190,7 +190,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     {
         var id = "11111111-1111-1111-1111-111111111111";
 
-        var problem = await ProblemAsync(await _client.GetAsync($"/mock/{id}"));
+        var problem = await ProblemAsync(await _client.GetAsync($"/api/mock-dmrp/entries/{id}"));
 
         ShouldBeAWellFormedProblem(problem, 404, "Entry Not Found");
         problem.GetProperty("detail").GetString().Should().Contain(id,
@@ -202,7 +202,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     {
         var id = "11111111-1111-1111-1111-111111111111";
 
-        var response = await _client.PutAsJsonAsync($"/mock/{id}", new
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{id}", new
         {
             id,
             facilityId = "100",
@@ -225,7 +225,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     {
         Seed();
 
-        var problem = await ProblemAsync(await _client.PostAsJsonAsync("/mock", Body()));
+        var problem = await ProblemAsync(await _client.PostAsJsonAsync("/api/mock-dmrp/entries", Body()));
 
         ShouldBeAWellFormedProblem(problem, 409, "Duplicate Reporting Plan Entry");
     }
@@ -234,7 +234,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     public async Task CadenceViolation_IsAWellFormedBadRequest()
     {
         var problem = await ProblemAsync(
-            await _client.PostAsJsonAsync("/mock", Body(measure: "NOMONTH", month: null)));
+            await _client.PostAsJsonAsync("/api/mock-dmrp/entries", Body(measure: "NOMONTH", month: null)));
 
         ShouldBeAWellFormedProblem(problem, 400, "Invalid Reporting Plan Entry");
         problem.GetProperty("detail").GetString().Should().Contain("monthly");
@@ -244,7 +244,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     public async Task UnknownComponent_IsAWellFormedBadRequest()
     {
         var problem = await ProblemAsync(
-            await _client.PostAsJsonAsync("/mock", Body(component: "XYZ", measure: "BAD")));
+            await _client.PostAsJsonAsync("/api/mock-dmrp/entries", Body(component: "XYZ", measure: "BAD")));
 
         ShouldBeAWellFormedProblem(problem, 400, "Invalid Reporting Plan Entry");
     }
@@ -254,7 +254,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     {
         var seeded = Seed();
 
-        var response = await _client.PutAsJsonAsync($"/mock/{seeded.Id}", new
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{seeded.Id}", new
         {
             id = Guid.NewGuid().ToString(),
             facilityId = "100",
@@ -278,7 +278,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
         //
         // What matters here is that the customization still reaches a validation problem, so
         // it carries a traceId like every other error this service returns.
-        var response = await _client.PutAsJsonAsync("/mock/delay", new { milliseconds = 999_999 });
+        var response = await _client.PutAsJsonAsync("/api/mock-dmrp/delay", new { milliseconds = 999_999 });
 
         var problem = await ProblemAsync(response);
 
@@ -342,7 +342,7 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
         // The one deliberate departure. This operation stands in for an authorization server,
         // and callers parse the documented OAuth codes -- turning it into problem details
         // would break every client library that expects them.
-        var response = await _client.PostAsJsonAsync("/mock/oauth2/token", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
         {
             grant_type = "client_credentials",
             client_id = "problem-test-client",

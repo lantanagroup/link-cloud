@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
@@ -166,7 +166,7 @@ public class DmrpControllerTests : IAsyncLifetime
         // That refusal is the assertion. It holds only while MockController actually
         // carries [Authorize]; drop the attribute and this call quietly succeeds instead,
         // which is precisely the regression worth catching.
-        var act = async () => await _client.DeleteAsync("/mock");
+        var act = async () => await _client.DeleteAsync("/api/mock-dmrp/entries");
 
         (await act.Should().ThrowAsync<InvalidOperationException>())
             .WithMessage("*authorization metadata*");

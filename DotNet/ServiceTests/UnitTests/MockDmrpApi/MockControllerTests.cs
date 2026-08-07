@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -153,18 +153,18 @@ public class MockControllerTests : IAsyncLifetime
     // ---------------------------------------------------------------- guarded
 
     [Theory]
-    [InlineData("GET", "/mock/search")]
-    [InlineData("GET", "/mock/facilities/F1")]
-    [InlineData("GET", "/mock/11111111-1111-1111-1111-111111111111")]
-    [InlineData("POST", "/mock")]
-    [InlineData("POST", "/mock/oauth2/token")]
-    [InlineData("PUT", "/mock/11111111-1111-1111-1111-111111111111")]
-    [InlineData("GET", "/mock/delay")]
-    [InlineData("PUT", "/mock/delay")]
-    [InlineData("DELETE", "/mock/delay")]
-    [InlineData("DELETE", "/mock")]
-    [InlineData("DELETE", "/mock/11111111-1111-1111-1111-111111111111")]
-    [InlineData("DELETE", "/mock/facilities/F1")]
+    [InlineData("GET", "/api/mock-dmrp/entries/search")]
+    [InlineData("GET", "/api/mock-dmrp/facilities/F1/entries")]
+    [InlineData("GET", "/api/mock-dmrp/entries/11111111-1111-1111-1111-111111111111")]
+    [InlineData("POST", "/api/mock-dmrp/entries")]
+    [InlineData("POST", "/api/mock-dmrp/oauth2/token")]
+    [InlineData("PUT", "/api/mock-dmrp/entries/11111111-1111-1111-1111-111111111111")]
+    [InlineData("GET", "/api/mock-dmrp/delay")]
+    [InlineData("PUT", "/api/mock-dmrp/delay")]
+    [InlineData("DELETE", "/api/mock-dmrp/delay")]
+    [InlineData("DELETE", "/api/mock-dmrp/entries")]
+    [InlineData("DELETE", "/api/mock-dmrp/entries/11111111-1111-1111-1111-111111111111")]
+    [InlineData("DELETE", "/api/mock-dmrp/facilities/F1/entries")]
     public async Task EverySupportEndpointRequiresALinkCredential(string method, string url)
     {
         // The surface can seed, mutate and wipe the store, so no operation on it may be
@@ -201,7 +201,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         var seeded = Seed();
 
-        var response = await _client.GetAsync($"/mock/{seeded.Id}");
+        var response = await _client.GetAsync($"/api/mock-dmrp/entries/{seeded.Id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var entry = await response.Content.ReadFromJsonAsync<MockEntryModel>();
@@ -213,7 +213,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetById_WithNonGuid_Returns400InvalidIdFormat()
     {
-        var response = await _client.GetAsync("/mock/not-a-guid");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/not-a-guid");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("Invalid Id format");
@@ -222,7 +222,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetById_WhenAbsent_Returns404()
     {
-        var response = await _client.GetAsync($"/mock/{Guid.NewGuid()}");
+        var response = await _client.GetAsync($"/api/mock-dmrp/entries/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -232,10 +232,10 @@ public class MockControllerTests : IAsyncLifetime
     {
         // /search, /facilities and /oauth2 must not be read as identifiers, which is how
         // they would surface: an "Invalid Id format" for a perfectly good URL.
-        (await _client.GetAsync("/mock/search")).StatusCode
+        (await _client.GetAsync("/api/mock-dmrp/entries/search")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
 
-        var byFacility = await _client.GetAsync("/mock/facilities/F1");
+        var byFacility = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries");
         byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await byFacility.Content.ReadAsStringAsync()).Should().NotContain("Invalid Id format");
     }
@@ -249,7 +249,7 @@ public class MockControllerTests : IAsyncLifetime
         Seed(measure: "HTCDI");
         Seed(facilityId: "F2");
 
-        var populated = await _client.GetAsync("/mock/facilities/F1");
+        var populated = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries");
         populated.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await populated.Content.ReadFromJsonAsync<MockEntryPage>();
         page!.Records.Should().HaveCount(2);
@@ -257,7 +257,7 @@ public class MockControllerTests : IAsyncLifetime
 
         // 404, not 204: the facility is named in the path, so an identifier that matches
         // nothing is an absent resource rather than an empty collection.
-        var empty = await _client.GetAsync("/mock/facilities/NoSuchFacility");
+        var empty = await _client.GetAsync("/api/mock-dmrp/facilities/NoSuchFacility/entries");
         empty.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await empty.Content.ReadAsStringAsync()).Should().Contain("NoSuchFacility",
             "the detail names the facility it looked for");
@@ -271,8 +271,8 @@ public class MockControllerTests : IAsyncLifetime
         // two ever agreed, one of them would be wrong.
         Seed();
 
-        var byFacility = await _client.GetAsync("/mock/facilities/NoSuchFacility");
-        var bySearch = await _client.GetAsync("/mock/search?facilityId=NoSuchFacility");
+        var byFacility = await _client.GetAsync("/api/mock-dmrp/facilities/NoSuchFacility/entries");
+        var bySearch = await _client.GetAsync("/api/mock-dmrp/entries/search?facilityId=NoSuchFacility");
 
         byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
         bySearch.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -285,7 +285,7 @@ public class MockControllerTests : IAsyncLifetime
         Seed(measure: "HOB");
         Seed(measure: "HAI", month: null, component: ReportingComponents.Ps);
 
-        var response = await _client.GetAsync("/mock/facilities/F1");
+        var response = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries");
 
         var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
         page!.Records.Should().HaveCount(2);
@@ -297,7 +297,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed();
 
-        var response = await _client.GetAsync("/mock/search");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
@@ -310,7 +310,7 @@ public class MockControllerTests : IAsyncLifetime
         Seed(measure: "HOB");
         Seed(measure: "HAI", month: null, component: ReportingComponents.Ps);
 
-        var response = await _client.GetAsync("/mock/search?component=PS");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search?component=PS");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
@@ -326,7 +326,7 @@ public class MockControllerTests : IAsyncLifetime
         Seed(facilityId: "F2", measure: "HOB");
 
         var response = await _client.GetAsync(
-            "/mock/search?facilityId=F1&measure=HOB&sortBy=Measure&sortOrder=Ascending");
+            "/api/mock-dmrp/entries/search?facilityId=F1&measure=HOB&sortBy=Measure&sortOrder=Ascending");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
@@ -339,7 +339,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed();
 
-        var response = await _client.GetAsync("/mock/search?measure=NOPE");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search?measure=NOPE");
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -347,7 +347,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Search_WithSortByOutsideTheAllowedSet_Returns400NotAServerError()
     {
-        var response = await _client.GetAsync("/mock/search?sortBy=DropTable");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search?sortBy=DropTable");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -357,7 +357,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_Returns201WithALocationHeaderAndTheCreatedEntry()
     {
-        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody());
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody());
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -365,7 +365,7 @@ public class MockControllerTests : IAsyncLifetime
         created!.Id.Should().NotBeNullOrWhiteSpace();
 
         response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().EndWith($"/mock/{created.Id}");
+        response.Headers.Location!.ToString().Should().EndWith($"/api/mock-dmrp/entries/{created.Id}");
 
         // The Location header must actually resolve.
         var followed = await _client.GetAsync(response.Headers.Location);
@@ -375,7 +375,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_AnnualEntry_OmitsTheMonth()
     {
-        var response = await _client.PostAsJsonAsync("/mock", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             component = "PS",
@@ -395,7 +395,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed();
 
-        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody());
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody());
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         _repository.Entries.Should().ContainSingle();
@@ -408,7 +408,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         // The sanitizer keeps the space character, so without an explicit trim " HOB" would
         // be stored verbatim.
-        var response = await _client.PostAsJsonAsync("/mock", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = " 100 ",
             component = " MSC ",
@@ -434,7 +434,7 @@ public class MockControllerTests : IAsyncLifetime
         // -- no error anywhere, just a short plan. Now the second create is a visible 409.
         Seed(measure: "HOB");
 
-        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody(measure: " HOB "));
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody(measure: " HOB "));
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         _repository.Entries.Should().ContainSingle();
@@ -446,7 +446,7 @@ public class MockControllerTests : IAsyncLifetime
         // Trimming writes without trimming lookups would move the problem rather than fix it.
         Seed(measure: "HOB");
 
-        var response = await _client.GetAsync("/mock/search?measure=%20HOB%20");
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search?measure=%20HOB%20");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
@@ -458,7 +458,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed(facilityId: "100");
 
-        var response = await _client.GetAsync("/mock/facilities/%20100%20");
+        var response = await _client.GetAsync("/api/mock-dmrp/facilities/%20100%20/entries");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -477,7 +477,7 @@ public class MockControllerTests : IAsyncLifetime
         // silently getting 100 has no way to tell that happened.
         Seed();
 
-        var response = await _client.GetAsync($"/mock/search?{filter}");
+        var response = await _client.GetAsync($"/api/mock-dmrp/entries/search?{filter}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -490,7 +490,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed();
 
-        var response = await _client.GetAsync($"/mock/search?{filter}");
+        var response = await _client.GetAsync($"/api/mock-dmrp/entries/search?{filter}");
 
         response.StatusCode.Should().NotBe(HttpStatusCode.BadRequest);
     }
@@ -500,7 +500,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         Seed();
 
-        var response = await _client.GetAsync("/mock/facilities/F1?pageSize=101");
+        var response = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries?pageSize=101");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -508,7 +508,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_WithMonthOutsideTheRange_Returns400()
     {
-        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody(month: 13));
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody(month: 13));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         _repository.Entries.Should().BeEmpty();
@@ -519,7 +519,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         // The rule is conditional on the component, so it cannot be a data annotation. The
         // message has to name the cadence or the caller has no way to know what was wrong.
-        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody(month: null));
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody(month: null));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("monthly");
@@ -529,7 +529,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_AnnualEntryWithAMonth_Returns400ExplainingTheCadence()
     {
-        var response = await _client.PostAsJsonAsync("/mock", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             component = "PS",
@@ -547,7 +547,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_WithAnUnrecognisedComponent_Returns400ListingTheKnownOnes()
     {
-        var response = await _client.PostAsJsonAsync("/mock", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             component = "XYZ",
@@ -566,7 +566,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Create_WithNoComponent_Returns400()
     {
-        var response = await _client.PostAsJsonAsync("/mock", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             measure = "HOB",
@@ -586,7 +586,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         var seeded = Seed();
 
-        var response = await _client.PutAsJsonAsync($"/mock/{seeded.Id}", new
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{seeded.Id}", new
         {
             id = seeded.Id,
             facilityId = "F9",
@@ -608,7 +608,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         var absentId = Guid.NewGuid().ToString();
 
-        var response = await _client.PutAsJsonAsync($"/mock/{absentId}", new
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{absentId}", new
         {
             id = absentId,
             facilityId = "F1",
@@ -628,7 +628,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         var seeded = Seed();
 
-        var response = await _client.PutAsJsonAsync($"/mock/{seeded.Id}", new
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{seeded.Id}", new
         {
             id = Guid.NewGuid().ToString(),
             facilityId = "F1",
@@ -645,7 +645,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task Update_WithNonGuidRouteId_Returns400InvalidIdFormat()
     {
-        var response = await _client.PutAsJsonAsync("/mock/not-a-guid", new
+        var response = await _client.PutAsJsonAsync("/api/mock-dmrp/entries/not-a-guid", new
         {
             id = "not-a-guid",
             facilityId = "F1",
@@ -667,9 +667,9 @@ public class MockControllerTests : IAsyncLifetime
     {
         var seeded = Seed();
 
-        (await _client.DeleteAsync($"/mock/{seeded.Id}")).StatusCode
+        (await _client.DeleteAsync($"/api/mock-dmrp/entries/{seeded.Id}")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
-        (await _client.DeleteAsync($"/mock/{seeded.Id}")).StatusCode
+        (await _client.DeleteAsync($"/api/mock-dmrp/entries/{seeded.Id}")).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -680,12 +680,12 @@ public class MockControllerTests : IAsyncLifetime
         Seed(measure: "HTCDI");
         Seed(facilityId: "F2");
 
-        (await _client.DeleteAsync("/mock/facilities/F1")).StatusCode
+        (await _client.DeleteAsync("/api/mock-dmrp/facilities/F1/entries")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
         _repository.Entries.Should().ContainSingle();
 
         // Succeeds again even though there is nothing left to remove.
-        (await _client.DeleteAsync("/mock/facilities/F1")).StatusCode
+        (await _client.DeleteAsync("/api/mock-dmrp/facilities/F1/entries")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -696,7 +696,7 @@ public class MockControllerTests : IAsyncLifetime
         Seed(measure: "HTCDI");
         Seed(facilityId: "F2");
 
-        var response = await _client.DeleteAsync("/mock");
+        var response = await _client.DeleteAsync("/api/mock-dmrp/entries");
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         _repository.Entries.Should().BeEmpty();
@@ -707,7 +707,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task IssueToken_ReturnsABearerToken()
     {
-        var response = await _client.PostAsJsonAsync("/mock/oauth2/token", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
         {
             grant_type = "client_credentials",
             client_id = ClientId,
@@ -726,7 +726,7 @@ public class MockControllerTests : IAsyncLifetime
     [Fact]
     public async Task IssueToken_WithWrongSecret_Returns401WithAnOAuthErrorBody()
     {
-        var response = await _client.PostAsJsonAsync("/mock/oauth2/token", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
         {
             grant_type = "client_credentials",
             client_id = ClientId,
@@ -748,7 +748,7 @@ public class MockControllerTests : IAsyncLifetime
         // The grant is a string rather than an enum precisely so an unknown value reaches
         // the service and comes back as unsupported_grant_type. Bound as an enum it would
         // fail model binding and produce a generic validation error instead.
-        var response = await _client.PostAsJsonAsync("/mock/oauth2/token", new
+        var response = await _client.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
         {
             grant_type = "password",
             client_id = ClientId,
@@ -770,7 +770,7 @@ public class MockControllerTests : IAsyncLifetime
         // would still work and every contract call would 401.
         Seed(measure: "HOB");
 
-        var tokenResponse = await _client.PostAsJsonAsync("/mock/oauth2/token", new
+        var tokenResponse = await _client.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
         {
             grant_type = "client_credentials",
             client_id = ClientId,
