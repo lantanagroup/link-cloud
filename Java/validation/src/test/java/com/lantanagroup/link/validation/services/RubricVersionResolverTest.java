@@ -1,53 +1,69 @@
 package com.lantanagroup.link.validation.services;
 
-import com.lantanagroup.link.validation.entities.RubricVersion;
+import com.lantanagroup.link.validation.enums.CheckType;
+import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
-import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.models.RubricVersionSnapshot;
+import com.lantanagroup.link.validation.providers.RubricCacheService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class RubricVersionResolverTest {
 
-    private final RubricVersionRepository repository = mock(RubricVersionRepository.class);
-    private final RubricVersionResolver resolver = new RubricVersionResolver(repository);
+    private final RubricCacheService cacheService = mock(RubricCacheService.class);
+    private final RubricVersionResolver resolver = new RubricVersionResolver(cacheService);
 
-    private static RubricVersion version(String semver, RubricVersionStatus status) {
-        return RubricVersion.builder()
+    private static RubricVersionSnapshot snapshot(String semver, RubricVersionStatus status) {
+        return RubricVersionSnapshot.builder()
+                .rubricVersionId(UUID.randomUUID())
                 .rubricId("piqi.core")
                 .semver(semver)
                 .status(status)
+                .checksum("abc")
+                .checks(List.of(RubricVersionSnapshot.CheckSnapshot.builder()
+                        .checkId(UUID.randomUUID())
+                        .checkLocalId("c1")
+                        .type(CheckType.FHIRPATH)
+                        .dimension(PiqiDimension.CONFORMANCE)
+                        .enabled(true)
+                        .build()))
                 .build();
     }
 
     @Test
-    @DisplayName("an explicit semver resolves that exact version")
+    @DisplayName("an explicit semver resolves that exact version with its checks")
     void resolvesExplicitSemver() {
-        RubricVersion v = version("1.2.0", RubricVersionStatus.PUBLISHED);
-        when(repository.findByRubricIdAndSemver("piqi.core", "1.2.0")).thenReturn(Optional.of(v));
+        RubricVersionSnapshot snap = snapshot("1.2.0", RubricVersionStatus.PUBLISHED);
+        when(cacheService.getVersion("piqi.core", "1.2.0")).thenReturn(snap);
 
-        assertThat(resolver.resolve("piqi.core", "1.2.0", true)).isSameAs(v);
+        RubricVersionResolver.ResolvedRubric resolved = resolver.resolve("piqi.core", "1.2.0", true);
+
+        assertThat(resolved.version().getSemver()).isEqualTo("1.2.0");
+        assertThat(resolved.version().getRubricVersionId()).isEqualTo(snap.getRubricVersionId());
+        assertThat(resolved.checks()).hasSize(1);
+        assertThat(resolved.checks().get(0).getCheckLocalId()).isEqualTo("c1");
         // an explicit semver must not fall through to the latest-published lookup
-        verify(repository).findByRubricIdAndSemver("piqi.core", "1.2.0");
-        verifyNoMoreInteractions(repository);
+        verify(cacheService).getVersion("piqi.core", "1.2.0");
+        verifyNoMoreInteractions(cacheService);
     }
 
     @Test
     @DisplayName("an explicit semver that does not exist throws RubricVersionNotFoundException")
     void explicitSemverNotFound() {
-        when(repository.findByRubricIdAndSemver("piqi.core", "9.9.9")).thenReturn(Optional.empty());
+        when(cacheService.getVersion("piqi.core", "9.9.9")).thenReturn(null);
 
         assertThatThrownBy(() -> resolver.resolve("piqi.core", "9.9.9", true))
                 .isInstanceOf(RubricVersionNotFoundException.class);
@@ -56,8 +72,8 @@ class RubricVersionResolverTest {
     @Test
     @DisplayName("$evaluate (publishedOnly) rejects an explicit non-PUBLISHED version with a lifecycle conflict")
     void evaluateRejectsNonPublishedExplicitVersion() {
-        RubricVersion draft = version("1.2.0", RubricVersionStatus.DRAFT);
-        when(repository.findByRubricIdAndSemver("piqi.core", "1.2.0")).thenReturn(Optional.of(draft));
+        when(cacheService.getVersion("piqi.core", "1.2.0"))
+                .thenReturn(snapshot("1.2.0", RubricVersionStatus.DRAFT));
 
         assertThatThrownBy(() -> resolver.resolve("piqi.core", "1.2.0", true))
                 .isInstanceOf(RubricLifecycleException.class);
@@ -66,40 +82,96 @@ class RubricVersionResolverTest {
     @Test
     @DisplayName("$dry-run (publishedOnly=false) resolves an explicit DRAFT version")
     void dryRunAllowsDraftExplicitVersion() {
-        RubricVersion draft = version("1.2.0", RubricVersionStatus.DRAFT);
-        when(repository.findByRubricIdAndSemver("piqi.core", "1.2.0")).thenReturn(Optional.of(draft));
+        when(cacheService.getVersion("piqi.core", "1.2.0"))
+                .thenReturn(snapshot("1.2.0", RubricVersionStatus.DRAFT));
 
-        assertThat(resolver.resolve("piqi.core", "1.2.0", false)).isSameAs(draft);
+        assertThat(resolver.resolve("piqi.core", "1.2.0", false).version().getStatus())
+                .isEqualTo(RubricVersionStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("no semver -> newest PUBLISHED version, ordered semantically (1.10.0 > 1.9.0)")
-    void resolvesLatestPublishedSemantically() {
-        when(repository.findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED))
-                .thenReturn(List.of(
-                        version("1.9.0", RubricVersionStatus.PUBLISHED),
-                        version("1.10.0", RubricVersionStatus.PUBLISHED),
-                        version("1.2.0", RubricVersionStatus.PUBLISHED)));
+    @DisplayName("no semver -> latest published via the cached pointer")
+    void resolvesLatestPublishedViaPointer() {
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("1.10.0");
+        when(cacheService.getVersion("piqi.core", "1.10.0"))
+                .thenReturn(snapshot("1.10.0", RubricVersionStatus.PUBLISHED));
 
-        RubricVersion resolved = resolver.resolve("piqi.core", null, true);
+        RubricVersionResolver.ResolvedRubric resolved = resolver.resolve("piqi.core", null, true);
 
-        assertThat(resolved.getSemver()).isEqualTo("1.10.0");
+        assertThat(resolved.version().getSemver()).isEqualTo("1.10.0");
+        // healthy pointer: no self-heal eviction should happen
+        verify(cacheService, never()).evictLatestPointer("piqi.core");
     }
 
     @Test
     @DisplayName("a blank semver is treated as 'latest published'")
     void blankSemverUsesLatestPublished() {
-        when(repository.findByRubricIdAndStatus(eq("piqi.core"), eq(RubricVersionStatus.PUBLISHED)))
-                .thenReturn(List.of(version("2.0.0", RubricVersionStatus.PUBLISHED)));
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("2.0.0");
+        when(cacheService.getVersion("piqi.core", "2.0.0"))
+                .thenReturn(snapshot("2.0.0", RubricVersionStatus.PUBLISHED));
 
-        assertThat(resolver.resolve("piqi.core", "   ", true).getSemver()).isEqualTo("2.0.0");
+        assertThat(resolver.resolve("piqi.core", "   ", true).version().getSemver()).isEqualTo("2.0.0");
     }
 
     @Test
     @DisplayName("no published version -> RubricVersionNotFoundException")
     void noPublishedVersionThrows() {
-        when(repository.findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn(null);
+
+        assertThatThrownBy(() -> resolver.resolve("piqi.core", null, true))
+                .isInstanceOf(RubricVersionNotFoundException.class);
+        // the null pointer triggers one self-heal retry before giving up
+        verify(cacheService).evictLatestPointer("piqi.core");
+    }
+
+    @Test
+    @DisplayName("self-heal: a stale pointer to a RETIRED version is evicted and the real latest is served")
+    void selfHealsStalePointerToRetiredVersion() {
+        // stale pointer says 1.2.0, but that snapshot is RETIRED; the recomputed answer is 1.1.0
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("1.2.0", "1.1.0");
+        when(cacheService.getVersion("piqi.core", "1.2.0"))
+                .thenReturn(snapshot("1.2.0", RubricVersionStatus.RETIRED));
+        when(cacheService.getVersion("piqi.core", "1.1.0"))
+                .thenReturn(snapshot("1.1.0", RubricVersionStatus.PUBLISHED));
+
+        RubricVersionResolver.ResolvedRubric resolved = resolver.resolve("piqi.core", null, true);
+
+        assertThat(resolved.version().getSemver()).isEqualTo("1.1.0");
+        // both the stale snapshot and the pointer must be dropped
+        verify(cacheService).evictVersion("piqi.core", "1.2.0");
+    }
+
+    @Test
+    @DisplayName("self-heal: a pointer to a missing snapshot is evicted and the real latest is served")
+    void selfHealsDanglingPointer() {
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("1.2.0", "1.1.0");
+        when(cacheService.getVersion("piqi.core", "1.2.0")).thenReturn(null);
+        when(cacheService.getVersion("piqi.core", "1.1.0"))
+                .thenReturn(snapshot("1.1.0", RubricVersionStatus.PUBLISHED));
+
+        assertThat(resolver.resolve("piqi.core", null, true).version().getSemver()).isEqualTo("1.1.0");
+        verify(cacheService).evictLatestPointer("piqi.core");
+    }
+
+    @Test
+    @DisplayName("self-heal that still finds nothing published -> RubricVersionNotFoundException")
+    void selfHealExhaustedThrows() {
+        // the only version was just retired: stale pointer on the first read, nothing after
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("1.0.0", (String) null);
+        when(cacheService.getVersion("piqi.core", "1.0.0"))
+                .thenReturn(snapshot("1.0.0", RubricVersionStatus.RETIRED));
+
+        assertThatThrownBy(() -> resolver.resolve("piqi.core", null, true))
+                .isInstanceOf(RubricVersionNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("latest-published never yields a non-PUBLISHED version, even if the retried snapshot is stale")
+    void latestNeverReturnsNonPublished() {
+        // pathological double-staleness: even after self-heal the snapshot claims RETIRED
+        when(cacheService.getLatestPublishedSemver("piqi.core")).thenReturn("1.0.0");
+        when(cacheService.getVersion("piqi.core", "1.0.0"))
+                .thenReturn(snapshot("1.0.0", RubricVersionStatus.RETIRED));
 
         assertThatThrownBy(() -> resolver.resolve("piqi.core", null, true))
                 .isInstanceOf(RubricVersionNotFoundException.class);
