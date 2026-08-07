@@ -255,7 +255,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
     }
 
-    private static async Task DisposeUnregisteredPollerAsync(Task task, CancellationTokenSource cts, IServiceScope scope)
+    private async Task DisposeUnregisteredPollerAsync(Task task, CancellationTokenSource cts, IServiceScope scope)
     {
         try
         {
@@ -264,6 +264,10 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         catch (OperationCanceledException)
         {
             // Expected after cancellation because another poller is already registered.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while disposing unregistered poller task.");
         }
         finally
         {

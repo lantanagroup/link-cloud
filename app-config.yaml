@@ -293,6 +293,11 @@ global:
     required: false
     defaultValue: "automation/imported-bundles"
     consumers: ["Report", "Submission", "AutomationUI"]
+  - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
+    description: "Optional blob-path prefix used by Automation.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
+    required: false
+    defaultValue: "automation/generated-bundles"
+    consumers: ["AutomationUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
@@ -488,6 +493,10 @@ services:
       description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
       required: true
       sensitive: true
+    - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
+      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI. Defaults to automation/generated-bundles."
+      required: false
+      defaultValue: "automation/generated-bundles"
     - key: "DataProtection:ApplicationName"
       description: "The Data Protection application name isolating Automation.UI's key ring from other services sharing the store. Falls back to 'Link.Automation.UI:{Environment}' when unset (Automation.UI/Program.cs:208), so it is only provisioned where that default is not wanted - currently dev alone."
       required: false

@@ -27,10 +27,15 @@ public sealed class MongoGeneratedPatientTemplateCache : IGeneratedPatientTempla
     private readonly IMongoCollection<GeneratedPatientTemplateDocument> _templates;
     private readonly BlobContainerClient _container;
     private readonly string _blobRoot;
+    private readonly ILogger<MongoGeneratedPatientTemplateCache> _logger;
 
-    public MongoGeneratedPatientTemplateCache(IMongoDatabase database, IOptions<ImportedBundleBlobStorageSettings> settings)
+    public MongoGeneratedPatientTemplateCache(
+        IMongoDatabase database,
+        IOptions<ImportedBundleBlobStorageSettings> settings,
+        ILogger<MongoGeneratedPatientTemplateCache> logger)
     {
         _templates = database.GetCollection<GeneratedPatientTemplateDocument>("automation_generated_patient_templates");
+        _logger = logger;
 
         var blobSettings = settings.Value;
         if (string.IsNullOrWhiteSpace(blobSettings.ConnectionString))
@@ -39,29 +44,43 @@ public sealed class MongoGeneratedPatientTemplateCache : IGeneratedPatientTempla
             throw new InvalidOperationException("InternalBlobStorage:BlobContainerName is required for generated patient templates.");
 
         _container = new BlobContainerClient(blobSettings.ConnectionString, blobSettings.BlobContainerName);
-        var configuredRoot = string.IsNullOrWhiteSpace(blobSettings.BlobRoot)
-            ? "automation"
-            : blobSettings.BlobRoot.Trim('/');
-        _blobRoot = $"{configuredRoot}/generated-patient-templates";
+        var configuredRoot = string.IsNullOrWhiteSpace(blobSettings.GeneratedTemplateBlobRoot)
+            ? string.Empty
+            : blobSettings.GeneratedTemplateBlobRoot.Trim('/');
+        _blobRoot = string.IsNullOrWhiteSpace(configuredRoot)
+            ? "generated-patient-templates"
+            : $"{configuredRoot}/generated-patient-templates";
     }
 
     public async Task<GeneratedPatientTemplate?> GetAsync(string key, CancellationToken ct = default)
     {
-        var doc = await _templates.Find(template => template.Key == key).FirstOrDefaultAsync(ct);
-        if (doc == null || string.IsNullOrWhiteSpace(doc.BlobName))
-            return null;
+        try
+        {
+            var doc = await _templates.Find(template => template.Key == key).FirstOrDefaultAsync(ct);
+            if (doc == null || string.IsNullOrWhiteSpace(doc.BlobName))
+                return null;
 
-        var blob = _container.GetBlobClient(doc.BlobName);
-        var exists = await blob.ExistsAsync(ct);
-        if (!exists.Value)
-            return null;
+            var blob = _container.GetBlobClient(doc.BlobName);
+            var exists = await blob.ExistsAsync(ct);
+            if (!exists.Value)
+                return null;
 
-        var download = await blob.DownloadContentAsync(ct);
-        var payload = JsonSerializer.Deserialize<TemplatePayload>(download.Value.Content.ToString());
-        if (payload == null || string.IsNullOrWhiteSpace(payload.TemplateRunTag) || payload.BundleJson is not { Count: > 0 })
-            return null;
+            var download = await blob.DownloadContentAsync(ct);
+            var payload = JsonSerializer.Deserialize<TemplatePayload>(download.Value.Content.ToString());
+            if (payload == null || string.IsNullOrWhiteSpace(payload.TemplateRunTag) || payload.BundleJson is not { Count: > 0 })
+                return null;
 
-        return new GeneratedPatientTemplate(payload.TemplateRunTag, payload.BundleJson);
+            return new GeneratedPatientTemplate(payload.TemplateRunTag, payload.BundleJson);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read generated patient template cache entry for key '{TemplateKey}'.", key);
+            return null;
+        }
     }
 
     public async Task StoreAsync(string key, GeneratedPatientTemplate template, CancellationToken ct = default)
@@ -73,32 +92,44 @@ public sealed class MongoGeneratedPatientTemplateCache : IGeneratedPatientTempla
         if (template.BundleJson.Count == 0)
             throw new InvalidOperationException("Template bundles are required.");
 
-        var payload = new TemplatePayload(template.TemplateRunTag, template.BundleJson.ToList());
-        var json = JsonSerializer.Serialize(payload);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        var contentHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
-
-        await _container.CreateIfNotExistsAsync(cancellationToken: ct);
-
-        var blobName = $"{_blobRoot}/{key}-{contentHash}.json";
-        var blob = _container.GetBlobClient(blobName);
-        if (!(await blob.ExistsAsync(ct)).Value)
+        try
         {
-            using var stream = new MemoryStream(bytes, writable: false);
-            await blob.UploadAsync(stream, overwrite: true, cancellationToken: ct);
-            await blob.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = "application/json" }, cancellationToken: ct);
+            var payload = new TemplatePayload(template.TemplateRunTag, template.BundleJson.ToList());
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            var contentHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+
+            await _container.CreateIfNotExistsAsync(cancellationToken: ct);
+
+            var blobName = $"{_blobRoot}/{key}-{contentHash}.json";
+            var blob = _container.GetBlobClient(blobName);
+            if (!(await blob.ExistsAsync(ct)).Value)
+            {
+                using var stream = new MemoryStream(bytes, writable: false);
+                await blob.UploadAsync(stream, overwrite: true, cancellationToken: ct);
+                await blob.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = "application/json" }, cancellationToken: ct);
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var update = Builders<GeneratedPatientTemplateDocument>.Update
+                .Set(d => d.ContentHash, contentHash)
+                .Set(d => d.BlobName, blobName)
+                .Set(d => d.ByteCount, bytes.LongLength)
+                .Set(d => d.UpdatedAt, now)
+                .SetOnInsert(d => d.Key, key)
+                .SetOnInsert(d => d.CreatedAt, now);
+
+            await _templates.UpdateOneAsync(d => d.Key == key, update, new UpdateOptions { IsUpsert = true }, ct);
         }
-
-        var now = DateTimeOffset.UtcNow;
-        var update = Builders<GeneratedPatientTemplateDocument>.Update
-            .Set(d => d.ContentHash, contentHash)
-            .Set(d => d.BlobName, blobName)
-            .Set(d => d.ByteCount, bytes.LongLength)
-            .Set(d => d.UpdatedAt, now)
-            .SetOnInsert(d => d.Key, key)
-            .SetOnInsert(d => d.CreatedAt, now);
-
-        await _templates.UpdateOneAsync(d => d.Key == key, update, new UpdateOptions { IsUpsert = true }, ct);
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to store generated patient template cache entry for key '{TemplateKey}'.", key);
+            return;
+        }
     }
 
     private sealed record TemplatePayload(string TemplateRunTag, List<string> BundleJson);

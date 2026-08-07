@@ -106,11 +106,16 @@ public class FhirDataLoader
     public async Task WaitForPatientDeletionAsync(
         string patientId,
         Action<string>? progress = null,
+        TimeSpan? timeout = null,
         CancellationToken ct = default)
     {
+        var maxWait = timeout ?? TimeSpan.FromSeconds(60);
+        var started = DateTime.UtcNow;
         var attempt = 0;
+        var delay = TimeSpan.FromSeconds(1);
+        var maxDelay = TimeSpan.FromSeconds(5);
 
-        while (true)
+        while (DateTime.UtcNow - started < maxWait)
         {
             ct.ThrowIfCancellationRequested();
             attempt++;
@@ -123,15 +128,23 @@ public class FhirDataLoader
                     return;
                 }
 
-                progress?.Invoke($"Waiting for FHIR purge to complete for patient '{patientId}' (check {attempt}).");
+                progress?.Invoke($"Waiting for FHIR purge to complete for patient '{patientId}' (check {attempt}, elapsed {(DateTime.UtcNow - started).TotalSeconds:F1}s).");
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 progress?.Invoke($"Could not verify FHIR purge completion for patient '{patientId}' (check {attempt}): {ex.Message}");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+            var remaining = maxWait - (DateTime.UtcNow - started);
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            var nextDelay = delay <= remaining ? delay : remaining;
+            await Task.Delay(nextDelay, ct);
+            delay = delay + TimeSpan.FromSeconds(1) <= maxDelay ? delay + TimeSpan.FromSeconds(1) : maxDelay;
         }
+
+        throw new TimeoutException($"Timed out waiting for FHIR purge to complete for patient '{patientId}' after {maxWait.TotalSeconds:F0}s.");
     }
 
     private void GetAuthorization()

@@ -213,7 +213,7 @@
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
-                                        <span id="importedUploadStatus" class="small text-muted" style="display:none;"></span>
+                                        <span id="importedUploadStatus" class="small text-muted" style="display:none;" role="status" aria-live="polite"></span>
                                     </div>
                                 </div>
                             </div>
@@ -303,6 +303,8 @@
         var btnUseServerData = document.getElementById('btnUseServerData');
         var btnReplaceFhirCancel = document.getElementById('btnReplaceFhirCancel');
         var btnReplaceFhirClose = document.getElementById('btnReplaceFhirClose');
+        var activePatientReplacementPollController = null;
+        var patientReplacementPollTimeoutMs = 2 * 60 * 1000;
 
         function notifyChanged(action, id, name) {
             document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
@@ -330,8 +332,21 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        function cancelPatientReplacementPolling() {
+            if (activePatientReplacementPollController) {
+                activePatientReplacementPollController.abort();
+                activePatientReplacementPollController = null;
+            }
+        }
+        function isScenarioEditorModalOpen() {
+            return !!modal && modal.style.display !== 'none';
+        }
         function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
-        function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+        function closeModal() {
+            cancelPatientReplacementPolling();
+            modal.style.display = 'none';
+            backdrop.style.display = 'none';
+        }
         function ensureScenarioId() {
             if (!idInput.value) idInput.value = crypto.randomUUID();
             return idInput.value;
@@ -600,27 +615,84 @@
         }
 
         async function waitForPatientReplacement(statusUrl, patientId) {
-            while (true) {
-                var response = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
-                if (!response.ok) {
-                    throw new Error(await response.text() || 'Could not retrieve replacement status.');
-                }
+            var startedAt = Date.now();
+            var controller = new AbortController();
+            activePatientReplacementPollController = controller;
 
-                var status = await response.json();
-                setImportedUploadStatus(
-                    status.message || 'Replacing FHIR-server data for Patient/' + patientId + '...',
-                    !status.isComplete);
-
-                if (status.isComplete) {
-                    if (!status.succeeded) {
-                        throw new Error(status.message || 'FHIR-server replacement failed.');
+            function delayWithSignal(ms, signal) {
+                return new Promise(function (resolve, reject) {
+                    if (signal.aborted) {
+                        reject(new DOMException('Polling canceled.', 'AbortError'));
+                        return;
                     }
 
-                    return status;
+                    var timeoutId = window.setTimeout(function () {
+                        signal.removeEventListener('abort', onAbort);
+                        resolve();
+                    }, ms);
+
+                    function onAbort() {
+                        window.clearTimeout(timeoutId);
+                        signal.removeEventListener('abort', onAbort);
+                        reject(new DOMException('Polling canceled.', 'AbortError'));
+                    }
+
+                    signal.addEventListener('abort', onAbort);
+                });
+            }
+
+            try {
+                while (Date.now() - startedAt < patientReplacementPollTimeoutMs) {
+                    if (!isScenarioEditorModalOpen()) {
+                        throw new DOMException('Scenario editor modal closed.', 'AbortError');
+                    }
+
+                    var response = await fetch(statusUrl, {
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal
+                    });
+                    if (!response.ok) {
+                        throw new Error(await response.text() || 'Could not retrieve replacement status.');
+                    }
+
+                    var status = await response.json();
+                    setImportedUploadStatus(
+                        status.message || 'Replacing FHIR-server data for Patient/' + patientId + '...',
+                        !status.isComplete);
+
+                    if (status.isComplete) {
+                        if (!status.succeeded) {
+                            throw new Error(status.message || 'FHIR-server replacement failed.');
+                        }
+
+                        return status;
+                    }
+
+                    var elapsed = Date.now() - startedAt;
+                    var remaining = patientReplacementPollTimeoutMs - elapsed;
+                    if (remaining <= 0) {
+                        break;
+                    }
+
+                    if (!isScenarioEditorModalOpen()) {
+                        throw new DOMException('Scenario editor modal closed.', 'AbortError');
+                    }
+
+                    await delayWithSignal(Math.min(2000, remaining), controller.signal);
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    throw new Error('FHIR-server replacement status polling was canceled.');
                 }
 
-                await new Promise(function (resolve) { window.setTimeout(resolve, 2000); });
+                throw err;
+            } finally {
+                if (activePatientReplacementPollController === controller) {
+                    activePatientReplacementPollController = null;
+                }
             }
+
+            throw new Error('Timed out waiting for FHIR-server replacement status for Patient/' + patientId + '.');
         }
 
         async function postForm(url, formData) {

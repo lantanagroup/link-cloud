@@ -172,6 +172,12 @@ public static class FhirGenerationPipeline
         // ------------------------------------------------------------------
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan, effectiveRunId);
 
+        if (generatedTemplateCache != null && !IsSafeRunTagForTemplateCache(ids.RunTag))
+        {
+            output.WriteLine($"[Pipeline] Run tag '{ids.RunTag}' is not in the expected generated format; skipping generated template cache for this run.");
+            generatedTemplateCache = null;
+        }
+
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
         output.WriteLine($"[Pipeline] Uploading {sharedBundles.Count} shared infrastructure bundle(s)...");
@@ -877,10 +883,33 @@ public static class FhirGenerationPipeline
 
     private static string ReplaceRunTag(string json, string sourceRunTag, string targetRunTag)
     {
+        if (!IsAllowedTemplateReplacementTag(sourceRunTag) || !IsAllowedTemplateReplacementTag(targetRunTag))
+            return json;
+
         if (string.Equals(sourceRunTag, targetRunTag, StringComparison.Ordinal))
             return json;
 
         return json.Replace(sourceRunTag, targetRunTag, StringComparison.Ordinal);
+    }
+
+    private static bool IsAllowedTemplateReplacementTag(string runTag)
+    {
+        return string.Equals(runTag, TemplateRunTag, StringComparison.Ordinal)
+            || IsSafeRunTagForTemplateCache(runTag);
+    }
+
+    private static bool IsSafeRunTagForTemplateCache(string? runTag)
+    {
+        if (string.IsNullOrWhiteSpace(runTag) || runTag.Length != 8)
+            return false;
+
+        foreach (var ch in runTag)
+        {
+            if (!Uri.IsHexDigit(ch))
+                return false;
+        }
+
+        return true;
     }
 
     private static List<Bundle.EntryComponent> ParseBundleEntriesFromJson(IReadOnlyList<string> bundleJson)

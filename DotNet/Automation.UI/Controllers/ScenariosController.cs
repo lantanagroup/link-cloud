@@ -339,10 +339,11 @@ public class ScenariosController(
         if (string.IsNullOrWhiteSpace(bundleJson))
             return BadRequest("Uploaded bundle content is missing.");
 
+        var patientId = request.PatientId.Trim();
         List<Bundle.EntryComponent> entries;
         try
         {
-            entries = ImportedPatientLoader.ParseBundleEntries(bundleJson, request.PatientId.Trim());
+            entries = ImportedPatientLoader.ParseBundleEntries(bundleJson, patientId);
         }
         catch (Exception ex)
         {
@@ -358,8 +359,8 @@ public class ScenariosController(
             .ToList();
 
         var patientIdForLog = request.PatientId.Replace("\r", string.Empty).Replace("\n", string.Empty);
-        var replayBundles = BuildReplayBundles(entries, request.PatientId.Trim());
-        var operationId = patientReplacementManager.Start(patientIdForLog, resourcesToDelete, replayBundles);
+        var replayBundles = BuildReplayBundles(entries, patientId);
+        var operationId = patientReplacementManager.Start(patientId, resourcesToDelete, replayBundles, ct);
 
         logger.LogInformation(
             "Queued FHIR-server replacement {OperationId} for patient '{PatientId}' using uploaded bundle '{BundleId}'. Deleting {DeleteCount} resource path(s) first.",
@@ -545,6 +546,9 @@ public class ScenariosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var scenario = await scenarioStore.GetByIdAsync(request.Id, ct);
         if (scenario == null) return NotFound();
         if (scenario.IsSystemScenario) return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be deleted.");
@@ -557,6 +561,9 @@ public class ScenariosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await scenarioStore.GetByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 

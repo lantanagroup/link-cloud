@@ -5,27 +5,61 @@ using System.Collections.Concurrent;
 
 namespace Automation.UI.Services;
 
-public sealed class PatientReplacementManager(
-    IOptions<AutomationConfig> automationConfig,
-    ILogger<PatientReplacementManager> logger)
+public sealed class PatientReplacementManager : IDisposable
 {
-    private readonly AutomationConfig _automationConfig = automationConfig.Value;
+    private readonly AutomationConfig _automationConfig;
+    private readonly ILogger<PatientReplacementManager> _logger;
     private readonly ConcurrentDictionary<Guid, PatientReplacementOperation> _operations = new();
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan CompletedOperationRetention = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CompletedOperationCleanupInterval = TimeSpan.FromMinutes(1);
+    private readonly Timer _cleanupTimer;
+
+    public PatientReplacementManager(
+        IOptions<AutomationConfig> automationConfig,
+        ILogger<PatientReplacementManager> logger)
+    {
+        _automationConfig = automationConfig.Value;
+        _logger = logger;
+        _cleanupTimer = new Timer(static state =>
+        {
+            var manager = (PatientReplacementManager)state!;
+            try
+            {
+                manager.EvictCompletedOperations();
+            }
+            catch (Exception ex)
+            {
+                manager._logger.LogWarning(ex, "Failed periodic cleanup of completed patient replacement operations.");
+            }
+        }, this, CompletedOperationCleanupInterval, CompletedOperationCleanupInterval);
+    }
 
     public Guid Start(
         string patientId,
         IReadOnlyList<string> resourcesToDelete,
-        IReadOnlyList<(string Name, string Json)> replayBundles)
+        IReadOnlyList<(string Name, string Json)> replayBundles,
+        CancellationToken ct = default)
     {
+        EvictCompletedOperations();
+
         var operation = new PatientReplacementOperation(Guid.NewGuid(), patientId, replayBundles.Count);
         _operations[operation.Id] = operation;
 
-        _ = Task.Run(() => ExecuteAsync(operation, resourcesToDelete, replayBundles), CancellationToken.None);
+        _ = Task.Run(async () =>
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(OperationTimeout);
+            await ExecuteAsync(operation, resourcesToDelete, replayBundles, timeoutCts.Token);
+        }, CancellationToken.None);
+
         return operation.Id;
     }
 
     public PatientReplacementStatus? GetStatus(Guid operationId)
     {
+        EvictCompletedOperations();
+
         return _operations.TryGetValue(operationId, out var operation)
             ? operation.GetStatus()
             : null;
@@ -34,7 +68,8 @@ public sealed class PatientReplacementManager(
     private async Task ExecuteAsync(
         PatientReplacementOperation operation,
         IReadOnlyList<string> resourcesToDelete,
-        IReadOnlyList<(string Name, string Json)> replayBundles)
+        IReadOnlyList<(string Name, string Json)> replayBundles,
+        CancellationToken ct)
     {
         try
         {
@@ -44,11 +79,15 @@ public sealed class PatientReplacementManager(
                 _automationConfig.FhirServerBasicAuth);
 
             operation.Update("purging", "Requesting FHIR resource expunge.");
-            var purge = await loader.DeleteResourcesWithExpungeAsync(resourcesToDelete);
+            var purge = await loader.DeleteResourcesWithExpungeAsync(resourcesToDelete, ct);
             operation.SetPurgeResult(purge.Succeeded, purge.Failed);
 
             operation.Update("waiting-for-purge", "Waiting for the patient to be removed from the FHIR server.");
-            await loader.WaitForPatientDeletionAsync(operation.PatientId, message => operation.Update("waiting-for-purge", message));
+            await loader.WaitForPatientDeletionAsync(
+                operation.PatientId,
+                message => operation.Update("waiting-for-purge", message),
+                OperationTimeout,
+                ct);
 
             operation.Update("uploading", $"Uploading {replayBundles.Count} replay bundle(s) to the FHIR server.");
             var output = new RunAutomationOutput(message => operation.Update("uploading", message));
@@ -65,11 +104,32 @@ public sealed class PatientReplacementManager(
 
             operation.Complete($"Successfully replaced FHIR-server data for patient '{operation.PatientId}'.");
         }
+        catch (OperationCanceledException)
+        {
+            operation.Fail($"FHIR patient replacement timed out or was canceled for patient '{operation.PatientId}'.");
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "FHIR patient replacement {OperationId} failed for patient '{PatientId}'.", operation.Id, operation.PatientId);
+            _logger.LogError(ex, "FHIR patient replacement {OperationId} failed for patient '{PatientId}'.", operation.Id, operation.PatientId);
             operation.Fail(ex.Message);
         }
+    }
+
+    private void EvictCompletedOperations()
+    {
+        var cutoff = DateTimeOffset.UtcNow - CompletedOperationRetention;
+        foreach (var kvp in _operations)
+        {
+            if (kvp.Value.TryGetCompletedAt(out var completedAt) && completedAt <= cutoff)
+            {
+                _operations.TryRemove(kvp.Key, out _);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _cleanupTimer.Dispose();
     }
 }
 
@@ -92,6 +152,7 @@ internal sealed class PatientReplacementOperation(Guid id, string patientId, int
     private bool _succeeded;
     private int _deletedSucceeded;
     private int _deletedFailed;
+    private DateTimeOffset? _completedAt;
 
     public Guid Id { get; } = id;
     public string PatientId { get; } = patientId;
@@ -122,6 +183,7 @@ internal sealed class PatientReplacementOperation(Guid id, string patientId, int
             _message = message;
             _succeeded = true;
             _isComplete = true;
+            _completedAt = DateTimeOffset.UtcNow;
         }
     }
 
@@ -132,7 +194,23 @@ internal sealed class PatientReplacementOperation(Guid id, string patientId, int
             _state = "failed";
             _message = message;
             _isComplete = true;
+            _completedAt = DateTimeOffset.UtcNow;
         }
+    }
+
+    public bool TryGetCompletedAt(out DateTimeOffset completedAt)
+    {
+        lock (_sync)
+        {
+            if (_completedAt.HasValue)
+            {
+                completedAt = _completedAt.Value;
+                return true;
+            }
+        }
+
+        completedAt = default;
+        return false;
     }
 
     public PatientReplacementStatus GetStatus()

@@ -35,6 +35,7 @@ public sealed class MongoIndexManager
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
+        EnsureGeneratedTemplateCacheVersionIndexes();
         EnsureQueryPlanTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
@@ -145,6 +146,19 @@ public sealed class MongoIndexManager
         // (DetachAndPruneOrphansAsync): "find every bundle that references this scenario"
         // would otherwise scan the entire collection on every save and delete.
         CreateIndexSafe(collection, new BsonDocument { { "ScenarioIds", 1 } }, unique: false, "idx_scenarioIds");
+    }
+
+    // --- automation_generated_template_versions ---
+
+    private void EnsureGeneratedTemplateCacheVersionIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_generated_template_versions");
+
+        // Supports latest-version lookup per scenario key (SortByDescending VersionNumber).
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "VersionNumber", -1 } }, unique: false, "idx_scenarioKey_versionNumber_desc");
+
+        // Supports exact lookup by scenario + template hash.
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "TemplateSetHash", 1 } }, unique: false, "idx_scenarioKey_templateSetHash");
     }
 
     // --- automation_query_plan_templates ---

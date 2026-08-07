@@ -68,41 +68,107 @@ public sealed class PatientBundleExternalizationMigrationService : IHostedServic
     private async Task<int> MigrateEmbeddedPayloadsAsync(CancellationToken ct)
     {
         var migrated = 0;
-        var scenarios = await _scenarios.Find(FilterDefinition<TestScenarioDocument>.Empty).ToListAsync(ct);
-        foreach (var scenario in scenarios)
+        Guid? lastScenarioId = null;
+        while (!ct.IsCancellationRequested)
         {
-            var result = await ExternalizeBundleJsonAsync(scenario.ImportedPatientBundlesJson, scenario.Id, ct);
-            if (!result.Changed)
-                continue;
+            var scenarioFilter = lastScenarioId.HasValue
+                ? Builders<TestScenarioDocument>.Filter.Gt(s => s.Id, lastScenarioId.Value)
+                : FilterDefinition<TestScenarioDocument>.Empty;
 
-            await _scenarios.UpdateOneAsync(
-                s => s.Id == scenario.Id,
-                Builders<TestScenarioDocument>.Update
-                    .Set(s => s.ImportedPatientBundlesJson, result.Json)
-                    .Set(s => s.ImportedBundleRefs, result.References)
-                    .Set(s => s.UpdatedAt, DateTimeOffset.UtcNow),
-                cancellationToken: ct);
-            migrated += result.MigratedCount;
+            var scenarios = await _scenarios
+                .Find(scenarioFilter)
+                .SortBy(s => s.Id)
+                .Project(s => new ScenarioEmbeddedPayloadProjection
+                {
+                    Id = s.Id,
+                    ImportedPatientBundlesJson = s.ImportedPatientBundlesJson
+                })
+                .Limit(MigrationBatchSize)
+                .ToListAsync(ct);
+
+            if (scenarios.Count == 0)
+                break;
+
+            foreach (var scenario in scenarios)
+            {
+                var result = await ExternalizeBundleJsonAsync(scenario.ImportedPatientBundlesJson, scenario.Id, ct);
+                if (!result.Changed)
+                    continue;
+
+                await _scenarios.UpdateOneAsync(
+                    s => s.Id == scenario.Id,
+                    Builders<TestScenarioDocument>.Update
+                        .Set(s => s.ImportedPatientBundlesJson, result.Json)
+                        .Set(s => s.ImportedBundleRefs, result.References)
+                        .Set(s => s.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
+                migrated += result.MigratedCount;
+            }
+
+            lastScenarioId = scenarios[^1].Id;
+
+            if (scenarios.Count == MigrationBatchSize)
+                await Task.Delay(InterBatchPause, ct);
         }
 
-        var runInputs = await _runInputs.Find(FilterDefinition<AutomationRunInputDocument>.Empty).ToListAsync(ct);
-        foreach (var runInput in runInputs)
+        Guid? lastRunId = null;
+        while (!ct.IsCancellationRequested)
         {
-            var result = await ExternalizeBundleJsonAsync(runInput.RunConfigurationJson, scenarioId: null, ct);
-            if (!result.Changed)
-                continue;
+            var runInputFilter = lastRunId.HasValue
+                ? Builders<AutomationRunInputDocument>.Filter.Gt(r => r.RunId, lastRunId.Value)
+                : FilterDefinition<AutomationRunInputDocument>.Empty;
 
-            await _runInputs.UpdateOneAsync(
-                r => r.RunId == runInput.RunId,
-                Builders<AutomationRunInputDocument>.Update
-                    .Set(r => r.RunConfigurationJson, result.Json)
-                    .Set(r => r.ImportedBundleIds, runInput.ImportedBundleIds.Concat(result.References.Select(reference => reference.BundleId)).Distinct().ToList())
-                    .Set(r => r.UpdatedAt, DateTimeOffset.UtcNow),
-                cancellationToken: ct);
-            migrated += result.MigratedCount;
+            var runInputs = await _runInputs
+                .Find(runInputFilter)
+                .SortBy(r => r.RunId)
+                .Project(r => new RunInputEmbeddedPayloadProjection
+                {
+                    RunId = r.RunId,
+                    RunConfigurationJson = r.RunConfigurationJson,
+                    ImportedBundleIds = r.ImportedBundleIds
+                })
+                .Limit(MigrationBatchSize)
+                .ToListAsync(ct);
+
+            if (runInputs.Count == 0)
+                break;
+
+            foreach (var runInput in runInputs)
+            {
+                var result = await ExternalizeBundleJsonAsync(runInput.RunConfigurationJson, scenarioId: null, ct);
+                if (!result.Changed)
+                    continue;
+
+                await _runInputs.UpdateOneAsync(
+                    r => r.RunId == runInput.RunId,
+                    Builders<AutomationRunInputDocument>.Update
+                        .Set(r => r.RunConfigurationJson, result.Json)
+                        .Set(r => r.ImportedBundleIds, runInput.ImportedBundleIds.Concat(result.References.Select(reference => reference.BundleId)).Distinct().ToList())
+                        .Set(r => r.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
+                migrated += result.MigratedCount;
+            }
+
+            lastRunId = runInputs[^1].RunId;
+
+            if (runInputs.Count == MigrationBatchSize)
+                await Task.Delay(InterBatchPause, ct);
         }
 
         return migrated;
+    }
+
+    private sealed class ScenarioEmbeddedPayloadProjection
+    {
+        public Guid Id { get; init; }
+        public string? ImportedPatientBundlesJson { get; init; }
+    }
+
+    private sealed class RunInputEmbeddedPayloadProjection
+    {
+        public Guid RunId { get; init; }
+        public string? RunConfigurationJson { get; init; }
+        public List<Guid> ImportedBundleIds { get; init; } = [];
     }
 
     private async Task<(bool Changed, string? Json, List<ImportedBundleReference> References, int MigratedCount)> ExternalizeBundleJsonAsync(
@@ -113,7 +179,16 @@ public sealed class PatientBundleExternalizationMigrationService : IHostedServic
         if (string.IsNullOrWhiteSpace(json))
             return (false, json, [], 0);
 
-        var root = JsonNode.Parse(json);
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(json);
+        }
+        catch
+        {
+            return (false, json, [], 0);
+        }
+
         var bundles = root switch
         {
             JsonArray array => array,

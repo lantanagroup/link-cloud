@@ -47,10 +47,6 @@ public sealed class ImportedBundleExecutionResolver
             contentById[bundleId] = content;
         }
 
-        var unresolvedInput = inputs.FirstOrDefault(input => !input.UploadedBundleId.HasValue);
-        if (unresolvedInput != null)
-            throw new InvalidOperationException($"Imported bundle '{unresolvedInput.FileName ?? unresolvedInput.PatientId}' has no external content reference.");
-
         return inputs.Select(input => new ImportedPatientInput
         {
             Source = input.Source,
@@ -59,7 +55,9 @@ public sealed class ImportedBundleExecutionResolver
             UploadedBundleId = input.UploadedBundleId,
             BundleJson = input.UploadedBundleId is Guid bundleId && contentById.TryGetValue(bundleId, out var content)
                 ? content
-                : throw new InvalidOperationException($"Imported bundle '{input.FileName ?? input.PatientId}' content is unavailable."),
+                : !string.IsNullOrWhiteSpace(input.BundleJson)
+                    ? input.BundleJson
+                    : throw new InvalidOperationException($"Imported bundle '{input.FileName ?? input.PatientId}' content is unavailable."),
             AutoDetect = input.AutoDetect,
             MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>(input.MeasureEligibilities ?? []),
             DetectedClinicalScenarioId = input.DetectedClinicalScenarioId

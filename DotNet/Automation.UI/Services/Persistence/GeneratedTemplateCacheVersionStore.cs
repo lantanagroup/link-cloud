@@ -29,10 +29,17 @@ public sealed record GeneratedTemplateCacheVersionBinding(Guid VersionId, int Ve
 public sealed class GeneratedTemplateCacheVersionStore
 {
     private readonly IMongoCollection<GeneratedTemplateCacheVersionDocument> _versions;
+    private const string ScenarioHashUniqueIndexName = "ux_generated_template_versions_scenario_hash";
 
     public GeneratedTemplateCacheVersionStore(IMongoDatabase database)
     {
         _versions = database.GetCollection<GeneratedTemplateCacheVersionDocument>("automation_generated_template_versions");
+        var uniqueScenarioHashIndex = new CreateIndexModel<GeneratedTemplateCacheVersionDocument>(
+            Builders<GeneratedTemplateCacheVersionDocument>.IndexKeys
+                .Ascending(version => version.ScenarioKey)
+                .Ascending(version => version.TemplateSetHash),
+            new CreateIndexOptions { Unique = true, Name = ScenarioHashUniqueIndexName });
+        _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
     }
 
     public async Task<GeneratedTemplateCacheVersionBinding?> BindRunAsync(
@@ -90,8 +97,32 @@ public sealed class GeneratedTemplateCacheVersionStore
             LastUsedAt = now
         };
 
-        await _versions.InsertOneAsync(doc, cancellationToken: ct);
-        return new GeneratedTemplateCacheVersionBinding(doc.Id, doc.VersionNumber, doc.ScenarioKey, doc.TemplateSetHash);
+        try
+        {
+            await _versions.InsertOneAsync(doc, cancellationToken: ct);
+            return new GeneratedTemplateCacheVersionBinding(doc.Id, doc.VersionNumber, doc.ScenarioKey, doc.TemplateSetHash);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            var existingAfterRace = await _versions
+                .Find(version => version.ScenarioKey == scenarioKey && version.TemplateSetHash == hash)
+                .SortByDescending(version => version.VersionNumber)
+                .FirstOrDefaultAsync(ct);
+
+            if (existingAfterRace == null)
+                throw;
+
+            await _versions.UpdateOneAsync(
+                version => version.Id == existingAfterRace.Id,
+                Builders<GeneratedTemplateCacheVersionDocument>.Update.Set(version => version.LastUsedAt, DateTimeOffset.UtcNow),
+                cancellationToken: ct);
+
+            return new GeneratedTemplateCacheVersionBinding(
+                existingAfterRace.Id,
+                existingAfterRace.VersionNumber,
+                existingAfterRace.ScenarioKey,
+                existingAfterRace.TemplateSetHash);
+        }
     }
 
     private static string BuildScenarioKey(Guid? scenarioId, string? scenarioName, IReadOnlyList<string> templateKeys)
