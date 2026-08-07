@@ -3,6 +3,7 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -54,8 +55,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
 
-        _fixture.TenantApiServiceMock
-            .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityExistenceMock
+            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
     }
 
@@ -63,16 +64,34 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
     private async Task<string> CreateMappingAsync()
     {
-        var mapping = new MeasureMapping();
+        // Measure is required and (Measure, Dqm) is unique, so each mapping needs its own name.
+        var mapping = new MeasureMapping
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            Dqm = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        };
+
         await _mappingRepository.AddAsync(mapping);
         await _mappingRepository.SaveChangesAsync();
 
         return mapping.Id;
     }
 
-    private async Task<FacilityReportingPlanModel> ValidRequestAsync(string facilityId = FacilityId, int month = 5,
+    private async Task<FacilityReportingPlanRequest> ValidRequestAsync(string facilityId = FacilityId, int month = 5,
         int year = 2026, bool isReporting = true) => new()
         {
+            FacilityId = facilityId,
+            MeasureMappingId = await CreateMappingAsync(),
+            ReportingMonth = month,
+            ReportingYear = year,
+            IsReporting = isReporting
+        };
+
+    private async Task<FacilityReportingPlanUpdateRequest> ValidUpdateRequestAsync(string? id = null,
+        string facilityId = FacilityId, int month = 5, int year = 2026, bool isReporting = true) => new()
+        {
+            Id = id,
             FacilityId = facilityId,
             MeasureMappingId = await CreateMappingAsync(),
             ReportingMonth = month,
@@ -113,14 +132,26 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFacilityReportingPlan_DuplicatePeriod_ReturnsBadRequest()
+    public async Task CreateFacilityReportingPlan_DuplicatePeriod_ReturnsConflict()
     {
         var request = await ValidRequestAsync();
 
         await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
         var second = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(second);
+        Assert.IsType<ConflictObjectResult>(second);
+    }
+
+    [Fact]
+    public async Task CreateFacilityReportingPlan_NullMeasureMappingId_ReturnsBadRequest()
+    {
+        var request = await ValidRequestAsync();
+        request.MeasureMappingId = null;
+
+        var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("MeasureMappingId is required.", badRequest.Value);
     }
 
     [Fact]
@@ -137,8 +168,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task CreateFacilityReportingPlan_UnknownFacility_ReturnsBadRequest()
     {
-        _fixture.TenantApiServiceMock
-            .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityExistenceMock
+            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         var result = await _controller.CreateFacilityReportingPlan(await ValidRequestAsync(), CancellationToken.None);
@@ -242,12 +273,25 @@ public class FacilityReportingPlansControllerTests : IDisposable
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Theory]
+    [InlineData("<script>alert(1)</script>")]
+    [InlineData("")]
+    public async Task SearchFacilityReportingPlans_SortByThatIsBlankAfterSanitizing_FallsBackToTheDefault(string sortBy)
+    {
+        await CreatedPlanAsync();
+
+        var result = await _controller.SearchFacilityReportingPlans(null, null, null, null, null,
+            sortBy: sortBy, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
     [Fact]
     public async Task UpdateFacilityReportingPlan_ChangesTheStoredPlan()
     {
         var created = await CreatedPlanAsync(month: 5, isReporting: true);
 
-        var result = await _controller.UpdateFacilityReportingPlan(created.Id!, new FacilityReportingPlanModel
+        var result = await _controller.UpdateFacilityReportingPlan(created.Id!, new FacilityReportingPlanUpdateRequest
         {
             Id = created.Id,
             FacilityId = created.FacilityId,
@@ -269,7 +313,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var created = await CreatedPlanAsync();
 
         var result = await _controller.UpdateFacilityReportingPlan(created.Id!,
-            new FacilityReportingPlanModel { Id = Guid.NewGuid().ToString() }, CancellationToken.None);
+            new FacilityReportingPlanUpdateRequest { Id = Guid.NewGuid().ToString() }, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -277,11 +321,23 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task UpdateFacilityReportingPlan_UnknownId_Returns404()
     {
-        var request = await ValidRequestAsync();
+        var unknownId = Guid.NewGuid().ToString();
+        var request = await ValidUpdateRequestAsync(id: unknownId);
 
-        var result = await _controller.UpdateFacilityReportingPlan(Guid.NewGuid().ToString(), request, CancellationToken.None);
+        var result = await _controller.UpdateFacilityReportingPlan(unknownId, request, CancellationToken.None);
 
         Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateFacilityReportingPlan_MissingId_ReturnsBadRequest()
+    {
+        var created = await CreatedPlanAsync();
+
+        var result = await _controller.UpdateFacilityReportingPlan(created.Id!,
+            await ValidUpdateRequestAsync(id: null), CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
@@ -289,7 +345,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var created = await CreatedPlanAsync();
 
-        var result = await _controller.UpdateFacilityReportingPlan(created.Id!, new FacilityReportingPlanModel
+        var result = await _controller.UpdateFacilityReportingPlan(created.Id!, new FacilityReportingPlanUpdateRequest
         {
             Id = created.Id,
             FacilityId = created.FacilityId,

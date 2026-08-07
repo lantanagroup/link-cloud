@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
@@ -58,31 +59,19 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             return true;
         }
 
-        /// <summary>
-        /// Registers the facility lookup the module validates reporting plans against. Facilities
-        /// belong to the host service, so the module confirms them through the shared Tenant API
-        /// client rather than reaching into the host's tables.
-        /// </summary>
-        /// <remarks>
-        /// The host is the Tenant service itself, so this configuration is normally absent there and
-        /// <see cref="TenantServiceRegistration"/> would be null. A missing section is filled in with
-        /// the check turned off: an unconfigured lookup cannot verify anything, and refusing every
-        /// write would be worse than accepting one. Set
-        /// <c>ServiceRegistry:TenantService:CheckIfTenantExists</c> to enable it.
-        /// </remarks>
         private static void AddFacilityVerification(WebApplicationBuilder builder)
         {
             builder.Services.PostConfigure<ServiceRegistry>(registry =>
             {
-                registry.TenantService ??= new TenantServiceRegistration { CheckIfTenantExists = false };
-
-                if (string.IsNullOrWhiteSpace(registry.TenantService.GetTenantRelativeEndpoint))
+                if (registry.TenantService is not null &&
+                    string.IsNullOrWhiteSpace(registry.TenantService.GetTenantRelativeEndpoint))
                 {
                     registry.TenantService.GetTenantRelativeEndpoint = DefaultFacilityRelativeEndpoint;
                 }
             });
 
             builder.Services.TryAddTransient<ITenantApiService, TenantApiService>();
+            builder.Services.TryAddScoped<IFacilityExistence, TenantApiFacilityExistence>();
         }
 
         /// <summary>

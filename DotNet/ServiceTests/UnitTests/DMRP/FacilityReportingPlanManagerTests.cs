@@ -1,7 +1,7 @@
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -19,7 +19,7 @@ namespace UnitTests.DMRP
         private readonly Mock<ILogger<FacilityReportingPlanManager>> _mockLogger;
         private readonly Mock<IEntityRepository<FacilityReportingPlan>> _mockRepository;
         private readonly Mock<IEntityRepository<MeasureMapping>> _mockMeasureMappingRepository;
-        private readonly Mock<ITenantApiService> _mockTenantApiService;
+        private readonly Mock<IFacilityExistence> _mockFacilityExistence;
         private readonly FacilityReportingPlanManager _manager;
 
         public FacilityReportingPlanManagerTests()
@@ -27,12 +27,12 @@ namespace UnitTests.DMRP
             _mockLogger = new Mock<ILogger<FacilityReportingPlanManager>>();
             _mockRepository = new Mock<IEntityRepository<FacilityReportingPlan>>();
             _mockMeasureMappingRepository = new Mock<IEntityRepository<MeasureMapping>>();
-            _mockTenantApiService = new Mock<ITenantApiService>();
+            _mockFacilityExistence = new Mock<IFacilityExistence>();
 
             // The happy path by default: the facility and the measure mapping both exist and the
             // period is not already taken. Each test spoils only what it is about.
-            _mockTenantApiService
-                .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _mockFacilityExistence
+                .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
             _mockMeasureMappingRepository
@@ -48,7 +48,7 @@ namespace UnitTests.DMRP
                 .ReturnsAsync((FacilityReportingPlan p, CancellationToken _) => p);
 
             _manager = new FacilityReportingPlanManager(_mockLogger.Object, _mockRepository.Object,
-                _mockMeasureMappingRepository.Object, _mockTenantApiService.Object);
+                _mockMeasureMappingRepository.Object, _mockFacilityExistence.Object);
         }
 
         private static FacilityReportingPlan ValidPlan() => new()
@@ -90,13 +90,33 @@ namespace UnitTests.DMRP
             await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
         }
 
-        [Fact]
-        public async Task CreateAsync_MissingMeasureMappingId_IsRejected()
+        [Theory]
+        [InlineData("")]
+        [InlineData(null)]
+        public async Task CreateAsync_MissingMeasureMappingId_IsRejected(string? measureMappingId)
         {
             var plan = ValidPlan();
-            plan.MeasureMappingId = string.Empty;
+            plan.MeasureMappingId = measureMappingId!;
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal("MeasureMappingId is required.", ex.Message);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_MissingMeasureMappingId_IsRejectedAndLeavesTheRowAlone()
+        {
+            var existing = ValidPlan();
+
+            _mockRepository.Setup(r => r.GetAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(existing);
+
+            var update = ValidPlan();
+            update.MeasureMappingId = string.Empty;
+
+            await Assert.ThrowsAsync<ApplicationException>(() => _manager.UpdateAsync(existing.Id, update));
+
+            Assert.NotEmpty(existing.MeasureMappingId);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Theory]
@@ -136,11 +156,14 @@ namespace UnitTests.DMRP
         [Fact]
         public async Task CreateAsync_FacilityNotInTenant_IsRejected()
         {
-            _mockTenantApiService
-                .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _mockFacilityExistence
+                .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(false);
 
             await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(ValidPlan()));
+
+            _mockFacilityExistence.Verify(
+                s => s.ExistsAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -150,7 +173,7 @@ namespace UnitTests.DMRP
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(ValidPlan()));
+            await Assert.ThrowsAsync<DmrpConflictException>(() => _manager.CreateAsync(ValidPlan()));
         }
 
         [Fact]
@@ -166,7 +189,7 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task CreateAsync_AnotherWriterTookThePeriodFirst_IsRejectedAsBadInput()
+        public async Task CreateAsync_AnotherWriterTookThePeriodFirst_IsReportedAsAConflict()
         {
             // Passes the pre-check, then the unique index rejects the insert and the row is there.
             var duplicateExists = false;
@@ -180,19 +203,40 @@ namespace UnitTests.DMRP
                 .Callback(() => duplicateExists = true)
                 .ThrowsAsync(new DbUpdateException("unique index violated"));
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(ValidPlan()));
+            await Assert.ThrowsAsync<DmrpConflictException>(() => _manager.CreateAsync(ValidPlan()));
         }
 
         [Fact]
         public async Task CreateAsync_DatabaseFailureThatIsNotADuplicate_IsNotDisguisedAsBadInput()
         {
+            var failure = new DbUpdateException("the database is unavailable");
+
             _mockRepository
                 .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new DbUpdateException("the database is unavailable"));
+                .ThrowsAsync(failure);
 
             // Not an ApplicationException: the caller sent a valid plan, so this must surface as a
             // server error rather than a 400.
-            await Assert.ThrowsAsync<DbUpdateException>(() => _manager.CreateAsync(ValidPlan()));
+            var thrown = await Assert.ThrowsAsync<DbUpdateException>(() => _manager.CreateAsync(ValidPlan()));
+
+            Assert.Same(failure, thrown);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_DatabaseFailureThatIsNotADuplicate_IsNotDisguisedAsBadInput()
+        {
+            var failure = new DbUpdateException("the database is unavailable");
+
+            _mockRepository.Setup(r => r.GetAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(ValidPlan());
+            _mockRepository
+                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(failure);
+
+            var thrown = await Assert.ThrowsAsync<DbUpdateException>(
+                () => _manager.UpdateAsync("some-id", ValidPlan()));
+
+            Assert.Same(failure, thrown);
         }
 
         [Fact]

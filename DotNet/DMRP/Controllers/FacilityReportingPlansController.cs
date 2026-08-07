@@ -74,9 +74,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
             int? month, int? year, bool? isReporting, string? sortBy, SortOrder? sortOrder,
             int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
-            facilityId = facilityId?.Sanitize();
-            measureMappingId = measureMappingId?.Sanitize();
-            sortBy = sortBy?.Sanitize();
+            facilityId = NullIfBlank(facilityId?.Sanitize());
+            measureMappingId = NullIfBlank(measureMappingId?.Sanitize());
+
+            sortBy = NullIfBlank(sortBy?.Sanitize());
 
             var periodError = ValidatePeriodFilters(month, year);
             if (periodError is not null)
@@ -84,24 +85,20 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequest(periodError);
             }
 
-            if (!string.IsNullOrWhiteSpace(sortBy) && !SortableColumns.Contains(sortBy))
+            if (sortBy is not null && !SortableColumns.Contains(sortBy))
             {
                 return BadRequest($"Cannot sort by '{sortBy}'.");
             }
 
-            if (pageSize < 1 || pageSize > 100)
+            var pagingError = ValidatePaging(pageSize, pageNumber);
+            if (pagingError is not null)
             {
-                pageSize = 10;
-            }
-
-            if (pageNumber < 1)
-            {
-                pageNumber = 1;
+                return BadRequest(pagingError);
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Facility Reporting Plans");
 
-            var result = await _queries.PagedSearchAsync(NullIfBlank(facilityId), NullIfBlank(measureMappingId),
+            var result = await _queries.PagedSearchAsync(facilityId, measureMappingId,
                 month, year, isReporting, sortBy ?? nameof(FacilityReportingPlan.Id),
                 sortOrder ?? SortOrder.Descending, pageSize, pageNumber, cancellationToken);
 
@@ -171,9 +168,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// </summary>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityReportingPlanModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
-        public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanModel request, CancellationToken cancellationToken)
+        public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanRequest request, CancellationToken cancellationToken)
         {
             if (request is null)
             {
@@ -185,6 +183,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
             try
             {
                 created = await _manager.CreateAsync(ToEntity(request), cancellationToken);
+            }
+            catch (DmrpConflictException ex)
+            {
+                return Conflict(ex.Message);
             }
             catch (ApplicationException ex)
             {
@@ -207,9 +209,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(FacilityReportingPlanModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFacilityReportingPlan(string id, FacilityReportingPlanModel request, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateFacilityReportingPlan(string id, FacilityReportingPlanUpdateRequest request, CancellationToken cancellationToken)
         {
             id = id.Sanitize();
 
@@ -218,7 +221,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequest("A facility reporting plan is required.");
             }
 
-            if (request.Id != null && request.Id != id)
+            if (string.IsNullOrWhiteSpace(request.Id))
+            {
+                return BadRequest("Id is required in the request body.");
+            }
+
+            if (request.Id != id)
             {
                 return BadRequest("Id in the URL must match the Id in the request body.");
             }
@@ -230,6 +238,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
             catch (DmrpNotFoundException ex)
             {
                 return NotFound(ex.Message);
+            }
+            catch (DmrpConflictException ex)
+            {
+                return Conflict(ex.Message);
             }
             catch (ApplicationException ex)
             {
@@ -325,6 +337,28 @@ namespace LantanaGroup.Link.DMRP.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Rejects paging arguments outside the supported range rather than quietly substituting the
+        /// defaults, so a caller that asks for page -1 is told its request was wrong instead of being
+        /// handed page 1 as though it had asked for it.
+        /// </summary>
+        internal const int MaximumPageSize = 100;
+
+        private static string? ValidatePaging(int pageSize, int pageNumber)
+        {
+            if (pageNumber < 1)
+            {
+                return "pageNumber must be 1 or greater.";
+            }
+
+            if (pageSize < 1 || pageSize > MaximumPageSize)
+            {
+                return $"pageSize must be between 1 and {MaximumPageSize}.";
+            }
+
+            return null;
+        }
+
         private static string? ValidatePeriodFilters(int? month, int? year)
         {
             if (month is < 1 or > 12)
@@ -344,13 +378,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
         private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-        private static FacilityReportingPlan ToEntity(FacilityReportingPlanModel model) => new()
+        private static FacilityReportingPlan ToEntity(FacilityReportingPlanRequest request) => new()
         {
-            FacilityId = model.FacilityId?.Sanitize() ?? string.Empty,
-            MeasureMappingId = model.MeasureMappingId?.Sanitize() ?? string.Empty,
-            ReportingMonth = model.ReportingMonth,
-            ReportingYear = model.ReportingYear,
-            IsReporting = model.IsReporting
+            FacilityId = request.FacilityId?.Sanitize() ?? string.Empty,
+            MeasureMappingId = request.MeasureMappingId?.Sanitize() ?? string.Empty,
+            ReportingMonth = request.ReportingMonth,
+            ReportingYear = request.ReportingYear,
+            IsReporting = request.IsReporting
         };
 
         private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) => new()

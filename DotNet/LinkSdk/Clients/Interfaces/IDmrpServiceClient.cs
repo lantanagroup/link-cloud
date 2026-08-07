@@ -12,9 +12,9 @@ public interface IDmrpServiceClient
     Task<LinkApiResponse> DeleteMeasureMappingAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
 
-    Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(FacilityReportingPlanModel request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(FacilityReportingPlanRequest request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityReportingPlanModel>> GetFacilityReportingPlanAsync(string id, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(string id, FacilityReportingPlanModel request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(string id, FacilityReportingPlanUpdateRequest request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityReportingPlanAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
 

@@ -60,7 +60,7 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(
-        FacilityReportingPlanModel request,
+        FacilityReportingPlanRequest request,
         CancellationToken cancellationToken = default) =>
         SendAsync<FacilityReportingPlanModel>(() => Request("/dmrp/reporting-plans")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
@@ -73,7 +73,7 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(
         string id,
-        FacilityReportingPlanModel request,
+        FacilityReportingPlanUpdateRequest request,
         CancellationToken cancellationToken = default) =>
         SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
@@ -93,17 +93,37 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse<List<FacilityReportingPlanModel>>> GetFacilityReportingPlansForFacilityAsync(
+    public async Task<LinkApiResponse<List<FacilityReportingPlanModel>>> GetFacilityReportingPlansForFacilityAsync(
         string facilityId,
         int? month = null,
         int? year = null,
         bool? isReporting = null,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<List<FacilityReportingPlanModel>>(() => Request($"/dmrp/reporting-plans/facilities/{facilityId}")
-            .SetQueryParam("month", month)
-            .SetQueryParam("year", year)
-            .SetQueryParam("isReporting", isReporting)
-            .GetAsync(cancellationToken: cancellationToken));
+        CancellationToken cancellationToken = default)
+    {
+        var response = await SendAsync<List<FacilityReportingPlanModel>>(
+            () => Request($"/dmrp/reporting-plans/facilities/{facilityId}")
+                .SetQueryParam("month", month)
+                .SetQueryParam("year", year)
+                .SetQueryParam("isReporting", isReporting)
+                .GetAsync(cancellationToken: cancellationToken));
+
+        if (response.IsSuccessStatusCode && response.Body is null)
+        {
+            return new LinkApiResponse<List<FacilityReportingPlanModel>>
+            {
+                StatusCode = response.StatusCode,
+                Body = [],
+                RawBody = response.RawBody,
+                ContentType = response.ContentType,
+                RequestUrl = response.RequestUrl,
+                RequestMethod = response.RequestMethod,
+                RequestBody = response.RequestBody,
+                TraceId = response.TraceId
+            };
+        }
+
+        return response;
+    }
 
     public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(
         string? facilityId,
