@@ -2,11 +2,8 @@
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
-using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
@@ -1172,6 +1169,140 @@ public class FhirServiceTests
         var resultParameter = result.GetSingleValue<FhirBoolean>("result");
         Assert.NotNull(resultParameter);
         Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodeAndSystem_ReturnsNameVersionDisplay()
+    {
+        // Arrange
+        var codeSystemId = "lookup-cs-id";
+        var codeSystemUrl = "http://lookup.system";
+        var codeSystemVersion = "2.0.0";
+        var code = "lookup-code";
+        var display = "Lookup Display";
+        var name = "LookupCodeSystem";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = codeSystemUrl,
+            Name = name,
+            Version = codeSystemVersion,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, codeSystemVersion))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.LookupCodeInCodeSystem(null, null, codeSystemUrl, code, codeSystemVersion, null);
+
+        // Assert
+        Assert.Equal(name, result.GetSingleValue<FhirString>("name")?.Value);
+        Assert.Equal(codeSystemVersion, result.GetSingleValue<FhirString>("version")?.Value);
+        Assert.Equal(display, result.GetSingleValue<FhirString>("display")?.Value);
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodingParameter_ReturnsNameVersionDisplay()
+    {
+        // Arrange
+        var codeSystemId = "lookup-cs-id";
+        var codeSystemUrl = "http://lookup.system";
+        var codeSystemVersion = "3.1.4";
+        var code = "lookup-code";
+        var display = "Lookup Display";
+        var name = "LookupCodeSystem";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = codeSystemUrl,
+            Name = name,
+            Version = codeSystemVersion,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, codeSystemVersion))
+            .Returns(mockCodeGroup);
+
+        var parameters = new Parameters();
+        parameters.Add("version", new FhirString(codeSystemVersion));
+        parameters.Add("coding", new Coding(codeSystemUrl, code, null));
+
+        // Act
+        var result = _service.LookupCodeInCodeSystem(null, null, null, null, null, parameters);
+
+        // Assert
+        Assert.Equal(name, result.GetSingleValue<FhirString>("name")?.Value);
+        Assert.Equal(codeSystemVersion, result.GetSingleValue<FhirString>("version")?.Value);
+        Assert.Equal(display, result.GetSingleValue<FhirString>("display")?.Value);
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithVersionNoMatch_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var codeSystemUrl = "http://lookup.system";
+        var requestedVersion = "9.9.9";
+        var fallbackCodeGroup = new CodeGroup
+        {
+            Id = "lookup-cs-id",
+            Url = codeSystemUrl,
+            Name = "LookupCodeSystem",
+            Version = "1.0.0",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = "lookup-code", Display = "Lookup Display" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, requestedVersion))
+            .Returns(fallbackCodeGroup);
+
+        // Act / Assert
+        Assert.Throws<KeyNotFoundException>(() =>
+            _service.LookupCodeInCodeSystem(null, null, codeSystemUrl, "lookup-code", requestedVersion, null));
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodeSystemAndCoding_ThrowsArgumentException()
+    {
+        // Arrange
+        var parameters = new Parameters();
+        parameters.Add("coding", new Coding("http://lookup.system", "lookup-code", null));
+
+        // Act / Assert
+        Assert.Throws<ArgumentException>(() =>
+            _service.LookupCodeInCodeSystem(null, null, "http://lookup.system", "lookup-code", null, parameters));
+    }
+
+    [Fact]
+    public void GetMetaData_CodeSystemOperations_IncludesLookupOperation()
+    {
+        // Act
+        var result = _service.GetMetaData();
+
+        // Assert
+        var codeSystemResource = result.Rest
+            .SelectMany(rest => rest.Resource)
+            .First(resource => resource.Type == "CodeSystem");
+
+        Assert.Contains(codeSystemResource.Operation, operation =>
+            operation.Name == "lookup" &&
+            operation.Definition == "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup");
     }
 
     #endregion
