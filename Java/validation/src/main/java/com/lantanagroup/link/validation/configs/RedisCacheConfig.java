@@ -79,6 +79,9 @@ public class RedisCacheConfig {
     @Bean
     public CacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory, RedisCacheConfiguration redisCacheConfiguration) {
         logger.info("Cache type set to 'redis'");
+        // deliberately not .transactionAware() — its deferred evicts run outside the cache
+        // error handler, so a redis outage would 500 lifecycle calls whose commit already
+        // went through. RubricCacheService defers its own evictions to after-commit instead.
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration)
                 .build();

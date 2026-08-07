@@ -27,10 +27,13 @@ public class MemoryCacheConfig {
     @ConditionalOnProperty(name = "cache.type", havingValue = "memory")
     public CacheManager caffeineCacheManager() {
         logger.info("Cache type set to 'memory'");
+        // caffeine runs in static mode here — cache names not in this list don't exist
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
                 "validateCodeCache",
                 "isCodeSystemSupportedCache",
-                "isValueSetSupportedCache");
+                "isValueSetSupportedCache",
+                "rubricVersionCache",
+                "rubricLatestSemverCache");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(this.cacheConfig.getValidateCode().getTtl()))
                 .maximumSize(1000));
