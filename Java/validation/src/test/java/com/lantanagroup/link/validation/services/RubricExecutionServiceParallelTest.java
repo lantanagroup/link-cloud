@@ -15,6 +15,7 @@ import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
+import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -269,12 +270,13 @@ class RubricExecutionServiceParallelTest {
 
     private RubricExecutionService service(List<RubricCheck> checks, CheckExecutor executor,
                                            ThreadPoolTaskExecutor checkPool, boolean parallel) {
-        when(rubricCheckRepository.findByRubricVersionIdOrderByOrdinalAsc(version.getRubricVersionId()))
+        when(rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(version.getRubricVersionId()))
                 .thenReturn(checks);
         when(executorRegistry.get(any())).thenReturn(executor);
         return new RubricExecutionService(
                 versionResolver,
                 rubricCheckRepository,
+                mock(RubricVersionRepository.class),
                 executorRegistry,
                 new ResultEnvelopeAssembler(objectMapper, new ScoreAggregator()),
                 mock(RubricResultPersister.class),

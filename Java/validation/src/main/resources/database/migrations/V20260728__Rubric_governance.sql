@@ -2,6 +2,9 @@
 -- lifecycle audit (rubric_lifecycle_event), facility-level overrides (facility_override),
 -- and evaluation results (rubric_result, rubric_finding).
 
+-- needed for the filtered unique index below, sqlcmd defaults this to OFF
+set quoted_identifier on;
+
 if not exists (select 1 from sys.tables where name = 'rubric' and schema_id = schema_id('dbo'))
 begin
     create table rubric
@@ -27,6 +30,11 @@ begin
         published_by            varchar(128),
         retired_at              datetimeoffset(6),
         retired_by              varchar(128),
+        -- set when a $dry-run completes, publish checks these when the dry-run gate is on
+        dry_run_completed_at    datetimeoffset(6),
+        dry_run_status          varchar(32) check (dry_run_status in
+                                                   ('ACCEPTABLE', 'ACCEPTABLE_WITH_WARNINGS', 'UNACCEPTABLE',
+                                                    'INCONCLUSIVE')),
         checksum                varchar(64)       not null,
         definition_json         varchar(max),
         dimensions_json         varchar(max),
@@ -53,8 +61,11 @@ begin
                                                             'CURRENCY')),
         parameters_json   varchar(max),
         severity_override varchar(16) check (severity_override in ('ERROR', 'WARNING', 'INFORMATION')),
-        ordinal           int              not null,
+        -- nullable, checks without an ordinal run first (NULL sorts first)
+        ordinal           int,
         enabled           bit              not null,
+        -- soft delete, set when a draft re-registration replaces the version's checks
+        deleted           bit              not null default 0,
         primary key (check_id)
     );
 end;
@@ -154,10 +165,14 @@ begin
         add constraint uq_rv_rubric_semver unique (rubric_id, semver);
 end;
 
-if not exists (select 1 from sys.key_constraints where name = 'uq_check_rv_local')
+-- (rubric_version_id, check_local_id) is only unique among live rows, a replacement check
+-- from a draft re-registration can reuse a soft-deleted predecessor's local id
+if not exists (select 1 from sys.indexes where name = 'uq_check_rv_local_active'
+                 and object_id = object_id('rubric_check'))
 begin
-    alter table rubric_check
-        add constraint uq_check_rv_local unique (rubric_version_id, check_local_id);
+    create unique nonclustered index uq_check_rv_local_active
+        on rubric_check (rubric_version_id, check_local_id)
+        where deleted = 0;
 end;
 
 if not exists (select 1 from sys.key_constraints where name = 'uq_fo_facility_rubric_effective')
