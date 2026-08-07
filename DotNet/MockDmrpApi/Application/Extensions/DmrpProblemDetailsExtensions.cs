@@ -86,7 +86,11 @@ internal static class DmrpProblemDetailsExtensions
 
                 if (environment.IsDevelopment() || includeExceptionDetails)
                 {
-                    ctx.ProblemDetails.Extensions.Add("API", DmrpApiConstants.ServiceName);
+                    // Indexer rather than Add: Add throws on a key that is already present, and
+                    // nothing here owns this dictionary exclusively. Overwriting our own value
+                    // with the same value is harmless; throwing while building an error
+                    // response is not, since it replaces a useful 404 with an opaque 500.
+                    ctx.ProblemDetails.Extensions["API"] = DmrpApiConstants.ServiceName;
                 }
                 else
                 {
