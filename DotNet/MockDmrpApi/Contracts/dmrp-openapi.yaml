@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: DMRP API
-  version: 0.2.0-provisional
+  version: 0.3.0-provisional
   description: |
     ##########################################################################
     # PROVISIONAL. THIS IS NOT THE PUBLISHED CONTRACT.
@@ -23,12 +23,14 @@ info:
     # contract also hosts a separate support surface, which is deliberately
     # absent here so that this document can be replaced without losing it.
     #
-    # Treat no field name, path or status code here as authoritative.
+    # The parameter names and the response body below came from LCG's record
+    # of the real request and response. The status codes, the rejection of a
+    # malformed period, and the component identifiers MSC and PS did not.
     ##########################################################################
 
     ## Two reporting plans, two components
 
-    A reporting plan lists the NHSN measures a facility is enrolled to report.
+    A reporting plan lists the NHSN modules a facility is enrolled to report.
     There are two, and they differ in both subject and cadence:
 
     | Operation      | Component | Subject          | Cadence |
@@ -36,19 +38,38 @@ info:
     | `/msc`         | MSC       | Medicine reports | Monthly |
     | `/ps/annual`   | PS        | Patient safety   | Annual  |
 
-    `reportingMonth` is therefore present on a monthly plan and absent from an
-    annual one.
+    Both accept the same query parameters. `month` has no meaning for the
+    annual plan, whose entries carry no month, so it is accepted and ignored
+    there rather than narrowing the result to nothing.
+
+    ## Only nhsnorgid is required
+
+    Everything else narrows the result. Omitting `year` returns every year the
+    facility has entries for; omitting `month` returns every month; omitting
+    `name` returns every module. A caller that supplies only `nhsnorgid` gets
+    the facility's whole plan for that component.
+
+    `year` and `month` are strings on the wire, not integers.
 
     ## Enrollment is expressed by presence, not by value
 
-    Both operations return only the measures a facility IS enrolled in. A
-    measure that does not appear in the `measures` array means the facility is
-    NOT enrolled in it for that period. There is no negative representation,
-    and `isReporting` is currently always `Y` wherever an entry exists.
+    Both operations return only the modules a facility IS enrolled in. A module
+    that does not appear in the `plans` array means the facility is NOT
+    enrolled in it. There is no negative representation, and `reporting` is
+    only ever `Y` - so that field carries no information a caller can act on.
 
     Consequently a facility enrolled in nothing returns `200` with an empty
-    `measures` array - not `204`, and not `404`. An empty plan is a
+    `plans` array - not `204`, and not `404`. An empty plan is a
     meaningful answer, not an absent resource.
+
+    ## The same value appears twice, with two types
+
+    `month` and `year` are NUMERIC on the root object and STRINGS inside
+    `plans`, and the facility is `orgid` (numeric) at the root but
+    `nhsnorgid` (string) inside `plans`. This stand-in reproduces that
+    faithfully. Normalising it would let a consumer write code that works here
+    and fails against the real endpoint, which is precisely what this service
+    exists to prevent.
 
 servers:
   - url: http://localhost:6159
@@ -66,30 +87,18 @@ paths:
       operationId: GetMonthlyMedicineReportingPlan
       summary: Get a facility's monthly medicine reporting plan.
       description: |
-        Returns the medicine-report measures the facility is enrolled to report
-        for the given month and year.
+        Returns the medicine-report modules the facility is enrolled to report,
+        narrowed by whichever of `name`, `year` and `month` are supplied.
       security:
         - dmrpBearer: []
       parameters:
-        - name: facilityId
-          in: query
-          required: true
-          description: The facility identifier, as known to the reporting system.
-          schema: { type: string, minLength: 1, maxLength: 120 }
-          example: FAC001
-        - name: reportingMonth
-          in: query
-          required: true
-          schema: { type: integer, format: int32, minimum: 1, maximum: 12 }
-          example: 5
-        - name: reportingYear
-          in: query
-          required: true
-          schema: { type: integer, format: int32, minimum: 2000, maximum: 2100 }
-          example: 2026
+        - $ref: '#/components/parameters/NhsnOrgId'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
       responses:
         '200':
-          description: The monthly reporting plan. `measures` may be empty.
+          description: The reporting plan. `measures` may be empty.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
@@ -106,28 +115,22 @@ paths:
       operationId: GetPatientSafetyAnnualReportingPlan
       summary: Get a facility's annual patient-safety reporting plan.
       description: |
-        Returns the patient-safety measures the facility is enrolled to report
-        for the given year.
+        Returns the patient-safety modules the facility is enrolled to report,
+        narrowed by whichever of `name` and `year` are supplied.
 
-        This plan is annual, so it takes no month and the response omits
+        This plan is annual. `month` is accepted for symmetry with the monthly
+        plan but does not narrow the result, and the response omits
         `reportingMonth`.
       security:
         - dmrpBearer: []
       parameters:
-        - name: facilityId
-          in: query
-          required: true
-          description: The facility identifier, as known to the reporting system.
-          schema: { type: string, minLength: 1, maxLength: 120 }
-          example: FAC001
-        - name: reportingYear
-          in: query
-          required: true
-          schema: { type: integer, format: int32, minimum: 2000, maximum: 2100 }
-          example: 2026
+        - $ref: '#/components/parameters/NhsnOrgId'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
       responses:
         '200':
-          description: The annual reporting plan. `measures` may be empty.
+          description: The reporting plan. `measures` may be empty.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
@@ -139,6 +142,44 @@ paths:
           $ref: '#/components/responses/Unavailable'
 
 components:
+
+  parameters:
+
+    NhsnOrgId:
+      name: nhsnorgid
+      in: query
+      required: true
+      description: The Link Cloud facility identifier.
+      schema: { type: string, minLength: 1, maxLength: 120 }
+      example: '100'
+
+    Name:
+      name: name
+      in: query
+      required: false
+      description: |
+        The NHSN module, for example `HOB` or `HTCDI`. Not to be confused with
+        the dQM (ACH Monthly, Daily, and so on). Omit to return every module.
+      schema: { type: string, maxLength: 50 }
+      example: HOB
+
+    Year:
+      name: year
+      in: query
+      required: false
+      description: The year of the reporting period. Omit to return every year.
+      schema: { type: string, maxLength: 4 }
+      example: '2020'
+
+    Month:
+      name: month
+      in: query
+      required: false
+      description: |
+        The month of the reporting period, `1` to `12`. Omit to return every
+        month. Has no effect on the annual plan.
+      schema: { type: string, maxLength: 2 }
+      example: '2'
 
   securitySchemes:
     dmrpBearer:
@@ -170,44 +211,112 @@ components:
 
     ReportingPlanResponse:
       type: object
-      required: [facilityId, reportingYear, measures]
+      required: [plans]
+      description: |
+        NOTE THE TYPES. `month` and `year` are NUMERIC here and STRINGS inside
+        `plans`. That is how the real API behaves, and this stand-in reproduces
+        it deliberately rather than tidying it up -- a consumer that codes
+        against a cleaned-up shape here would break on first contact with the
+        real endpoint, which is the one failure this service exists to prevent.
       properties:
-        facilityId:
-          type: string
-        reportingMonth:
+        psDMRptPlanID:
+          type: integer
+          format: int32
+          nullable: true
+          description: The reporting plan record's own identifier.
+          example: 1
+        orgid:
           type: integer
           format: int32
           nullable: true
           description: |
-            The reporting month, on a monthly plan. Absent from an annual plan.
-        reportingYear:
+            The facility, as a NUMBER. Equivalent to the Link Cloud facility
+            identifier. Null when the facility identifier is not numeric --
+            see `plans[].nhsnorgid`, which carries it as a string.
+          example: 100
+        year:
           type: integer
           format: int32
-        measures:
+          nullable: true
+          description: |
+            The year the result was narrowed to, echoed from the request. Null
+            when no year was supplied, in which case `plans` may span several
+            years. NUMERIC here, a string inside `plans`.
+          example: 2020
+        month:
+          type: integer
+          format: int32
+          nullable: true
+          description: |
+            The month the result was narrowed to, echoed from the request. Null
+            when no month was supplied, and always null on the annual plan.
+            NUMERIC here, a string inside `plans`.
+          example: 2
+        modifyDate:
+          type: string
+          nullable: true
+          description: |
+            When the plan was last changed. Note the format: a space separator
+            and no timezone, which is NOT RFC 3339. Typed as a plain string so
+            it is emitted exactly as the real API emits it rather than being
+            normalised to ISO 8601 by a date-time binding.
+          example: '2023-09-09 11:12:12.59'
+        createDate:
+          type: string
+          nullable: true
+          description: When the plan was created. Same format as `modifyDate`.
+          example: '2023-09-09 11:12:12.59'
+        plans:
           type: array
           description: |
-            Only measures the facility IS enrolled in appear here. Absence of a
-            measure means the facility is NOT enrolled in it for this period.
-            There is no negative representation. An empty array is a valid,
-            meaningful response.
-          items: { $ref: '#/components/schemas/ReportingPlanMeasure' }
-        retrievedOn:
-          type: string
-          format: date-time
-          description: When the response was produced.
+            Only modules the facility IS enrolled in appear here. Absence of a
+            module means the facility is NOT enrolled in it. There is no
+            negative representation. An empty array is a valid, meaningful
+            response.
+          items: { $ref: '#/components/schemas/ReportingPlanItem' }
 
-    ReportingPlanMeasure:
+    ReportingPlanItem:
       type: object
-      required: [measure, isReporting]
+      required: [name]
       properties:
-        measure:
+        name:
           type: string
-          description: NHSN measure short name.
+          description: |
+            The NHSN measure the facility is enrolled in. A consumer maps this
+            to the dQM Link Cloud reports patients against; that mapping is not
+            part of this API.
           example: HOB
-        isReporting:
+        nhsnorgid:
           type: string
-          description: Currently always `Y`.
+          nullable: true
+          description: The facility, as a STRING here. Numeric at the root as `orgid`.
+          example: '100'
+        month:
+          type: string
+          nullable: true
+          description: |
+            The entry's own reporting month, as a STRING. Numeric at the root.
+            Absent for an annual component, whose entries carry no month.
+          example: '2'
+        year:
+          type: string
+          nullable: true
+          description: The entry's own reporting year, as a STRING. Numeric at the root.
+          example: '2020'
+        reporting:
+          type: string
+          nullable: true
+          description: |
+            Only ever `Y`. Every entry returned is one the facility is enrolled
+            to report for the period, so this field carries no information a
+            caller can act on -- enrollment is conveyed by the entry's presence.
           example: 'Y'
+        rptSeq:
+          type: integer
+          format: int32
+          nullable: true
+          description: Report sequence.
+          example: 0
 
     ProblemDetails:
       type: object

@@ -20,25 +20,35 @@ public interface IReportingPlanService
         ReportingPlanSearchCriteria criteria, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The entries making up a facility's monthly plan for one component -- MSC today.
+    /// The entries making up a facility's reporting plan for one component.
     /// </summary>
+    /// <param name="component">MSC or PS. Always applied — the two plans never mix.</param>
+    /// <param name="nhsnOrgId">The facility. Always applied.</param>
+    /// <param name="measure">An NHSN module to narrow to, or null for every module.</param>
+    /// <param name="reportingMonth">A month to narrow to, or null for every month.</param>
+    /// <param name="reportingYear">A year to narrow to, or null for every year.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
     /// <remarks>
-    /// Only entries actively being reported are returned; the absence of a measure is what
+    /// Component and facility are the only filters always applied; the rest narrow the result
+    /// when supplied and are ignored when not. A caller passing neither month nor year gets
+    /// the facility's whole plan for that component.
+    /// <para>
+    /// Only entries actively being reported are returned; the absence of a module is what
     /// conveys "not enrolled".
+    /// </para>
+    /// <para>
+    /// Annual components carry no reporting month, so the caller passes null for
+    /// <paramref name="reportingMonth"/> there. Matching on a month would exclude every row
+    /// it is supposed to return.
+    /// </para>
     /// </remarks>
-    Task<IReadOnlyList<ReportingPlanEntryEntity>> GetMonthlyReportingPlanAsync(
-        string component, string facilityId, int reportingMonth, int reportingYear,
+    Task<IReadOnlyList<ReportingPlanEntryEntity>> GetReportingPlanAsync(
+        string component,
+        string nhsnOrgId,
+        string? measure,
+        int? reportingMonth,
+        int? reportingYear,
         CancellationToken cancellationToken);
-
-    /// <summary>
-    /// The entries making up a facility's annual plan for one component -- PS today.
-    /// </summary>
-    /// <remarks>
-    /// Annual components carry no reporting month, so this matches on the year alone. Same
-    /// absence semantics as the monthly plan.
-    /// </remarks>
-    Task<IReadOnlyList<ReportingPlanEntryEntity>> GetAnnualReportingPlanAsync(
-        string component, string facilityId, int reportingYear, CancellationToken cancellationToken);
 
     /// <summary>
     /// Creates an entry.

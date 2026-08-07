@@ -35,16 +35,17 @@ public class EntryMapperTests
 
         var plan = EntryMapper.ToReportingPlan("F1", 5, 2026, [Entry(measure: "HOB")], retrievedOn);
 
-        plan.FacilityId.Should().Be("F1");
-        plan.ReportingMonth.Should().Be(5);
-        plan.ReportingYear.Should().Be(2026);
-        plan.RetrievedOn.Should().Be(retrievedOn);
-        plan.Measures.Should().ContainSingle();
-        plan.Measures.Single().Measure.Should().Be("HOB");
-        plan.Measures.Single().IsReporting.Should().Be("Y");
+        plan.Orgid.Should().BeNull("F1 is not numeric, so it cannot be represented by the root orgid");
+        plan.Month.Should().Be(5);
+        plan.Year.Should().Be(2026);
+        plan.CreateDate.Should().MatchRegex(@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{2}$",
+            "the real API's format is a space separator with no timezone, not ISO 8601");
+        plan.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HOB");
+        plan.Plans.Single().Reporting.Should().Be("Y");
 
         // The absence of HTCDI is what tells a caller the facility is not enrolled in it.
-        plan.Measures.Should().NotContain(m => m.Measure == "HTCDI");
+        plan.Plans.Should().NotContain(m => m.Name == "HTCDI");
     }
 
     [Fact]
@@ -57,9 +58,9 @@ public class EntryMapperTests
             [Entry(measure: "HAI", month: null, component: ReportingComponents.Ps)],
             DateTimeOffset.UtcNow);
 
-        plan.ReportingMonth.Should().BeNull();
-        plan.ReportingYear.Should().Be(2026);
-        plan.Measures.Should().ContainSingle();
+        plan.Month.Should().BeNull();
+        plan.Year.Should().Be(2026);
+        plan.Plans.Should().ContainSingle();
     }
 
     [Fact]
@@ -70,8 +71,8 @@ public class EntryMapperTests
         // consumer code for the most ordinary case there is.
         var plan = EntryMapper.ToReportingPlan("F1", 5, 2026, [], DateTimeOffset.UtcNow);
 
-        plan.Measures.Should().NotBeNull();
-        plan.Measures.Should().BeEmpty();
+        plan.Plans.Should().NotBeNull();
+        plan.Plans.Should().BeEmpty();
     }
 
     [Fact]

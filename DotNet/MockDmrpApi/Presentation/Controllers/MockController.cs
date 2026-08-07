@@ -39,11 +39,14 @@ public class MockController : ControllerBase
 
     private readonly IReportingPlanService _reportingPlans;
     private readonly IAuthTokenService _tokens;
+    private readonly IResponseDelayService _delays;
 
-    public MockController(IReportingPlanService reportingPlans, IAuthTokenService tokens)
+    public MockController(
+        IReportingPlanService reportingPlans, IAuthTokenService tokens, IResponseDelayService delays)
     {
         _reportingPlans = reportingPlans ?? throw new ArgumentNullException(nameof(reportingPlans));
         _tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
+        _delays = delays ?? throw new ArgumentNullException(nameof(delays));
     }
 
     // ------------------------------------------------------------------ reads
@@ -257,6 +260,58 @@ public class MockController : ControllerBase
     public async Task<IActionResult> DeleteAll(CancellationToken cancellationToken = default)
     {
         await _reportingPlans.DeleteAllAsync(cancellationToken);
+        return NoContent();
+    }
+
+    // ------------------------------------------------------------- response delay
+
+    /// <summary>Gets the artificial delay currently applied to the contract endpoints.</summary>
+    [HttpGet("delay")]
+    [ProducesResponseType(typeof(MockDelayModel), StatusCodes.Status200OK)]
+    public ActionResult<MockDelayModel> GetDelay()
+    {
+        return Ok(MockDelayModel.From(_delays.Current));
+    }
+
+    /// <summary>
+    /// Sets an artificial delay on the contract endpoints, for exercising a caller's timeout
+    /// and retry behaviour against a slow upstream.
+    /// </summary>
+    /// <remarks>
+    /// Held in memory and never persisted, so a restart always clears it.
+    /// <para>
+    /// Answers 200 rather than the 202 this service uses for PUT elsewhere. 202 says the work
+    /// has been accepted and will happen; this has already happened by the time the response
+    /// is written, and the body is the state now in force.
+    /// </para>
+    /// <para>
+    /// The delay never reaches <c>/mock</c>, so this endpoint and its counterparts stay
+    /// responsive no matter how long a delay is configured.
+    /// </para>
+    /// </remarks>
+    [HttpPut("delay")]
+    [ProducesResponseType(typeof(MockDelayModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult<MockDelayModel> SetDelay([FromBody] MockDelayRequest body)
+    {
+        try
+        {
+            return Ok(MockDelayModel.From(_delays.Set(body.Milliseconds)));
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            // The annotation covers the ordinary case; this catches a bound value that got
+            // past it, so the ceiling is enforced in one place rather than two.
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    /// <summary>Removes any artificial delay. Idempotent.</summary>
+    [HttpDelete("delay")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public IActionResult ClearDelay()
+    {
+        _delays.Clear();
         return NoContent();
     }
 

@@ -77,8 +77,8 @@ public class ReportingPlanSemanticsTests
         using var scope = _fixture.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IReportingPlanService>();
 
-        return await service.GetMonthlyReportingPlanAsync(
-            ReportingComponents.Msc, facilityId, month, year, CancellationToken.None);
+        return await service.GetReportingPlanAsync(
+            ReportingComponents.Msc, facilityId, null, month, year, CancellationToken.None);
     }
 
     private async Task<IReadOnlyList<ReportingPlanEntryEntity>> AnnualPlanAsync(
@@ -87,8 +87,8 @@ public class ReportingPlanSemanticsTests
         using var scope = _fixture.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IReportingPlanService>();
 
-        return await service.GetAnnualReportingPlanAsync(
-            ReportingComponents.Ps, facilityId, year, CancellationToken.None);
+        return await service.GetReportingPlanAsync(
+            ReportingComponents.Ps, facilityId, null, null, year, CancellationToken.None);
     }
 
     // ------------------------------------------------------ presence semantics
@@ -121,8 +121,8 @@ public class ReportingPlanSemanticsTests
         // And the projection turns that into an empty array, not a null a consumer would
         // dereference on the most ordinary case there is.
         var response = EntryMapper.ToReportingPlan("F1", 5, 2026, plan, DateTimeOffset.UtcNow);
-        response.Measures.Should().NotBeNull();
-        response.Measures.Should().BeEmpty();
+        response.Plans.Should().NotBeNull();
+        response.Plans.Should().BeEmpty();
     }
 
     [Fact]

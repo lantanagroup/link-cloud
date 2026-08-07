@@ -51,32 +51,27 @@ public class ReportingPlanService : IReportingPlanService
         return (records, metadata);
     }
 
-    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetMonthlyReportingPlanAsync(
-        string component, string facilityId, int reportingMonth, int reportingYear,
+    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetReportingPlanAsync(
+        string component,
+        string nhsnOrgId,
+        string? measure,
+        int? reportingMonth,
+        int? reportingYear,
         CancellationToken cancellationToken)
     {
+        // Component and facility always apply; the rest narrow only when supplied, so a
+        // caller passing neither month nor year gets the whole plan for that component.
+        //
         // Only entries actively being reported take part in a plan. An entry explicitly
         // marked as not reporting is equivalent to no entry at all, since the response
         // conveys enrollment by presence.
         return await _repository.FindAsync(
-            e => e.FacilityId == facilityId
+            e => e.FacilityId == nhsnOrgId
                  && e.Component == component
-                 && e.ReportingMonth == reportingMonth
-                 && e.ReportingYear == reportingYear
-                 && e.IsReporting == "Y",
-            cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetAnnualReportingPlanAsync(
-        string component, string facilityId, int reportingYear, CancellationToken cancellationToken)
-    {
-        // No month in the predicate: an annual component's entries carry none, and matching
-        // on one would exclude every row it is supposed to return.
-        return await _repository.FindAsync(
-            e => e.FacilityId == facilityId
-                 && e.Component == component
-                 && e.ReportingYear == reportingYear
-                 && e.IsReporting == "Y",
+                 && e.IsReporting == "Y"
+                 && (measure == null || e.Measure.ToLower() == measure.ToLower())
+                 && (reportingMonth == null || e.ReportingMonth == reportingMonth)
+                 && (reportingYear == null || e.ReportingYear == reportingYear),
             cancellationToken);
     }
 

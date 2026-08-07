@@ -55,7 +55,7 @@ public class ReportingPlanServiceTests
     // -------------------------------------------------------- monthly plan (MSC)
 
     [Fact]
-    public async Task GetMonthlyReportingPlanAsync_ReturnsOnlyTheMatchingFacilityMeasuresForThePeriod()
+    public async Task GetReportingPlanAsync_Monthly_ReturnsOnlyTheMatchingFacilityMeasuresForThePeriod()
     {
         _repository.Seed(
             Entry(measure: "HOB"),
@@ -64,15 +64,15 @@ public class ReportingPlanServiceTests
             Entry(measure: "HOB", month: 6),
             Entry(measure: "HOB", year: 2025));
 
-        var plan = await _service.GetMonthlyReportingPlanAsync(
-            ReportingComponents.Msc, "F1", 5, 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Msc, "F1", null, 5, 2026, CancellationToken.None);
 
         plan.Should().HaveCount(2);
         plan.Select(e => e.Measure).Should().BeEquivalentTo("HOB", "HTCDI");
     }
 
     [Fact]
-    public async Task GetMonthlyReportingPlanAsync_ExcludesOtherComponents()
+    public async Task GetReportingPlanAsync_Monthly_ExcludesOtherComponents()
     {
         // The two endpoints share one table. A patient-safety measure appearing in the
         // medicine plan would be a silent cross-contamination, not a visible failure.
@@ -80,15 +80,15 @@ public class ReportingPlanServiceTests
             Entry(measure: "HOB"),
             Entry(measure: "HAI", component: ReportingComponents.Ps, month: 5));
 
-        var plan = await _service.GetMonthlyReportingPlanAsync(
-            ReportingComponents.Msc, "F1", 5, 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Msc, "F1", null, 5, 2026, CancellationToken.None);
 
         plan.Should().ContainSingle();
         plan[0].Measure.Should().Be("HOB");
     }
 
     [Fact]
-    public async Task GetMonthlyReportingPlanAsync_ExcludesEntriesNotBeingReported()
+    public async Task GetReportingPlanAsync_Monthly_ExcludesEntriesNotBeingReported()
     {
         // Enrollment is conveyed by presence, so an entry marked as not reporting must not
         // appear in a plan -- it is equivalent to no entry at all.
@@ -96,20 +96,20 @@ public class ReportingPlanServiceTests
             Entry(measure: "HOB"),
             Entry(measure: "HTCDI", isReporting: "N"));
 
-        var plan = await _service.GetMonthlyReportingPlanAsync(
-            ReportingComponents.Msc, "F1", 5, 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Msc, "F1", null, 5, 2026, CancellationToken.None);
 
         plan.Should().ContainSingle();
         plan[0].Measure.Should().Be("HOB");
     }
 
     [Fact]
-    public async Task GetMonthlyReportingPlanAsync_ForAFacilityWithNoEntries_ReturnsEmptyRatherThanFailing()
+    public async Task GetReportingPlanAsync_Monthly_ForAFacilityWithNoEntries_ReturnsEmptyRatherThanFailing()
     {
         _repository.Seed(Entry(facilityId: "F2"));
 
-        var plan = await _service.GetMonthlyReportingPlanAsync(
-            ReportingComponents.Msc, "unknown-facility", 5, 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Msc, "unknown-facility", null, 5, 2026, CancellationToken.None);
 
         plan.Should().BeEmpty();
     }
@@ -117,7 +117,7 @@ public class ReportingPlanServiceTests
     // --------------------------------------------------------- annual plan (PS)
 
     [Fact]
-    public async Task GetAnnualReportingPlanAsync_ReturnsEveryMeasureForTheYearRegardlessOfMonth()
+    public async Task GetReportingPlanAsync_Annual_ReturnsEveryMeasureForTheYearRegardlessOfMonth()
     {
         // The annual predicate deliberately omits month. Seeding an MSC entry in the same
         // year proves the omission does not widen the result to other components.
@@ -128,8 +128,8 @@ public class ReportingPlanServiceTests
             AnnualEntry(facilityId: "F2", measure: "HAI"),
             Entry(measure: "HOB"));
 
-        var plan = await _service.GetAnnualReportingPlanAsync(
-            ReportingComponents.Ps, "F1", 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Ps, "F1", null, null, 2026, CancellationToken.None);
 
         plan.Should().HaveCount(2);
         plan.Select(e => e.Measure).Should().BeEquivalentTo("HAI", "SSI");
@@ -137,26 +137,26 @@ public class ReportingPlanServiceTests
     }
 
     [Fact]
-    public async Task GetAnnualReportingPlanAsync_ExcludesEntriesNotBeingReported()
+    public async Task GetReportingPlanAsync_Annual_ExcludesEntriesNotBeingReported()
     {
         _repository.Seed(
             AnnualEntry(measure: "HAI"),
             AnnualEntry(measure: "SSI", isReporting: "N"));
 
-        var plan = await _service.GetAnnualReportingPlanAsync(
-            ReportingComponents.Ps, "F1", 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Ps, "F1", null, null, 2026, CancellationToken.None);
 
         plan.Should().ContainSingle();
         plan[0].Measure.Should().Be("HAI");
     }
 
     [Fact]
-    public async Task GetAnnualReportingPlanAsync_ForAFacilityWithNoEntries_ReturnsEmptyRatherThanFailing()
+    public async Task GetReportingPlanAsync_Annual_ForAFacilityWithNoEntries_ReturnsEmptyRatherThanFailing()
     {
         _repository.Seed(AnnualEntry(facilityId: "F2"));
 
-        var plan = await _service.GetAnnualReportingPlanAsync(
-            ReportingComponents.Ps, "unknown-facility", 2026, CancellationToken.None);
+        var plan = await _service.GetReportingPlanAsync(
+            ReportingComponents.Ps, "unknown-facility", null, null, 2026, CancellationToken.None);
 
         plan.Should().BeEmpty();
     }

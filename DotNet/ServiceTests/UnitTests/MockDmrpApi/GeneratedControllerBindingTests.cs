@@ -31,14 +31,16 @@ namespace UnitTests.MockDmrpApi;
 /// and the operations land at the paths the contract names.</item>
 /// <item>Default parameter values do <em>not</em> carry over. An override that drops
 /// <c>= default</c> gets no default at all.</item>
+/// <item>Optional string filters are typed non-nullable. NSwag emits <c>string name</c>, not
+/// <c>string?</c>, and [ApiController] treats a non-nullable reference parameter as required —
+/// so a filter the contract documents as optional is mandatory in practice until the override
+/// restates it.</item>
 /// </list>
 /// <para>
-/// The contract is currently two operations with no optional parameters, so the third point
-/// has only the cancellation token to demonstrate it. It is kept because the contract is
-/// provisional: the published one is likely to add optional filters and paging, and that is
-/// exactly when this trap bites. The related hazard -- NSwag typing optional string filters as
-/// non-nullable, which [ApiController] then treats as required -- has no example on the
-/// current base and will need re-pinning if optional filters return.
+/// The fourth point is why <c>DmrpController</c> restates <c>name</c>, <c>year</c> and
+/// <c>month</c> as nullable rather than taking the generated signature. Both probe controllers
+/// below are deliberately wrong in that respect so the failure is observable; only
+/// <c>CorrectProbeController</c> shows the shape an implementation should use.
 /// </para>
 /// </remarks>
 public class GeneratedControllerBindingTests
@@ -132,10 +134,10 @@ public class GeneratedControllerBindingTests
         using var host = await StartHostAsync();
         var client = host.GetTestClient();
 
-        (await client.GetAsync("/annotated/msc?facilityId=F1&reportingMonth=5&reportingYear=2026"))
+        (await client.GetAsync("/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await client.GetAsync("/annotated/ps/annual?facilityId=F1&reportingYear=2026"))
+        (await client.GetAsync("/annotated/ps/annual?nhsnorgid=100&name=HAI&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -145,57 +147,77 @@ public class GeneratedControllerBindingTests
         using var host = await StartHostAsync();
 
         var response = await host.GetTestClient().GetAsync(
-            "/annotated/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
+            "/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        plan!.FacilityId.Should().Be("F1");
-        plan.ReportingMonth.Should().Be(5);
-        plan.ReportingYear.Should().Be(2026);
-    }
-
-    [Fact]
-    public async Task WithApiController_TheAnnualOperationBindsWithoutAMonth()
-    {
-        // Its signature has no month at all, so a request that omits one must succeed --
-        // and the response carries none.
-        using var host = await StartHostAsync();
-
-        var response = await host.GetTestClient().GetAsync("/annotated/ps/annual?facilityId=F1&reportingYear=2026");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        plan!.FacilityId.Should().Be("F1");
-        plan.ReportingYear.Should().Be(2026);
-        plan.ReportingMonth.Should().BeNull();
+        plan!.Orgid.Should().Be(100);
+        plan.Month.Should().Be(2);
+        plan.Year.Should().Be(2020);
     }
 
     [Theory]
-    [InlineData("/annotated/msc?reportingMonth=5&reportingYear=2026")]
-    [InlineData("/annotated/msc?facilityId=F1&reportingYear=2026")]
-    [InlineData("/annotated/msc?facilityId=F1&reportingMonth=5")]
-    [InlineData("/annotated/ps/annual?reportingYear=2026")]
-    [InlineData("/annotated/ps/annual?facilityId=F1")]
-    public async Task WithApiController_MissingRequiredQueryParameterIsRejected(string url)
+    [InlineData("/annotated/msc?name=HOB&year=2020&month=2")]
+    [InlineData("/annotated/ps/annual?name=HAI&year=2020&month=2")]
+    public async Task WithApiController_OmittingTheRequiredParameterIsRejected(string url)
     {
-        // [BindRequired] lives on the base's parameters and is never restated by the
+        // [BindRequired] lives on the base's nhsnorgid parameter and is never restated by the
         // override, so this is the proof that validation attributes inherit as well as
         // binding sources do.
         using var host = await StartHostAsync();
 
         (await host.GetTestClient().GetAsync(url)).StatusCode
-            .Should().Be(HttpStatusCode.BadRequest, "{0} omits a required parameter", url);
+            .Should().Be(HttpStatusCode.BadRequest, "{0} omits nhsnorgid", url);
     }
 
     [Fact]
-    public async Task WithApiController_ANonNumericMonthIsRejectedRatherThanCoerced()
+    public async Task WithApiController_OmittingAnOptionalFilterIsRejected()
+    {
+        // The trap, live again now that the contract has optional filters. NSwag emits
+        // `string name` -- not `string?` -- and under an enabled nullable context
+        // [ApiController] treats a non-nullable reference parameter as required. So filters
+        // the contract documents as optional are mandatory in practice, and omitting one is a
+        // 400 rather than "do not narrow by this".
+        using var host = await StartHostAsync();
+
+        var response = await host.GetTestClient().GetAsync("/annotated/msc?nhsnorgid=100");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await response.Content.ReadAsStringAsync();
+        _output.WriteLine(problem);
+        problem.Should().Contain("name");
+    }
+
+    [Fact]
+    public async Task WhenTheOverrideRestatesNullability_OptionalFiltersAreReallyOptional()
+    {
+        // The shape a real implementation must use, and what DmrpController does.
+        using var host = await StartHostAsync();
+
+        var response = await host.GetTestClient().GetAsync("/correct/msc?nhsnorgid=100");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Orgid.Should().Be(100);
+        plan.Month.Should().BeNull("no month was supplied");
+        plan.Year.Should().BeNull("no year was supplied");
+    }
+
+    [Fact]
+    public async Task WhenTheOverrideRestatesNullability_SuppliedFiltersStillBind()
     {
         using var host = await StartHostAsync();
 
-        var response = await host.GetTestClient().GetAsync(
-            "/annotated/msc?facilityId=F1&reportingMonth=May&reportingYear=2026");
+        var response = await host.GetTestClient()
+            .GetAsync("/correct/msc?nhsnorgid=100&name=HOB&year=2020&month=2");
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Orgid.Should().Be(100);
+        plan.Month.Should().Be(2);
+        plan.Year.Should().Be(2020);
+        plan.Plans.Single().Name.Should().Be("HOB");
     }
 
     [Fact]
@@ -208,12 +230,12 @@ public class GeneratedControllerBindingTests
         using var host = await StartHostAsync();
 
         var response = await host.GetTestClient().GetAsync(
-            "/plain/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
+            "/plain/msc?nhsnorgid=100&name=HOB&year=2020&month=2");
 
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
 
-        _output.WriteLine($"without [ApiController], bound FacilityId = '{plan?.FacilityId}'");
-        plan!.FacilityId.Should().Be("F1", "the generated [FromQuery] is still honoured");
+        _output.WriteLine($"without [ApiController], bound NhsnOrgId = '{plan?.Orgid}'");
+        plan!.Orgid.Should().Be(100, "the generated [FromQuery] is still honoured");
     }
 }
 
@@ -231,6 +253,29 @@ public class PlainProbeController : ProbeControllerBase
 }
 
 /// <summary>
+/// The shape a real implementation must use: every optional filter restated as nullable.
+/// </summary>
+/// <remarks>
+/// Not inherited from the generated base. Leaving a filter non-nullable makes
+/// <c>[ApiController]</c> treat it as required and reject requests the contract says are
+/// valid.
+/// </remarks>
+[ApiController]
+[Route("correct")]
+public class CorrectProbeController : ProbeControllerBase
+{
+    public override Task<ActionResult<ReportingPlanResponse>> GetMonthlyMedicineReportingPlan(
+        string nhsnorgid,
+        string? name,
+        string? year,
+        string? month,
+        CancellationToken cancellationToken = default)
+    {
+        return base.GetMonthlyMedicineReportingPlan(nhsnorgid, name!, year!, month!, cancellationToken);
+    }
+}
+
+/// <summary>
 /// Echoes back whatever MVC managed to bind, so a test can tell binding success from silent
 /// failure.
 /// </summary>
@@ -242,28 +287,26 @@ public class PlainProbeController : ProbeControllerBase
 public abstract class ProbeControllerBase : DmrpControllerBase
 {
     public override Task<ActionResult<ReportingPlanResponse>> GetMonthlyMedicineReportingPlan(
-        string facilityId, int reportingMonth, int reportingYear, CancellationToken cancellationToken)
+        string nhsnorgid, string name, string year, string month, CancellationToken cancellationToken)
     {
-        return Task.FromResult<ActionResult<ReportingPlanResponse>>(new ReportingPlanResponse
-        {
-            FacilityId = facilityId,
-            ReportingMonth = reportingMonth,
-            ReportingYear = reportingYear,
-            Measures = [],
-            RetrievedOn = DateTimeOffset.UnixEpoch
-        });
+        return Task.FromResult<ActionResult<ReportingPlanResponse>>(Echo(nhsnorgid, name, year, month));
     }
 
     public override Task<ActionResult<ReportingPlanResponse>> GetPatientSafetyAnnualReportingPlan(
-        string facilityId, int reportingYear, CancellationToken cancellationToken)
+        string nhsnorgid, string name, string year, string month, CancellationToken cancellationToken)
     {
-        return Task.FromResult<ActionResult<ReportingPlanResponse>>(new ReportingPlanResponse
-        {
-            FacilityId = facilityId,
-            ReportingMonth = null,
-            ReportingYear = reportingYear,
-            Measures = [],
-            RetrievedOn = DateTimeOffset.UnixEpoch
-        });
+        // Annual: the month never narrows the result, so it is not echoed either.
+        return Task.FromResult<ActionResult<ReportingPlanResponse>>(Echo(nhsnorgid, name, year, month: null));
     }
+
+    private static ReportingPlanResponse Echo(string nhsnorgid, string? name, string? year, string? month) =>
+        new()
+        {
+            Orgid = int.TryParse(nhsnorgid, out var org) ? org : null,
+            Month = int.TryParse(month, out var m) ? m : null,
+            Year = int.TryParse(year, out var y) ? y : null,
+            Plans = string.IsNullOrEmpty(name)
+                ? []
+                : [new ReportingPlanItem { Name = name, Nhsnorgid = nhsnorgid, Reporting = "Y" }]
+        };
 }

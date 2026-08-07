@@ -72,6 +72,7 @@ public class MockControllerTests : IAsyncLifetime
                     services.AddSingleton<IOptions<DmrpApiSettings>>(Options.Create(settings));
                     services.AddScoped<IReportingPlanService, ReportingPlanService>();
                     services.AddSingleton<IAuthTokenService, AuthTokenService>();
+                    services.AddSingleton<IResponseDelayService, ResponseDelayService>();
 
                     services
                         .AddAuthentication(LinkCredentialAuthHandler.SchemeName)
@@ -158,6 +159,9 @@ public class MockControllerTests : IAsyncLifetime
     [InlineData("POST", "/mock")]
     [InlineData("POST", "/mock/oauth2/token")]
     [InlineData("PUT", "/mock/11111111-1111-1111-1111-111111111111")]
+    [InlineData("GET", "/mock/delay")]
+    [InlineData("PUT", "/mock/delay")]
+    [InlineData("DELETE", "/mock/delay")]
     [InlineData("DELETE", "/mock")]
     [InlineData("DELETE", "/mock/11111111-1111-1111-1111-111111111111")]
     [InlineData("DELETE", "/mock/facilities/F1")]
@@ -183,7 +187,7 @@ public class MockControllerTests : IAsyncLifetime
         // They opt out with [AllowAnonymous] and validate the third party's token instead.
         // A 401 here would be right for the wrong reason, so the body is what is checked:
         // the OAuth-shaped rejection is the contract endpoint's, not the middleware's.
-        var response = await _anonymousClient.GetAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
+        var response = await _anonymousClient.GetAsync("/msc?nhsnorgid=F1&year=2026&month=5");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         response.Headers.WwwAuthenticate.Should().BeEmpty(
@@ -652,7 +656,7 @@ public class MockControllerTests : IAsyncLifetime
         var token = await tokenResponse.Content.ReadFromJsonAsync<MockTokenResponse>();
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, "/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
+            HttpMethod.Get, "/msc?nhsnorgid=F1&year=2026&month=5");
         request.Headers.Add("Authorization", $"Bearer {token!.Access_token}");
 
         // Sent without a Link credential, proving the third-party token is what carries it.

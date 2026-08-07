@@ -36,6 +36,10 @@ builder.Services.AddScoped<IBaseEntityRepository<ReportingPlanEntryEntity>,
 builder.Services.AddScoped<IReportingPlanService, ReportingPlanService>();
 builder.Services.AddSingleton<IAuthTokenService, AuthTokenService>();
 
+// Singleton because the delay is process state, not per-request state, and it is deliberately
+// not persisted -- a restart clears it.
+builder.Services.AddSingleton<IResponseDelayService, ResponseDelayService>();
+
 // Link's own authentication, guarding the support surface at /mock. The contract endpoints
 // take the third party's token instead and opt out with [AllowAnonymous]; see DmrpController.
 var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -88,6 +92,11 @@ else
 // Swagger is registered after it deliberately: a disabled deployment should not advertise
 // a surface it will not serve.
 app.UseDmrpAvailabilityGate();
+
+// After the availability gate: a disabled deployment should refuse a request immediately
+// rather than refuse it slowly. Before routing, so the delay models a slow upstream rather
+// than slow handler code. Reaches the contract endpoints only -- see the middleware.
+app.UseContractResponseDelay();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

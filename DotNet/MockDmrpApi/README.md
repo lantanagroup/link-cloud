@@ -44,21 +44,89 @@ lives in that document, so it can be swapped wholesale (§2.8).
 
 ### 1.2 The two components
 
-The two contract endpoints differ in **subject and in cadence**, which is why they take
-different parameters.
+The two contract endpoints differ in **subject and in cadence**:
 
-| Endpoint | Component | Subject | Cadence | Parameters |
-|---|---|---|---|---|
-| `GET /msc` | `MSC` | Medicine reports | Monthly | facility + month + year |
-| `GET /ps/annual` | `PS` | Patient safety | Annual | facility + year |
+| Endpoint | Component | Subject | Cadence |
+|---|---|---|---|
+| `GET /msc` | `MSC` | Medicine reports | Monthly |
+| `GET /ps/annual` | `PS` | Patient safety | Annual |
 
 That cadence difference reaches the schema: `ReportingMonth` is **nullable**, populated for
 MSC and null for PS. Whether it is required depends on the component, which no column
 constraint or range annotation can express, so the service enforces it — see §4.1.
 
-⚠️ **Both endpoints are placeholders.** Their shape is expected to change once the published
-contract arrives, and the strings `"MSC"` and `"PS"` are our invention. They are cheap to
-change while nothing is deployed.
+⚠️ **The strings `"MSC"` and `"PS"` are our invention,** as is the response body. Both are
+cheap to change while nothing is deployed.
+
+### 1.3 The query parameters
+
+Both endpoints take the same four, and **only the first is required**:
+
+| Name | Description | Required | Type | Example |
+|---|---|---|---|---|
+| `nhsnorgid` | The Link Cloud facility identifier | **Yes** | string | `100` |
+| `name` | The NHSN module (`HOB`, `HTCDI`). Not the dQM (ACH Monthly, Daily, …) | No | string | `HOB` |
+| `year` | The year of the reporting period | No | string | `2020` |
+| `month` | The month of the reporting period | No | string | `2` |
+
+Two things about this are easy to get wrong:
+
+- **`year` and `month` are strings, not integers.** The service parses them; a value that is
+  not a whole number — or a month outside 1–12 — is a `400` rather than a filter that quietly
+  matches nothing. A typo must not read as "enrolled in nothing", which is the one conclusion
+  this API exists to convey.
+- **`month` has no effect on `/ps/annual`.** Annual entries carry no month, so narrowing by one
+  would exclude every row the endpoint is supposed to return. It is accepted for symmetry and
+  ignored, and the response omits `reportingMonth` regardless.
+
+The optional parameters are why `DmrpController` restates them as `string?`; see the second
+trap in §2.7.
+
+There is deliberately **no `day` parameter**. A facility enrolling in daily reporting is
+agreeing to it for the whole month, so a day would have nothing to select.
+
+### 1.4 ⚠️ Two response quirks that must not be tidied up
+
+Both come from the real API, and this stand-in reproduces them exactly. Normalising either
+would let a consumer write code that works here and fails on first contact with the real
+endpoint — which is the one failure this service exists to prevent.
+
+**The same values appear twice, with different types.**
+
+| | Root object | Inside `plans` |
+|---|---|---|
+| Facility | `orgid`, **number** | `nhsnorgid`, **string** |
+| Year | `year`, **number** | `year`, **string** |
+| Month | `month`, **number** | `month`, **string** |
+
+The generated C# reflects it: `int? Month` on `ReportingPlanResponse`, `string Month` on
+`ReportingPlanItem`.
+
+**The timestamps are not RFC 3339.** `modifyDate` and `createDate` are `2023-09-09 11:12:12.59`
+— a space separator, two fractional digits, no timezone. They are typed as plain strings in the
+contract rather than `date-time` precisely so they are emitted in that form; binding them as
+dates would produce `2023-09-09T11:12:12.59+00:00`, which is well formed and not what a
+consumer will have to parse in production.
+
+One consequence of the numeric `orgid`: **a facility identifier that is not numeric cannot be
+represented there**, and the root `orgid` comes back null. The string form survives in
+`plans[].nhsnorgid`. Link facility identifiers are not always numeric, so this is worth
+knowing before a consumer keys off `orgid`.
+
+### 1.5 ⚠️ In production these are two APIs, not two paths
+
+The DMRP integration ADR is explicit: Leidos deploys **a separate DMRP API per NHSN
+component** — one for Medication Safety, one for Patient Safety — and Link Cloud has to query
+each. Consolidating them is wanted but scheduled for a future release, so the multiple
+endpoints have to be supported as they are.
+
+This service hosts both under one base URL, because one stand-in is cheaper to run than two.
+That is a deviation, and it has a practical consequence: **a consumer cannot switch to the
+real thing by changing a single base URL.** It will need one per component, and the paths may
+well not be `/msc` and `/ps/annual` once each has its own host.
+
+Keeping the two operations distinct in the contract, rather than collapsing them into one
+parameterised endpoint, is what makes that switch a routing change rather than a rewrite.
 
 ---
 
@@ -174,15 +242,16 @@ What does **not**:
 1. **Default parameter values.** An override that drops `= default` gets none. Harmless for the
    cancellation token MVC supplies anyway; not harmless for a `pageSize = 10`, where the loss
    silently unpages an endpoint.
-2. **Nullability of optional string filters.** NSwag emits `string facilityId`, not `string?`,
+2. **Nullability of optional string filters.** NSwag emits `string name`, not `string?`,
    and `[ApiController]` treats a non-nullable reference parameter as required — so filters the
    contract documents as optional return `400` until the override restates them as `string?`.
 
-The current two-operation contract has no optional parameters, so trap 2 has no live example
-and trap 1 only the cancellation token. **Both are near-certain to matter again** once a
-fuller contract lands with paging and filters, which is why they are documented here rather
-than deleted. Keep `[ApiController]`: it is what infers `Path` for route parameters carrying
-only `[BindRequired]`.
+Trap 2 is live: `name`, `year` and `month` are all optional in the contract, so
+`DmrpController` restates all three as nullable. Leave them as generated and every one becomes
+mandatory, which is a `400` for requests the contract says are valid. Trap 1 currently has only
+the cancellation token to demonstrate it, and is kept because a fuller contract with paging
+would make it bite. Keep `[ApiController]`: it is what infers `Path` for route parameters
+carrying only `[BindRequired]`.
 
 ### 2.8 Replacing the spec when Leidos publishes theirs
 
@@ -218,8 +287,12 @@ Authenticated with the **third party's** bearer token, from `POST /mock/oauth2/t
 
 | Route | Purpose |
 |---|---|
-| `GET /msc?facilityId=&reportingMonth=&reportingYear=` | Monthly medicine reporting plan (`MSC`) |
-| `GET /ps/annual?facilityId=&reportingYear=` | Annual patient-safety reporting plan (`PS`) |
+| `GET /msc?nhsnorgid=&name=&year=&month=` | Monthly medicine reporting plan (`MSC`) |
+| `GET /ps/annual?nhsnorgid=&name=&year=&month=` | Annual patient-safety reporting plan (`PS`) |
+
+Only `nhsnorgid` is required. `name`, `year` and `month` each narrow the result when supplied
+and are ignored when not, so a caller passing only `nhsnorgid` gets the facility's whole plan
+for that component. `year` and `month` are **strings** on the wire, not integers. See §1.3.
 
 Both return `ReportingPlanResponse`. Both answer `200` with an empty `measures` array for a
 facility enrolled in nothing (§4), and `401` without a valid token.
@@ -239,6 +312,9 @@ Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
 | `DELETE /mock/{id}` | `204`, or `404` if absent |
 | `DELETE /mock/facilities/{facilityId}` | Idempotent `204` |
 | `DELETE /mock` | Removes **every** entry. No confirmation step |
+| `GET /mock/delay` | The artificial delay currently in force |
+| `PUT /mock/delay` | Sets an artificial delay on the contract endpoints. See §4.3 |
+| `DELETE /mock/delay` | Removes it. Idempotent |
 
 ### Unauthenticated
 
@@ -260,27 +336,32 @@ The single most important behaviour, and the one most likely to be mis-implement
 **A measure that does not appear in `measures` means the facility is NOT enrolled in it.**
 There is no negative representation. `isReporting` is `"Y"` wherever an entry exists.
 
-Seed only `HOB` for FAC001, May 2026, then `GET /msc`:
+Seed only `HOB` for facility `100`, February 2020, then `GET /msc?nhsnorgid=100&year=2020&month=2`:
 
 ```json
 {
-  "facilityId": "FAC001",
-  "reportingMonth": 5,
-  "reportingYear": 2026,
-  "measures": [ { "measure": "HOB", "isReporting": "Y" } ],
-  "retrievedOn": "2026-05-01T12:00:00+00:00"
+  "psDMRptPlanID": 1,
+  "orgid": 100,
+  "year": 2020,
+  "month": 2,
+  "modifyDate": "2023-09-09 11:12:12.59",
+  "createDate": "2023-09-09 11:12:12.59",
+  "plans": [
+    { "name": "HOB", "nhsnorgid": "100", "month": "2", "year": "2020", "reporting": "Y", "rptSeq": 0 }
+  ]
 }
 ```
 
-The caller concludes "not enrolled in HTCDI" from its absence.
+The caller concludes "not enrolled in HTCDI" from its absence. `reporting` is only ever
+`"Y"`, so it carries no information a caller can act on — presence is the whole signal.
 
-A facility enrolled in nothing returns **`200` with `"measures": []`** — not `204`, not `404`
+A facility enrolled in nothing returns **`200` with `"plans": []`** — not `204`, not `404`
 — because an empty plan is a meaningful answer rather than an absent resource. This
 deliberately differs from `/mock/search` and `/mock/facilities/{id}`, which do return `204`
 when empty. An entry stored with `isReporting` other than `"Y"` is excluded from a plan
 entirely.
 
-An annual plan omits `reportingMonth` from the response, rather than reporting a zero or a
+An annual plan omits the root `month` from the response, rather than reporting a zero or a
 stale value that would tell a consumer the plan covers one particular month.
 
 ### 4.1 ⚠️ The cadence rule, and why the service enforces it
@@ -317,6 +398,46 @@ the standard, where NULLs are distinct, so the index alone does not stop a dupli
 entry there. What holds on both providers is the service's own pre-check, and that is what the
 tests assert.
 
+### 4.3 Making the contract endpoints answer slowly
+
+A caller's timeout and retry path only gets exercised against an upstream that is actually
+slow, so the service can be told to hold contract requests:
+
+```bash
+curl -X PUT $B/mock/delay -H 'Content-Type: application/json' -d '{"milliseconds":5000}'
+curl $B/mock/delay          # what is in force
+curl -X DELETE $B/mock/delay
+```
+
+**In memory, never persisted.** A restart always returns the service to answering immediately.
+That is deliberate: the delay describes what a test is doing right now, not how the service is
+configured, so a forgotten delay must not outlive the run that set it.
+
+⚠️ **The delay reaches the contract endpoints only.** `/mock`, `/health` and `/api` are never
+delayed, and that scoping is load-bearing rather than tidy:
+
+- If `/mock` were delayed, turning a five-minute delay off would take five minutes, because
+  the endpoint that clears it would be delayed too. The escape hatch has to stay fast.
+- If `/health` were delayed, the container would miss its probe timeout and be restarted —
+  which reads as an outage rather than a test in progress.
+
+The rule is written as "everything except our own namespaced paths" rather than a list of
+contract routes, so an endpoint added to the contract is delayed automatically. That inversion
+is only safe because the contract endpoints sit at the root and everything of ours is prefixed
+(§2.1).
+
+Two other properties worth knowing:
+
+- **Capped at five minutes.** Long enough to exceed any client timeout worth testing, short
+  enough that a mistyped value cannot make the contract surface unusable until someone
+  restarts the service.
+- **The wait is cancellable.** A caller that times out and disconnects releases its request
+  instead of holding it for the full delay, so concurrent callers against a long delay do not
+  tie up requests nobody is waiting for any more.
+
+`PUT` answers `200` rather than the `202` used elsewhere for updates: the change has already
+taken effect by the time the response is written, and the body is the state now in force.
+
 ---
 
 ## 5. Seeding a scenario
@@ -329,13 +450,13 @@ B=http://localhost:6159
 # Start clean
 curl -X DELETE $B/mock
 
-# Enrol FAC001 in HOB for May 2026 -- monthly, so a month is required
+# Enrol facility 100 in HOB for February 2020 -- monthly, so a month is required
 curl -X POST $B/mock -H 'Content-Type: application/json' \
-  -d '{"facilityId":"FAC001","component":"MSC","measure":"HOB","reportingMonth":5,"reportingYear":2026,"isReporting":"Y"}'
+  -d '{"facilityId":"100","component":"MSC","measure":"HOB","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
-# ...and in HAI for 2026 -- annual, so a month must be omitted
+# ...and in HAI for 2020 -- annual, so a month must be omitted
 curl -X POST $B/mock -H 'Content-Type: application/json' \
-  -d '{"facilityId":"FAC001","component":"PS","measure":"HAI","reportingYear":2026,"isReporting":"Y"}'
+  -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingYear":2020,"isReporting":"Y"}'
 
 # Acquire a third-party token
 TOKEN=$(curl -s -X POST $B/mock/oauth2/token -H 'Content-Type: application/json' \
@@ -343,8 +464,11 @@ TOKEN=$(curl -s -X POST $B/mock/oauth2/token -H 'Content-Type: application/json'
   | jq -r .access_token)
 
 # Query each plan -- each returns only its own component's measures
-curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?facilityId=FAC001&reportingMonth=5&reportingYear=2026" | jq
-curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?facilityId=FAC001&reportingYear=2026" | jq
+curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100&year=2020&month=2" | jq
+curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?nhsnorgid=100&year=2020" | jq
+
+# Everything but nhsnorgid is optional -- this returns the whole medicine plan
+curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100" | jq
 ```
 
 Against a deployed instance the `/mock` calls also need a Link bearer token; locally
@@ -489,18 +613,22 @@ Everything below is invented. Getting a real request/response pair, or the publi
 matters more than anything else in this project — a consumer written against these guesses
 will work perfectly here and fail on first contact with the real endpoint.
 
-- **Path shapes** — are `/msc` and `/ps/annual` the real paths, and are they the *only* two?
+- **Path shapes** — `/msc` and `/ps/annual` are what LCG recorded, but the ADR describes the
+  two components as *separately deployed APIs* rather than two paths on one. See §1.5.
 - **Component identifiers** — the strings `"MSC"` and `"PS"` are ours. Does the real API use
   these, longer names, or coded values?
-- **Field names** — `facilityId` vs `orgId`/`orgID`; `measures` vs `reportingPlan`; whether
-  `retrievedOn` exists at all
-- **`isReporting`** — genuinely the string `"Y"` on the wire, or a boolean the ticket
-  paraphrased?
-- **`measure`** — a short name (`HOB`, `HTCDI`) or a coded identifier?
-- **The period** — separate month and year integers, or one `reportingPeriod` like `2026-05`?
-  And does the annual endpoint really take no month?
-- **Response shape parity** — do both endpoints genuinely return the *same* schema, or does
-  the annual one differ in ways we have flattened together?
+- **`psDMRptPlanID` and `rptSeq`.** Their meaning is not documented. This service derives a
+  stable identifier from the query so repeated identical requests agree, and always returns
+  `rptSeq: 0`. Neither is likely to be what the real API does.
+- **What comes back with no period.** Omitting `year` and `month` is valid, so the result can
+  span several periods — but the response carries a single root `month`/`year`. This returns
+  null for both in that case. Does the real API do something else?
+- **Malformed `year` or `month`.** This returns `400`. The real API might ignore it, or return
+  an empty plan. That guess is deliberately loud rather than silent.
+- **Status codes.** Every non-200 in the contract is invented; the ADR documents only the
+  success body.
+- **Response shape parity** — the ADR gives one example, from one component. Do both
+  deployments genuinely return the same schema?
 - **Auth** — is NHSN Auth a separate service with its own base URL, and does it use RS256
   with a published JWKS?
 
@@ -519,11 +647,13 @@ DotNet/MockDmrpApi/
 │   └── Context/                      ReportingPlanDbContext + mapping
 ├── Migrations/                       InitMockDmrp
 ├── Application/
-│   ├── Middleware/                   DmrpAvailability, DmrpDisabledMiddleware
-│   ├── Models/                       ReportingPlanSearchCriteria,
-│   │                                 MockEntryModels, MockTokenModels
+│   ├── Middleware/                   DmrpAvailability, DmrpDisabledMiddleware,
+│   │                                 ResponseDelayMiddleware
+│   ├── Models/                       ReportingPlanSearchCriteria, MockEntryModels,
+│   │                                 MockTokenModels, MockDelayModels
 │   ├── Mapping/                      EntryMapper  (entity → generated DTO)
-│   └── Services/                     ReportingPlanService, AuthTokenService
+│   └── Services/                     ReportingPlanService, AuthTokenService,
+│                                     ResponseDelayService
 └── Presentation/Controllers/
     ├── DmrpController.cs             Contract surface — overrides the generated base
     └── MockController.cs             Support surface — entirely hand-written
