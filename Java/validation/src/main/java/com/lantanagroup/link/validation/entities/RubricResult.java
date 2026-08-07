@@ -115,18 +115,6 @@ public class RubricResult {
     @Column(length = 64)
     private String stage;
 
-    @Column(name = "facility_override_id")
-    private UUID facilityOverrideId;
-
-    // Read-only association purely to emit a real FK (nullable: results without an override have null).
-    // The scalar facilityOverrideId above remains the writable mapping; do not use this field in code.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "facility_override_id", insertable = false, updatable = false,
-            foreignKey = @ForeignKey(name = "fk_result_facility_override"))
-    @Getter(AccessLevel.NONE)
-    @Setter(AccessLevel.NONE)
-    private FacilityOverride facilityOverride;
-
     @Column(name = "requested_at", nullable = false)
     private OffsetDateTime requestedAt;
 

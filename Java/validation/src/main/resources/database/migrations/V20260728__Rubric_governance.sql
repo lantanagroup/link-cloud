@@ -1,5 +1,5 @@
 -- Rubric governance schema: rubric registry (rubric, rubric_version, rubric_check),
--- lifecycle audit (rubric_lifecycle_event), facility-level overrides (facility_override),
+-- lifecycle audit (rubric_lifecycle_event),
 -- and evaluation results (rubric_result, rubric_finding).
 
 -- needed for the filtered unique index below, sqlcmd defaults this to OFF
@@ -70,25 +70,6 @@ begin
     );
 end;
 
-if not exists (select 1 from sys.tables where name = 'facility_override' and schema_id = schema_id('dbo'))
-begin
-    create table facility_override
-    (
-        override_id             uniqueidentifier  not null,
-        facility_id             varchar(128)      not null,
-        rubric_id               varchar(128)      not null,
-        rubric_version_id       uniqueidentifier,
-        disabled_check_ids_json varchar(max),
-        severity_overrides_json varchar(max),
-        context_vars_json       varchar(max),
-        effective_from          datetimeoffset(6) not null,
-        effective_to            datetimeoffset(6),
-        created_at              datetimeoffset(6) not null,
-        created_by              varchar(128)      not null,
-        primary key (override_id)
-    );
-end;
-
 if not exists (select 1 from sys.tables where name = 'rubric_result' and schema_id = schema_id('dbo'))
 begin
     create table rubric_result
@@ -113,7 +94,6 @@ begin
         report_id                 varchar(128),
         workflow_tag              varchar(128),
         stage                     varchar(64),
-        facility_override_id      uniqueidentifier,
         requested_at              datetimeoffset(6) not null,
         completed_at              datetimeoffset(6) not null,
         duration_ms               bigint            not null,
@@ -175,12 +155,6 @@ begin
         where deleted = 0;
 end;
 
-if not exists (select 1 from sys.key_constraints where name = 'uq_fo_facility_rubric_effective')
-begin
-    alter table facility_override
-        add constraint uq_fo_facility_rubric_effective unique (facility_id, rubric_id, effective_from);
-end;
-
 if not exists (select 1 from sys.key_constraints where name = 'uq_result_request')
 begin
     alter table rubric_result
@@ -193,9 +167,6 @@ end;
 
 if not exists (select 1 from sys.indexes where name = 'ix_check_rv_ordinal' and object_id = object_id('rubric_check'))
     create index ix_check_rv_ordinal on rubric_check (rubric_version_id, ordinal);
-
-if not exists (select 1 from sys.indexes where name = 'ix_fo_lookup' and object_id = object_id('facility_override'))
-    create index ix_fo_lookup on facility_override (facility_id, rubric_id, effective_from);
 
 if not exists (select 1 from sys.indexes where name = 'ix_result_rubric' and object_id = object_id('rubric_result'))
     create index ix_result_rubric on rubric_result (rubric_id, completed_at);
@@ -239,13 +210,6 @@ begin
             foreign key (rubric_version_id) references rubric_version;
 end;
 
-if not exists (select 1 from sys.foreign_keys where name = 'fk_facility_override_rubric')
-begin
-    alter table facility_override
-        add constraint fk_facility_override_rubric
-            foreign key (rubric_id) references rubric;
-end;
-
 if not exists (select 1 from sys.foreign_keys where name = 'fk_result_rubric')
 begin
     alter table rubric_result
@@ -258,13 +222,6 @@ begin
     alter table rubric_result
         add constraint fk_result_rubric_version
             foreign key (rubric_version_id) references rubric_version;
-end;
-
-if not exists (select 1 from sys.foreign_keys where name = 'fk_result_facility_override')
-begin
-    alter table rubric_result
-        add constraint fk_result_facility_override
-            foreign key (facility_override_id) references facility_override;
 end;
 
 if not exists (select 1 from sys.foreign_keys where name = 'fk_finding_result')
