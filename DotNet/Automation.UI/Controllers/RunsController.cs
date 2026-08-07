@@ -152,14 +152,22 @@ public class RunsController(
     {
         if (request.Scenario == AutomationScenarioKind.Custom && request.ScenarioId is Guid scenarioId)
         {
-            var scenario = await scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+            var scenario = await scenarioStore.GetByIdAsync(
+                scenarioId,
+                cancellationToken);
+
             if (scenario == null)
             {
-                TempData["RunStartError"] = "Unable to start test: selected scenario was not found.";
+                TempData["RunStartError"] =
+                    "Unable to start test: selected scenario was not found.";
+
                 return RedirectToAction(nameof(Index));
             }
 
+            // Build the run request from the complete persisted scenario rather than
+            // relying on the default hidden values submitted by the Quick Launch form.
             await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+
             return RedirectToAction(nameof(Index));
         }
 

@@ -84,6 +84,7 @@ public class ScenariosController(
         model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
             ? GenerateRandomNhsnOrganizationId()
             : model.NhsnOrganizationId.Trim();
+        
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
         await scenarioStore.UpsertAsync(model, ct);
@@ -529,6 +530,30 @@ public class ScenariosController(
             encounterEnd = encEnd?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
             organizationIds
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetQuickLaunchMetadata(
+    Guid id,
+    CancellationToken ct)
+    {
+        var scenario = await scenarioStore.GetByIdAsync(id, ct);
+
+        if (scenario == null)
+            return NotFound();
+
+        return Json(new
+        {
+            id = scenario.Id,
+            name = scenario.Name,
+            description = scenario.Description ?? string.Empty,
+            method = scenario.ReportMethod.ToString(),
+            type = scenario.IsSystemScenario ? "System" : "Custom",
+            measures = scenario.SelectedMeasures
+                .Select(ProfiledMeasureCatalog.GetDisplayName)
+                .ToList(),
+            updatedAt = scenario.UpdatedAt.ToUnixTimeMilliseconds()
         });
     }
 
