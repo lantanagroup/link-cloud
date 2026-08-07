@@ -67,7 +67,6 @@ public class RubricResultQueryService {
                 .requestor(r.getRequestor())
                 .subject(subject(r))
                 .payloadRef(r.getPayloadRef())
-                .facilityOverrideId(r.getFacilityOverrideId())
                 .status(r.getStatus())
                 .score(parseScore(r))
                 .summary(SummaryDto.builder()

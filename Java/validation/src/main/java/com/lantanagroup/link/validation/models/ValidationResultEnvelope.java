@@ -25,7 +25,6 @@ public class ValidationResultEnvelope {
     private String rubricVersionHash;
     private SubjectDto subject;
     private String payloadRef;
-    private UUID facilityOverrideId;
     private RubricResultStatus status;
     private ScoreCardDto score;
     private SummaryDto summary;

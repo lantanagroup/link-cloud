@@ -13,14 +13,8 @@ if exists (select 1 from sys.foreign_keys where name = 'fk_result_rubric')
 if exists (select 1 from sys.foreign_keys where name = 'fk_result_rubric_version')
     alter table rubric_result drop constraint fk_result_rubric_version;
 
-if exists (select 1 from sys.foreign_keys where name = 'fk_result_facility_override')
-    alter table rubric_result drop constraint fk_result_facility_override;
-
 if exists (select 1 from sys.foreign_keys where name = 'fk_lifecycle_event_rubric')
     alter table rubric_lifecycle_event drop constraint fk_lifecycle_event_rubric;
-
-if exists (select 1 from sys.foreign_keys where name = 'fk_facility_override_rubric')
-    alter table facility_override drop constraint fk_facility_override_rubric;
 
 if exists (select 1 from sys.foreign_keys where name = 'fk_check_rubric_version')
     alter table rubric_check drop constraint fk_check_rubric_version;
@@ -33,8 +27,6 @@ drop table if exists rubric_finding;
 drop table if exists rubric_result;
 
 drop table if exists rubric_lifecycle_event;
-
-drop table if exists facility_override;
 
 drop table if exists rubric_check;
 

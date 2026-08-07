@@ -1,6 +1,5 @@
 package com.lantanagroup.link.validation.controllers;
 
-import com.lantanagroup.link.validation.exceptions.FacilityOverrideNotFoundException;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
@@ -21,7 +20,7 @@ import java.util.List;
 
 /**
  * Maps the rubric-registry domain exceptions to the HTTP status codes documented on
- * {@link RubricController} (and the facility-override surface). Without this advice these plain
+ * {@link RubricController}. Without this advice these plain
  * {@code RuntimeException}s fall through to the default error path and surface as HTTP 500,
  * contradicting the endpoints' {@code @ApiResponses} contract.
  *
@@ -35,8 +34,7 @@ public class RubricExceptionHandler {
 
     @ExceptionHandler({
             RubricNotFoundException.class,
-            RubricVersionNotFoundException.class,
-            FacilityOverrideNotFoundException.class
+            RubricVersionNotFoundException.class
     })
     public ProblemDetail handleNotFound(RuntimeException ex) {
         logger.warn("Rubric registry lookup failed: {}", LogUtils.sanitize(ex.getMessage()));
