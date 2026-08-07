@@ -100,6 +100,17 @@ public sealed class RunLogDocument
 
     public int ChunkNumber { get; set; }
     public int LineCount { get; set; }
+    public int BsonByteCount { get; set; }
     public List<string> Lines { get; set; } = [];
+    public List<long> LineSequences { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+public sealed class RunLogSequenceDocument
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public long NextSequence { get; set; }
 }
