@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
@@ -21,17 +20,31 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.MockDmrpApi;
 
 /// <summary>
-/// Drives the controllers over real HTTP so the assertions cover routing, model binding,
-/// status codes and serialization -- not just the method bodies.
+/// Drives the two contract endpoints over real HTTP, so the assertions cover routing, model
+/// binding, status codes and serialization -- not just the method bodies.
 /// </summary>
+/// <remarks>
+/// Both endpoints are placeholders whose shape is expected to change when the published
+/// contract arrives, so these tests assert <em>behaviour</em> -- which component is served,
+/// which rows are excluded, how an empty plan reads, what an unauthenticated call gets -- and
+/// avoid pinning field-level detail that the next contract is likely to move.
+/// <para>
+/// Link's authentication is deliberately absent from this host. These endpoints carry
+/// <c>[AllowAnonymous]</c> and check the third party's token themselves, and a host with no
+/// authentication middleware is the sharpest way to prove that: if the attribute were ever
+/// dropped, the 401s below would come from the wrong system, and the token-bearing tests
+/// would fail outright.
+/// </para>
+/// </remarks>
 public class DmrpControllerTests : IAsyncLifetime
 {
-    private const string ClientId = "test-client";
-    private const string ClientSecret = "test-client-secret";
+    private const string ClientId = "contract-test-client";
+    private const string ClientSecret = "contract-test-client-secret";
 
     private readonly FakeEntryRepository _repository = new();
     private IHost _host = null!;
     private HttpClient _client = null!;
+    private IAuthTokenService _tokens = null!;
 
     public async Task InitializeAsync()
     {
@@ -55,7 +68,6 @@ public class DmrpControllerTests : IAsyncLifetime
                     services.AddSingleton<IOptions<DmrpApiSettings>>(Options.Create(settings));
                     services.AddScoped<IReportingPlanService, ReportingPlanService>();
                     services.AddSingleton<IAuthTokenService, AuthTokenService>();
-                    services.AddScoped<DmrpController>();
                     services.AddControllers()
                             .AddApplicationPart(typeof(DmrpController).Assembly);
                 });
@@ -68,6 +80,7 @@ public class DmrpControllerTests : IAsyncLifetime
             .StartAsync();
 
         _client = _host.GetTestClient();
+        _tokens = _host.Services.GetRequiredService<IAuthTokenService>();
     }
 
     public async Task DisposeAsync()
@@ -77,13 +90,20 @@ public class DmrpControllerTests : IAsyncLifetime
         _host.Dispose();
     }
 
+    /// <summary>Seeds a monthly (MSC) entry.</summary>
     private ReportingPlanEntryEntity Seed(
-        string facilityId = "F1", string measure = "HOB", int month = 5, int year = 2026, string isReporting = "Y")
+        string facilityId = "F1",
+        string measure = "HOB",
+        int? month = 5,
+        int year = 2026,
+        string isReporting = "Y",
+        string component = ReportingComponents.Msc)
     {
         var entry = new ReportingPlanEntryEntity
         {
             Id = Guid.NewGuid().ToString(),
             FacilityId = facilityId,
+            Component = component,
             Measure = measure,
             ReportingMonth = month,
             ReportingYear = year,
@@ -95,410 +115,128 @@ public class DmrpControllerTests : IAsyncLifetime
         return entry;
     }
 
-    private async Task<string> AcquireTokenAsync()
-    {
-        var response = await _client.PostAsJsonAsync("/dmrp/mock/oauth2/token", new
-        {
-            grant_type = "client_credentials",
-            client_id = ClientId,
-            client_secret = ClientSecret,
-            scope = "dmrp.read"
-        });
+    /// <summary>Seeds an annual (PS) entry, which carries no month.</summary>
+    private ReportingPlanEntryEntity SeedAnnual(
+        string facilityId = "F1", string measure = "HAI", int year = 2026, string isReporting = "Y") =>
+        Seed(facilityId, measure, month: null, year, isReporting, ReportingComponents.Ps);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var token = await response.Content.ReadFromJsonAsync<AuthTokenResponse>();
-        return token!.Access_token;
+    /// <summary>
+    /// Mints a third-party token directly rather than through the support surface, so these
+    /// tests do not depend on a host that has Link's authentication wired up.
+    /// </summary>
+    private string ThirdPartyToken()
+    {
+        var result = _tokens.Issue("client_credentials", ClientId, ClientSecret, "dmrp.read");
+        result.Succeeded.Should().BeTrue();
+        return result.AccessToken!;
     }
 
-    // ------------------------------------------------------------- get by id
-
-    [Fact]
-    public async Task GetById_ReturnsTheEntry()
+    private async Task<HttpResponseMessage> GetAuthorizedAsync(string url)
     {
-        var seeded = Seed();
-
-        var response = await _client.GetAsync($"/dmrp/mock/{seeded.Id}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var entry = await response.Content.ReadFromJsonAsync<ReportingPlanEntry>();
-        entry!.Id.Should().Be(seeded.Id);
-        entry.Measure.Should().Be("HOB");
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("Authorization", $"Bearer {ThirdPartyToken()}");
+        return await _client.SendAsync(request);
     }
 
-    [Fact]
-    public async Task GetById_WithNonGuid_Returns400InvalidIdFormat()
-    {
-        var response = await _client.GetAsync("/dmrp/mock/not-a-guid");
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("Invalid Id format");
-    }
+    // -------------------------------------------------------------- routing
 
     [Fact]
-    public async Task GetById_WhenAbsent_Returns404()
+    public async Task TheContractEndpointsSitAtTheRootWithNoPrefix()
     {
-        var response = await _client.GetAsync($"/dmrp/mock/{Guid.NewGuid()}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task ThePrefixIsAppliedExactlyOnce()
-    {
-        // The spec's server URL carries the dmrp/mock path, so NSwag emits a class-level
-        // [Route("dmrp/mock")] on the generated base -- and DmrpController declares the same
-        // route itself. Attribute routing takes the most-derived declaration rather than
-        // combining them, so the prefix is not doubled. If that ever changed, every route
-        // would move to /dmrp/mock/dmrp/mock and this test is what would say so.
-        (await _client.GetAsync("/dmrp/mock/search")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent, "the prefix is applied once");
-
-        (await _client.GetAsync("/dmrp/mock/dmrp/mock/search")).StatusCode
-            .Should().Be(HttpStatusCode.NotFound, "the prefix must not be applied twice");
-    }
-
-    [Fact]
-    public async Task GetById_DoesNotShadowTheLiteralRoutes()
-    {
-        // /search and /reporting-plans must win over /{id}; otherwise they would be read
-        // as identifiers and answered with "Invalid Id format".
-        var search = await _client.GetAsync("/dmrp/mock/search");
-        search.StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        var plan = await _client.GetAsync("/dmrp/mock/reporting-plans?facilityId=F1&reportingMonth=5&reportingYear=2026");
-        plan.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "it is gated on a token, not treated as an id");
-    }
-
-    // ------------------------------------------------------- facility + search
-
-    [Fact]
-    public async Task GetByFacility_ReturnsAPageAnd204WhenEmpty()
-    {
-        Seed();
-        Seed(measure: "HTCDI");
-        Seed(facilityId: "F2");
-
-        var populated = await _client.GetAsync("/dmrp/mock/facilities/F1");
-        populated.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await populated.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Records.Should().HaveCount(2);
-        page.Metadata.PageSize.Should().Be(10, "the generated default must survive the override");
-
-        var empty = await _client.GetAsync("/dmrp/mock/facilities/NoSuchFacility");
-        empty.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task Search_WithNoFiltersSupplied_Works()
-    {
-        // Every filter is optional in the contract. This fails with 400 if the override
-        // forgets to restate the generated string parameters as nullable.
+        // The spec's server URL no longer carries a path, so NSwag emits no class-level
+        // route and both operations land at the root. Repointing a consumer at the real
+        // service is then a base-URL change and nothing else. If a prefix ever crept back
+        // in -- via the spec's server URL or a stray [Route] -- this is what would say so.
         Seed();
 
-        var response = await _client.GetAsync("/dmrp/mock/search");
+        (await GetAuthorizedAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Records.Should().ContainSingle();
+        (await GetAuthorizedAsync("/dmrp/mock/msc?facilityId=F1&reportingMonth=5&reportingYear=2026"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound, "the old prefix must be gone");
     }
 
     [Fact]
-    public async Task Search_FiltersAndSorts()
+    public async Task TheSupportSurfaceCannotBeServedWithoutAuthorizationMiddleware()
     {
-        Seed(measure: "HOB");
-        Seed(measure: "HTCDI");
-        Seed(facilityId: "F2", measure: "HOB");
+        // This host wires no authorization middleware, and ASP.NET refuses outright to
+        // serve an endpoint that carries authorization metadata without it -- so reaching
+        // DELETE /mock throws rather than wiping the store.
+        //
+        // That refusal is the assertion. It holds only while MockController actually
+        // carries [Authorize]; drop the attribute and this call quietly succeeds instead,
+        // which is precisely the regression worth catching.
+        var act = async () => await _client.DeleteAsync("/mock");
 
-        var response = await _client.GetAsync(
-            "/dmrp/mock/search?facilityId=F1&measure=HOB&sortBy=Measure&sortOrder=Ascending");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Records.Should().ContainSingle();
-        page.Records.Single().Measure.Should().Be("HOB");
-    }
-
-    [Fact]
-    public async Task Search_WithNoMatches_Returns204()
-    {
-        Seed();
-
-        var response = await _client.GetAsync("/dmrp/mock/search?measure=NOPE");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task Search_WithSortByOutsideTheAllowedSet_Returns400NotAServerError()
-    {
-        var response = await _client.GetAsync("/dmrp/mock/search?sortBy=DropTable");
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    // ------------------------------------------------------------------ create
-
-    [Fact]
-    public async Task Create_Returns201WithALocationHeaderAndTheCreatedEntry()
-    {
-        var response = await _client.PostAsJsonAsync("/dmrp/mock", new
-        {
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 5,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-
-        var created = await response.Content.ReadFromJsonAsync<ReportingPlanEntry>();
-        created!.Id.Should().NotBeNullOrWhiteSpace();
-
-        response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().EndWith($"/dmrp/mock/{created.Id}");
-
-        // The Location header must actually resolve.
-        var followed = await _client.GetAsync(response.Headers.Location);
-        followed.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task Create_WithDuplicateNaturalKey_Returns409AndDoesNotPersist()
-    {
-        Seed();
-
-        var response = await _client.PostAsJsonAsync("/dmrp/mock", new
-        {
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 5,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        _repository.Entries.Should().ContainSingle();
-    }
-
-    [Fact]
-    public async Task Create_WithMonthOutsideTheContractRange_Returns400()
-    {
-        // Range validation comes from the spec via generated data annotations.
-        var response = await _client.PostAsJsonAsync("/dmrp/mock", new
-        {
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 13,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await act.Should().ThrowAsync<InvalidOperationException>())
+            .WithMessage("*authorization metadata*");
         _repository.Entries.Should().BeEmpty();
     }
 
-    // ------------------------------------------------------------------ update
+    // ------------------------------------------------------------------ /msc
 
     [Fact]
-    public async Task Update_Returns202WithTheUpdatedEntry()
+    public async Task GetMonthlyPlan_WithoutAToken_Returns401()
     {
-        var seeded = Seed();
-
-        var response = await _client.PutAsJsonAsync($"/dmrp/mock/{seeded.Id}", new
-        {
-            id = seeded.Id,
-            facilityId = "F9",
-            measure = "HTCDI",
-            reportingMonth = 11,
-            reportingYear = 2027,
-            isReporting = "N"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        var updated = await response.Content.ReadFromJsonAsync<ReportingPlanEntry>();
-        updated!.FacilityId.Should().Be("F9");
-        updated.Measure.Should().Be("HTCDI");
-    }
-
-    [Fact]
-    public async Task Update_OnAMissingEntry_Returns404AndCreatesNothing()
-    {
-        var absentId = Guid.NewGuid().ToString();
-
-        var response = await _client.PutAsJsonAsync($"/dmrp/mock/{absentId}", new
-        {
-            id = absentId,
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 5,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        _repository.Entries.Should().BeEmpty("update must never upsert");
-    }
-
-    [Fact]
-    public async Task Update_WithMismatchedBodyId_Returns400()
-    {
-        var seeded = Seed();
-
-        var response = await _client.PutAsJsonAsync($"/dmrp/mock/{seeded.Id}", new
-        {
-            id = Guid.NewGuid().ToString(),
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 5,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task Update_WithNonGuidRouteId_Returns400InvalidIdFormat()
-    {
-        var response = await _client.PutAsJsonAsync("/dmrp/mock/not-a-guid", new
-        {
-            id = "not-a-guid",
-            facilityId = "F1",
-            measure = "HOB",
-            reportingMonth = 5,
-            reportingYear = 2026,
-            isReporting = "Y"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("Invalid Id format");
-    }
-
-    // ----------------------------------------------------------------- deletes
-
-    [Fact]
-    public async Task Delete_RemovesTheEntryThen404sOnTheSecondAttempt()
-    {
-        var seeded = Seed();
-
-        (await _client.DeleteAsync($"/dmrp/mock/{seeded.Id}")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent);
-        (await _client.DeleteAsync($"/dmrp/mock/{seeded.Id}")).StatusCode
-            .Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task DeleteByFacility_IsIdempotent()
-    {
-        Seed();
-        Seed(measure: "HTCDI");
-        Seed(facilityId: "F2");
-
-        (await _client.DeleteAsync("/dmrp/mock/facilities/F1")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent);
-        _repository.Entries.Should().ContainSingle();
-
-        // Succeeds again even though there is nothing left to remove.
-        (await _client.DeleteAsync("/dmrp/mock/facilities/F1")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task DeleteAll_EmptiesTheStore()
-    {
-        Seed();
-        Seed(measure: "HTCDI");
-        Seed(facilityId: "F2");
-
-        var response = await _client.DeleteAsync("/dmrp/mock");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        _repository.Entries.Should().BeEmpty();
-    }
-
-    // -------------------------------------------------------- token + the plan
-
-    [Fact]
-    public async Task IssueToken_ReturnsABearerToken()
-    {
-        var response = await _client.PostAsJsonAsync("/dmrp/mock/oauth2/token", new
-        {
-            grant_type = "client_credentials",
-            client_id = ClientId,
-            client_secret = ClientSecret,
-            scope = "dmrp.read"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var token = await response.Content.ReadFromJsonAsync<AuthTokenResponse>();
-        token!.Access_token.Should().NotBeNullOrWhiteSpace();
-        token.Token_type.Should().Be(AuthTokenResponseToken_type.Bearer);
-        token.Expires_in.Should().Be(3600);
-    }
-
-    [Fact]
-    public async Task IssueToken_WithWrongSecret_Returns401WithAnOAuthErrorBody()
-    {
-        var response = await _client.PostAsJsonAsync("/dmrp/mock/oauth2/token", new
-        {
-            grant_type = "client_credentials",
-            client_id = ClientId,
-            client_secret = "wrong",
-            scope = (string?)null
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-
-        // OAuth error shape, not problem details -- this operation stands in for an
-        // authorization server and callers parse the documented codes.
-        var payload = await response.Content.ReadAsStringAsync();
-        using var document = JsonDocument.Parse(payload);
-        document.RootElement.GetProperty("error").GetString().Should().Be("invalid_client");
-    }
-
-    [Fact]
-    public async Task GetReportingPlan_WithoutAToken_Returns401()
-    {
-        var response = await _client.GetAsync(
-            "/dmrp/mock/reporting-plans?facilityId=F1&reportingMonth=5&reportingYear=2026");
+        var response = await _client.GetAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetReportingPlan_WithAToken_ListsOnlyEnrolledMeasures()
+    public async Task GetMonthlyPlan_WithAnUnrelatedToken_Returns401()
+    {
+        // A token this service did not sign must not be accepted, or the endpoint would be
+        // effectively anonymous to anyone who can send a plausible-looking bearer.
+        Seed();
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, "/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
+        request.Headers.Add("Authorization", "Bearer not-a-token-this-service-issued");
+
+        (await _client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_ListsOnlyEnrolledMeasuresForThePeriod()
     {
         Seed(measure: "HOB");
         Seed(measure: "HTCDI", isReporting: "N");
-        var token = await AcquireTokenAsync();
+        Seed(measure: "OTHER", month: 6);
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, "/dmrp/mock/reporting-plans?facilityId=F1&reportingMonth=5&reportingYear=2026");
-        request.Headers.Add("Authorization", $"Bearer {token}");
-
-        var response = await _client.SendAsync(request);
+        var response = await GetAuthorizedAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        plan!.Measures.Should().ContainSingle();
+        plan!.FacilityId.Should().Be("F1");
+        plan.ReportingMonth.Should().Be(5);
+        plan.ReportingYear.Should().Be(2026);
+        plan.Measures.Should().ContainSingle();
         plan.Measures.Single().Measure.Should().Be("HOB");
-        plan.Measures.Should().NotContain(m => m.Measure == "HTCDI");
     }
 
     [Fact]
-    public async Task GetReportingPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
+    public async Task GetMonthlyPlan_DoesNotServePatientSafetyEntries()
     {
-        // Not 204 and not 404. An empty plan is a meaningful answer, and this is the one
-        // place the contract deliberately departs from the empty-list convention used by
-        // search and get-by-facility.
-        var token = await AcquireTokenAsync();
+        // The two endpoints share a table, so component isolation is the property that
+        // keeps them from becoming one another. A patient-safety measure surfacing in the
+        // medicine plan is silent -- the response still looks well formed.
+        Seed(measure: "HOB");
+        SeedAnnual(measure: "HAI");
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, "/dmrp/mock/reporting-plans?facilityId=Nobody&reportingMonth=5&reportingYear=2026");
-        request.Headers.Add("Authorization", $"Bearer {token}");
+        var response = await GetAuthorizedAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
 
-        var response = await _client.SendAsync(request);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Measures.Should().ContainSingle();
+        plan.Measures.Single().Measure.Should().Be("HOB");
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
+    {
+        // Not 204 and not 404. An empty plan is a meaningful answer -- "enrolled in
+        // nothing" -- and the caller iterates measures unconditionally.
+        var response = await GetAuthorizedAsync("/msc?facilityId=Nobody&reportingMonth=5&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -506,36 +244,136 @@ public class DmrpControllerTests : IAsyncLifetime
         plan.Measures.Should().BeEmpty();
     }
 
-    // ------------------------------------------------ NHSN Auth simulation route
-
     [Fact]
-    public async Task AuthTestAlias_IssuesAnInterchangeableToken()
+    public async Task GetMonthlyPlan_WithoutTheRequiredQueryParameters_Returns400()
     {
-        var aliasResponse = await _client.GetAsync(
-            $"/dmrp/mock/auth-test?clientId={ClientId}&clientSecret={ClientSecret}&scope=dmrp.read");
+        // The parameters are required in the contract, so the generated data annotations
+        // reject the call before the token is even looked at.
+        var response = await GetAuthorizedAsync("/msc?facilityId=F1");
 
-        aliasResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var aliasToken = await aliasResponse.Content.ReadFromJsonAsync<AuthTokenResponse>();
-        aliasToken!.Token_type.Should().Be(AuthTokenResponseToken_type.Bearer);
-        aliasToken.Expires_in.Should().Be(3600);
-        aliasToken.Scope.Should().Be("dmrp.read");
-
-        // The token the alias issues must be accepted by the contract endpoint.
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, "/dmrp/mock/reporting-plans?facilityId=F1&reportingMonth=5&reportingYear=2026");
-        request.Headers.Add("Authorization", $"Bearer {aliasToken.Access_token}");
-
-        (await _client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // ------------------------------------------------------------ /ps/annual
+
     [Fact]
-    public async Task AuthTest_RejectsABadSecretTheSameWayAsTheTokenEndpoint()
+    public async Task GetAnnualPlan_WithoutAToken_Returns401()
     {
-        var response = await _client.GetAsync(
-            $"/dmrp/mock/auth-test?clientId={ClientId}&clientSecret=wrong");
+        var response = await _client.GetAsync("/ps/annual?facilityId=F1&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("invalid_client");
     }
 
+    [Fact]
+    public async Task GetAnnualPlan_ListsTheYearsMeasuresAndOmitsTheMonth()
+    {
+        SeedAnnual(measure: "HAI");
+        SeedAnnual(measure: "SSI");
+        SeedAnnual(measure: "OLD", year: 2025);
+
+        var response = await GetAuthorizedAsync("/ps/annual?facilityId=F1&reportingYear=2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.FacilityId.Should().Be("F1");
+        plan.ReportingYear.Should().Be(2026);
+        plan.ReportingMonth.Should().BeNull("an annual plan covers no particular month");
+        plan.Measures.Select(m => m.Measure).Should().BeEquivalentTo("HAI", "SSI");
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_DoesNotServeMedicineEntries()
+    {
+        // The annual query deliberately does not filter on month. Without the component
+        // in the predicate that omission would pull in every monthly entry for the year.
+        SeedAnnual(measure: "HAI");
+        Seed(measure: "HOB");
+        Seed(measure: "HTCDI", month: 6);
+
+        var response = await GetAuthorizedAsync("/ps/annual?facilityId=F1&reportingYear=2026");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Measures.Should().ContainSingle();
+        plan.Measures.Single().Measure.Should().Be("HAI");
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_ExcludesEntriesNotBeingReported()
+    {
+        SeedAnnual(measure: "HAI");
+        SeedAnnual(measure: "SSI", isReporting: "N");
+
+        var response = await GetAuthorizedAsync("/ps/annual?facilityId=F1&reportingYear=2026");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Measures.Should().ContainSingle();
+        plan.Measures.Single().Measure.Should().Be("HAI");
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
+    {
+        var response = await GetAuthorizedAsync("/ps/annual?facilityId=Nobody&reportingYear=2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Measures.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_DoesNotAcceptAReportingMonth()
+    {
+        // A month on an annual request would be quietly ignored by the handler. Proving it
+        // is not bound at all keeps a caller from believing the plan was month-scoped.
+        SeedAnnual(measure: "HAI");
+        Seed(measure: "HOB");
+
+        var response = await GetAuthorizedAsync("/ps/annual?facilityId=F1&reportingYear=2026&reportingMonth=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.ReportingMonth.Should().BeNull();
+        plan.Measures.Should().ContainSingle();
+        plan.Measures.Single().Measure.Should().Be("HAI");
+    }
+
+    // -------------------------------------------------------- shared behaviour
+
+    [Fact]
+    public async Task BothEndpointsAcceptTheSameToken()
+    {
+        // One authorization server stands behind both, so a caller acquires a token once.
+        Seed(measure: "HOB");
+        SeedAnnual(measure: "HAI");
+
+        var token = ThirdPartyToken();
+
+        foreach (var url in new[]
+                 {
+                     "/msc?facilityId=F1&reportingMonth=5&reportingYear=2026",
+                     "/ps/annual?facilityId=F1&reportingYear=2026"
+                 })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            (await _client.SendAsync(request)).StatusCode
+                .Should().Be(HttpStatusCode.OK, "{0} must accept the same token", url);
+        }
+    }
+
+    [Fact]
+    public async Task BothEndpointsScopeToTheRequestedFacility()
+    {
+        Seed(facilityId: "F2", measure: "HOB");
+        SeedAnnual(facilityId: "F2", measure: "HAI");
+
+        var monthly = await (await GetAuthorizedAsync("/msc?facilityId=F1&reportingMonth=5&reportingYear=2026"))
+            .Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        var annual = await (await GetAuthorizedAsync("/ps/annual?facilityId=F1&reportingYear=2026"))
+            .Content.ReadFromJsonAsync<ReportingPlanResponse>();
+
+        monthly!.Measures.Should().BeEmpty();
+        annual!.Measures.Should().BeEmpty();
+    }
 }

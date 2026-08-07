@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.MockDmrpApi.Migrations
 {
     [DbContext(typeof(ReportingPlanDbContext))]
-    [Migration("20260803193257_InitMockDmrp")]
+    [Migration("20260806172339_InitMockDmrp")]
     partial class InitMockDmrp
     {
         /// <inheritdoc />
@@ -30,6 +30,11 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
                     b.Property<string>("Id")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Component")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -52,7 +57,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ReportingMonth")
+                    b.Property<int?>("ReportingMonth")
                         .HasColumnType("int");
 
                     b.Property<int>("ReportingYear")
@@ -60,9 +65,9 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FacilityId", "ReportingYear", "ReportingMonth", "Measure")
+                    b.HasIndex("FacilityId", "Component", "ReportingYear", "ReportingMonth", "Measure")
                         .IsUnique()
-                        .HasDatabaseName("UX_MockDmrpEntries_Facility_Period_Measure");
+                        .HasDatabaseName("UX_MockDmrpEntries_Facility_Component_Period_Measure");
 
                     b.ToTable("MockDmrpEntries", (string)null);
                 });

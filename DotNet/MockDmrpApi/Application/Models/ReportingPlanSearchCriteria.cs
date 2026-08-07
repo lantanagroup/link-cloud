@@ -14,6 +14,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Application.Models;
 public enum ReportingPlanSortBy
 {
     FacilityId,
+    Component,
     Measure,
     ReportingMonth,
     ReportingYear,
@@ -31,6 +32,9 @@ public class ReportingPlanSearchCriteria
     public const int MaxPageSize = 100;
 
     public string? FacilityId { get; set; }
+
+    /// <summary>The NHSN component, e.g. MSC or PS. Matched exactly.</summary>
+    public string? Component { get; set; }
 
     /// <summary>Matched case-insensitively.</summary>
     public string? Measure { get; set; }

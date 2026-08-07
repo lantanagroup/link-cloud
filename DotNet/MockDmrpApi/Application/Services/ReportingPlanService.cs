@@ -51,15 +51,30 @@ public class ReportingPlanService : IReportingPlanService
         return (records, metadata);
     }
 
-    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetReportingPlanAsync(
-        string facilityId, int reportingMonth, int reportingYear, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetMonthlyReportingPlanAsync(
+        string component, string facilityId, int reportingMonth, int reportingYear,
+        CancellationToken cancellationToken)
     {
         // Only entries actively being reported take part in a plan. An entry explicitly
         // marked as not reporting is equivalent to no entry at all, since the response
         // conveys enrollment by presence.
         return await _repository.FindAsync(
             e => e.FacilityId == facilityId
+                 && e.Component == component
                  && e.ReportingMonth == reportingMonth
+                 && e.ReportingYear == reportingYear
+                 && e.IsReporting == "Y",
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ReportingPlanEntryEntity>> GetAnnualReportingPlanAsync(
+        string component, string facilityId, int reportingYear, CancellationToken cancellationToken)
+    {
+        // No month in the predicate: an annual component's entries carry none, and matching
+        // on one would exclude every row it is supposed to return.
+        return await _repository.FindAsync(
+            e => e.FacilityId == facilityId
+                 && e.Component == component
                  && e.ReportingYear == reportingYear
                  && e.IsReporting == "Y",
             cancellationToken);
@@ -69,6 +84,7 @@ public class ReportingPlanService : IReportingPlanService
     {
         ArgumentNullException.ThrowIfNull(entry);
 
+        GuardComponentAndPeriod(entry);
         await GuardNaturalKeyAsync(entry, excludeId: null, cancellationToken);
 
         entry.Id = Guid.NewGuid().ToString();
@@ -82,7 +98,7 @@ public class ReportingPlanService : IReportingPlanService
             // The pre-check above narrows the window but does not close it; the unique
             // index is the actual guarantee. Translate so callers see one failure mode.
             throw new DuplicateReportingPlanEntryException(
-                entry.FacilityId, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
+                entry.FacilityId, entry.Component, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
         }
     }
 
@@ -97,9 +113,11 @@ public class ReportingPlanService : IReportingPlanService
             return null;
         }
 
+        GuardComponentAndPeriod(entry);
         await GuardNaturalKeyAsync(entry, excludeId: entry.Id, cancellationToken);
 
         existing.FacilityId = entry.FacilityId;
+        existing.Component = entry.Component;
         existing.Measure = entry.Measure;
         existing.ReportingMonth = entry.ReportingMonth;
         existing.ReportingYear = entry.ReportingYear;
@@ -112,7 +130,7 @@ public class ReportingPlanService : IReportingPlanService
         catch (DbUpdateException)
         {
             throw new DuplicateReportingPlanEntryException(
-                entry.FacilityId, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
+                entry.FacilityId, entry.Component, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
         }
     }
 
@@ -151,10 +169,58 @@ public class ReportingPlanService : IReportingPlanService
         return entries.Count;
     }
 
+    /// <summary>
+    /// Rejects an entry whose reporting period does not match its component's cadence.
+    /// </summary>
+    /// <remarks>
+    /// This cannot be a column constraint or a range annotation, because whether a month is
+    /// required depends on the component. It has to be enforced, not merely documented: a
+    /// patient-safety entry saved with a stray month satisfies the unique index perfectly
+    /// well, but the annual query does not filter on month, so the row would be returned for
+    /// every month -- or, with the month wrong on a monthly entry, returned for none. Both
+    /// failures are silent.
+    /// </remarks>
+    private static void GuardComponentAndPeriod(ReportingPlanEntryEntity entry)
+    {
+        if (!ReportingComponents.IsKnown(entry.Component))
+        {
+            throw new InvalidReportingPlanEntryException(
+                $"Component '{entry.Component}' is not recognised. Expected one of: "
+                + string.Join(", ", ReportingComponents.All) + ".");
+        }
+
+        // Accepted in any casing but stored canonically. The endpoints match the component
+        // exactly, and a case-sensitive collation would otherwise make a row seeded as
+        // "msc" invisible to /msc -- a difference no local run against SQL Server's
+        // default case-insensitive collation would ever reveal.
+        entry.Component = ReportingComponents.Normalize(entry.Component);
+
+        var monthRequired = ReportingComponents.RequiresReportingMonth(entry.Component);
+
+        if (monthRequired && entry.ReportingMonth is null)
+        {
+            throw new InvalidReportingPlanEntryException(
+                $"Component '{entry.Component}' is reported monthly, so reportingMonth is required.");
+        }
+
+        if (!monthRequired && entry.ReportingMonth is not null)
+        {
+            throw new InvalidReportingPlanEntryException(
+                $"Component '{entry.Component}' is reported annually, so reportingMonth must be omitted.");
+        }
+
+        if (entry.ReportingMonth is < 1 or > 12)
+        {
+            throw new InvalidReportingPlanEntryException(
+                "reportingMonth must be between 1 and 12.");
+        }
+    }
+
     private async Task GuardNaturalKeyAsync(ReportingPlanEntryEntity entry, string? excludeId, CancellationToken cancellationToken)
     {
         var clash = await _repository.AnyAsync(
             e => e.FacilityId == entry.FacilityId
+                 && e.Component == entry.Component
                  && e.Measure == entry.Measure
                  && e.ReportingMonth == entry.ReportingMonth
                  && e.ReportingYear == entry.ReportingYear
@@ -164,7 +230,7 @@ public class ReportingPlanService : IReportingPlanService
         if (clash)
         {
             throw new DuplicateReportingPlanEntryException(
-                entry.FacilityId, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
+                entry.FacilityId, entry.Component, entry.Measure, entry.ReportingMonth, entry.ReportingYear);
         }
     }
 
@@ -172,6 +238,7 @@ public class ReportingPlanService : IReportingPlanService
     {
         return e =>
             (criteria.FacilityId == null || e.FacilityId == criteria.FacilityId)
+            && (criteria.Component == null || e.Component == criteria.Component)
             && (criteria.Measure == null || e.Measure.ToLower() == criteria.Measure.ToLower())
             && (criteria.ReportingMonth == null || e.ReportingMonth == criteria.ReportingMonth)
             && (criteria.ReportingYear == null || e.ReportingYear == criteria.ReportingYear)
@@ -186,6 +253,7 @@ public class ReportingPlanService : IReportingPlanService
     private static string ResolveSortBy(ReportingPlanSortBy sortBy) => sortBy switch
     {
         ReportingPlanSortBy.FacilityId => nameof(ReportingPlanEntryEntity.FacilityId),
+        ReportingPlanSortBy.Component => nameof(ReportingPlanEntryEntity.Component),
         ReportingPlanSortBy.Measure => nameof(ReportingPlanEntryEntity.Measure),
         ReportingPlanSortBy.ReportingMonth => nameof(ReportingPlanEntryEntity.ReportingMonth),
         ReportingPlanSortBy.ReportingYear => nameof(ReportingPlanEntryEntity.ReportingYear),

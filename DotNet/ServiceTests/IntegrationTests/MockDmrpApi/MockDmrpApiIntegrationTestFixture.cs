@@ -23,6 +23,13 @@ namespace IntegrationTests.MockDmrpApi;
 /// the unique index actually rejecting a duplicate. SQLite enforces unique indexes, so the
 /// constraint tests are meaningful.
 /// <para>
+/// One constraint does <b>not</b> carry over. SQL Server treats NULL as a single value in a
+/// unique index and rejects a second row with the same key; SQLite follows the standard,
+/// where NULLs are distinct. So the index alone does not stop two annual entries sharing a
+/// key here, though it does in every deployed environment. What holds on both providers is
+/// the service's own pre-check, and that is what the tests assert.
+/// </para>
+/// <para>
 /// Note this uses EnsureCreated rather than Migrate, so the EF migration itself is not
 /// exercised here. That is covered by bringing the service up against SQL Server.
 /// </para>

@@ -22,36 +22,71 @@ It is a **stand-in, not a simulation of CDC's implementation**. It returns what 
 it. Its value is that a caller has to acquire a token, present it, and interpret a reporting
 plan — the same sequence it will perform against the real service.
 
+### 1.1 ⚠️ Two surfaces, and only one of them is DMRP
+
+Everything this service serves falls into one of two groups, and conflating them is the
+mistake most likely to waste someone's week.
+
+| | **Contract surface** | **Support surface** |
+|---|---|---|
+| Routes | `GET /msc`, `GET /ps/annual` | everything under `/mock` |
+| Whose API is it? | The third party's | Ours |
+| In `Contracts/dmrp-openapi.yaml`? | Yes — it describes *only* these | No, deliberately |
+| Authentication | The third party's bearer token | **Link's standard scheme** |
+| Exists in real DMRP? | Yes | **No** |
+
+**A consumer integrates against the contract surface only.** The support surface exists so a
+test can seed and inspect the data those two endpoints then serve; it has no counterpart in
+the real service, and code written against it has nothing to talk to in production.
+
+The split is why replacing the contract when Leidos publishes theirs is safe: nothing of ours
+lives in that document, so it can be swapped wholesale (§2.8).
+
+### 1.2 The two components
+
+The two contract endpoints differ in **subject and in cadence**, which is why they take
+different parameters.
+
+| Endpoint | Component | Subject | Cadence | Parameters |
+|---|---|---|---|---|
+| `GET /msc` | `MSC` | Medicine reports | Monthly | facility + month + year |
+| `GET /ps/annual` | `PS` | Patient safety | Annual | facility + year |
+
+That cadence difference reaches the schema: `ReportingMonth` is **nullable**, populated for
+MSC and null for PS. Whether it is required depends on the component, which no column
+constraint or range annotation can express, so the service enforces it — see §4.1.
+
+⚠️ **Both endpoints are placeholders.** Their shape is expected to change once the published
+contract arrives, and the strings `"MSC"` and `"PS"` are our invention. They are cheap to
+change while nothing is deployed.
+
 ---
 
 ## 2. How this project is built — contract-first with NSwag
 
 This is the part worth reading before changing anything.
 
-### 2.1 The spec is the source of truth
+### 2.1 The spec is the source of truth — for the contract surface only
 
-`Contracts/dmrp-openapi.yaml` describes the API with production operation names. The words
-"test" and "mock" appear nowhere in it.
+`Contracts/dmrp-openapi.yaml` describes **the two contract endpoints and nothing else**. It
+uses production operation names; the words "test" and "mock" appear nowhere in it. The support
+surface at `/mock` is hand-written and deliberately absent from it (§1.1).
 
-Every path is **relative to the server URL**, and that URL carries the `dmrp/mock` prefix:
+The server URL carries **no path component**:
 
 ```yaml
 servers:
-  - url: http://localhost:6159/dmrp/mock
+  - url: http://localhost:6159
 ```
 
-So the spec's `/search` resolves to `http://localhost:6159/dmrp/mock/search`, matching the
-`[Route("dmrp/mock")]` on the controller. Repointing a consumer at another instance — or
-eventually at the real DMRP — is a change to that one server URL and nothing else.
+So the spec's `/msc` resolves to `http://localhost:6159/msc`, and the operations sit at the
+root. `DmrpController` therefore declares **no `[Route]` of its own** — routing comes entirely
+from the generated base. Repointing a consumer at another instance, or eventually at real
+DMRP, is a change to that one server URL and nothing else.
 
-⚠️ **The prefix is declared twice, and that is deliberate.** Because the server URL has a path
-component, NSwag emits a class-level `[Route("dmrp/mock")]` on the generated base as well.
-Attribute routing takes the most-derived declaration rather than combining them, so the prefix
-is applied once — `ThePrefixIsAppliedExactlyOnce` in `DmrpControllerTests` pins that.
-
-The explicit route on the controller is what actually decides the served path. Keep it: if the
-server URL were ever shortened to `http://localhost:6159`, the generated route would become
-empty and, without the explicit one, every endpoint would silently move to `/`.
+That is the point of putting the contract endpoints at the root and our own under `/mock`:
+the base URL is the only thing that has to change, because none of our paths would come with
+it. `TheContractEndpointsSitAtTheRootWithNoPrefix` in `DmrpControllerTests` pins it.
 
 ### 2.2 What happens on build
 
@@ -62,12 +97,14 @@ Contracts/dmrp-openapi.yaml
         ▼
 obj/NSwag/DmrpApi.Generated.cs
         │
-        ├── abstract class DmrpControllerBase   routes, [ProducesResponseType], abstract methods
-        └── DTOs                                ReportingPlanEntry, ReportingPlanResponse, …
+        ├── abstract class DmrpControllerBase   routes, [ProducesResponseType], 2 abstract methods
+        └── DTOs                                ReportingPlanResponse, ReportingPlanMeasure, …
         │
         │  we override
         ▼
-Presentation/Controllers/DmrpController.cs
+Presentation/Controllers/DmrpController.cs      the contract surface
+
+Presentation/Controllers/MockController.cs      the support surface — untouched by any of this
 ```
 
 The target's `Inputs`/`Outputs` make `dotnet build` incremental — codegen re-runs only when
@@ -77,20 +114,30 @@ publish-then-restart loop always picks up a spec edit.
 ### 2.3 Validation rules live in the spec, not the C#
 
 NSwag emits `[Required]`, `[Range]` and `[StringLength]` from the schema's `required`,
-`minimum`/`maximum` and `maxLength`. So a range change is a **yaml edit**, not a code edit.
-`sortBy` is a closed enum in the spec for the same reason: the repository resolves the sort
-field by property name and throws for anything that is not one, which would turn ordinary
-client input into a server fault.
+`minimum`/`maximum` and `maxLength`, and `[BindRequired]` for required query parameters. So a
+range change on the contract surface is a **yaml edit**, not a code edit.
+
+This applies to the contract surface only. The support surface carries its own data
+annotations in `Application/Models/MockEntryModels.cs`, and `sortBy` there is a C# enum for
+the reason a closed set matters: the repository resolves the sort field by property name and
+throws for anything that is not one, which would turn ordinary client input into a server
+fault.
 
 ### 2.4 What we write by hand
 
 | File | Role |
 |---|---|
-| `Presentation/Controllers/DmrpController.cs` | Overrides the generated base; HTTP plumbing only |
-| `Presentation/Controllers/NhsnAuthController.cs` | The `auth-test` route; outside the contract |
-| `Application/Services/ReportingPlanService.cs` | Storage and querying |
-| `Application/Services/AuthTokenService.cs` | Issues and validates tokens |
-| `Application/Mapping/EntryMapper.cs` | Entity ⇄ generated DTO; keeps the contract out of the database |
+| `Presentation/Controllers/DmrpController.cs` | Overrides the generated base. Validate the token, select by component, project |
+| `Presentation/Controllers/MockController.cs` | The whole support surface, including the token endpoint. Outside the contract |
+| `Application/Models/MockEntryModels.cs` | The support surface's own request/response models |
+| `Application/Models/MockTokenModels.cs` | Token exchange models |
+| `Application/Services/ReportingPlanService.cs` | Storage, querying, and the component/cadence rules |
+| `Application/Services/AuthTokenService.cs` | Issues and validates the third-party token |
+| `Application/Mapping/EntryMapper.cs` | Entity → generated DTO. The only seam where contract types appear |
+
+The support surface has its **own models rather than borrowing the generated ones**. If it
+shared them, replacing the third party's contract would break endpoints that have nothing to
+do with it.
 
 ### 2.5 Why the generated code is not committed
 
@@ -109,22 +156,33 @@ in `DmrpController.cs`. This is not a broken checkout.
 dotnet build DotNet/MockDmrpApi/MockDmrpApi.csproj
 ```
 
-### 2.7 ⚠️ Two traps when overriding the generated base
+### 2.7 ⚠️ Traps when overriding the generated base
 
-Neither is inherited from the base, and neither produces a compiler warning. Both are covered
-by `GeneratedControllerBindingTests` in `DotNet/ServiceTests`, which will fail loudly if an
-NSwag or ASP.NET upgrade changes the behaviour.
+None of these is inherited from the base, and none produces a compiler warning. All are
+covered by `GeneratedControllerBindingTests` in `DotNet/ServiceTests`, which will fail loudly
+if an NSwag or ASP.NET upgrade changes the behaviour.
 
-1. **Default parameter values do not carry over.** An override that drops `= 10` binds `null`
-   and silently unpages the endpoint.
-2. **Optional string filters are typed non-nullable.** NSwag emits `string facilityId`, not
-   `string?`, and `[ApiController]` treats a non-nullable reference parameter as required —
-   so the contract's optional filters return `400` until the override restates them as
-   `string?`.
+What **does** survive into the override, because MVC resolves parameter attributes through the
+base declaration:
 
-Binding *source* attributes (`[FromQuery]`, `[FromBody]`) **do** survive, because MVC resolves
-them through the base declaration. Keep `[ApiController]`: it is what infers `Path` for route
-parameters carrying only `[BindRequired]`.
+- Binding *source* attributes — `[FromQuery]`, `[FromBody]`
+- Validation attributes — `[BindRequired]`, so a missing required parameter is still a `400`
+- Routes, including the method-level ones the current contract relies on entirely
+
+What does **not**:
+
+1. **Default parameter values.** An override that drops `= default` gets none. Harmless for the
+   cancellation token MVC supplies anyway; not harmless for a `pageSize = 10`, where the loss
+   silently unpages an endpoint.
+2. **Nullability of optional string filters.** NSwag emits `string facilityId`, not `string?`,
+   and `[ApiController]` treats a non-nullable reference parameter as required — so filters the
+   contract documents as optional return `400` until the override restates them as `string?`.
+
+The current two-operation contract has no optional parameters, so trap 2 has no live example
+and trap 1 only the cancellation token. **Both are near-certain to matter again** once a
+fuller contract lands with paging and filters, which is why they are documented here rather
+than deleted. Keep `[ApiController]`: it is what infers `Path` for route parameters carrying
+only `[BindRequired]`.
 
 ### 2.8 Replacing the spec when Leidos publishes theirs
 
@@ -134,8 +192,11 @@ parameters carrying only `[BindRequired]`.
 4. Fix each override in `DmrpController.cs`, restating defaults and nullability per §2.7.
 5. Run `dotnet test DotNet/ServiceTests/ServiceTests.csproj --filter FullyQualifiedName~MockDmrpApi`.
 
+`MockController` and its models should need **no changes at all**. If a spec replacement forces
+edits there, the two surfaces have become entangled and that is the thing to fix.
+
 Never edit the generated file, and never add routes that exist only on this stand-in to the
-spec — those belong in `NhsnAuthController`.
+spec — those belong on `MockController`.
 
 ### 2.9 Troubleshooting
 
@@ -151,32 +212,44 @@ spec — those belong in `NhsnAuthController`.
 
 ## 3. Route map
 
-Spec paths are relative to the server URL, which carries the `dmrp/mock` prefix (§2.1), so
-the served URL is the prefix plus the path.
+### Contract surface — in the spec, this is DMRP
 
-| Spec path | Served at | Purpose |
-|---|---|---|
-| `GET /reporting-plans` | `/dmrp/mock/reporting-plans` | **The consumer-facing query.** Requires a bearer token |
-| `POST /oauth2/token` | `/dmrp/mock/oauth2/token` | Issues a token. Client credentials, JSON body |
-| `POST /` | `/dmrp/mock` | Create an entry → `201` + `Location` |
-| `GET /{id}` | `/dmrp/mock/{id}` | One entry. `400` on a non-GUID, `404` if absent |
-| `PUT /{id}` | `/dmrp/mock/{id}` | Update → `202`. **Never creates**; `404` if absent |
-| `GET /facilities/{facilityId}` | `/dmrp/mock/facilities/{id}` | A facility's entries, paged. `204` when none |
-| `GET /search` | `/dmrp/mock/search` | Filtered search, paged. `204` when none |
-| `DELETE /{id}` | `/dmrp/mock/{id}` | `204`, or `404` if absent |
-| `DELETE /facilities/{facilityId}` | `/dmrp/mock/facilities/{id}` | Idempotent `204` |
-| `DELETE /` | `/dmrp/mock` | Removes **every** entry. No confirmation step |
+Authenticated with the **third party's** bearer token, from `POST /mock/oauth2/token`.
 
-**Not in the spec** — this stand-in only:
+| Route | Purpose |
+|---|---|
+| `GET /msc?facilityId=&reportingMonth=&reportingYear=` | Monthly medicine reporting plan (`MSC`) |
+| `GET /ps/annual?facilityId=&reportingYear=` | Annual patient-safety reporting plan (`PS`) |
+
+Both return `ReportingPlanResponse`. Both answer `200` with an empty `measures` array for a
+facility enrolled in nothing (§4), and `401` without a valid token.
+
+### Support surface — ours, not in the spec, no counterpart in real DMRP
+
+Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
+
+| Route | Purpose |
+|---|---|
+| `POST /mock/oauth2/token` | Issues the third-party token the contract surface accepts |
+| `POST /mock` | Create an entry → `201` + `Location` |
+| `GET /mock/{id}` | One entry. `400` on a non-GUID, `404` if absent |
+| `PUT /mock/{id}` | Update → `202`. **Never creates**; `404` if absent |
+| `GET /mock/facilities/{facilityId}` | A facility's entries across both components, paged. `204` when none |
+| `GET /mock/search` | Filtered search, paged. `204` when none |
+| `DELETE /mock/{id}` | `204`, or `404` if absent |
+| `DELETE /mock/facilities/{facilityId}` | Idempotent `204` |
+| `DELETE /mock` | Removes **every** entry. No confirmation step |
+
+### Unauthenticated
 
 | Route | Notes |
 |---|---|
-| `GET /dmrp/mock/auth-test` | Query-parameter convenience form of the token endpoint. The secret travels in the query string, which reaches access logs; integrate against `POST /oauth2/token` |
 | `GET /health`, `GET /api/mock-dmrp/info` | Answer even when the service is disabled |
 
-There is deliberately **no `api-test` route**. The reporting plan query belongs to the real
-API and is already served at `/dmrp/mock/reporting-plans`; a second path to it would invite a
-consumer to integrate against something the real service does not have.
+⚠️ The token endpoint sits on the support surface but hands out a **contract-surface**
+credential. That is deliberate: a caller acquires a third-party token through Link's
+authenticated surface, then presents it to the endpoints impersonating the third party —
+the same acquire-then-use sequence it will perform for real.
 
 ---
 
@@ -187,11 +260,11 @@ The single most important behaviour, and the one most likely to be mis-implement
 **A measure that does not appear in `measures` means the facility is NOT enrolled in it.**
 There is no negative representation. `isReporting` is `"Y"` wherever an entry exists.
 
-Seed only `HOB` for TestFacility01, May 2026:
+Seed only `HOB` for FAC001, May 2026, then `GET /msc`:
 
 ```json
 {
-  "facilityId": "TestFacility01",
+  "facilityId": "FAC001",
   "reportingMonth": 5,
   "reportingYear": 2026,
   "measures": [ { "measure": "HOB", "isReporting": "Y" } ],
@@ -203,8 +276,46 @@ The caller concludes "not enrolled in HTCDI" from its absence.
 
 A facility enrolled in nothing returns **`200` with `"measures": []`** — not `204`, not `404`
 — because an empty plan is a meaningful answer rather than an absent resource. This
-deliberately differs from `/search` and `/facilities/{id}`, which do return `204` when empty.
-An entry stored with `isReporting` other than `"Y"` is excluded from a plan entirely.
+deliberately differs from `/mock/search` and `/mock/facilities/{id}`, which do return `204`
+when empty. An entry stored with `isReporting` other than `"Y"` is excluded from a plan
+entirely.
+
+An annual plan omits `reportingMonth` from the response, rather than reporting a zero or a
+stale value that would tell a consumer the plan covers one particular month.
+
+### 4.1 ⚠️ The cadence rule, and why the service enforces it
+
+A monthly component **requires** a reporting month; an annual one **must omit** it. The rule
+is conditional on the component, so no column constraint or `[Range]` annotation can express
+it — `ReportingPlanService` rejects violations with a `400` naming the cadence.
+
+It has to be enforced rather than merely documented, because both failure modes are silent:
+
+- A **PS entry saved with a month** satisfies the unique index perfectly well, and `/ps/annual`
+  does not filter on month — so the row is returned for every request, looking correct.
+- An **MSC entry saved without one** matches no month, so `/msc` never returns it. The plan
+  simply comes back short, with nothing to indicate a row was skipped.
+
+Neither produces an error anywhere. The only symptom is a reporting plan that is quietly wrong.
+
+### 4.2 ⚠️ The unique index must not be filtered
+
+The natural key is `(facilityId, component, reportingYear, reportingMonth, measure)`.
+
+`ReportingMonth` is nullable, and **EF's default for a unique index over a nullable column is a
+filtered index** — `WHERE [ReportingMonth] IS NOT NULL`. That would drop every annual row out
+of the index and silently permit duplicate patient-safety entries, which is precisely what the
+index exists to prevent. `ReportingPlanEntryMap` suppresses it with `.HasFilter(null)`, and
+`TheUniqueIndexIsNotFiltered` pins that.
+
+SQL Server then treats NULL as a single value in the index and rejects the second annual row
+(error 2601), which is the behaviour wanted: one PS row per (facility, year, measure), one MSC
+row per (facility, year, month, measure).
+
+⚠️ **The integration fixture runs on SQLite, which does not share that behaviour** — it follows
+the standard, where NULLs are distinct, so the index alone does not stop a duplicate annual
+entry there. What holds on both providers is the service's own pre-check, and that is what the
+tests assert.
 
 ---
 
@@ -216,25 +327,33 @@ With the service running (see §7):
 B=http://localhost:6159
 
 # Start clean
-curl -X DELETE $B/dmrp/mock
+curl -X DELETE $B/mock
 
-# Enrol TestFacility01 in HOB for May 2026
-curl -X POST $B/dmrp/mock -H 'Content-Type: application/json' \
-  -d '{"facilityId":"TestFacility01","measure":"HOB","reportingMonth":5,"reportingYear":2026,"isReporting":"Y"}'
+# Enrol FAC001 in HOB for May 2026 -- monthly, so a month is required
+curl -X POST $B/mock -H 'Content-Type: application/json' \
+  -d '{"facilityId":"FAC001","component":"MSC","measure":"HOB","reportingMonth":5,"reportingYear":2026,"isReporting":"Y"}'
 
-# Acquire a token
-TOKEN=$(curl -s -X POST $B/dmrp/mock/oauth2/token -H 'Content-Type: application/json' \
+# ...and in HAI for 2026 -- annual, so a month must be omitted
+curl -X POST $B/mock -H 'Content-Type: application/json' \
+  -d '{"facilityId":"FAC001","component":"PS","measure":"HAI","reportingYear":2026,"isReporting":"Y"}'
+
+# Acquire a third-party token
+TOKEN=$(curl -s -X POST $B/mock/oauth2/token -H 'Content-Type: application/json' \
   -d '{"grant_type":"client_credentials","client_id":"link-cloud-dev","client_secret":"link-cloud-dev-secret","scope":"dmrp.read"}' \
   | jq -r .access_token)
 
-# Query the plan
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$B/dmrp/mock/reporting-plans?facilityId=TestFacility01&reportingMonth=5&reportingYear=2026" | jq
+# Query each plan -- each returns only its own component's measures
+curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?facilityId=FAC001&reportingMonth=5&reportingYear=2026" | jq
+curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?facilityId=FAC001&reportingYear=2026" | jq
 ```
 
-The natural key is `(facilityId, measure, reportingYear, reportingMonth)`, enforced by a
-unique index — a second create with the same combination is a `409`, so the store cannot hold
-two contradictory rows for one facility, measure and period.
+Against a deployed instance the `/mock` calls also need a Link bearer token; locally
+docker-compose sets `Authentication:EnableAnonymousAccess`, as it does for every Link service
+(§6).
+
+A second create with the same natural key is a `409`, so the store cannot hold two
+contradictory rows for one facility, component, measure and period. The same measure name
+under **both** components is two legitimate rows, not a duplicate — the plans are independent.
 
 ---
 
@@ -254,6 +373,18 @@ All under the `MockDmrpApi` section, or `MockDmrpApi__<Key>` as an environment v
 
 Also read: `ConnectionStrings:DatabaseConnection`, `DatabaseProvider` (`SqlServer`),
 `AutoMigrate`, `EnableSwagger`, `ExternalConfigurationSource`.
+
+**Link authentication** uses the same global keys every other Link service does, all already
+in `app-config.yaml`: `Authentication:EnableAnonymousAccess`,
+`Authentication:Schemas:LinkBearer:{Authority,ValidateToken}`, `DataProtection:Enabled` and
+`LinkTokenService:SigningKey`. Nothing service-specific was added.
+
+`appsettings.Docker.json` sets `Authentication:EnableAnonymousAccess: true`, matching every
+other service in the local stack — only `admin-bff` and `automation-ui` carry Link token
+config in docker-compose, so enforcing it here would make seeding locally require a token
+nothing in the stack conveniently issues. It is unset elsewhere, so deployed environments
+enforce. The `401` behaviour of every `/mock` endpoint is covered by `MockControllerTests`
+rather than by the local stack.
 
 ⚠️ **`SigningKey` must be the same value on every replica.** Tokens are validated by the same
 service that issues them, so a per-instance key means a token minted by one pod is rejected by
@@ -276,7 +407,20 @@ Everywhere else, `MockDmrpApi:Enabled` decides. When disabled:
 - **EF migration is skipped** — a dormant deployment has no business altering a schema
 - a warning is logged naming the environment and the routes that remain
 
-### 6.2 The token, and where it differs from real NHSN Auth
+### 6.2 The two authentication systems
+
+They are separate on purpose, mirroring the real topology.
+
+| | Guards | Scheme |
+|---|---|---|
+| **Link's** | the support surface at `/mock` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
+| **The third party's** | `GET /msc`, `GET /ps/annual` | HS512 JWT minted by `POST /mock/oauth2/token`, validated by `AuthTokenService` |
+
+`DmrpController` carries `[AllowAnonymous]` so Link's middleware never sees it, and checks the
+third-party token itself. That is not a hole: those endpoints impersonate an external service,
+and Link's credential has no meaning to it.
+
+### 6.3 The token, and where it differs from real NHSN Auth
 
 Issued tokens are genuine signed JWTs (HS512) carrying `iss`, `aud`, `sub`, `scope`, `iat`,
 `nbf`, `exp` and `jti`, with a real expiry — so a caller's acquire, cache and
@@ -289,9 +433,10 @@ keys. **This is the one seam where mock-tested integration code is not the code 
 Upgrading to RS256 + JWKS + discovery later is additive and would not disturb the token
 endpoint's contract.
 
-One consequence of the contract typing `grant_type` as a single-value enum: an unknown grant
-is rejected by model binding as a validation `400` and never reaches the
-`unsupported_grant_type` branch a real authorization server would use.
+`grant_type` is typed as a **string rather than an enum**, so an unknown grant reaches the
+service and comes back as `unsupported_grant_type` — the code a real authorization server
+would use. Bound as an enum it would fail model binding and produce a generic validation
+`400` instead.
 
 ---
 
@@ -329,11 +474,12 @@ pointing schema changes at a server.
 
 ### ⚠️ Swagger is not the contract
 
-`/swagger` is available when `EnableSwagger` is true. It is a Swashbuckle-reflected OpenAPI
-**2.0** document generated from the controllers; `Contracts/dmrp-openapi.yaml` is a
-hand-authored OpenAPI **3.0.3** document and is the actual contract. The two describe the same
-routes but are produced by opposite processes, so they can disagree in detail. **Read the
-yaml, not the Swagger page**, when you need the contract.
+`/swagger` is available when `EnableSwagger` is true. It is a Swashbuckle-reflected document
+generated from the controllers, so it shows **both** surfaces — including everything under
+`/mock`, which is not part of DMRP at all. `Contracts/dmrp-openapi.yaml` is the actual
+contract, and it describes only the two endpoints in §3. **Read the yaml, not the Swagger
+page**, when you need the contract; the Swagger page is useful for exercising the support
+surface.
 
 ---
 
@@ -343,15 +489,18 @@ Everything below is invented. Getting a real request/response pair, or the publi
 matters more than anything else in this project — a consumer written against these guesses
 will work perfectly here and fail on first contact with the real endpoint.
 
-- **Path shapes** — `/reporting-plans`, `/oauth2/token`, `/facilities/{id}`, `/search`
+- **Path shapes** — are `/msc` and `/ps/annual` the real paths, and are they the *only* two?
+- **Component identifiers** — the strings `"MSC"` and `"PS"` are ours. Does the real API use
+  these, longer names, or coded values?
 - **Field names** — `facilityId` vs `orgId`/`orgID`; `measures` vs `reportingPlan`; whether
   `retrievedOn` exists at all
 - **`isReporting`** — genuinely the string `"Y"` on the wire, or a boolean the ticket
   paraphrased?
 - **`measure`** — a short name (`HOB`, `HTCDI`) or a coded identifier?
 - **The period** — separate month and year integers, or one `reportingPeriod` like `2026-05`?
-- **Writes** — does DMRP expose them at all, or is it read-only with enrollment managed
-  elsewhere?
+  And does the annual endpoint really take no month?
+- **Response shape parity** — do both endpoints genuinely return the *same* schema, or does
+  the annual one differ in ways we have flattened together?
 - **Auth** — is NHSN Auth a separate service with its own base URL, and does it use RS256
   with a published JWKS?
 
@@ -361,20 +510,23 @@ will work perfectly here and fail on first contact with the real endpoint.
 
 ```
 DotNet/MockDmrpApi/
-├── Contracts/dmrp-openapi.yaml       Source of truth. Drives codegen
+├── Contracts/dmrp-openapi.yaml       Source of truth for the CONTRACT surface only
 ├── nswag.json                        Codegen configuration
 ├── Program.cs
 ├── Settings/                         DmrpApiConstants, DmrpApiSettings
 ├── Domain/
-│   ├── Entities/                     ReportingPlanEntryEntity
+│   ├── Entities/                     ReportingPlanEntryEntity, ReportingComponents
 │   └── Context/                      ReportingPlanDbContext + mapping
 ├── Migrations/                       InitMockDmrp
 ├── Application/
 │   ├── Middleware/                   DmrpAvailability, DmrpDisabledMiddleware
-│   ├── Models/                       ReportingPlanSearchCriteria
-│   ├── Mapping/                      EntryMapper
+│   ├── Models/                       ReportingPlanSearchCriteria,
+│   │                                 MockEntryModels, MockTokenModels
+│   ├── Mapping/                      EntryMapper  (entity → generated DTO)
 │   └── Services/                     ReportingPlanService, AuthTokenService
-└── Presentation/Controllers/         DmrpController, NhsnAuthController
+└── Presentation/Controllers/
+    ├── DmrpController.cs             Contract surface — overrides the generated base
+    └── MockController.cs             Support surface — entirely hand-written
 ```
 
 Tests live in `DotNet/ServiceTests` under `UnitTests/MockDmrpApi` and

@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Reflection;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
 using Microsoft.AspNetCore.Builder;
@@ -21,20 +20,26 @@ namespace UnitTests.MockDmrpApi;
 /// overridden.
 /// </summary>
 /// <remarks>
-/// Three things are worth knowing before implementing against this base, and all three
-/// are easier to verify than to reason about -- so these tests drive real HTTP through a
-/// real MVC pipeline, and will fail loudly if an NSwag or ASP.NET upgrade changes any of
-/// them.
+/// Everything here is easier to verify than to reason about, so these tests drive real HTTP
+/// through a real MVC pipeline and will fail loudly if an NSwag or ASP.NET upgrade changes
+/// any of it.
 /// <list type="number">
-/// <item>Binding source attributes on the generated base <em>do</em> reach the override.
-/// MVC resolves them through the base declaration, so [FromQuery] and [FromBody] keep
-/// working. Only parameters with no source attribute need [ApiController] inference.</item>
-/// <item>Default parameter values do <em>not</em> carry over. An override that omits
-/// <c>= 10</c> silently binds null.</item>
-/// <item>NSwag types optional string filters as non-nullable <c>string</c>, which
-/// [ApiController] treats as required. An override must restate them as <c>string?</c>
-/// or the contract's optional filters become mandatory.</item>
+/// <item>Binding source and validation attributes on the generated base <em>do</em> reach the
+/// override. MVC resolves them through the base declaration, so [FromQuery] and [BindRequired]
+/// keep working even though <c>DmrpController</c> restates neither.</item>
+/// <item>Routes come from the base too. <c>DmrpController</c> declares no [Route] of its own,
+/// and the operations land at the paths the contract names.</item>
+/// <item>Default parameter values do <em>not</em> carry over. An override that drops
+/// <c>= default</c> gets no default at all.</item>
 /// </list>
+/// <para>
+/// The contract is currently two operations with no optional parameters, so the third point
+/// has only the cancellation token to demonstrate it. It is kept because the contract is
+/// provisional: the published one is likely to add optional filters and paging, and that is
+/// exactly when this trap bites. The related hazard -- NSwag typing optional string filters as
+/// non-nullable, which [ApiController] then treats as required -- has no example on the
+/// current base and will need re-pinning if optional filters return.
+/// </para>
 /// </remarks>
 public class GeneratedControllerBindingTests
 {
@@ -65,7 +70,7 @@ public class GeneratedControllerBindingTests
         return host;
     }
 
-    // ------------------------------------------------------- the C# level fact
+    // ------------------------------------------------------- the C# level facts
 
     [Fact]
     public void ParameterAttributesReachTheOverrideOnlyViaTheStaticAttributeHelper()
@@ -75,7 +80,7 @@ public class GeneratedControllerBindingTests
         // override's own attributes -- none. Attribute.GetCustomAttributes walks to the
         // base method's parameter, and that is the one MVC's behaviour matches.
         var overrideParameter = typeof(AnnotatedProbeController)
-            .GetMethod(nameof(AnnotatedProbeController.GetReportingPlan))!
+            .GetMethod(nameof(AnnotatedProbeController.GetMonthlyMedicineReportingPlan))!
             .GetParameters()[0];
 
         var viaParameterInfo = overrideParameter
@@ -88,23 +93,28 @@ public class GeneratedControllerBindingTests
 
         viaParameterInfo.Should().BeEmpty();
         viaAttributeHelper.Should().Contain("FromQueryAttribute");
+        viaAttributeHelper.Should().Contain("BindRequiredAttribute");
     }
 
     [Fact]
     public void DefaultParameterValuesAreNotInheritedByTheOverride()
     {
-        // The base declares pageSize = 10. The override redeclares the parameter without
-        // a default, and defaults are baked into the declaring signature rather than
-        // resolved through the base -- so the generated default is silently lost.
+        // The base declares cancellationToken = default. The probe redeclares it without
+        // one, and defaults are baked into the declaring signature rather than resolved
+        // through the base -- so the generated default is silently lost.
+        //
+        // Harmless for a cancellation token, which MVC supplies anyway. Not harmless for
+        // the pageSize = 10 that a fuller contract would bring, where the loss turns a
+        // paged endpoint into an unpaged one with no compiler warning.
         var baseParameter = typeof(DmrpControllerBase)
-            .GetMethod(nameof(DmrpControllerBase.GetReportingPlanEntriesByFacility))!
-            .GetParameters().Single(p => p.Name == "pageSize");
+            .GetMethod(nameof(DmrpControllerBase.GetMonthlyMedicineReportingPlan))!
+            .GetParameters().Single(p => p.Name == "cancellationToken");
         var overrideParameter = typeof(AnnotatedProbeController)
-            .GetMethod(nameof(AnnotatedProbeController.GetReportingPlanEntriesByFacility))!
-            .GetParameters().Single(p => p.Name == "pageSize");
+            .GetMethod(nameof(AnnotatedProbeController.GetMonthlyMedicineReportingPlan))!
+            .GetParameters().Single(p => p.Name == "cancellationToken");
 
-        _output.WriteLine($"base pageSize default:     {baseParameter.HasDefaultValue} ({baseParameter.RawDefaultValue})");
-        _output.WriteLine($"override pageSize default: {overrideParameter.HasDefaultValue}");
+        _output.WriteLine($"base default:     {baseParameter.HasDefaultValue}");
+        _output.WriteLine($"override default: {overrideParameter.HasDefaultValue}");
 
         baseParameter.HasDefaultValue.Should().BeTrue();
         overrideParameter.HasDefaultValue.Should().BeFalse(
@@ -114,12 +124,28 @@ public class GeneratedControllerBindingTests
     // ------------------------------------------------- what MVC actually does
 
     [Fact]
+    public async Task RoutesComeFromTheGeneratedBase()
+    {
+        // The probe declares a class-level prefix but no method routes; the paths below
+        // come entirely from the base. This is what lets DmrpController declare no routing
+        // at all and still serve the contract's paths.
+        using var host = await StartHostAsync();
+        var client = host.GetTestClient();
+
+        (await client.GetAsync("/annotated/msc?facilityId=F1&reportingMonth=5&reportingYear=2026"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await client.GetAsync("/annotated/ps/annual?facilityId=F1&reportingYear=2026"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task WithApiController_QueryParametersStillBind()
     {
         using var host = await StartHostAsync();
 
         var response = await host.GetTestClient().GetAsync(
-            "/annotated/reporting-plans?facilityId=F1&reportingMonth=5&reportingYear=2026");
+            "/annotated/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -129,117 +155,45 @@ public class GeneratedControllerBindingTests
     }
 
     [Fact]
-    public async Task WithApiController_JsonBodyStillBinds()
+    public async Task WithApiController_TheAnnualOperationBindsWithoutAMonth()
     {
+        // Its signature has no month at all, so a request that omits one must succeed --
+        // and the response carries none.
         using var host = await StartHostAsync();
 
-        var response = await host.GetTestClient().PostAsJsonAsync("/annotated", new ReportingPlanEntryRequest
-        {
-            FacilityId = "F1",
-            Measure = "HOB",
-            ReportingMonth = 5,
-            ReportingYear = 2026,
-            IsReporting = "Y"
-        });
+        var response = await host.GetTestClient().GetAsync("/annotated/ps/annual?facilityId=F1&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var echoed = await response.Content.ReadFromJsonAsync<ReportingPlanEntry>();
-        echoed!.FacilityId.Should().Be("F1");
-        echoed.Measure.Should().Be("HOB");
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.FacilityId.Should().Be("F1");
+        plan.ReportingYear.Should().Be(2026);
+        plan.ReportingMonth.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("/annotated/msc?reportingMonth=5&reportingYear=2026")]
+    [InlineData("/annotated/msc?facilityId=F1&reportingYear=2026")]
+    [InlineData("/annotated/msc?facilityId=F1&reportingMonth=5")]
+    [InlineData("/annotated/ps/annual?reportingYear=2026")]
+    [InlineData("/annotated/ps/annual?facilityId=F1")]
+    public async Task WithApiController_MissingRequiredQueryParameterIsRejected(string url)
+    {
+        // [BindRequired] lives on the base's parameters and is never restated by the
+        // override, so this is the proof that validation attributes inherit as well as
+        // binding sources do.
+        using var host = await StartHostAsync();
+
+        (await host.GetTestClient().GetAsync(url)).StatusCode
+            .Should().Be(HttpStatusCode.BadRequest, "{0} omits a required parameter", url);
     }
 
     [Fact]
-    public async Task WithApiController_RouteAndOptionalQueryParametersStillBind()
-    {
-        using var host = await StartHostAsync();
-
-        var response = await host.GetTestClient()
-            .GetAsync("/annotated/facilities/F9?pageSize=25&pageNumber=3");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Metadata.PageSize.Should().Be(25);
-        page.Metadata.PageNumber.Should().Be(3);
-        page.Records.Single().FacilityId.Should().Be("F9");
-    }
-
-    [Fact]
-    public async Task WithApiController_EnumQueryParametersBindWhenAllStringFiltersAreSupplied()
+    public async Task WithApiController_ANonNumericMonthIsRejectedRatherThanCoerced()
     {
         using var host = await StartHostAsync();
 
         var response = await host.GetTestClient().GetAsync(
-            "/annotated/search?facilityId=F1&measure=HOB&isReporting=Y&sortBy=Measure&sortOrder=Ascending");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Records.Single().Measure.Should().Be("Measure/Ascending");
-    }
-
-    [Fact]
-    public async Task WithApiController_OmittingAnOptionalStringFilterIsRejected()
-    {
-        // The trap. NSwag emits `string facilityId` -- not `string?` -- for optional query
-        // filters, and under an enabled nullable context [ApiController] treats a
-        // non-nullable reference parameter as required. So filters the contract documents
-        // as optional are mandatory in practice, and omitting one is a 400.
-        using var host = await StartHostAsync();
-
-        var response = await host.GetTestClient().GetAsync("/annotated/search?sortBy=Measure");
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-
-        var problem = await response.Content.ReadAsStringAsync();
-        _output.WriteLine(problem);
-        problem.Should().Contain("facilityId");
-    }
-
-    [Fact]
-    public async Task WithApiController_OmittedOptionalParametersLoseTheirDefaultWhenTheOverrideDropsIt()
-    {
-        using var host = await StartHostAsync();
-
-        var response = await host.GetTestClient().GetAsync("/annotated/facilities/F9");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-
-        // -1 is the probe's stand-in for null. The generated base declares pageSize = 10,
-        // but this override redeclared the parameter without a default and MVC therefore
-        // binds null -- a paging bug that no compiler warning would catch.
-        page!.Metadata.PageSize.Should().Be(-1);
-        page.Metadata.PageNumber.Should().Be(-1);
-    }
-
-    // --------------------------------- the shape an implementation should use
-
-    [Fact]
-    public async Task WhenTheOverrideRestatesDefaultsAndNullability_OptionalParametersBehave()
-    {
-        using var host = await StartHostAsync();
-        var client = host.GetTestClient();
-
-        // Defaults apply when omitted.
-        var byFacility = await client.GetAsync("/correct/facilities/F9");
-        byFacility.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await byFacility.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        page!.Metadata.PageSize.Should().Be(10);
-        page.Metadata.PageNumber.Should().Be(1);
-
-        // Optional string filters really are optional.
-        var search = await client.GetAsync("/correct/search?sortBy=Measure");
-        search.StatusCode.Should().Be(HttpStatusCode.OK);
-        var searched = await search.Content.ReadFromJsonAsync<ReportingPlanEntryPage>();
-        searched!.Records.Single().Measure.Should().Be("Measure/Descending");
-        searched.Metadata.PageSize.Should().Be(10);
-    }
-
-    [Fact]
-    public async Task WithApiController_MissingRequiredQueryParameterIsRejected()
-    {
-        using var host = await StartHostAsync();
-
-        var response = await host.GetTestClient().GetAsync("/annotated/reporting-plans?facilityId=F1");
+            "/annotated/msc?facilityId=F1&reportingMonth=May&reportingYear=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -247,24 +201,19 @@ public class GeneratedControllerBindingTests
     [Fact]
     public async Task WithoutApiController_ExplicitBindingSourcesStillApply()
     {
-        // [FromBody] on the generated base still reaches MVC without [ApiController],
+        // [FromQuery] on the generated base still reaches MVC without [ApiController],
         // because MVC resolves parameter attributes through the base declaration. What
-        // [ApiController] adds is inference for parameters with no source attribute.
+        // [ApiController] adds is inference for parameters with no source attribute, plus
+        // automatic 400s for model-state failures.
         using var host = await StartHostAsync();
 
-        var response = await host.GetTestClient().PostAsJsonAsync("/plain", new ReportingPlanEntryRequest
-        {
-            FacilityId = "F1",
-            Measure = "HOB",
-            ReportingMonth = 5,
-            ReportingYear = 2026,
-            IsReporting = "Y"
-        });
+        var response = await host.GetTestClient().GetAsync(
+            "/plain/msc?facilityId=F1&reportingMonth=5&reportingYear=2026");
 
-        var echoed = await response.Content.ReadFromJsonAsync<ReportingPlanEntry>();
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
 
-        _output.WriteLine($"without [ApiController], bound FacilityId = '{echoed?.FacilityId}'");
-        echoed!.FacilityId.Should().Be("F1", "the generated [FromBody] is still honoured");
+        _output.WriteLine($"without [ApiController], bound FacilityId = '{plan?.FacilityId}'");
+        plan!.FacilityId.Should().Be("F1", "the generated [FromQuery] is still honoured");
     }
 }
 
@@ -282,52 +231,17 @@ public class PlainProbeController : ProbeControllerBase
 }
 
 /// <summary>
-/// The shape a real implementation should use: every optional parameter restates its
-/// default, and every optional string restates itself as nullable.
+/// Echoes back whatever MVC managed to bind, so a test can tell binding success from silent
+/// failure.
 /// </summary>
 /// <remarks>
-/// Neither is inherited from the generated base. Dropping a default silently turns a
-/// paged endpoint into an unpaged one; leaving a filter non-nullable makes [ApiController]
-/// treat it as required and reject requests the contract says are valid.
+/// Both overrides deliberately drop the base's <c>= default</c> on the cancellation token.
+/// That is the mistake <see cref="GeneratedControllerBindingTests"/> documents, reproduced
+/// here so the reflection assertion has something real to observe.
 /// </remarks>
-[ApiController]
-[Route("correct")]
-public class CorrectProbeController : ProbeControllerBase
-{
-    public override Task<ActionResult<ReportingPlanEntryPage>> GetReportingPlanEntriesByFacility(
-        string facilityId,
-        int? pageSize = 10,
-        int? pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        return base.GetReportingPlanEntriesByFacility(facilityId, pageSize, pageNumber, cancellationToken);
-    }
-
-    public override Task<ActionResult<ReportingPlanEntryPage>> SearchReportingPlanEntries(
-        string? facilityId,
-        string? measure,
-        int? reportingMonth,
-        int? reportingYear,
-        string? isReporting,
-        SortBy? sortBy = SortBy.CreateDate,
-        SortOrder? sortOrder = SortOrder.Descending,
-        int? pageSize = 10,
-        int? pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        return base.SearchReportingPlanEntries(
-            facilityId!, measure!, reportingMonth, reportingYear, isReporting!,
-            sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-    }
-}
-
-/// <summary>
-/// Echoes back whatever MVC managed to bind, so a test can tell binding success from
-/// silent failure. Only the members the tests exercise do anything.
-/// </summary>
 public abstract class ProbeControllerBase : DmrpControllerBase
 {
-    public override Task<ActionResult<ReportingPlanResponse>> GetReportingPlan(
+    public override Task<ActionResult<ReportingPlanResponse>> GetMonthlyMedicineReportingPlan(
         string facilityId, int reportingMonth, int reportingYear, CancellationToken cancellationToken)
     {
         return Task.FromResult<ActionResult<ReportingPlanResponse>>(new ReportingPlanResponse
@@ -340,66 +254,16 @@ public abstract class ProbeControllerBase : DmrpControllerBase
         });
     }
 
-    public override Task<ActionResult<ReportingPlanEntry>> CreateReportingPlanEntry(
-        ReportingPlanEntryRequest body, CancellationToken cancellationToken)
+    public override Task<ActionResult<ReportingPlanResponse>> GetPatientSafetyAnnualReportingPlan(
+        string facilityId, int reportingYear, CancellationToken cancellationToken)
     {
-        return Task.FromResult<ActionResult<ReportingPlanEntry>>(new ReportingPlanEntry
+        return Task.FromResult<ActionResult<ReportingPlanResponse>>(new ReportingPlanResponse
         {
-            Id = "probe",
-            FacilityId = body?.FacilityId ?? "<null body>",
-            Measure = body?.Measure ?? "<null body>",
-            ReportingMonth = body?.ReportingMonth ?? 0,
-            ReportingYear = body?.ReportingYear ?? 0,
-            IsReporting = "Y"
+            FacilityId = facilityId,
+            ReportingMonth = null,
+            ReportingYear = reportingYear,
+            Measures = [],
+            RetrievedOn = DateTimeOffset.UnixEpoch
         });
     }
-
-    public override Task<ActionResult<ReportingPlanEntryPage>> GetReportingPlanEntriesByFacility(
-        string facilityId, int? pageSize, int? pageNumber, CancellationToken cancellationToken)
-    {
-        return Task.FromResult<ActionResult<ReportingPlanEntryPage>>(
-            Page(facilityId, "n/a", pageSize, pageNumber));
-    }
-
-    public override Task<ActionResult<ReportingPlanEntryPage>> SearchReportingPlanEntries(
-        string facilityId, string measure, int? reportingMonth, int? reportingYear, string isReporting,
-        SortBy? sortBy, SortOrder? sortOrder, int? pageSize, int? pageNumber,
-        CancellationToken cancellationToken)
-    {
-        return Task.FromResult<ActionResult<ReportingPlanEntryPage>>(
-            Page(facilityId ?? "<null>", $"{sortBy}/{sortOrder}", pageSize, pageNumber));
-    }
-
-    private static ReportingPlanEntryPage Page(string facilityId, string measure, int? pageSize, int? pageNumber) =>
-        new()
-        {
-            Records =
-            [
-                new ReportingPlanEntry
-                {
-                    Id = "probe",
-                    FacilityId = facilityId,
-                    Measure = measure,
-                    ReportingMonth = 1,
-                    ReportingYear = 2026,
-                    IsReporting = "Y"
-                }
-            ],
-            Metadata = new PageMetadata
-            {
-                PageSize = pageSize ?? -1,
-                PageNumber = pageNumber ?? -1,
-                TotalCount = 1,
-                TotalPages = 1
-            }
-        };
-
-    // ---- Not exercised by these probes. ----
-
-    public override Task<ActionResult<ReportingPlanEntry>> GetReportingPlanEntry(string id, CancellationToken cancellationToken) => throw new NotSupportedException();
-    public override Task<ActionResult<ReportingPlanEntry>> UpdateReportingPlanEntry(string id, ReportingPlanEntry body, CancellationToken cancellationToken) => throw new NotSupportedException();
-    public override Task<IActionResult> DeleteReportingPlanEntry(string id, CancellationToken cancellationToken) => throw new NotSupportedException();
-    public override Task<IActionResult> DeleteAllReportingPlanEntries(CancellationToken cancellationToken) => throw new NotSupportedException();
-    public override Task<IActionResult> DeleteReportingPlanEntriesByFacility(string facilityId, CancellationToken cancellationToken) => throw new NotSupportedException();
-    public override Task<ActionResult<AuthTokenResponse>> IssueToken(TokenRequest body, CancellationToken cancellationToken) => throw new NotSupportedException();
 }

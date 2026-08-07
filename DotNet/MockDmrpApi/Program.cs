@@ -3,9 +3,10 @@ using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Domain.Context;
 using LantanaGroup.Link.MockDmrpApi.Domain.Entities;
-using LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
 using LantanaGroup.Link.MockDmrpApi.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -35,11 +36,20 @@ builder.Services.AddScoped<IBaseEntityRepository<ReportingPlanEntryEntity>,
 builder.Services.AddScoped<IReportingPlanService, ReportingPlanService>();
 builder.Services.AddSingleton<IAuthTokenService, AuthTokenService>();
 
-builder.Services.AddControllers();
+// Link's own authentication, guarding the support surface at /mock. The contract endpoints
+// take the third party's token instead and opt out with [AllowAnonymous]; see DmrpController.
+var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+builder.Services.AddLinkBearerServiceAuthentication(options =>
+{
+    options.Environment = builder.Environment;
+    options.AllowAnonymous = allowAnonymousAccess;
+    options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+    options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+    options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+    options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+});
 
-// NhsnAuthController delegates to DmrpController, so the concrete type has to be
-// resolvable rather than only discovered as a controller.
-builder.Services.AddScoped<DmrpController>();
+builder.Services.AddControllers();
 
 builder.Services.AddProblemDetails();
 
@@ -82,10 +92,20 @@ app.UseDmrpAvailabilityGate();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-// Reflected from the controllers, so it shows the routes as this service actually hosts
-// them -- under /dmrp/mock. It is NOT the contract; Contracts/dmrp-openapi.yaml is, and it
-// describes the API rooted at / as it is expected to be published.
+// Reflected from the controllers, so it shows both surfaces as this service hosts them.
+// It is NOT the contract: Contracts/dmrp-openapi.yaml describes only the two third-party
+// endpoints, and says nothing about the support surface at /mock.
 app.ConfigureSwagger();
+
+// Guards /mock. The contract endpoints opt out with [AllowAnonymous] and check the third
+// party's token themselves, so this scheme never sees them.
+if (!allowAnonymousAccess)
+{
+    app.UseAuthentication();
+    app.UseMiddleware<UserScopeMiddleware>();
+}
+
+app.UseAuthorization();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
