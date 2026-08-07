@@ -158,7 +158,7 @@ it. `TheContractEndpointsSitAtTheRootWithNoPrefix` in `DmrpControllerTests` pins
 
 ### 2.2 What happens on build
 
-```
+```text
 Contracts/dmrp-openapi.yaml
         │
         │  NSwag  (MSBuild target "GenerateDmrpContract", before CoreCompile)
@@ -220,7 +220,7 @@ rather than thousands of lines of mechanical churn.
 After cloning, the generated types do not exist until you build once, so the IDE shows errors
 in `DmrpController.cs`. This is not a broken checkout.
 
-```
+```bash
 dotnet build DotNet/MockDmrpApi/MockDmrpApi.csproj
 ```
 
@@ -698,7 +698,7 @@ will work perfectly here and fail on first contact with the real endpoint.
 
 ## 9. Project structure
 
-```
+```text
 DotNet/MockDmrpApi/
 ├── Contracts/dmrp-openapi.yaml       Source of truth for the CONTRACT surface only
 ├── nswag.json                        Codegen configuration
