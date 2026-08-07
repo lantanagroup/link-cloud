@@ -72,8 +72,17 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ReportingPlanDbContext>("database");
+// Health is registered in both modes so /health always answers. The database check is not:
+// a disabled deployment deliberately skips migration (below), so probing the DbContext would
+// report Unhealthy and a platform probe would restart the container in a loop -- which is the
+// "looks like an outage" failure the disabled path exists to avoid. A dormant service has no
+// database to be unhealthy about.
+var healthChecks = builder.Services.AddHealthChecks();
+
+if (enabled)
+{
+    healthChecks.AddDbContextCheck<ReportingPlanDbContext>("database");
+}
 
 var app = builder.Build();
 
