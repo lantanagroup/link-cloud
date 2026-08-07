@@ -41,6 +41,13 @@ namespace UnitTests.MockDmrpApi;
 /// <em>lower</em> bound, which a slow agent can only overshoot, and the never-delayed paths
 /// are checked against a five-minute delay, so the margin between pass and fail is enormous.
 /// </para>
+/// <para>
+/// One assertion cannot be written that way. Proving nothing holds a request needs an
+/// <em>upper</em> bound, which a slow agent can break, so
+/// <see cref="WithNoDelayConfigured_TheContractEndpointAnswersImmediately"/> warms the
+/// pipeline first: measured cold it took 219-264ms against a 300ms bound, and warm it takes
+/// 3-4ms. Anything new here that measures a first request should do the same.
+/// </para>
 /// </remarks>
 public class ResponseDelayPipelineTests : IAsyncLifetime
 {
@@ -161,6 +168,13 @@ public class ResponseDelayPipelineTests : IAsyncLifetime
     [Fact]
     public async Task WithNoDelayConfigured_TheContractEndpointAnswersImmediately()
     {
+        // Warm the pipeline, unmeasured. This is the only assertion in the file with an upper
+        // bound, so it is the only one a slow agent can break, and the first request through a
+        // freshly built host pays for JIT, routing and the auth handler before any of this
+        // service's own code runs. Measured cold that came to 219-264ms against a 300ms
+        // bound -- passing, but on a margin no CI agent should be asked to hold.
+        (await GetPlanAsync()).StatusCode.Should().Be(HttpStatusCode.OK);
+
         var elapsed = await ElapsedAsync(GetPlanAsync);
 
         elapsed.Should().BeLessThan(LowerBound, "nothing should be holding the request");
