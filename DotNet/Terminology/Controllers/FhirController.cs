@@ -2,6 +2,7 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Formatters;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -376,7 +377,7 @@ public class FhirController(FhirService fhirService) : Controller
     [HttpPost("ValueSet/$validate-code")]
     [HttpPost("ValueSet/{id}/$validate-code")]
     public ActionResult<Parameters> ValidateCodeInValueSet([FromQuery] string? url, [FromRoute] string? id,
-        [FromQuery] string? system, [FromQuery] string? code, [FromQuery] string? display,
+        [FromQuery][PreserveEmptyString] string? system, [FromQuery] string? code, [FromQuery] string? display,
         [FromBody] Parameters? parameters)
     {
         try

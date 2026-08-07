@@ -187,6 +187,58 @@ public class FhirControllerTests
     }
 
     [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemInCodingBody_ReturnsBadRequest()
+    {
+        // Arrange - LEGLINK-888's reported request: a resolvable value set and a code that does match,
+        // with the coding's system blank. The value set is wired up deliberately, so the 400 proves the
+        // blank is rejected rather than the request merely failing to find anything.
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl, It.IsAny<string>()))
+            .Returns(BuildCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, CodeSystemUrl));
+
+        var parameters = new Parameters();
+        parameters.Add("url", new FhirUri(ValueSetUrl));
+        parameters.Add("coding", new Coding { Code = LoincCode, System = string.Empty });
+
+        // Act
+        var result = _controller.ValidateCodeInValueSet(null, null, null, null, null, parameters);
+
+        // Assert - previously this answered 200 result=true by searching every system in the value set
+        AssertBadRequestProblem(result, "The 'coding.system' parameter cannot be blank.");
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemQueryParameter_ReturnsBadRequest()
+    {
+        // Arrange
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl, It.IsAny<string>()))
+            .Returns(BuildCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, CodeSystemUrl));
+
+        // Act - an empty query string value binds as "", not as an absent parameter
+        var result = _controller.ValidateCodeInValueSet(ValueSetUrl, null, string.Empty, LoincCode, null, null);
+
+        // Assert
+        AssertBadRequestProblem(result, "The 'system' parameter cannot be blank.");
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithNullPlaceholderSystem_SearchesAllSystems()
+    {
+        // Arrange
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl, It.IsAny<string>()))
+            .Returns(BuildCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, CodeSystemUrl));
+
+        // Act - a client that interpolated an unset variable sends the literal string "null"
+        var result = _controller.ValidateCodeInValueSet(ValueSetUrl, null, "null", LoincCode, null, null);
+
+        // Assert - treated as if the system had been omitted rather than looked up as a system URL
+        var parameters = AssertOkParameters(result);
+        Assert.True(parameters.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    [Fact]
     public void GetValueSetById_WhenValueSetNotLoaded_ReturnsNotFoundProblem()
     {
         // Arrange - the cache has no value set under this id
