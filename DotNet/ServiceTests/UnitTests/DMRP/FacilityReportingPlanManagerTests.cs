@@ -321,46 +321,43 @@ namespace UnitTests.DMRP
         [Fact]
         public async Task DeleteAllAsync_RemovesEveryRowAndReportsHowMany()
         {
-            var plans = new List<FacilityReportingPlan> { ValidPlan(), ValidPlan(), ValidPlan() };
-
-            _mockRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(plans);
+            _mockRepository.Setup(r => r.ExecuteDeleteAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(3);
 
             var removed = await _manager.DeleteAllAsync();
 
             Assert.Equal(3, removed);
-            foreach (var plan in plans)
-            {
-                _mockRepository.Verify(r => r.Remove(plan), Times.Once);
-            }
-
-            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockRepository.Verify(r => r.GetAllAsync(It.IsAny<CancellationToken>()), Times.Never);
+            _mockRepository.Verify(r => r.Remove(It.IsAny<FacilityReportingPlan>()), Times.Never);
         }
 
         [Fact]
-        public async Task DeleteAllAsync_EmptyTable_TouchesNothing()
+        public async Task DeleteAllAsync_EmptyTable_ReportsNothingRemoved()
         {
-            _mockRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<FacilityReportingPlan>());
+            _mockRepository.Setup(r => r.ExecuteDeleteAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(0);
 
-            var removed = await _manager.DeleteAllAsync();
-
-            Assert.Equal(0, removed);
-            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+            Assert.Equal(0, await _manager.DeleteAllAsync());
         }
 
         [Fact]
         public async Task DeleteForFacilityAsync_RemovesThatFacilitysRowsAndReportsHowMany()
         {
-            var plans = new List<FacilityReportingPlan> { ValidPlan(), ValidPlan() };
+            Expression<Func<FacilityReportingPlan, bool>>? captured = null;
 
-            _mockRepository.Setup(r => r.FindAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(plans);
+            _mockRepository.Setup(r => r.ExecuteDeleteAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
+                .Callback((Expression<Func<FacilityReportingPlan, bool>> p, CancellationToken _) => captured = p)
+                .ReturnsAsync(2);
 
             var removed = await _manager.DeleteForFacilityAsync(FacilityId);
 
             Assert.Equal(2, removed);
-            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockRepository.Verify(r => r.FindAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()), Times.Never);
+
+            Assert.NotNull(captured);
+            var matches = captured!.Compile();
+            Assert.True(matches(new FacilityReportingPlan { FacilityId = FacilityId }));
+            Assert.False(matches(new FacilityReportingPlan { FacilityId = "another-facility" }));
         }
 
         [Fact]

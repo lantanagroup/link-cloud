@@ -221,12 +221,14 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequest("A facility reporting plan is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(request.Id))
+            var requestId = request.Id?.Sanitize();
+
+            if (string.IsNullOrWhiteSpace(requestId))
             {
                 return BadRequest("Id is required in the request body.");
             }
 
-            if (request.Id != id)
+            if (requestId != id)
             {
                 return BadRequest("Id in the URL must match the Id in the request body.");
             }

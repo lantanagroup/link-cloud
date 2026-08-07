@@ -70,6 +70,7 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                 }
             });
 
+            builder.Services.AddHttpClient();
             builder.Services.TryAddTransient<ITenantApiService, TenantApiService>();
             builder.Services.TryAddScoped<IFacilityExistence, TenantApiFacilityExistence>();
         }

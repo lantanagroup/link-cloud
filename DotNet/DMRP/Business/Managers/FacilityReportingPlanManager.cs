@@ -142,13 +142,11 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             await _repository.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task<int> DeleteAllAsync(CancellationToken cancellationToken = default)
+        public Task<int> DeleteAllAsync(CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete All Facility Reporting Plans");
 
-            var existing = await _repository.GetAllAsync(cancellationToken);
-
-            return await RemoveRangeAsync(existing, cancellationToken);
+            return _repository.ExecuteDeleteAsync(_ => true, cancellationToken);
         }
 
         public async Task<int> DeleteForFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -160,29 +158,12 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 throw new ApplicationException("FacilityId is required.");
             }
 
-            var existing = await _repository.FindAsync(p => p.FacilityId == facilityId, cancellationToken);
+            var removed = await _repository.ExecuteDeleteAsync(p => p.FacilityId == facilityId, cancellationToken);
 
-            _logger.LogInformation("Removing {Count} reporting plan(s) for facility {FacilityId}",
-                existing.Count, facilityId.SanitizeForLog());
+            _logger.LogInformation("Removed {Count} reporting plan(s) for facility {FacilityId}",
+                removed, facilityId.SanitizeForLog());
 
-            return await RemoveRangeAsync(existing, cancellationToken);
-        }
-
-        private async Task<int> RemoveRangeAsync(List<FacilityReportingPlan> plans, CancellationToken cancellationToken)
-        {
-            if (plans.Count == 0)
-            {
-                return 0;
-            }
-
-            foreach (var plan in plans)
-            {
-                _repository.Remove(plan);
-            }
-
-            await _repository.SaveChangesAsync(cancellationToken);
-
-            return plans.Count;
+            return removed;
         }
 
         /// <summary>
