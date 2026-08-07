@@ -95,8 +95,4 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         return Ok();
     }
 
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
-    }
 }

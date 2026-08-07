@@ -70,7 +70,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.IsActive, false)
-            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow)
             .Set(r => r.Duration, duration);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
@@ -95,8 +94,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.Error, summary.Error)
             .Set(r => r.FacilityId, facilityId ?? string.Empty)
             .Set(r => r.ReportId, reportId ?? string.Empty)
+            .Set(r => r.GeneratedTemplateCacheVersionId, summary.GeneratedTemplateCacheVersionId)
+            .Set(r => r.GeneratedTemplateCacheVersionNumber, summary.GeneratedTemplateCacheVersionNumber)
+            .Set(r => r.GeneratedTemplateCacheScenarioKey, summary.GeneratedTemplateCacheScenarioKey)
+            .Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash)
             .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
-            .Set(r => r.CompletedAt, summary.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled ? summary.FinishedAt ?? DateTimeOffset.UtcNow : null)
             .SetOnInsert(r => r.RunId, summary.RunId);
 
         await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
@@ -342,6 +344,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
+            GeneratedTemplateCacheVersionId = doc.GeneratedTemplateCacheVersionId,
+            GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,
+            GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
+            GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
             Logs = []
         };
     }

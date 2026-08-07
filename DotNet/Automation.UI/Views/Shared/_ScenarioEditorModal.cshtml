@@ -598,6 +598,31 @@
             var ct = res.headers.get('content-type') || '';
             return ct.indexOf('json') >= 0 ? res.json() : null;
         }
+
+        async function waitForPatientReplacement(statusUrl, patientId) {
+            while (true) {
+                var response = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) {
+                    throw new Error(await response.text() || 'Could not retrieve replacement status.');
+                }
+
+                var status = await response.json();
+                setImportedUploadStatus(
+                    status.message || 'Replacing FHIR-server data for Patient/' + patientId + '...',
+                    !status.isComplete);
+
+                if (status.isComplete) {
+                    if (!status.succeeded) {
+                        throw new Error(status.message || 'FHIR-server replacement failed.');
+                    }
+
+                    return status;
+                }
+
+                await new Promise(function (resolve) { window.setTimeout(resolve, 2000); });
+            }
+        }
+
         async function postForm(url, formData) {
             var res = await fetch(url, {
                 method: 'POST',
@@ -1261,8 +1286,16 @@
                                     uploadedBundleId: uploaded.bundleId,
                                     patientId: uploaded.patientId
                                 });
-                                if (replaceRes && replaceRes.message) {
-                                    lastSpecialOutcomeMessage = replaceRes.message;
+                                if (!replaceRes || !replaceRes.statusUrl) {
+                                    throw new Error('FHIR-server replacement did not return a status endpoint.');
+                                }
+
+                                var replacementStatus = await waitForPatientReplacement(replaceRes.statusUrl, uploaded.patientId);
+                                lastSpecialOutcomeMessage = replacementStatus.message || 'Successfully replaced FHIR-server data for Patient/' + uploaded.patientId + '.';
+                                if (replacementStatus.deletedFailed > 0) {
+                                    showWarning('FHIR purge completed with ' + replacementStatus.deletedFailed + ' failed delete request(s).');
+                                }
+                                if (lastSpecialOutcomeMessage) {
                                     setImportedUploadStatus(lastSpecialOutcomeMessage, false);
                                 }
                             } catch (replaceErr) {

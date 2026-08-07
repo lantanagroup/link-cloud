@@ -99,6 +99,41 @@ public class FhirDataLoader
             $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for Patient/{patientId}. Response body: {response.Content}");
     }
 
+    /// <summary>
+    /// Waits until a Patient is no longer available from the FHIR server. This is used
+    /// after requesting an expunge, which can complete asynchronously on deployed servers.
+    /// </summary>
+    public async Task WaitForPatientDeletionAsync(
+        string patientId,
+        Action<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var attempt = 0;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            attempt++;
+
+            try
+            {
+                if (!await PatientExistsAsync(patientId, ct))
+                {
+                    progress?.Invoke($"FHIR purge completed for patient '{patientId}'.");
+                    return;
+                }
+
+                progress?.Invoke($"Waiting for FHIR purge to complete for patient '{patientId}' (check {attempt}).");
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                progress?.Invoke($"Could not verify FHIR purge completion for patient '{patientId}' (check {attempt}): {ex.Message}");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        }
+    }
+
     private void GetAuthorization()
     {
         if (_oauthConfig?.ShouldAuthenticate != true &&

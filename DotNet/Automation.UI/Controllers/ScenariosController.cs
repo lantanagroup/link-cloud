@@ -22,6 +22,7 @@ public class ScenariosController(
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
+    PatientReplacementManager patientReplacementManager,
     ILogger<ScenariosController> logger) : Controller
 {
     private static readonly JsonSerializerOptions FhirJsonOptions = LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation();
@@ -131,6 +132,9 @@ public class ScenariosController(
                 if (string.IsNullOrWhiteSpace(bundleJson))
                     return $"Imported bundle '{p.FileName ?? p.PatientId}' content is missing. Please re-upload the file.";
             }
+
+            if (string.IsNullOrWhiteSpace(bundleJson))
+                return $"Imported bundle '{p.FileName ?? p.PatientId}' is missing its uploaded reference.";
 
             Bundle? bundle;
             try
@@ -353,49 +357,29 @@ public class ScenariosController(
             .Cast<string>()
             .ToList();
 
-        var cfg = automationConfig.Value;
-        var loader = new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
         var patientIdForLog = request.PatientId.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        var replayBundles = BuildReplayBundles(entries, request.PatientId.Trim());
+        var operationId = patientReplacementManager.Start(patientIdForLog, resourcesToDelete, replayBundles);
 
         logger.LogInformation(
-            "Replacing FHIR-server data for patient '{PatientId}' using uploaded bundle '{BundleId}'. Deleting {DeleteCount} resource path(s) first.",
+            "Queued FHIR-server replacement {OperationId} for patient '{PatientId}' using uploaded bundle '{BundleId}'. Deleting {DeleteCount} resource path(s) first.",
+            operationId,
             patientIdForLog,
             request.UploadedBundleId,
             resourcesToDelete.Count);
 
-        var purge = await loader.DeleteResourcesWithExpungeAsync(resourcesToDelete, ct);
-        if (purge.Failed > 0)
-        {
-            logger.LogWarning(
-                "FHIR purge before patient replace had failures for patient '{PatientId}': {Failed} failed, {Succeeded} succeeded. First errors: {Errors}",
-                patientIdForLog,
-                purge.Failed,
-                purge.Succeeded,
-                string.Join(" | ", purge.Failures.Take(5)));
-        }
-
-        var replayBundles = BuildReplayBundles(entries, request.PatientId.Trim());
-        var output = new RunAutomationOutput(message => logger.LogInformation("[FHIR Replay] {Message}", message));
-        var replayOk = await loader.UploadBundlesSequentiallyAsync(output, replayBundles, $"[replace:{patientIdForLog}] ");
-        if (!replayOk)
-        {
-            return StatusCode(StatusCodes.Status502BadGateway,
-                "Failed to replay uploaded bundle to FHIR server after purge. Uploaded bundle remains stored for scenario execution.");
-        }
-
-        var messageText = purge.Failed > 0
-            ? $"Replaced FHIR-server data for patient '{patientIdForLog}' with uploaded bundle, but purge had {purge.Failed} failed delete(s)."
-            : $"Successfully replaced FHIR-server data for patient '{patientIdForLog}' with uploaded bundle.";
-
         return Json(new
         {
-            success = true,
-            warningMessage = purge.Failed > 0 ? messageText : null,
-            message = messageText,
-            deletedSucceeded = purge.Succeeded,
-            deletedFailed = purge.Failed,
-            replayBundleCount = replayBundles.Count
+            operationId,
+            statusUrl = Url.Action(nameof(GetPatientReplacementStatus), new { operationId })
         });
+    }
+
+    [HttpGet]
+    public IActionResult GetPatientReplacementStatus(Guid operationId)
+    {
+        var status = patientReplacementManager.GetStatus(operationId);
+        return status == null ? NotFound("Patient replacement operation not found.") : Json(status);
     }
 
     [HttpPost]
@@ -637,11 +621,6 @@ public class ScenariosController(
 
         await scenarioStore.UpsertAsync(clone, ct);
         return Json(new { id = clone.Id });
-    }
-
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
     }
 
     private static string ComputeContentHash(string json)

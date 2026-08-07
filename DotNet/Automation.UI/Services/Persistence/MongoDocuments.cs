@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace Automation.UI.Services.Persistence;
 
 /// <summary>MongoDB document for automation_runs collection.</summary>
+[BsonIgnoreExtraElements]
 public sealed class AutomationRunDocument
 {
     [BsonId]
@@ -39,10 +40,13 @@ public sealed class AutomationRunDocument
     public DateTimeOffset StartedAt { get; set; }
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? FinishedAt { get; set; }
-    [BsonRepresentation(BsonType.DateTime)]
-    public DateTimeOffset? CompletedAt { get; set; }
     /// <summary>Human-readable pipeline duration (report created ? submitted). Populated at run completion.</summary>
     public string? Duration { get; set; }
+    [BsonRepresentation(BsonType.String)]
+    public Guid? GeneratedTemplateCacheVersionId { get; set; }
+    public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    public string? GeneratedTemplateCacheScenarioKey { get; set; }
+    public string? GeneratedTemplateSetHash { get; set; }
 }
 
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>

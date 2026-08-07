@@ -112,11 +112,6 @@ public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
         return Ok();
     }
 
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
-    }
-
     private static QueryEntry ToQueryEntry(QueryPlanQueryEntry src) => new()
     {
         ResourceType = src.ResourceType,

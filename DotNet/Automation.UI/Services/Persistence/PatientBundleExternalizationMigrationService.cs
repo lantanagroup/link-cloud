@@ -1,31 +1,26 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
+﻿using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 
 namespace Automation.UI.Services.Persistence;
 
-public sealed class ImportedBundleBlobMigrationService : IHostedService
+public sealed class PatientBundleExternalizationMigrationService : IHostedService
 {
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IImportedBundleContentStore _contentStore;
-    private readonly ILogger<ImportedBundleBlobMigrationService> _logger;
+    private readonly ILogger<PatientBundleExternalizationMigrationService> _logger;
     private readonly IHostApplicationLifetime _applicationLifetime;
     private const int MigrationBatchSize = 25;
-    private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan InterBatchPause = TimeSpan.FromMilliseconds(250);
     private const long MaxDocsForDeepDedupPass = 5000;
-    private Task? _backgroundTask;
-    private CancellationTokenSource? _cts;
 
-    public ImportedBundleBlobMigrationService(
+    public PatientBundleExternalizationMigrationService(
         IMongoDatabase database,
         IImportedBundleContentStore contentStore,
-        ILogger<ImportedBundleBlobMigrationService> logger,
+        ILogger<PatientBundleExternalizationMigrationService> logger,
         IHostApplicationLifetime applicationLifetime)
     {
         _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -36,55 +31,26 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
         _applicationLifetime = applicationLifetime;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
-    {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _applicationLifetime.ApplicationStarted.Register(() =>
-        {
-            if (_cts?.IsCancellationRequested == true)
-                return;
-
-            _backgroundTask = Task.Run(() => RunMigrationAsync(_cts!.Token), CancellationToken.None);
-        });
-
-        _logger.LogInformation("Imported bundle ABS migration is scheduled to run after app startup.");
-        return Task.CompletedTask;
-    }
+    public Task StartAsync(CancellationToken cancellationToken) => RunMigrationAsync(cancellationToken);
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_cts != null)
-            _cts.Cancel();
-
-        if (_backgroundTask == null)
-            return;
-
-        await Task.WhenAny(_backgroundTask, Task.Delay(Timeout.Infinite, cancellationToken));
+        await Task.CompletedTask;
     }
 
     private async Task RunMigrationAsync(CancellationToken stoppingToken)
     {
-        // Non-blocking startup: run migration in the background after app is already serving.
-        await Task.Yield();
-
         try
         {
-            await Task.Delay(StartupDelay, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
+            _logger.LogInformation("Starting required migration of imported bundles to Azure Blob Storage.");
 
-        try
-        {
-            _logger.LogInformation("Starting background migration of imported bundles to Azure Blob Storage.");
-
+            var migratedEmbeddedPayloads = await MigrateEmbeddedPayloadsAsync(stoppingToken);
             var migratedPayloadDocs = await MigrateInlinePayloadsToAbsAsync(stoppingToken);
             var deduplicatedDocs = await DeduplicateBundleDocumentsAsync(stoppingToken);
 
             _logger.LogInformation(
-                "Imported bundle ABS migration completed. Payload docs migrated: {MigratedPayloadDocs}. Duplicate bundle docs removed: {DeduplicatedDocs}.",
+                "Imported bundle ABS migration completed. Embedded payloads migrated: {MigratedEmbeddedPayloads}. Payload docs migrated: {MigratedPayloadDocs}. Duplicate bundle docs removed: {DeduplicatedDocs}.",
+                migratedEmbeddedPayloads,
                 migratedPayloadDocs,
                 deduplicatedDocs);
         }
@@ -94,8 +60,110 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Imported bundle ABS migration encountered an error. Existing data remains usable; migration will retry on next startup.");
+            _logger.LogCritical(ex, "Imported bundle ABS migration failed. Application startup is blocked to prevent execution against inline bundle payloads.");
+            throw;
         }
+    }
+
+    private async Task<int> MigrateEmbeddedPayloadsAsync(CancellationToken ct)
+    {
+        var migrated = 0;
+        var scenarios = await _scenarios.Find(FilterDefinition<TestScenarioDocument>.Empty).ToListAsync(ct);
+        foreach (var scenario in scenarios)
+        {
+            var result = await ExternalizeBundleJsonAsync(scenario.ImportedPatientBundlesJson, scenario.Id, ct);
+            if (!result.Changed)
+                continue;
+
+            await _scenarios.UpdateOneAsync(
+                s => s.Id == scenario.Id,
+                Builders<TestScenarioDocument>.Update
+                    .Set(s => s.ImportedPatientBundlesJson, result.Json)
+                    .Set(s => s.ImportedBundleRefs, result.References)
+                    .Set(s => s.UpdatedAt, DateTimeOffset.UtcNow),
+                cancellationToken: ct);
+            migrated += result.MigratedCount;
+        }
+
+        var runInputs = await _runInputs.Find(FilterDefinition<AutomationRunInputDocument>.Empty).ToListAsync(ct);
+        foreach (var runInput in runInputs)
+        {
+            var result = await ExternalizeBundleJsonAsync(runInput.RunConfigurationJson, scenarioId: null, ct);
+            if (!result.Changed)
+                continue;
+
+            await _runInputs.UpdateOneAsync(
+                r => r.RunId == runInput.RunId,
+                Builders<AutomationRunInputDocument>.Update
+                    .Set(r => r.RunConfigurationJson, result.Json)
+                    .Set(r => r.ImportedBundleIds, runInput.ImportedBundleIds.Concat(result.References.Select(reference => reference.BundleId)).Distinct().ToList())
+                    .Set(r => r.UpdatedAt, DateTimeOffset.UtcNow),
+                cancellationToken: ct);
+            migrated += result.MigratedCount;
+        }
+
+        return migrated;
+    }
+
+    private async Task<(bool Changed, string? Json, List<ImportedBundleReference> References, int MigratedCount)> ExternalizeBundleJsonAsync(
+        string? json,
+        Guid? scenarioId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return (false, json, [], 0);
+
+        var root = JsonNode.Parse(json);
+        var bundles = root switch
+        {
+            JsonArray array => array,
+            JsonObject obj when obj["importedPatientBundles"] is JsonArray array => array,
+            _ => null
+        };
+        if (bundles == null)
+            return (false, json, [], 0);
+
+        var references = new List<ImportedBundleReference>();
+        var migrated = 0;
+        foreach (var bundle in bundles.OfType<JsonObject>())
+        {
+            var rawJson = bundle["bundleJson"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(rawJson))
+                continue;
+
+            var contentHash = ComputeContentHash(rawJson);
+            var now = DateTimeOffset.UtcNow;
+            var document = await _bundles.FindOneAndUpdateAsync(
+                b => b.ContentHash == contentHash,
+                Builders<ImportedBundleDocument>.Update
+                    .SetOnInsert(b => b.Id, Guid.NewGuid())
+                    .SetOnInsert(b => b.ContentHash, contentHash)
+                    .SetOnInsert(b => b.CreatedAt, now)
+                    .SetOnInsert(b => b.IsLibraryEntry, false)
+                    .Set(b => b.PatientId, bundle["patientId"]?.GetValue<string>() ?? string.Empty)
+                    .Set(b => b.FileName, bundle["fileName"]?.GetValue<string>())
+                    .Set(b => b.UpdatedAt, now)
+                    .AddToSetEach(b => b.ScenarioIds, scenarioId.HasValue ? [scenarioId.Value] : []),
+                new FindOneAndUpdateOptions<ImportedBundleDocument> { IsUpsert = true, ReturnDocument = ReturnDocument.After },
+                ct);
+
+            var stored = await _contentStore.StoreAsync(document.Id, document.ContentHash, rawJson, ct);
+            await _bundles.UpdateOneAsync(
+                b => b.Id == document.Id,
+                Builders<ImportedBundleDocument>.Update
+                    .Set(b => b.BundleBlobName, stored.BlobName)
+                    .Set(b => b.ByteCount, stored.ByteCount)
+                    .Set(b => b.BundleJson, null)
+                    .Set(b => b.UpdatedAt, now),
+                cancellationToken: ct);
+
+            bundle["uploadedBundleId"] = document.Id.ToString();
+            bundle.Remove("bundleJson");
+            references.Add(new ImportedBundleReference { BundleId = document.Id, PatientId = bundle["patientId"]?.GetValue<string>() ?? string.Empty });
+            migrated++;
+        }
+
+        return migrated == 0 ? (false, json, references, 0) : (true, root!.ToJsonString(), references, migrated);
     }
 
     private async Task<int> MigrateInlinePayloadsToAbsAsync(CancellationToken ct)
