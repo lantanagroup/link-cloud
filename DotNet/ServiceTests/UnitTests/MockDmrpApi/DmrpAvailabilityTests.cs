@@ -52,13 +52,27 @@ public class DmrpAvailabilityTests
     [Fact]
     public void IsEnabled_InProduction_IsFalseEvenWhenEveryOtherSignalSaysOtherwise()
     {
+        // Layered the way the real chain layers them: a base source standing in for
+        // appsettings, and a second appended after it standing in for Azure App
+        // Configuration, which is added last and so outranks everything before it.
+        //
+        // A differently-cased key would not work as a second signal -- configuration keys are
+        // case-insensitive, so it is the same key, and the in-memory provider rejects it as a
+        // duplicate. Ranking sources is the only way one key arrives by two routes.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [DmrpAvailability.EnabledConfigurationKey] = "true",
-                ["MockDmrpApi:Enabled "] = "true"
+                [DmrpAvailability.EnabledConfigurationKey] = "false"
+            })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [DmrpAvailability.EnabledConfigurationKey] = "true"
             })
             .Build();
+
+        // Guards the test against going vacuous: the later source really does win, so the
+        // environment block below is the only thing standing between this and a running mock.
+        configuration[DmrpAvailability.EnabledConfigurationKey].Should().Be("true");
 
         DmrpAvailability.IsEnabled(Environment("Production"), configuration).Should().BeFalse();
     }
