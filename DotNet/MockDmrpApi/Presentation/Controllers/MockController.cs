@@ -1,3 +1,4 @@
+using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using LantanaGroup.Link.MockDmrpApi.Application.Models;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -60,13 +61,13 @@ public class MockController : ControllerBase
     {
         if (!Guid.TryParse(id, out _))
         {
-            return Problem(detail: InvalidIdFormat, statusCode: StatusCodes.Status400BadRequest);
+            return InvalidId();
         }
 
         var entry = await _reportingPlans.GetByIdAsync(id, cancellationToken);
         if (entry is null)
         {
-            return NotFound();
+            return EntryNotFound(id);
         }
 
         return Ok(MockEntryMapper.ToModel(entry));
@@ -86,7 +87,7 @@ public class MockController : ControllerBase
         var sanitizedFacilityId = facilityId.SanitizeAndRemove();
         if (string.IsNullOrWhiteSpace(sanitizedFacilityId))
         {
-            return Problem(detail: "facilityId is required.", statusCode: StatusCodes.Status400BadRequest);
+            return MissingFacilityId();
         }
 
         var (records, metadata) = await _reportingPlans.GetByFacilityAsync(
@@ -164,11 +165,11 @@ public class MockController : ControllerBase
         }
         catch (InvalidReportingPlanEntryException ex)
         {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            return InvalidEntry(ex);
         }
         catch (DuplicateReportingPlanEntryException ex)
         {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+            return DuplicateEntry(ex);
         }
     }
 
@@ -183,14 +184,16 @@ public class MockController : ControllerBase
     {
         if (!Guid.TryParse(id, out _))
         {
-            return Problem(detail: InvalidIdFormat, statusCode: StatusCodes.Status400BadRequest);
+            return InvalidId();
         }
 
         if (string.IsNullOrWhiteSpace(body.Id) || !string.Equals(body.Id, id, StringComparison.OrdinalIgnoreCase))
         {
             return Problem(
                 detail: "The id in the request body must match the id in the route.",
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Id Mismatch",
+                type: DmrpProblemTypes.BadRequest);
         }
 
         var entity = MockEntryMapper.ToEntity(body);
@@ -204,19 +207,20 @@ public class MockController : ControllerBase
             if (updated is null)
             {
                 // Update-only. Creating here would let a caller create entries through a
-                // verb the contract says never creates.
-                return NotFound();
+                // verb the contract says never creates. The detail says so, because a bare
+                // 404 from a PUT reads like a routing problem.
+                return EntryNotFound(id, " This endpoint updates an existing entry and never creates one.");
             }
 
             return Accepted(MockEntryMapper.ToModel(updated));
         }
         catch (InvalidReportingPlanEntryException ex)
         {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            return InvalidEntry(ex);
         }
         catch (DuplicateReportingPlanEntryException ex)
         {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+            return DuplicateEntry(ex);
         }
     }
 
@@ -231,11 +235,11 @@ public class MockController : ControllerBase
     {
         if (!Guid.TryParse(id, out _))
         {
-            return Problem(detail: InvalidIdFormat, statusCode: StatusCodes.Status400BadRequest);
+            return InvalidId();
         }
 
         var deleted = await _reportingPlans.DeleteAsync(id, cancellationToken);
-        return deleted ? NoContent() : NotFound();
+        return deleted ? NoContent() : EntryNotFound(id);
     }
 
     /// <summary>Deletes a facility's entries. Idempotent.</summary>
@@ -247,7 +251,7 @@ public class MockController : ControllerBase
         var sanitizedFacilityId = facilityId.SanitizeAndRemove();
         if (string.IsNullOrWhiteSpace(sanitizedFacilityId))
         {
-            return Problem(detail: "facilityId is required.", statusCode: StatusCodes.Status400BadRequest);
+            return MissingFacilityId();
         }
 
         await _reportingPlans.DeleteByFacilityAsync(sanitizedFacilityId, cancellationToken);
@@ -302,7 +306,11 @@ public class MockController : ControllerBase
         {
             // The annotation covers the ordinary case; this catches a bound value that got
             // past it, so the ceiling is enforced in one place rather than two.
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Delay",
+                type: DmrpProblemTypes.BadRequest);
         }
     }
 
@@ -360,6 +368,44 @@ public class MockController : ControllerBase
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>
+    /// The problem responses this controller repeats, built in one place.
+    /// </summary>
+    /// <remarks>
+    /// Each carries a title and a type as well as a detail. Passing only a detail leaves the
+    /// framework's generic title beside a specific message, and gives a caller nothing to
+    /// branch on but the status code -- which several of these share.
+    /// </remarks>
+    private ObjectResult InvalidId() => Problem(
+        detail: InvalidIdFormat,
+        statusCode: StatusCodes.Status400BadRequest,
+        title: "Invalid Id",
+        type: DmrpProblemTypes.BadRequest);
+
+    private ObjectResult EntryNotFound(string id, string extra = "") => Problem(
+        detail: $"No reporting plan entry was found with id '{id}'.{extra}",
+        statusCode: StatusCodes.Status404NotFound,
+        title: "Entry Not Found",
+        type: DmrpProblemTypes.NotFound);
+
+    private ObjectResult MissingFacilityId() => Problem(
+        detail: "A 'facilityId' is required.",
+        statusCode: StatusCodes.Status400BadRequest,
+        title: "Missing Facility Id",
+        type: DmrpProblemTypes.BadRequest);
+
+    private ObjectResult InvalidEntry(InvalidReportingPlanEntryException ex) => Problem(
+        detail: ex.Message,
+        statusCode: StatusCodes.Status400BadRequest,
+        title: "Invalid Reporting Plan Entry",
+        type: DmrpProblemTypes.BadRequest);
+
+    private ObjectResult DuplicateEntry(DuplicateReportingPlanEntryException ex) => Problem(
+        detail: ex.Message,
+        statusCode: StatusCodes.Status409Conflict,
+        title: "Duplicate Reporting Plan Entry",
+        type: DmrpProblemTypes.Conflict);
 
     /// <summary>Sanitizes a filter, treating blank as "not supplied".</summary>
     private static string? Blank(string? value)

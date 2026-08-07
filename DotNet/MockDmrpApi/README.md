@@ -531,7 +531,38 @@ Everywhere else, `MockDmrpApi:Enabled` decides. When disabled:
 - **EF migration is skipped** — a dormant deployment has no business altering a schema
 - a warning is logged naming the environment and the routes that remain
 
-### 6.2 The two authentication systems
+### 6.2 Error responses
+
+RFC 9457 problem details, shaped the way Terminology shapes them —
+`AddDmrpProblemDetails` supplies a `traceId` on every problem and a `detail` where the
+framework would leave none, and each controller passes a `title` and `type` alongside its own
+message.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+  "title": "Entry Not Found",
+  "status": 404,
+  "detail": "No reporting plan entry was found with id '1111…'.",
+  "traceId": "00-6a12bf09f00084d0c4f708a11a990f81-…"
+}
+```
+
+A `500` has its detail replaced wholesale rather than filtered, so an exception message cannot
+reach a caller by accident. `ProblemDetails:IncludeExceptionDetails` adds an `API` extension
+naming the service; it is otherwise off outside Development.
+
+Two things worth knowing:
+
+- **`POST /mock/oauth2/token` is the one exception.** It answers with the OAuth 2.0 error shape
+  (`{"error": "invalid_client", …}`) rather than problem details, because it stands in for an
+  authorization server and client libraries parse those codes.
+- **This applies to the contract endpoints too.** The real DMRP API has not been observed to
+  define an error shape, so matching Link's house style is the better default — but it is a
+  divergence, and a consumer should not read these error bodies as evidence of what the real
+  service returns.
+
+### 6.3 The two authentication systems
 
 They are separate on purpose, mirroring the real topology.
 
@@ -544,7 +575,7 @@ They are separate on purpose, mirroring the real topology.
 third-party token itself. That is not a hole: those endpoints impersonate an external service,
 and Link's credential has no meaning to it.
 
-### 6.3 The token, and where it differs from real NHSN Auth
+### 6.4 The token, and where it differs from real NHSN Auth
 
 Issued tokens are genuine signed JWTs (HS512) carrying `iss`, `aud`, `sub`, `scope`, `iat`,
 `nbf`, `exp` and `jti`, with a real expiry — so a caller's acquire, cache and

@@ -1,4 +1,5 @@
 using System.Globalization;
+using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using LantanaGroup.Link.MockDmrpApi.Application.Mapping;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
@@ -97,7 +98,16 @@ public class DmrpController : DmrpControllerBase
     {
         if (!_tokens.TryValidate(Request.Headers.Authorization.ToString(), out _))
         {
-            return Unauthorized();
+            // Problem details rather than a bare Unauthorized(), so a caller gets a traceId
+            // and a reason. Deliberately vague about which check failed -- missing, malformed
+            // and expired are one answer, because distinguishing them helps an attacker more
+            // than a caller.
+            return Problem(
+                detail: "A valid bearer token issued by the reporting system's authorization "
+                        + "server is required.",
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized",
+                type: DmrpProblemTypes.Unauthorized);
         }
 
         if (!TryParsePeriod(year, nameof(year), null, null, out var reportingYear, out var invalidYear))
@@ -143,7 +153,9 @@ public class DmrpController : DmrpControllerBase
 
         return Problem(
             detail: $"'{parameterName}' must be {expected}, or be omitted. Received '{value.SanitizeAndRemove()}'.",
-            statusCode: StatusCodes.Status400BadRequest);
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Invalid Reporting Period",
+            type: DmrpProblemTypes.BadRequest);
     }
 
     private bool TryParsePeriod(

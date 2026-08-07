@@ -1,4 +1,5 @@
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Domain.Context;
@@ -55,7 +56,9 @@ builder.Services.AddLinkBearerServiceAuthentication(options =>
 
 builder.Services.AddControllers();
 
-builder.Services.AddProblemDetails();
+builder.Services.AddDmrpProblemDetails(
+    builder.Environment,
+    builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails"));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -98,8 +101,18 @@ app.UseDmrpAvailabilityGate();
 // than slow handler code. Reaches the contract endpoints only -- see the middleware.
 app.UseContractResponseDelay();
 
-app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+// The developer page only outside deployment, as Terminology does: it renders the stack trace,
+// which is what you want on a workstation and never what a caller should receive.
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler();
+}
 
 // Reflected from the controllers, so it shows both surfaces as this service hosts them.
 // It is NOT the contract: Contracts/dmrp-openapi.yaml describes only the two third-party
