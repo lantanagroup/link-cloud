@@ -166,7 +166,7 @@ Contracts/dmrp-openapi.yaml
 obj/NSwag/DmrpApi.Generated.cs
         │
         ├── abstract class DmrpControllerBase   routes, [ProducesResponseType], 2 abstract methods
-        └── DTOs                                ReportingPlanResponse, ReportingPlanMeasure, …
+        └── DTOs                                ReportingPlanResponse, ReportingPlanItem, …
         │
         │  we override
         ▼
@@ -294,7 +294,7 @@ Only `nhsnorgid` is required. `name`, `year` and `month` each narrow the result 
 and are ignored when not, so a caller passing only `nhsnorgid` gets the facility's whole plan
 for that component. `year` and `month` are **strings** on the wire, not integers. See §1.3.
 
-Both return `ReportingPlanResponse`. Both answer `200` with an empty `measures` array for a
+Both return `ReportingPlanResponse`. Both answer `200` with an empty `plans` array for a
 facility enrolled in nothing (§4), and `401` without a valid token.
 
 ### Support surface — ours, not in the spec, no counterpart in real DMRP
@@ -333,7 +333,7 @@ the same acquire-then-use sequence it will perform for real.
 
 The single most important behaviour, and the one most likely to be mis-implemented.
 
-**A measure that does not appear in `measures` means the facility is NOT enrolled in it.**
+**A measure that does not appear in `plans` means the facility is NOT enrolled in it.**
 There is no negative representation. `isReporting` is `"Y"` wherever an entry exists.
 
 Seed only `HOB` for facility `100`, February 2020, then `GET /msc?nhsnorgid=100&year=2020&month=2`:
