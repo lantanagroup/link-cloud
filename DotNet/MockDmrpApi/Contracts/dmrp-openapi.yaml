@@ -98,7 +98,7 @@ paths:
         - $ref: '#/components/parameters/Month'
       responses:
         '200':
-          description: The reporting plan. `measures` may be empty.
+          description: The reporting plan. `plans` may be empty.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
@@ -130,7 +130,7 @@ paths:
         - $ref: '#/components/parameters/Month'
       responses:
         '200':
-          description: The reporting plan. `measures` may be empty.
+          description: The reporting plan. `plans` may be empty.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
