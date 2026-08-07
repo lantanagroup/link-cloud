@@ -14,6 +14,7 @@ import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.models.CheckDto;
 import com.lantanagroup.link.validation.models.RubricVersionPayloadDto;
+import com.lantanagroup.link.validation.providers.RubricCacheService;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricLifecycleEventRepository;
 import com.lantanagroup.link.validation.repositories.RubricRepository;
@@ -46,11 +47,12 @@ class RubricRegistryServiceTest {
     private final RubricLifecycleEventRepository eventRepository = mock(RubricLifecycleEventRepository.class);
     private final RubricDefinitionValidator definitionValidator = mock(RubricDefinitionValidator.class);
     private final RubricDryRunConfig dryRunConfig = new RubricDryRunConfig();
+    private final RubricCacheService cacheService = mock(RubricCacheService.class);
 
     private RubricRegistryService service() {
         return new RubricRegistryService(
                 rubricRepository, versionRepository, checkRepository, eventRepository,
-                definitionValidator, new ObjectMapper(), dryRunConfig);
+                definitionValidator, new ObjectMapper(), dryRunConfig, cacheService);
     }
 
     private RubricVersion draftVersion() {
@@ -316,6 +318,52 @@ class RubricRegistryServiceTest {
         assertThat(retired.getRetiredAt()).isNotNull();
         assertThat(retired.getRetiredBy()).isEqualTo("qa");
         verify(eventRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("retire removes the version's cache entry (and the latest pointer)")
+    void retire_evictsCache() {
+        RubricVersion version = draftVersion();
+        version.setStatus(RubricVersionStatus.PUBLISHED);
+        stubVersion(version);
+
+        service().retire("piqi.core", "1.0.0", "qa");
+
+        verify(cacheService).evictVersion("piqi.core", "1.0.0");
+    }
+
+    @Test
+    @DisplayName("a failed retire (already RETIRED) does not touch the cache")
+    void retire_rejectedDoesNotEvict() {
+        RubricVersion version = draftVersion();
+        version.setStatus(RubricVersionStatus.RETIRED);
+        stubVersion(version);
+
+        assertThatThrownBy(() -> service().retire("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricLifecycleException.class);
+        verify(cacheService, never()).evictVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("publish evicts the stale DRAFT snapshot and the latest pointer")
+    void publish_evictsCache() {
+        stubVersion(draftVersion());
+
+        service().publish("piqi.core", "1.0.0", "qa");
+
+        verify(cacheService).evictVersion("piqi.core", "1.0.0");
+    }
+
+    @Test
+    @DisplayName("re-registering a DRAFT evicts its stale cached snapshot")
+    void reRegisterDraft_evictsCache() {
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
+                .thenReturn(Optional.of(draftVersion()));
+        stubRubricUpsert();
+
+        service().registerVersion(payloadWithCheck("c-new"), "qa");
+
+        verify(cacheService).evictVersion("piqi.core", "1.0.0");
     }
 
     @Test

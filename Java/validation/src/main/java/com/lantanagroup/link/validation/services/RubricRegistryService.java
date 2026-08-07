@@ -17,6 +17,7 @@ import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundExceptio
 import com.lantanagroup.link.validation.models.CheckDto;
 import com.lantanagroup.link.validation.models.RubricVersionPayloadDto;
 import com.lantanagroup.link.validation.models.Semver;
+import com.lantanagroup.link.validation.providers.RubricCacheService;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricLifecycleEventRepository;
 import com.lantanagroup.link.validation.repositories.RubricRepository;
@@ -56,6 +57,7 @@ public class RubricRegistryService {
     private final RubricDefinitionValidator definitionValidator;
     private final ObjectMapper objectMapper;
     private final RubricDryRunConfig dryRunConfig;
+    private final RubricCacheService rubricCacheService;
 
     @Transactional
     public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor) {
@@ -144,6 +146,9 @@ public class RubricRegistryService {
                     .build());
         }
         rubricCheckRepository.saveAll(checks);
+        // a draft re-register replaces the definition and checks in place, so drop any
+        // cached snapshot of this version
+        rubricCacheService.evictVersion(payload.getId(), payload.getSemver());
         recordEvent(rubric.getRubricId(), payload.getSemver(), RubricLifecycleAction.REGISTERED, actor, checksum);
         logger.info("{} rubric {} v{} with {} checks (status=DRAFT)",
                 existing.isPresent() ? "Re-registered (draft replaced)" : "Registered",
@@ -170,6 +175,8 @@ public class RubricRegistryService {
         v.setPublishedAt(OffsetDateTime.now());
         v.setPublishedBy(publishedBy);
         v = rubricVersionRepository.save(v);
+        // drop the stale DRAFT snapshot and the latest pointer — this may be the new latest
+        rubricCacheService.evictVersion(rubricId, semver);
         recordEvent(rubricId, semver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
         logger.info("Published rubric {} v{} by {}",
                 LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(publishedBy));
@@ -189,6 +196,8 @@ public class RubricRegistryService {
         v.setRetiredAt(OffsetDateTime.now());
         v.setRetiredBy(retiredBy);
         v = rubricVersionRepository.save(v);
+        // drop the cached entry and the latest pointer so nothing keeps evaluating this version
+        rubricCacheService.evictVersion(rubricId, semver);
         recordEvent(rubricId, semver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
         logger.info("Retired rubric {} v{} by {}",
                 LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(retiredBy));
