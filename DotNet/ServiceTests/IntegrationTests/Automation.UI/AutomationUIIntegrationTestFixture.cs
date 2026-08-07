@@ -45,6 +45,9 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     public IMongoCollection<MongoDB.Bson.BsonDocument> RawRunsCollection =>
         Database.GetCollection<MongoDB.Bson.BsonDocument>("automation_runs");
 
+    public IMongoCollection<MongoDB.Bson.BsonDocument> RawLogSequenceCollection =>
+        Database.GetCollection<MongoDB.Bson.BsonDocument>("automation_log_sequences");
+
     public MongoSnapshotStore CreateStore() =>
         new(Database, NullLogger<MongoSnapshotStore>.Instance);
 
@@ -91,8 +94,24 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
 
     /// <summary>Drops the automation_runs collection so each test starts from a known
     /// empty state without restarting the container.</summary>
-    public Task ResetAsync()
-        => Database.DropCollectionAsync("automation_runs");
+    public async Task ResetAsync()
+    {
+        await DropCollectionIfExistsAsync("automation_runs");
+        await DropCollectionIfExistsAsync("automation_logs");
+        await DropCollectionIfExistsAsync("automation_log_sequences");
+    }
+
+    private async Task DropCollectionIfExistsAsync(string collectionName)
+    {
+        try
+        {
+            await Database.DropCollectionAsync(collectionName);
+        }
+        catch (MongoCommandException ex) when (ex.CodeName == "NamespaceNotFound")
+        {
+            // already absent
+        }
+    }
 
     public async Task DisposeAsync()
     {
