@@ -27,7 +27,6 @@ public class RubricResultDto {
     private String requestor;
     private SubjectDto subject;
     private String payloadRef;
-    private UUID facilityOverrideId;
     private RubricResultStatus status;
     private ScoreCardDto score;
     private SummaryDto summary;
