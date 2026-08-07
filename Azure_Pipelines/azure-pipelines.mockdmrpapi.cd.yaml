@@ -92,9 +92,12 @@ steps:
       arguments: '--filter "$(testFilter)"'
     displayName: 'Run Tests'
 
+  # No `condition: always()` here, unlike most of the sibling CD pipelines. The step above
+  # runs the test suite, and always() would publish `latest` from a commit whose tests had
+  # just failed -- the tag every environment pulls by default. Omitting the condition leaves
+  # the default succeeded(), so a red build stops here.
   - task: Docker@2
     displayName: "Build & Push Mock DMRP API Docker Image"
-    condition: always()
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
