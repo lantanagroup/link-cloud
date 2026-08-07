@@ -1,10 +1,11 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 
 namespace LantanaGroup.Link.Terminology.Application.Formatters;
 
 /// <summary>
 /// Keeps an empty string supplied by a client as an empty string during model binding, rather than
-/// converting it to null.
+/// converting it to null, for parameters marked with <see cref="PreserveEmptyStringAttribute"/>.
 /// </summary>
 /// <remarks>
 /// MVC's default is <c>ConvertEmptyStringToNull = true</c>, which makes <c>?system=</c> arrive at an action
@@ -13,18 +14,21 @@ namespace LantanaGroup.Link.Terminology.Application.Formatters;
 /// and has to be rejected with a 400 (LEGLINK-888). Validation cannot make a distinction the binder has
 /// already erased, so the transformation is turned off rather than worked around in the controller.
 ///
-/// Every other query parameter in this service guards with <c>string.IsNullOrEmpty</c> or
-/// <c>string.IsNullOrWhiteSpace</c> — including ConfigController's <c>version</c>, which normalizes blank
-/// to null itself — so preserving the empty string leaves their behavior unchanged.
+/// The attribute keeps that off-switch to the one parameter that needs it, leaving every other bound value
+/// in the service on MVC's default behavior.
 /// </remarks>
 public class PreserveEmptyStringMetadataProvider : IDisplayMetadataProvider
 {
     /// <summary>
-    /// Clears <c>ConvertEmptyStringToNull</c> for every bound model in the service.
+    /// Clears <c>ConvertEmptyStringToNull</c> for a parameter carrying <see cref="PreserveEmptyStringAttribute"/>.
     /// </summary>
     /// <param name="context">The metadata being built for a model.</param>
     public void CreateDisplayMetadata(DisplayMetadataProviderContext context)
     {
-        context.DisplayMetadata.ConvertEmptyStringToNull = false;
+        ParameterInfo? parameter = context.Key.ParameterInfo;
+        if (parameter is not null && parameter.IsDefined(typeof(PreserveEmptyStringAttribute), inherit: false))
+        {
+            context.DisplayMetadata.ConvertEmptyStringToNull = false;
+        }
     }
 }
