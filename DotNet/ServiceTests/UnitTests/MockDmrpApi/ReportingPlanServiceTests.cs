@@ -352,6 +352,78 @@ public class ReportingPlanServiceTests
         records.Should().HaveCount(2);
     }
 
+    // ------------------------------------------------------------- trimming
+
+    [Fact]
+    public async Task CreateAsync_TrimsEveryFieldThatTakesPartInTheNaturalKey()
+    {
+        var created = await _service.CreateAsync(
+            new ReportingPlanEntryEntity
+            {
+                FacilityId = "  F1  ",
+                Component = "  MSC  ",
+                Measure = "  HOB  ",
+                ReportingMonth = 5,
+                ReportingYear = 2026,
+                IsReporting = " Y "
+            },
+            CancellationToken.None);
+
+        created.FacilityId.Should().Be("F1");
+        created.Component.Should().Be("MSC");
+        created.Measure.Should().Be("HOB");
+        created.IsReporting.Should().Be("Y");
+    }
+
+    [Fact]
+    public async Task CreateAsync_TreatsAPaddedMeasureAsADuplicateOfItsTrimmedTwin()
+    {
+        // Before trimming these were two rows, and the padded one was invisible to a plan
+        // query -- a silent short plan rather than a visible error.
+        _repository.Seed(Entry(measure: "HOB"));
+
+        var act = async () => await _service.CreateAsync(
+            Entry(measure: " HOB "), CancellationToken.None);
+
+        await act.Should().ThrowAsync<DuplicateReportingPlanEntryException>();
+        _repository.Entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithAWhitespaceOnlyMeasure_IsRejected()
+    {
+        // Trimming turns "   " into "", which the cadence guard would let through -- an entry
+        // with no measure at all. The measure has to survive the trim.
+        var act = async () => await _service.CreateAsync(
+            Entry(measure: "   "), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidReportingPlanEntryException>();
+        _repository.Entries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetReportingPlanAsync_MatchesAPaddedQueryAgainstATrimmedRow()
+    {
+        _repository.Seed(Entry(measure: "HOB"));
+
+        var plan = await _service.GetReportingPlanAsync(
+            "  MSC  ", "  F1  ", "  HOB  ", 5, 2026, CancellationToken.None);
+
+        plan.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task SearchAsync_MatchesAPaddedFilterAgainstATrimmedRow()
+    {
+        _repository.Seed(Entry(measure: "HOB"));
+
+        var (records, _) = await _service.SearchAsync(
+            new ReportingPlanSearchCriteria { FacilityId = " F1 ", Measure = " HOB " },
+            CancellationToken.None);
+
+        records.Should().ContainSingle();
+    }
+
     // ---------------------------------------------- component and period rules
 
     [Fact]

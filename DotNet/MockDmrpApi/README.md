@@ -307,7 +307,7 @@ Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
 | `POST /mock` | Create an entry → `201` + `Location` |
 | `GET /mock/{id}` | One entry. `400` on a non-GUID, `404` if absent |
 | `PUT /mock/{id}` | Update → `202`. **Never creates**; `404` if absent |
-| `GET /mock/facilities/{facilityId}` | A facility's entries across both components, paged. `204` when none |
+| `GET /mock/facilities/{facilityId}` | A facility's entries across both components, paged. `404` when it has none |
 | `GET /mock/search` | Filtered search, paged. `204` when none |
 | `DELETE /mock/{id}` | `204`, or `404` if absent |
 | `DELETE /mock/facilities/{facilityId}` | Idempotent `204` |
@@ -357,8 +357,14 @@ The caller concludes "not enrolled in HTCDI" from its absence. `reporting` is on
 
 A facility enrolled in nothing returns **`200` with `"plans": []`** — not `204`, not `404`
 — because an empty plan is a meaningful answer rather than an absent resource. This
-deliberately differs from `/mock/search` and `/mock/facilities/{id}`, which do return `204`
-when empty. An entry stored with `isReporting` other than `"Y"` is excluded from a plan
+deliberately differs from `/mock/search`, which returns `204` when nothing matches.
+
+`GET /mock/facilities/{id}` returns **`404`**, not `204`. The distinction is where the
+identifier sits: a facility named in the path that matches nothing is an absent resource,
+while a search whose query-parameter filters match nothing is an empty result set. This
+service keeps no facility registry, so "a facility with no entries" and "a facility that does
+not exist" are the same observation, and the `404` claims only what it can support — nothing
+is stored under that identifier. An entry stored with `isReporting` other than `"Y"` is excluded from a plan
 entirely.
 
 An annual plan omits the root `month` from the response, rather than reporting a zero or a
@@ -478,6 +484,31 @@ docker-compose sets `Authentication:EnableAnonymousAccess`, as it does for every
 A second create with the same natural key is a `409`, so the store cannot hold two
 contradictory rows for one facility, component, measure and period. The same measure name
 under **both** components is two legitimate rows, not a duplicate — the plans are independent.
+
+### 5.1 Key fields are trimmed
+
+`facilityId`, `component`, `measure` and `isReporting` are trimmed before they are stored or
+compared, on writes and on lookups alike.
+
+That matters because the sanitizer keeps the space character. Without trimming, `" HOB"` and
+`"HOB"` were two distinct rows in the natural key: both stored happily, and a plan seeded with
+the padded one **silently omitted** the measure a consumer was looking for. No error anywhere,
+just a short plan. Now the second create is a visible `409`, and a padded query still finds a
+trimmed row.
+
+A value that is empty once trimmed is rejected with a `400` rather than stored — otherwise
+`"   "` would become an entry with no measure at all, which satisfies every other rule here.
+
+### 5.2 Paging is rejected, not clamped
+
+`pageSize` must be `1`–`100` and `pageNumber` at least `1`. Anything outside that is a `400`
+from the request annotations.
+
+Clamping was the friendlier behaviour and the wrong one for a stand-in: a caller asking for
+5,000 rows and silently receiving 100 has no way to tell that happened, and a test written
+against the clamped result would pass while proving nothing. The service still clamps
+internally for callers that bypass HTTP, so a bad value cannot reach the repository as a
+negative `Skip`.
 
 ---
 

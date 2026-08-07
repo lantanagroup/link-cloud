@@ -235,14 +235,15 @@ public class MockControllerTests : IAsyncLifetime
         (await _client.GetAsync("/mock/search")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
 
-        (await _client.GetAsync("/mock/facilities/F1")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent);
+        var byFacility = await _client.GetAsync("/mock/facilities/F1");
+        byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await byFacility.Content.ReadAsStringAsync()).Should().NotContain("Invalid Id format");
     }
 
     // ------------------------------------------------------- facility + search
 
     [Fact]
-    public async Task GetByFacility_ReturnsAPageAnd204WhenEmpty()
+    public async Task GetByFacility_ReturnsAPageAnd404WhenTheFacilityHasNothing()
     {
         Seed();
         Seed(measure: "HTCDI");
@@ -254,8 +255,27 @@ public class MockControllerTests : IAsyncLifetime
         page!.Records.Should().HaveCount(2);
         page.Metadata.PageSize.Should().Be(10);
 
+        // 404, not 204: the facility is named in the path, so an identifier that matches
+        // nothing is an absent resource rather than an empty collection.
         var empty = await _client.GetAsync("/mock/facilities/NoSuchFacility");
-        empty.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        empty.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await empty.Content.ReadAsStringAsync()).Should().Contain("NoSuchFacility",
+            "the detail names the facility it looked for");
+    }
+
+    [Fact]
+    public async Task SearchStillAnswers204WhenNothingMatches()
+    {
+        // The distinction the by-facility 404 rests on. Search takes its filters as query
+        // parameters, so no matches is an empty result set, not a missing resource. If these
+        // two ever agreed, one of them would be wrong.
+        Seed();
+
+        var byFacility = await _client.GetAsync("/mock/facilities/NoSuchFacility");
+        var bySearch = await _client.GetAsync("/mock/search?facilityId=NoSuchFacility");
+
+        byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        bySearch.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]
@@ -379,6 +399,110 @@ public class MockControllerTests : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         _repository.Entries.Should().ContainSingle();
+    }
+
+    // ----------------------------------------------------------- trimming
+
+    [Fact]
+    public async Task Create_TrimsTheKeyFieldsBeforeStoringThem()
+    {
+        // The sanitizer keeps the space character, so without an explicit trim " HOB" would
+        // be stored verbatim.
+        var response = await _client.PostAsJsonAsync("/mock", new
+        {
+            facilityId = " 100 ",
+            component = " MSC ",
+            measure = " HOB ",
+            reportingMonth = 5,
+            reportingYear = 2026,
+            isReporting = "Y"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await response.Content.ReadFromJsonAsync<MockEntryModel>();
+        created!.Measure.Should().Be("HOB");
+        created.FacilityId.Should().Be("100");
+        created.Component.Should().Be("MSC");
+    }
+
+    [Fact]
+    public async Task APaddedMeasure_CollidesWithItsTrimmedTwin()
+    {
+        // The payoff. Before trimming these were two distinct rows in the natural key, so a
+        // plan seeded with the padded one silently omitted the measure a consumer looked for
+        // -- no error anywhere, just a short plan. Now the second create is a visible 409.
+        Seed(measure: "HOB");
+
+        var response = await _client.PostAsJsonAsync("/mock", MonthlyBody(measure: " HOB "));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        _repository.Entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task APaddedFilter_FindsTheTrimmedRow()
+    {
+        // Trimming writes without trimming lookups would move the problem rather than fix it.
+        Seed(measure: "HOB");
+
+        var response = await _client.GetAsync("/mock/search?measure=%20HOB%20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
+        page!.Records.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task APaddedFacility_FindsTheTrimmedRows()
+    {
+        Seed(facilityId: "100");
+
+        var response = await _client.GetAsync("/mock/facilities/%20100%20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // ------------------------------------------------------------- paging
+
+    [Theory]
+    [InlineData("pageSize=101")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=-1")]
+    [InlineData("pageNumber=-1")]
+    [InlineData("pageNumber=0")]
+    public async Task Search_WithPagingOutsideTheAllowedRange_Returns400(string filter)
+    {
+        // Rejected at the boundary rather than clamped. A caller asking for 5,000 rows and
+        // silently getting 100 has no way to tell that happened.
+        Seed();
+
+        var response = await _client.GetAsync($"/mock/search?{filter}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData("pageSize=1")]
+    [InlineData("pageSize=100")]
+    [InlineData("pageNumber=1")]
+    public async Task Search_AtThePagingBoundaries_IsAccepted(string filter)
+    {
+        Seed();
+
+        var response = await _client.GetAsync($"/mock/search?{filter}");
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetByFacility_WithPagingOutsideTheAllowedRange_Returns400()
+    {
+        Seed();
+
+        var response = await _client.GetAsync("/mock/facilities/F1?pageSize=101");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

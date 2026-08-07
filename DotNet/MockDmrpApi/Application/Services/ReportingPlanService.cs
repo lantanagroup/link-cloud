@@ -24,6 +24,8 @@ public class ReportingPlanService : IReportingPlanService
     public async Task<(IReadOnlyList<ReportingPlanEntryEntity> Records, PaginationMetadata Metadata)> GetByFacilityAsync(
         string facilityId, int pageSize, int pageNumber, CancellationToken cancellationToken)
     {
+        facilityId = Trim(facilityId);
+
         var (records, metadata) = await _repository.SearchAsync(
             e => e.FacilityId == facilityId,
             nameof(ReportingPlanEntryEntity.CreateDate),
@@ -65,6 +67,10 @@ public class ReportingPlanService : IReportingPlanService
         // Only entries actively being reported take part in a plan. An entry explicitly
         // marked as not reporting is equivalent to no entry at all, since the response
         // conveys enrollment by presence.
+        nhsnOrgId = Trim(nhsnOrgId);
+        component = Trim(component);
+        measure = string.IsNullOrWhiteSpace(measure) ? null : Trim(measure);
+
         return await _repository.FindAsync(
             e => e.FacilityId == nhsnOrgId
                  && e.Component == component
@@ -79,6 +85,8 @@ public class ReportingPlanService : IReportingPlanService
     {
         ArgumentNullException.ThrowIfNull(entry);
 
+        Normalize(entry);
+        GuardRequiredFields(entry);
         GuardComponentAndPeriod(entry);
         await GuardNaturalKeyAsync(entry, excludeId: null, cancellationToken);
 
@@ -108,6 +116,8 @@ public class ReportingPlanService : IReportingPlanService
             return null;
         }
 
+        Normalize(entry);
+        GuardRequiredFields(entry);
         GuardComponentAndPeriod(entry);
         await GuardNaturalKeyAsync(entry, excludeId: entry.Id, cancellationToken);
 
@@ -143,6 +153,8 @@ public class ReportingPlanService : IReportingPlanService
 
     public async Task<int> DeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken)
     {
+        facilityId = Trim(facilityId);
+
         var existing = await _repository.FindAsync(e => e.FacilityId == facilityId, cancellationToken);
         return await DeleteRangeAsync(existing, cancellationToken);
     }
@@ -175,6 +187,59 @@ public class ReportingPlanService : IReportingPlanService
     /// every month -- or, with the month wrong on a monthly entry, returned for none. Both
     /// failures are silent.
     /// </remarks>
+    /// <summary>
+    /// Trims a value that takes part in the natural key.
+    /// </summary>
+    /// <remarks>
+    /// The sanitizer keeps the space character, so without this <c>" HOB"</c> and <c>"HOB"</c>
+    /// are two distinct measures. Both would store happily, and a plan seeded with the padded
+    /// one would silently omit the measure a consumer is looking for -- no error anywhere,
+    /// just a short plan. Applied to lookups as well as writes, so a padded query still finds
+    /// a trimmed row.
+    /// </remarks>
+    private static string Trim(string? value) => value?.Trim() ?? string.Empty;
+
+    /// <summary>Trims a filter, keeping "not supplied" distinct from "supplied as blank".</summary>
+    private static string? TrimFilter(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// Brings an entry's key fields to the form they are stored and compared in.
+    /// </summary>
+    /// <remarks>
+    /// Runs before both the cadence guard and the duplicate pre-check, so an entry is
+    /// validated and compared as it will be persisted rather than as it arrived.
+    /// </remarks>
+    private static void Normalize(ReportingPlanEntryEntity entry)
+    {
+        entry.FacilityId = Trim(entry.FacilityId);
+        entry.Component = Trim(entry.Component);
+        entry.Measure = Trim(entry.Measure);
+        entry.IsReporting = Trim(entry.IsReporting);
+    }
+
+    /// <summary>
+    /// Rejects a key field that is empty once trimmed.
+    /// </summary>
+    /// <remarks>
+    /// Trimming introduces this: a measure of <c>"   "</c> used to be stored verbatim and was
+    /// merely useless, but it now trims to <c>""</c>, and an entry with no measure at all
+    /// would satisfy every other rule here. The request annotations catch it over HTTP; this
+    /// closes the same hole for a caller reaching the service directly.
+    /// </remarks>
+    private static void GuardRequiredFields(ReportingPlanEntryEntity entry)
+    {
+        if (string.IsNullOrEmpty(entry.FacilityId))
+        {
+            throw new InvalidReportingPlanEntryException("facilityId is required.");
+        }
+
+        if (string.IsNullOrEmpty(entry.Measure))
+        {
+            throw new InvalidReportingPlanEntryException("measure is required.");
+        }
+    }
+
     private static void GuardComponentAndPeriod(ReportingPlanEntryEntity entry)
     {
         if (!ReportingComponents.IsKnown(entry.Component))
@@ -231,6 +296,13 @@ public class ReportingPlanService : IReportingPlanService
 
     private static Expression<Func<ReportingPlanEntryEntity, bool>> BuildPredicate(ReportingPlanSearchCriteria criteria)
     {
+        // Trimmed for the same reason writes are: a padded filter must still match the row a
+        // padded create would now have stored trimmed.
+        criteria.FacilityId = TrimFilter(criteria.FacilityId);
+        criteria.Component = TrimFilter(criteria.Component);
+        criteria.Measure = TrimFilter(criteria.Measure);
+        criteria.IsReporting = TrimFilter(criteria.IsReporting);
+
         return e =>
             (criteria.FacilityId == null || e.FacilityId == criteria.FacilityId)
             && (criteria.Component == null || e.Component == criteria.Component)
@@ -257,6 +329,15 @@ public class ReportingPlanService : IReportingPlanService
         _ => throw new ArgumentOutOfRangeException(nameof(sortBy), sortBy, "Unsupported sort field.")
     };
 
+    /// <summary>
+    /// Brings paging into range for a direct caller.
+    /// </summary>
+    /// <remarks>
+    /// No longer reachable over HTTP: the controller carries <c>[Range]</c> annotations that
+    /// reject an out-of-range page with a 400 before the action runs, which is what QA's cases
+    /// assert. Kept as a floor for callers that reach the service directly, so a bad value
+    /// cannot turn into a negative <c>Skip</c> in the repository.
+    /// </remarks>
     private static int ClampPageSize(int pageSize) => pageSize switch
     {
         < 1 => ReportingPlanSearchCriteria.DefaultPageSize,
