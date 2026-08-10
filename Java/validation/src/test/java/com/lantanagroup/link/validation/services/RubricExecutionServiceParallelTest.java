@@ -273,6 +273,7 @@ class RubricExecutionServiceParallelTest {
                 mock(RubricVersionRepository.class),
                 executorRegistry,
                 new ResultEnvelopeAssembler(objectMapper, new ScoreAggregator()),
+                new ScoreAggregator(),
                 mock(RubricResultPersister.class),
                 FHIR_CONTEXT,
                 objectMapper,
