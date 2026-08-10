@@ -19,12 +19,11 @@ Three classes of finding:
   WARN   A secret-shaped key (password / secret / connection-string / signing-key
          / webhook / jaas / ...) holding a plain literal rather than a Key Vault
          reference. Not every such value is a credential, so this is surfaced for
-         review rather than failing the build. Keys listed in ENDPOINT_ONLY_KEYS
-         are exempt: they are named "...ConnectionString" but hold only a bare
-         host:port, with the password supplied separately from Key Vault. Those
-         keys are still checked for credential shapes, and additionally warn if
-         they carry comma-delimited Redis config syntax, which would break
-         ConfigurationOptions.EndPoints. Use --strict to make warnings fatal.
+         review rather than failing the build. Keys listed in
+         PASSWORDLESS_CONNECTION_STRING_KEYS are exempt: they use a
+         comma-delimited Redis connection string with the password supplied
+         separately from Key Vault. Those keys are still checked for credential
+         shapes. Use --strict to make warnings fatal.
 
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
@@ -76,16 +75,14 @@ SECRET_KEY_WORD_EXEMPT_PREFIXES = (
     "/secret-management/",
 )
 
-# Keys named "...ConnectionString" that in fact hold only a bare host:port. Both
-# are assigned to ConfigurationOptions.EndPoints and paired with a separate
+# Redis connection strings that carry connection options but pair with a separate
 # Key Vault-referenced password:
 #   ConnectionStrings:Redis              -> RedisCacheExtension.cs, password from Redis:Password
 #   ResourceCache:Redis:ConnectionString -> ResourceCacheExtensions.cs, password from
 #                                           ResourceCache:Redis:Password
-# A credential here would not merely leak, it would break the connection --
-# EndPoints.Add() rejects the comma-delimited StackExchange.Redis config syntax.
-# Exempt from the secret-shaped-key warning; every value-based check still applies.
-ENDPOINT_ONLY_KEYS = (
+# Exempt from the secret-shaped-key warning; every value-based check still applies,
+# including the inline password check below.
+PASSWORDLESS_CONNECTION_STRING_KEYS = (
     "connectionstrings:redis",
     "resourcecache:redis:connectionstring",
 )
@@ -96,7 +93,7 @@ CREDENTIAL_VALUE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     (r"(?i)SharedAccessKey\s*=\s*[A-Za-z0-9+/]{20,}={0,2}", "Service Bus / Event Hub shared access key"),
     (r"(?i)SharedAccessSignature\s*=", "Azure SAS token"),
     (r"[?&]sig=[A-Za-z0-9%+/]{20,}", "SAS signature"),
-    (r"(?i)\b(?:password|pwd)\s*=\s*[^;,\s\"']{4,}", "inline password in a connection string"),
+    (r"(?i)\b(?:password|pwd)\s*=\s*[^;,\s\"']+", "inline password in a connection string"),
     (r"(?i)mongodb(?:\+srv)?://[^/\s:@]+:[^@\s]+@", "MongoDB URI with embedded credentials"),
     (r"(?i)amqps?://[^/\s:@]+:[^@\s]+@", "AMQP URI with embedded credentials"),
     (r"(?i)redis://[^/\s:@]+:[^@\s]+@", "Redis URI with embedded credentials"),
@@ -136,9 +133,9 @@ def is_secret_shaped_key(key: str) -> bool:
     return any(word in squashed for word in SECRET_KEY_WORDS)
 
 
-def is_endpoint_only_key(key: str) -> bool:
-    """Check if the key holds a bare host:port despite a secret-sounding name."""
-    return key.strip().lower() in ENDPOINT_ONLY_KEYS
+def is_passwordless_connection_string_key(key: str) -> bool:
+    """Check if the connection string gets its password from a separate key."""
+    return key.strip().lower() in PASSWORDLESS_CONNECTION_STRING_KEYS
 
 
 def is_non_secret_scalar(value: str) -> bool:
@@ -206,20 +203,10 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
                     f"Move it to Key Vault and reference it instead."))
                 break
 
-    # An endpoint-only key carrying StackExchange.Redis configuration syntax.
-    # EndPoints.Add() cannot parse it, so this breaks the connection as well as
-    # being the shape a pasted credential arrives in.
-    if is_endpoint_only_key(key) and "," in value:
-        findings.append(Finding(
-            "WARN", entry_location(path, index, key, label),
-            "Value contains ',' but this key is assigned to "
-            "ConfigurationOptions.EndPoints, which accepts only host:port. "
-            "Redis options belong in the sibling settings, not here."))
-
     # Secret-shaped key holding a literal. Not always a credential, so warn.
     if (is_secret_shaped_key(key) and value.strip() and not is_kv_ref
             and not is_non_secret_scalar(value)
-            and not is_endpoint_only_key(key)):
+            and not is_passwordless_connection_string_key(key)):
         preview = value if len(value) <= 60 else value[:57] + "..."
         findings.append(Finding(
             "WARN", entry_location(path, index, key, label),

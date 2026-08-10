@@ -13,7 +13,7 @@ public class CustomHeaderAuth : IAuth
         _secretManager = secretManager;
     }
 
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
         if (authSettings.CustomHeaders == null || !authSettings.CustomHeaders.Any())
         {
@@ -24,7 +24,7 @@ public class CustomHeaderAuth : IAuth
         foreach (var header in authSettings.CustomHeaders)
         {
             var name = header.Value;
-            var value = await _secretManager.GetSecretAsync(name, CancellationToken.None);
+            var value = await _secretManager.GetSecretAsync(name, cancellationToken);
             if (string.IsNullOrEmpty(value))
             {
                 throw new InvalidOperationException(

@@ -44,7 +44,7 @@ public class EpicAuthTests
         _mockLogger = new Mock<ILogger<EpicAuth>>();
 
         _mockCacheService = new Mock<ICacheService>();
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         _mockSecretManager = new Mock<ISecretManager>();
         _mockSecretManager
@@ -89,7 +89,7 @@ public class EpicAuthTests
     public async Task SetAuthentication_ReturnsCachedToken_WhenTokenExistsInCache()
     {
         const string cachedToken = "cached-token";
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns(cachedToken);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync(cachedToken);
 
         var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
 
@@ -117,7 +117,7 @@ public class EpicAuthTests
         Assert.Equal(DataAcquisitionConstants.Auth.Bearer, header.Scheme);
         Assert.Equal("new-token", header.Parameter);
         _mockCacheService.Verify(
-            x => x.Set(FacilityId, "new-token", TimeSpan.FromSeconds(1800), ExpirationType.Absolute),
+            x => x.SetAsync(FacilityId, "new-token", TimeSpan.FromSeconds(1800), ExpirationType.Absolute, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
     {
         public string? ConnectionString { get; set; }
         public string? Password { get; set; }
+        public int PoolSize { get; set; } = 5;
         /// <summary>
         /// The percentage of the configured Redis max-memory (<see cref="MaxMemoryBytes"/>) at
         /// which Hybrid caching falls back to ABS. Defaults to 80. When

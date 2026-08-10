@@ -63,15 +63,15 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.27" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.27" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.16" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.27" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Compliance.Redaction" Version="8.10.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="7.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.27" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.Extensions.Primitives" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Primitives" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Telemetry" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.1" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.1" />
@@ -112,10 +112,10 @@
     <PackageVersion Include="SpecFlow.NUnit" Version="3.9.74" />
     <PackageVersion Include="SpecFlow.Plus.LivingDocPlugin" Version="3.9.57" />
     <PackageVersion Include="SSH.NET" Version="2024.2.0" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
-    <PackageVersion Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.0.0" />
-    <PackageVersion Include="StackExchange.Redis.Extensions.Core" Version="11.0.0" />
-    <PackageVersion Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.0.0" />
+    <PackageVersion Include="StackExchange.Redis" Version="3.1.11" />
+    <PackageVersion Include="StackExchange.Redis.Extensions.AspNetCore" Version="13.0.1" />
+    <PackageVersion Include="StackExchange.Redis.Extensions.Core" Version="13.0.1" />
+    <PackageVersion Include="StackExchange.Redis.Extensions.System.Text.Json" Version="13.0.1" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.9.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.6" />

@@ -271,7 +271,7 @@ global:
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:Redis"
-    description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
+    description: "The Redis connection string. The password is supplied separately via Redis:Password. Required for distributed locks and Redis/Hybrid resource caching in DataAcquisition and DataAcquisitionWorker."
     required: true
     consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Redis:Password"
@@ -503,19 +503,15 @@ services:
       description: "The expiration time in minutes for distributed locks."
       required: false
       defaultValue: "10"
+    - key: "DistributedLockSettings:PoolSize"
+      description: "Optional shared Redis connection-pool size for distributed locks and resource caching. Defaults to 5."
+      required: false
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
-    - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
-      required: true
-    - key: "ResourceCache:Redis:Password"
-      description: "Optional Redis password for the resource cache. Defaults to empty."
-      required: false
-      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -544,19 +540,15 @@ services:
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
+    - key: "DistributedLockSettings:PoolSize"
+      description: "Optional shared Redis connection-pool size for distributed locks and resource caching. Defaults to 5."
+      required: false
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
-    - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
-      required: true
-    - key: "ResourceCache:Redis:Password"
-      description: "Optional Redis password for the resource cache. Defaults to empty."
-      required: false
-      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -610,7 +602,7 @@ services:
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
       required: false
     - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      description: "The Redis connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
       required: true
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
