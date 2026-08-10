@@ -7,4 +7,5 @@ public sealed class ImportedBundleBlobStorageSettings
     public string? ConnectionString { get; set; }
     public string? BlobContainerName { get; set; }
     public string? BlobRoot { get; set; }
+    public string? GeneratedTemplateBlobRoot { get; set; }
 }
