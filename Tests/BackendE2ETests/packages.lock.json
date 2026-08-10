@@ -2290,6 +2290,7 @@
       "dmrp": {
         "type": "Project",
         "dependencies": {
+          "LinkSdk": "[1.0.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },

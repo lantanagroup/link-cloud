@@ -3,14 +3,17 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Sdk.Clients;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
+using System.Net;
 
 namespace LantanaGroup.Link.DMRP.Controllers
 {
@@ -22,12 +25,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private readonly ILogger<MeasureMappingsController> _logger;
         private readonly IMeasureMappingManager _manager;
         private readonly IMeasureMappingQueries _queries;
+        private readonly IMeasureEvalServiceClient _measureEvalClient;
 
-        public MeasureMappingsController(ILogger<MeasureMappingsController> logger, IMeasureMappingManager manager, IMeasureMappingQueries queries)
+        public MeasureMappingsController(
+            ILogger<MeasureMappingsController> logger,
+            IMeasureMappingManager manager,
+            IMeasureMappingQueries queries,
+            IMeasureEvalServiceClient measureEvalClient)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _measureEvalClient = measureEvalClient ?? throw new ArgumentNullException(nameof(measureEvalClient));
         }
 
         /// <summary>
@@ -36,26 +45,14 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedMeasureMappingDto))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpGet(Name = "GetMeasureMappings")]
-        public async Task<IActionResult> GetMeasureMappings(string? sortBy, SortOrder? sortOrder,
-            int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        [HttpGet("search")]
+        public async Task<IActionResult> GetMeasureMappings(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
         {
-            sortBy = sortBy?.Sanitize();
-
-            if (pageSize < 1 || pageSize > 100)
-            {
-                pageSize = 10;
-            }
-
-            if (pageNumber < 1)
-            {
-                pageNumber = 1;
-            }
+            searchDto.Sanitize();
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Measure Mappings");
 
-            var result = await _queries.PagedSearchAsync(sortBy ?? "Id", sortOrder ?? SortOrder.Descending,
-                pageSize, pageNumber, cancellationToken);
+            var result = await _queries.PagedSearchAsync(searchDto, cancellationToken);
 
             if (result.Records.Count == 0)
             {
@@ -92,6 +89,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         [HttpPost]
         public async Task<IActionResult> CreateMeasureMapping(MeasureMappingModel request, CancellationToken cancellationToken)
         {
@@ -99,13 +97,24 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             try
             {
-                var entity = new MeasureMapping();
-                // TODO: Map `request` to `entity`
+                var entity = ToEntity(request);
+                if (!await DqmExistsAsync(entity.DQM, cancellationToken))
+                {
+                    return BadRequest($"DQM '{entity.DQM}' was not found in MeasureEval.");
+                }
+
                 created = await _manager.CreateAsync(entity, cancellationToken);
             }
-            catch (ApplicationException ex)
+            catch (DuplicateMeasureMappingException)
             {
-                return BadRequest(ex.Message);
+                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["measure"] = ["A measure mapping for this measure and dQM already exists."]
+                }));
+            }
+            catch (ApplicationException)
+            {
+                return BadRequest();
             }
             catch (Exception ex)
             {
@@ -113,8 +122,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return Problem("An error occurred while creating the measure mapping", null, 500);
             }
 
-            var model = new MeasureMappingModel { Id = created.Id };
-            // TODO: Map `created` to `model`
+            var model = ToModel(created);
 
             return Created($"/api/dmrp/measure-mappings/{model.Id}", model);
         }
@@ -126,6 +134,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateMeasureMapping(string id, MeasureMappingModel request, CancellationToken cancellationToken)
         {
@@ -138,7 +147,22 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             try
             {
-                await _manager.UpdateAsync(id, new MeasureMapping { Id = id }, cancellationToken);
+                var entity = ToEntity(request);
+                entity.Id = id;
+
+                if (!await DqmExistsAsync(entity.DQM, cancellationToken))
+                {
+                    return BadRequest($"DQM '{entity.DQM}' was not found in MeasureEval.");
+                }
+
+                await _manager.UpdateAsync(id, entity, cancellationToken);
+            }
+            catch (DuplicateMeasureMappingException)
+            {
+                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["measure"] = ["A measure mapping for this measure and dQM already exists."]
+                }));
             }
             catch (ApplicationException ex)
             {
@@ -181,6 +205,49 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// Deletes all measure mappings.
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteAllMeasureMappings(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _manager.DeleteAllAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception encountered in MeasureMappingsController.DeleteAllMeasureMappings");
+                return Problem("An error occurred while deleting the measure mappings", null, 500);
+            }
+
+            return NoContent();
+        }
+
+        private static MeasureMapping ToEntity(MeasureMappingModel model) => new()
+        {
+            Measure = model.Measure?.Sanitize() ?? "",
+            DQM = model.DQM?.Sanitize() ?? "",
+            Frequency = model.Frequency ?? Frequency.Adhoc
+        };
+
+        private static MeasureMappingModel ToModel(MeasureMapping entity) => new()
+        {
+            Id = entity.Id,
+            Measure = entity.Measure,
+            DQM = entity.DQM,
+            Frequency = entity.Frequency
+        };
+
+        private async Task<bool> DqmExistsAsync(string dqm, CancellationToken cancellationToken)
+        {
+            var response = await _measureEvalClient.GetMeasureDefinitionAsync(dqm, cancellationToken);
+            return response.IsSuccessStatusCode;
         }
     }
 }

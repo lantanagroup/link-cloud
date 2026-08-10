@@ -1,5 +1,7 @@
 ﻿using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.Data.Sqlite;
@@ -73,10 +75,60 @@ namespace UnitTests.DMRP
 
             var queries = CreateQueries(context);
 
-            var result = await queries.PagedSearchAsync(pageSize: 2, pageNumber: 1);
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto
+            {
+                PageSize = 2,
+                PageNumber = 1
+            });
 
             Assert.Equal(2, result.Records.Count);
             Assert.Equal(3, result.Metadata.TotalCount);
+        }
+
+        [Fact]
+        public async Task PagedSearchAsync_ProvidedFields_ReturnsOnlyMatchingRecords()
+        {
+            using var context = CreateContext();
+            var matchingMapping = new MeasureMapping
+            {
+                Measure = "CMS130v13",
+                DQM = "Preventive Care",
+                Frequency = Frequency.Monthly
+            };
+            context.MeasureMappings.AddRange(
+                matchingMapping,
+                new MeasureMapping
+                {
+                    Measure = "CMS130v13",
+                    DQM = "Preventive Care",
+                    Frequency = Frequency.Daily
+                },
+                new MeasureMapping
+                {
+                    Measure = "CMS122v12",
+                    DQM = "Preventive Care",
+                    Frequency = Frequency.Monthly
+                },
+                new MeasureMapping
+                {
+                    Measure = "CMS130v13",
+                    DQM = "Immunization Status",
+                    Frequency = Frequency.Monthly
+                });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto
+            {
+                Measure = matchingMapping.Measure,
+                DQM = matchingMapping.DQM,
+                Frequency = matchingMapping.Frequency
+            });
+
+            var record = Assert.Single(result.Records);
+            Assert.Equal(matchingMapping.Id, record.Id);
+            Assert.Equal(1, result.Metadata.TotalCount);
         }
     }
 }
