@@ -11,7 +11,6 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
-import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
@@ -35,7 +34,6 @@ import java.util.stream.Collectors;
 public class RubricExecutionService {
 
     private final RubricVersionResolver versionResolver;
-    private final RubricCheckRepository rubricCheckRepository;
     private final RubricVersionRepository rubricVersionRepository;
     private final CheckExecutorRegistry executorRegistry;
     private final ResultEnvelopeAssembler envelopeAssembler;
@@ -47,7 +45,6 @@ public class RubricExecutionService {
     private final boolean parallel;
 
     public RubricExecutionService(RubricVersionResolver versionResolver,
-                                  RubricCheckRepository rubricCheckRepository,
                                   RubricVersionRepository rubricVersionRepository,
                                   CheckExecutorRegistry executorRegistry,
                                   ResultEnvelopeAssembler envelopeAssembler,
@@ -57,7 +54,6 @@ public class RubricExecutionService {
                                   @Qualifier("checkExecutorPool") Executor checkExecutorPool,
                                   @Value("${vaas.checks.parallel:false}") boolean parallel) {
         this.versionResolver = versionResolver;
-        this.rubricCheckRepository = rubricCheckRepository;
         this.rubricVersionRepository = rubricVersionRepository;
         this.executorRegistry = executorRegistry;
         this.envelopeAssembler = envelopeAssembler;
@@ -75,12 +71,11 @@ public class RubricExecutionService {
         OffsetDateTime requestedAt = OffsetDateTime.now();
 
 
-        RubricVersion version = versionResolver.resolve(rubricId, semver, persist);
+        // the resolver returns version + checks together (soft-deleted checks already excluded)
+        RubricVersionResolver.ResolvedRubric resolved = versionResolver.resolve(rubricId, semver, persist);
+        RubricVersion version = resolved.version();
+        List<RubricCheck> checks = resolved.checks();
         log.debug("Resolved rubric {} v{} ({})", version.getRubricId(), version.getSemver(), version.getRubricVersionId());
-
-        // soft-deleted checks are excluded here
-        List<RubricCheck> checks =
-                rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(version.getRubricVersionId());
 
         SubjectDto subject = request.getSubject();
 
