@@ -230,6 +230,22 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
+        public async Task CreateAsync_UniqueIndexViolation_IsRecognisedWithoutQueryingAgain()
+        {
+            _mockRepository
+                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new DbUpdateException("save failed",
+                    new Exception($"Violation of UNIQUE KEY constraint '{FacilityReportingPlanConfigMap.UniquePeriodIndexName}'.")));
+
+            await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(ValidPlan()));
+
+            // Once for the pre-check only. The failure names the index, so there is no second lookup.
+            _mockRepository.Verify(
+                r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        [Fact]
         public async Task CreateAsync_DatabaseFailureThatIsNotADuplicate_IsNotDisguisedAsBadInput()
         {
             var failure = new DbUpdateException("the database is unavailable");

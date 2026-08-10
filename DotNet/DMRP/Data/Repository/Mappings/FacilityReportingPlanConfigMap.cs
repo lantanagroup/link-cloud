@@ -12,6 +12,8 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
         /// </summary>
         public const int FacilityIdMaxLength = 100;
 
+        public const string UniquePeriodIndexName = "IX_FacilityReportingPlans_Facility_Mapping_Period";
+
         /// <summary>
         /// Matches the length EF Core gives a string primary key, so the foreign key column and
         /// MeasureMappings.Id are the same type.
@@ -48,7 +50,7 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
             // manager's pre-check and insert a duplicate.
             builder.HasIndex(p => new { p.FacilityId, p.MeasureMappingId, p.ReportingMonth, p.ReportingYear })
                 .IsUnique()
-                .HasDatabaseName("IX_FacilityReportingPlans_Facility_Mapping_Period");
+                .HasDatabaseName(UniquePeriodIndexName);
 
             // Serves the by-facility and by-period reads.
             builder.HasIndex(p => new { p.FacilityId, p.ReportingYear, p.ReportingMonth })
