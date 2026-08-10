@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
+import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Patient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -108,5 +109,58 @@ class FhirPathCheckExecutorTest {
     @DisplayName("missing expression -> no findings")
     void missingExpression() {
         assertThat(executor.execute(check("{}", null), context(new Patient()))).isEmpty();
+    }
+
+    // empty-Bundle payload: resource is the Bundle, bundleEntries is empty. Must NOT be treated
+    // like a bare single resource (which would run resource-typed checks against the envelope).
+    private static ExecutionContext emptyBundleContext() {
+        return ExecutionContext.builder()
+                .resource(new Bundle())
+                .bundleEntries(List.of())
+                .build();
+    }
+
+    @Test
+    @DisplayName("empty bundle: a resource-typed check produces NO findings (not phantom findings against the Bundle)")
+    void emptyBundleResourceTypedCheckHasNoFindings() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.name.exists()\"}", null), emptyBundleContext());
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("empty bundle: a Bundle-level expression still evaluates against the Bundle so it can be flagged")
+    void emptyBundleBundleLevelExpressionStillEvaluated() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.count() >= 1\",\"code\":\"bundle-empty\"}", null),
+                emptyBundleContext());
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("bundle-empty");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Bundle");
+    }
+
+    @Test
+    @DisplayName("non-empty bundle: a resource-typed check runs once per matching entry")
+    void nonEmptyBundleTargetsMatchingEntries() {
+        Patient withName = new Patient();
+        withName.setId("with");
+        withName.addName().setFamily("Doe");
+        Patient withoutName = new Patient();
+        withoutName.setId("without");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(withName);
+        bundle.addEntry().setResource(withoutName);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(withName, withoutName))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.name.exists()\"}", null), ctx);
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getLocation()).isEqualTo("Patient/without");
     }
 }
