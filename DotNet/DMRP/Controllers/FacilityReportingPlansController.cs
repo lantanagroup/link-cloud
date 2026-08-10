@@ -53,7 +53,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Get a paged list of facility reporting plans.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilityReportingPlans")]
@@ -67,7 +66,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// period and reporting state.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("search", Name = "SearchFacilityReportingPlans")]
@@ -103,11 +101,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 filters.Month, filters.Year, filters.IsReporting, sortBy ?? nameof(FacilityReportingPlan.Id),
                 sortOrder ?? SortOrder.Descending, pageSize, pageNumber, cancellationToken);
 
-            if (result.Records.Count == 0)
-            {
-                return NoContent();
-            }
-
+            // A search that matched nothing is still a successful search: return the empty page so
+            // callers keep the paging metadata instead of having to special-case an absent body.
             return Ok(result);
         }
 
@@ -116,7 +111,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// reporting state.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityReportingPlanModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}")]
@@ -135,11 +129,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting, cancellationToken);
 
-            if (results.Count == 0)
-            {
-                return NoContent();
-            }
-
+            // An empty list is the honest answer for a facility with no plans; 404 is reserved for a
+            // plan that does not exist by Id.
             return Ok(results);
         }
 

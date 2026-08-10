@@ -223,11 +223,11 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetFacilityReportingPlansForFacility_NoPlans_Returns204()
+    public async Task GetFacilityReportingPlansForFacility_NoPlans_ReturnsEmptyList()
     {
         var result = await _controller.GetFacilityReportingPlansForFacility("no-such-facility", null, null, null, CancellationToken.None);
 
-        Assert.IsType<NoContentResult>(result);
+        Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value));
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchFacilityReportingPlans_NoMatches_Returns204()
+    public async Task SearchFacilityReportingPlans_NoMatches_ReturnsEmptyPageWithMetadata()
     {
         await CreatedPlanAsync();
 
@@ -263,7 +263,10 @@ public class FacilityReportingPlansControllerTests : IDisposable
             new FacilityReportingPlanSearchFilters { FacilityId = "no-such-facility" },
             sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
-        Assert.IsType<NoContentResult>(result);
+        var paged = Assert.IsType<PagedFacilityReportingPlanDto>(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.Empty(paged.Records);
+        Assert.Equal(0, paged.Metadata.TotalCount);
+        Assert.Equal(1, paged.Metadata.PageNumber);
     }
 
     [Fact]
@@ -388,8 +391,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.DeleteFacilityReportingPlansForFacility(FacilityId, CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
 
-        Assert.IsType<NoContentResult>(
-            await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, CancellationToken.None));
+        var cleared = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, CancellationToken.None);
+        Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(cleared).Value));
         Assert.IsType<OkObjectResult>(
             await _controller.GetFacilityReportingPlan(survivor.Id!, CancellationToken.None));
     }
@@ -414,6 +417,6 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var remaining = await _controller.SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(),
             sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
-        Assert.IsType<NoContentResult>(remaining);
+        Assert.Empty(Assert.IsType<PagedFacilityReportingPlanDto>(Assert.IsType<OkObjectResult>(remaining).Value).Records);
     }
 }
