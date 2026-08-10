@@ -113,8 +113,6 @@ namespace UnitTests.DMRP
 
             builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
 
-            // The module must neither supply its own lookup nor disturb the host's: exactly the
-            // registration the host made, and nothing else.
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
             Assert.Same(hostLookup, registration.ImplementationInstance);
         }
@@ -126,8 +124,6 @@ namespace UnitTests.DMRP
 
             builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
 
-            // A host that forgets to register IFacilityExistence must fail at DI resolution rather
-            // than fall back to something the module invented.
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
 

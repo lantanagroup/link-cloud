@@ -101,8 +101,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 filters.Month, filters.Year, filters.IsReporting, sortBy ?? nameof(FacilityReportingPlan.Id),
                 sortOrder ?? SortOrder.Descending, pageSize, pageNumber, cancellationToken);
 
-            // A search that matched nothing is still a successful search: return the empty page so
-            // callers keep the paging metadata instead of having to special-case an absent body.
             return Ok(result);
         }
 
@@ -129,8 +127,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting, cancellationToken);
 
-            // An empty list is the honest answer for a facility with no plans; 404 is reserved for a
-            // plan that does not exist by Id.
             return Ok(results);
         }
 

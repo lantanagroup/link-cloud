@@ -60,8 +60,6 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
     public void Dispose()
     {
-        // Undo any facility-existence stub this test installed before the next one runs; the mock
-        // outlives the test class.
         _fixture.ResetFacilityExistence();
         _scope.Dispose();
     }

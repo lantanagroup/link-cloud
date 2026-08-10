@@ -42,10 +42,6 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // the module's assembly and its routes would never be mapped.
             mvcBuilder.AddApplicationPart(typeof(DmrpModuleExtensions).Assembly);
 
-            // The module deliberately registers no IFacilityExistence: DMRP cannot see the host's
-            // facility entity (the host references DMRP, not the reverse), so the host must supply
-            // the implementation - as the Tenant service does with a direct table query. A host that
-            // forgets fails loudly at DI resolution instead of silently degrading.
             builder.Services.AddScoped<IEntityRepository<MeasureMapping>, EntityRepository<MeasureMapping, TDbContext>>();
             builder.Services.AddScoped<IEntityRepository<FacilityReportingPlan>, EntityRepository<FacilityReportingPlan, TDbContext>>();
 

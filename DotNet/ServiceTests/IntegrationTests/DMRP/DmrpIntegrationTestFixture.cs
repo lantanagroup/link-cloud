@@ -78,12 +78,8 @@ namespace IntegrationTests.DMRP
         }
 
         /// <summary>
-        /// Restores the default "every facility exists" stub and drops any setup a test added. The
-        /// mock is fixture-scoped and shared by every test in the collection, so a test that stubs a
-        /// missing facility would otherwise leave that answer in place for whatever runs next —
-        /// xUnit gives no ordering guarantee, so the resulting failure would move around.
-        /// <see cref="Mock{T}.Object"/> survives the reset, so the singleton already handed to the
-        /// container stays valid.
+        /// Restores the default "every facility exists" stub, dropping any setup a test added to the
+        /// shared mock.
         /// </summary>
         public void ResetFacilityExistence()
         {
