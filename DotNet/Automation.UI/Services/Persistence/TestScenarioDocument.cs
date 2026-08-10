@@ -62,10 +62,10 @@ public sealed class TestScenarioDocument
     /// stored as <c>null</c> here and the raw bundle payload lives in the
     /// <c>automation_imported_bundles</c> collection (one document per bundle, keyed by
     /// <see cref="ImportedBundleReference.BundleId"/>). <see cref="MongoScenarioStore"/>
-    /// hydrates <c>BundleJson</c> on read using <see cref="ImportedBundleRefs"/>. Legacy
-    /// documents written before the migration may still contain inline bundle JSON;
-    /// those are accepted on read and converted to the externalized layout on the next
-    /// upsert.
+    /// attaches the external bundle IDs on read; execution resolves raw content through
+    /// the imported bundle content store. Legacy documents written before the migration
+    /// may still contain inline bundle JSON; those are accepted on read and converted to
+    /// the externalized layout on the next upsert.
     /// </para>
     /// </summary>
     public string ImportedPatientBundlesJson { get; set; } = "[]";

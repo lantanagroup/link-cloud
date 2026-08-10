@@ -8,7 +8,8 @@
       "applicationUrl": "http://localhost:5255",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true"
+        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
+        "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles"
       }
     },
     "https": {
@@ -18,7 +19,8 @@
       "applicationUrl": "https://localhost:7022;http://localhost:5255",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true"
+        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
+        "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles"
       }
     },
     "docker": {
@@ -50,7 +52,8 @@
         "Automation__Kafka__RestProxyBaseUrl": "http://localhost:8082",
         "PreQualification__WritePreQualOperationOutcome": "false",
         "pre-qualification.write-pre-qual-operation-outcome": "false",
-        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true"
+        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
+        "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles"
       }
     }
   }

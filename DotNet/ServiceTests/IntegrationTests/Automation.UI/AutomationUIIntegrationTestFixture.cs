@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
@@ -79,7 +80,10 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             store,
             Mock.Of<IQueryPlanTemplateStore>(),
             Mock.Of<INormalizationStore>(),
-            Mock.Of<IOrganizationResourceMapTemplateStore>());
+            Mock.Of<IOrganizationResourceMapTemplateStore>(),
+            new ImportedBundleExecutionResolver(Database, Mock.Of<IImportedBundleContentStore>()),
+            Mock.Of<IGeneratedPatientTemplateCache>(),
+            new GeneratedTemplateCacheVersionStore(Database));
     }
 
     public async Task InitializeAsync()

@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
 
@@ -56,6 +55,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOperation([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var op = await store.GetOperationByIdAsync(request.Id, ct);
         if (op == null) return NotFound();
         if (op.IsSystem)
@@ -79,6 +81,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneOperation([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetOperationByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -138,6 +143,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSequence([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var seq = await store.GetSequenceByIdAsync(request.Id, ct);
         if (seq == null) return NotFound();
         if (seq.IsSystem)
@@ -156,6 +164,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneSequence([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetSequenceByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -207,6 +218,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSuite([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var suite = await store.GetSuiteByIdAsync(request.Id, ct);
         if (suite == null) return NotFound();
         if (suite.IsSystem)
@@ -222,6 +236,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneSuite([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetSuiteByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -245,6 +262,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetDefaultSuite([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var suite = await store.GetSuiteByIdAsync(request.Id, ct);
         if (suite == null) return NotFound();
 
@@ -252,8 +272,4 @@ public class NormalizationsController(INormalizationStore store) : Controller
         return Ok();
     }
 
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
-    }
 }

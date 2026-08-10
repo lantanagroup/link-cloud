@@ -228,6 +228,9 @@ builder.Services.AddOptions<KeyManagementOptions>()
 
 builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBundleContentStore>();
+builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
+builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
+builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
@@ -258,7 +261,7 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutio
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
 builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
-builder.Services.AddHostedService<ImportedBundleBlobMigrationService>();
+builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
@@ -307,6 +310,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
