@@ -70,7 +70,7 @@ class ResultEnvelopeAssemblerTest {
 
         RubricVersion version = version();
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version, raw, Map.of("c-e1", 12L), completedAt);
+                assembler.assemble(ctx, version, raw, List.of(), Map.of("c-e1", 12L), completedAt);
 
         // envelope
         assertThat(out.envelope().getRubricId()).isEqualTo("piqi.core");
@@ -114,7 +114,7 @@ class ResultEnvelopeAssemblerTest {
                 .build();
 
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version(), List.of(), Map.of(), OffsetDateTime.now());
+                assembler.assemble(ctx, version(), List.of(), List.of(), Map.of(), OffsetDateTime.now());
 
         assertThat(out.envelope().getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE);
         assertThat(out.envelope().getFindings()).isEmpty();
@@ -131,7 +131,7 @@ class ResultEnvelopeAssemblerTest {
                 .build();
 
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version(), List.of(), Map.of(), OffsetDateTime.now());
+                assembler.assemble(ctx, version(), List.of(), List.of(), Map.of(), OffsetDateTime.now());
 
         assertThat(out.resultEntity().getFacilityId()).isNull();
         assertThat(out.resultEntity().getPatientId()).isNull();
