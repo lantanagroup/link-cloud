@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 // Load external configuration first: Azure App Configuration is appended after the
 // built-in sources, so anything it defines outranks appsettings and environment
