@@ -70,7 +70,10 @@ namespace UnitTests.DMRP
         public async Task PagedSearchAsync_ReturnsPagedRecordsAndMetadata()
         {
             using var context = CreateContext();
-            context.MeasureMappings.AddRange(new MeasureMapping(), new MeasureMapping(), new MeasureMapping());
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "CMS122v12", DQM = "Diabetes Care" },
+                new MeasureMapping { Measure = "CMS2v13", DQM = "Immunization Status" });
             await context.SaveChangesAsync();
 
             var queries = CreateQueries(context);
@@ -100,7 +103,7 @@ namespace UnitTests.DMRP
                 new MeasureMapping
                 {
                     Measure = "CMS130v13",
-                    DQM = "Preventive Care",
+                    DQM = "Diabetes Care",
                     Frequency = Frequency.Daily
                 },
                 new MeasureMapping
