@@ -85,7 +85,9 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
-        if (configureRedis.GetValueOrDefault())
+        var useExistingRedisConnection = configureRedis.GetValueOrDefault();
+
+        if (useExistingRedisConnection)
         {
             builder.RegisterRedis();
         }
@@ -99,7 +101,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterRepositories();
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
-        builder.Services.AddResourceCache(builder.Configuration);
+        builder.Services.AddResourceCache(builder.Configuration, useExistingRedisConnection);
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);

@@ -1096,7 +1096,7 @@
 		},
 		{
 			"key": "ConnectionStrings:Redis",
-			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000",
+			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
 			"label": null,
 			"content_type": "",
 			"tags": {
@@ -1616,7 +1616,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
 			}
 		},
 		{
@@ -1625,7 +1625,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
 			}
 		},
 		{
@@ -1634,7 +1634,7 @@
 			"label": null,
 			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
 			}
 		},
 		{
@@ -1643,16 +1643,16 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
 			}
 		},
 		{
 			"key": "ResourceCache:Redis:ConnectionString",
-			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000",
+			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "Normalization"
 			}
 		},
 		{
@@ -1661,7 +1661,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
 			}
 		},
 		{
@@ -1670,7 +1670,7 @@
 			"label": null,
 			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
 			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+				"link:consumers": "Normalization"
 			}
 		},
 		{

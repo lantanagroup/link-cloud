@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             {
                 var user = context.User;
 
-                var token = await _createLinkBearerToken.ExecuteAsync(user, _tokenServiceconfig.Value.TokenLifespan);
+                var token = await _createLinkBearerToken.ExecuteAsync(user, _tokenServiceconfig.Value.TokenLifespan, context.RequestAborted);
 
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, user.Claims.First(c => c.Type == "sub")?.Value ?? "subject missing");
 
@@ -87,7 +87,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         {
             try
             {
-                var result = await _refreshSigningKey.ExecuteAsync(context.User);
+                var result = await _refreshSigningKey.ExecuteAsync(context.User, context.RequestAborted);
                 _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
 
                 return Results.Ok(new KeyRefreshedResponse

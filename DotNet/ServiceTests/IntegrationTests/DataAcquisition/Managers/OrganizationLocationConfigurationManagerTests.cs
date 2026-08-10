@@ -117,10 +117,10 @@ public class OrganizationLocationConfigurationManagerTests
 
         // Simulate the read side (LocationMappingService) having populated the conditions cache.
         var cacheKey = OrgLocationCacheKeys.Conditions(facilityId);
-        cacheService.Set(cacheKey,
+        await cacheService.SetAsync(cacheKey,
             new List<OrganizationLocationConditionModel> { new() { ConditionId = 1, FhirPath = "Location.name = 'A'", Priority = 1 } },
             TimeSpan.FromHours(1), ExpirationType.Absolute);
-        Assert.NotNull(cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey));
+        Assert.NotNull(await cacheService.GetAsync<List<OrganizationLocationConditionModel>?>(cacheKey));
 
         // Act — editing the configuration must evict the cached conditions immediately.
         await manager.UpdateByIdAsync(created.ConfigId, new UpdateOrganizationLocationConfigurationModel
@@ -132,7 +132,7 @@ public class OrganizationLocationConfigurationManagerTests
         });
 
         // Assert — stale conditions are gone, so the next read repopulates from the database.
-        Assert.Null(cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey));
+        Assert.Null(await cacheService.GetAsync<List<OrganizationLocationConditionModel>?>(cacheKey));
     }
 
     [Fact]

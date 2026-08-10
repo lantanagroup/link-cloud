@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
     public interface ICreateLinkBearerToken
     {
-        Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan);
+        Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan, CancellationToken cancellationToken = default);
     }
 }
