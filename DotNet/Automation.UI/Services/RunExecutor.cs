@@ -1,6 +1,8 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
-using Automation.UI.Models;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -43,6 +45,9 @@ internal sealed class RunExecutor
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
     private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
+    private readonly ImportedBundleExecutionResolver _importedBundleResolver;
+    private readonly IGeneratedPatientTemplateCache _generatedTemplateCache;
+    private readonly GeneratedTemplateCacheVersionStore _generatedTemplateVersionStore;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly string _includePatientAggregatorOrganizationResourceSource;
@@ -58,6 +63,9 @@ internal sealed class RunExecutor
         QueryPlanTemplateResolver queryPlanResolver,
         NormalizationSuiteResolver normalizationSuiteResolver,
         OrganizationResourceMapTemplateResolver organizationResourceMapResolver,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         IConfiguration configuration,
         ILogger logger)
     {
@@ -68,6 +76,9 @@ internal sealed class RunExecutor
         _queryPlanResolver = queryPlanResolver;
         _normalizationSuiteResolver = normalizationSuiteResolver;
         _organizationResourceMapResolver = organizationResourceMapResolver;
+        _importedBundleResolver = importedBundleResolver;
+        _generatedTemplateCache = generatedTemplateCache;
+        _generatedTemplateVersionStore = generatedTemplateVersionStore;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _includePatientAggregatorOrganizationResource = includeOrg.Value;
@@ -274,7 +285,9 @@ internal sealed class RunExecutor
                 var importedPatients = new List<ImportedPatientInput>(
                     state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
                 importedPatients.AddRange(state.Options.ImportedPatientIds);
-                importedPatients.AddRange(state.Options.ImportedPatientBundles);
+                importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
+                    state.Options.ImportedPatientBundles,
+                    state.RunCancellation.Token));
 
                 // Pre-load imported patient FHIR data so the pipeline can reuse it without
                 // re-fetching, and surface — but do NOT enforce — whether each imported
@@ -340,10 +353,30 @@ internal sealed class RunExecutor
                         // date is outside the reporting window.
                         AllowEncounterAnchoredDateOverrideForOutOfRange = false
                     },
-                    importedPatients: importedPatients.Count > 0 ? importedPatients : null);
+                    importedPatients: importedPatients.Count > 0 ? importedPatients : null,
+                    generatedTemplateCache: _generatedTemplateCache);
 
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
+
+                var cacheBinding = await _generatedTemplateVersionStore.BindRunAsync(
+                    state.RunId,
+                    state.ScenarioId,
+                    state.RunNameOverride,
+                    pipelineResult.GeneratedTemplateKeys,
+                    state.RunCancellation.Token);
+                if (cacheBinding != null)
+                {
+                    lock (state.Sync)
+                    {
+                        state.GeneratedTemplateCacheVersionId = cacheBinding.VersionId;
+                        state.GeneratedTemplateCacheVersionNumber = cacheBinding.VersionNumber;
+                        state.GeneratedTemplateCacheScenarioKey = cacheBinding.ScenarioKey;
+                        state.GeneratedTemplateSetHash = cacheBinding.TemplateSetHash;
+                    }
+
+                    output.WriteLine($"[cache-version] Bound run to {cacheBinding.ScenarioKey} v{cacheBinding.VersionNumber} ({cacheBinding.VersionId}).");
+                }
 
                 // Manifest carries explicit patient/profile pairs. Build the initial expected
                 // submitted set from those pairs; scheduled runs are recomputed later after
@@ -1355,15 +1388,6 @@ internal sealed class RunExecutor
                 .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-        static List<NormalizationOperationApiModel> BuildKeyedOperationPool(
-            List<NormalizationOperationApiModel> operations,
-            string name,
-            string operationType)
-            => operations
-                .Where(op => string.Equals(op.Name ?? string.Empty, name, StringComparison.Ordinal)
-                             && string.Equals(op.OperationType ?? string.Empty, operationType, StringComparison.Ordinal))
-                .ToList();
-
         static bool TryTakeMatchingOperation(
             List<NormalizationOperationApiModel> candidates,
             string[] plannedResourceTypes,
@@ -1451,8 +1475,8 @@ internal sealed class RunExecutor
 
             var apiOp = new CreateNormalizationOperationDetailsApiModel
             {
-                OperationType = opDef.OperationType,
-                Name = opDef.Name,
+                OperationType = opDef.OperationType ?? string.Empty,
+                Name = opDef.Name ?? string.Empty,
                 Description = opDef.Description ?? string.Empty,
                 SourceFhirPath = opDef.SourceFhirPath ?? string.Empty,
                 TargetFhirPath = opDef.TargetFhirPath ?? string.Empty

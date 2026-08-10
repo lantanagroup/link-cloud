@@ -40,7 +40,7 @@ public static class StartScenarioRequestResolver
             {
                 NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
             },
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], [])
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 30, 30, false, true, defaultMeasures, [], [])
             {
                 NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
             },
