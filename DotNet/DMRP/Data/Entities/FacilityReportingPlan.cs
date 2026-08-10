@@ -17,7 +17,11 @@ public class FacilityReportingPlan : BaseEntityExtended
 
     /// <summary>
     /// The mapping this plan reports against, relating the NHSN measure to the digital quality
-    /// measure (dQM) Link evaluates patients against.
+    /// measure (dQM) Link evaluates patients against. A single-column foreign key to
+    /// MeasureMappings.Id, not a composite one -- the composite is the uniqueness rule over
+    /// (FacilityId, MeasureMappingId, ReportingMonth, ReportingYear), which is an index rather than
+    /// a key. One NHSN measure can map to several dQMs, so a facility reporting that measure gets
+    /// one plan row per mapping, each pointing at a different mapping Id.
     /// </summary>
     public string MeasureMappingId { get; set; } = string.Empty;
 

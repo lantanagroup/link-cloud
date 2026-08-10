@@ -55,12 +55,16 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
 
-        _fixture.FacilityExistenceMock
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        _fixture.ResetFacilityExistence();
     }
 
-    public void Dispose() => _scope.Dispose();
+    public void Dispose()
+    {
+        // Undo any facility-existence stub this test installed before the next one runs; the mock
+        // outlives the test class.
+        _fixture.ResetFacilityExistence();
+        _scope.Dispose();
+    }
 
     private async Task<string> CreateMappingAsync()
     {

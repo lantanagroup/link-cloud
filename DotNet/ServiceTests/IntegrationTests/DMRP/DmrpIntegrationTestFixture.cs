@@ -55,9 +55,7 @@ namespace IntegrationTests.DMRP
                 ["DMRP:Enabled"] = "true"
             });
 
-            FacilityExistenceMock
-                .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(true);
+            ResetFacilityExistence();
 
             builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
 
@@ -77,6 +75,23 @@ namespace IntegrationTests.DMRP
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
             dbContext.Database.EnsureCreated();
+        }
+
+        /// <summary>
+        /// Restores the default "every facility exists" stub and drops any setup a test added. The
+        /// mock is fixture-scoped and shared by every test in the collection, so a test that stubs a
+        /// missing facility would otherwise leave that answer in place for whatever runs next —
+        /// xUnit gives no ordering guarantee, so the resulting failure would move around.
+        /// <see cref="Mock{T}.Object"/> survives the reset, so the singleton already handed to the
+        /// container stays valid.
+        /// </summary>
+        public void ResetFacilityExistence()
+        {
+            FacilityExistenceMock.Reset();
+
+            FacilityExistenceMock
+                .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
         }
 
         public void Dispose()

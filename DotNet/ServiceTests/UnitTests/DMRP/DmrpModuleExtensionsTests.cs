@@ -4,8 +4,6 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
@@ -13,7 +11,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Moq;
 
 namespace UnitTests.DMRP
@@ -107,18 +104,7 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public void AddDmrpModule_registers_the_facility_lookup_reporting_plans_validate_against()
-        {
-            var builder = CreateBuilder(enabled: true);
-
-            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
-
-            var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
-            Assert.Equal(typeof(TenantApiFacilityExistence), registration.ImplementationType);
-        }
-
-        [Fact]
-        public void AddDmrpModule_keeps_a_facility_lookup_the_host_already_registered()
+        public void AddDmrpModule_leaves_the_facility_lookup_to_the_host()
         {
             var builder = CreateBuilder(enabled: true);
             var hostLookup = Mock.Of<IFacilityExistence>();
@@ -127,36 +113,22 @@ namespace UnitTests.DMRP
 
             builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
 
+            // The module must neither supply its own lookup nor disturb the host's: exactly the
+            // registration the host made, and nothing else.
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
             Assert.Same(hostLookup, registration.ImplementationInstance);
         }
 
         [Fact]
-        public void AddDmrpModule_leaves_an_absent_tenant_configuration_absent()
+        public void AddDmrpModule_registers_no_facility_lookup_of_its_own()
         {
             var builder = CreateBuilder(enabled: true);
 
             builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
 
-            var registry = builder.Services.BuildServiceProvider()
-                .GetRequiredService<IOptions<ServiceRegistry>>().Value;
-
-            Assert.Null(registry.TenantService);
-        }
-
-        [Fact]
-        public void AddDmrpModule_defaults_the_relative_endpoint_when_the_host_configures_a_tenant_client()
-        {
-            var builder = CreateBuilder(enabled: true);
-            builder.Services.Configure<ServiceRegistry>(registry =>
-                registry.TenantService = new TenantServiceRegistration { CheckIfTenantExists = true });
-
-            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
-
-            var registry = builder.Services.BuildServiceProvider()
-                .GetRequiredService<IOptions<ServiceRegistry>>().Value;
-
-            Assert.Equal("facility/", registry.TenantService!.GetTenantRelativeEndpoint);
+            // A host that forgets to register IFacilityExistence must fail at DI resolution rather
+            // than fall back to something the module invented.
+            Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
 
         [Theory]

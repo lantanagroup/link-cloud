@@ -1,14 +1,10 @@
-﻿using LantanaGroup.Link.DMRP.Business;
-using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LantanaGroup.Link.DMRP.DependencyInjection
 {
@@ -46,8 +42,10 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // the module's assembly and its routes would never be mapped.
             mvcBuilder.AddApplicationPart(typeof(DmrpModuleExtensions).Assembly);
 
-            AddFacilityVerification(builder);
-
+            // The module deliberately registers no IFacilityExistence: DMRP cannot see the host's
+            // facility entity (the host references DMRP, not the reverse), so the host must supply
+            // the implementation - as the Tenant service does with a direct table query. A host that
+            // forgets fails loudly at DI resolution instead of silently degrading.
             builder.Services.AddScoped<IEntityRepository<MeasureMapping>, EntityRepository<MeasureMapping, TDbContext>>();
             builder.Services.AddScoped<IEntityRepository<FacilityReportingPlan>, EntityRepository<FacilityReportingPlan, TDbContext>>();
 
@@ -58,27 +56,5 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
             return true;
         }
-
-        private static void AddFacilityVerification(WebApplicationBuilder builder)
-        {
-            builder.Services.PostConfigure<ServiceRegistry>(registry =>
-            {
-                if (registry.TenantService is not null &&
-                    string.IsNullOrWhiteSpace(registry.TenantService.GetTenantRelativeEndpoint))
-                {
-                    registry.TenantService.GetTenantRelativeEndpoint = DefaultFacilityRelativeEndpoint;
-                }
-            });
-
-            builder.Services.AddHttpClient();
-            builder.Services.TryAddTransient<ITenantApiService, TenantApiService>();
-            builder.Services.TryAddScoped<IFacilityExistence, TenantApiFacilityExistence>();
-        }
-
-        /// <summary>
-        /// Relative path of the host's facility lookup, matching the Tenant service's
-        /// <c>api/Facility/{facilityId}</c> route.
-        /// </summary>
-        private const string DefaultFacilityRelativeEndpoint = "facility/";
     }
 }
