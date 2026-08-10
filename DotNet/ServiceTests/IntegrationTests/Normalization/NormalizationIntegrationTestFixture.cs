@@ -35,7 +35,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
-using StackExchange.Redis;
+using StackExchange.Redis.Extensions.System.Text.Json;
 using System.Resources;
 using Testcontainers.Azurite;
 using Testcontainers.Redis;
@@ -55,7 +55,6 @@ namespace IntegrationTests.Normalization
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
         public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
-        public Mock<RedisResourceCache> RedisMock { get; } = new Mock<RedisResourceCache>(new Mock<IConnectionMultiplexer>().Object, new Mock<ILogger<RedisResourceCache>>().Object);
         public Mock<IVendorVersionResolver> VendorVersionResolverMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -82,11 +81,10 @@ namespace IntegrationTests.Normalization
 
             var builder = Host.CreateApplicationBuilder();
 
-            var connection = await ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString());
-
-            builder.Services.AddSingleton<IConnectionMultiplexer>(connection);
-            builder.Services.AddSingleton(sp => sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
-            builder.Services.AddSingleton<StackExchange.Redis.IDatabase>(connection.GetDatabase());
+            builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new StackExchange.Redis.Extensions.Core.Configuration.RedisConfiguration
+            {
+                ConnectionString = _redisContainer.GetConnectionString()
+            });
 
             // Add in-memory with warning suppression
             builder.Services.AddDbContext<NormalizationDbContext>(options =>

@@ -598,8 +598,6 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
       ResourceCache__CacheImplementation: Hybrid
-      ResourceCache__Redis__ConnectionString: redis_cache:6379
-      ResourceCache__Redis__Password: ${REDIS_PASS}
       ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -642,8 +640,6 @@ services:
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
        ResourceCache__CacheImplementation: Hybrid
-       ResourceCache__Redis__ConnectionString: redis_cache:6379
-       ResourceCache__Redis__Password: ${REDIS_PASS}
        ResourceCache__Redis__MaxMemoryBytes: 268435456
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
        ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -776,7 +772,7 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
       ResourceCache__Redis__Password: ${REDIS_PASS}
       ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
