@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("search")]
-        public async Task<IActionResult> GetMeasureMappings(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetMeasureMappings([FromQuery] SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
         {
             searchDto.Sanitize();
 
@@ -88,6 +88,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// </summary>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpPost]
@@ -116,6 +117,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
             {
                 return BadRequest();
             }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "MeasureEval failed while verifying the DQM for a measure mapping.");
+                return Problem("Unable to verify the DQM in MeasureEval.", statusCode: StatusCodes.Status502BadGateway);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception encountered in MeasureMappingsController.CreateMeasureMapping");
@@ -133,6 +139,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpPut("{id}")]
@@ -167,6 +174,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
             catch (ApplicationException ex)
             {
                 return NotFound(ex.Message);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "MeasureEval failed while verifying the DQM for a measure mapping.");
+                return Problem("Unable to verify the DQM in MeasureEval.", statusCode: StatusCodes.Status502BadGateway);
             }
             catch (Exception ex)
             {
@@ -213,6 +225,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         [HttpDelete]
         public async Task<IActionResult> DeleteAllMeasureMappings(CancellationToken cancellationToken)
         {
@@ -247,7 +260,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private async Task<bool> DqmExistsAsync(string dqm, CancellationToken cancellationToken)
         {
             var response = await _measureEvalClient.GetMeasureDefinitionAsync(dqm, cancellationToken);
-            return response.IsSuccessStatusCode;
+
+            if (response.StatusCode == StatusCodes.Status404NotFound)
+            {
+                return false;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"MeasureEval returned status code {response.StatusCode} while verifying a DQM.", null, (HttpStatusCode)response.StatusCode);
+            }
+
+            return true;
         }
     }
 }

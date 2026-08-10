@@ -13,9 +13,11 @@ public class MeasureMappingModel
     public string? Id { get; set; }
 
     [Required]
+    [StringLength(255)]
     public string? Measure { get; set; }
 
     [Required]
+    [StringLength(255)]
     public string? DQM { get; set; }
 
     [Required]

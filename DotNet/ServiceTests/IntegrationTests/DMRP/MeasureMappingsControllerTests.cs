@@ -35,7 +35,12 @@ public class MeasureMappingsControllerTests : IDisposable
             .Setup(client => client.GetMeasureDefinitionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string dqm, CancellationToken _) => new LinkApiResponse<string>
             {
-                StatusCode = dqm == "Unknown DQM" ? StatusCodes.Status404NotFound : StatusCodes.Status200OK
+                StatusCode = dqm switch
+                {
+                    "Unknown DQM" => StatusCodes.Status404NotFound,
+                    "Unavailable DQM" => StatusCodes.Status500InternalServerError,
+                    _ => StatusCodes.Status200OK
+                }
             });
 
         _controller = new MeasureMappingsController(logger, manager, queries, measureEvalClient.Object)
@@ -84,6 +89,23 @@ public class MeasureMappingsControllerTests : IDisposable
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("DQM 'Unknown DQM' was not found in MeasureEval.", badRequest.Value);
+    }
+
+    [Fact]
+    public async Task CreateMeasureMapping_WhenMeasureEvalFails_ReturnsBadGatewayProblemDetails()
+    {
+        var result = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = "Initial Measure",
+            DQM = "Unavailable DQM",
+            Frequency = Frequency.Daily
+        }, CancellationToken.None);
+
+        var badGateway = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status502BadGateway, badGateway.StatusCode);
+
+        var problemDetails = Assert.IsType<ProblemDetails>(badGateway.Value);
+        Assert.Equal(StatusCodes.Status502BadGateway, problemDetails.Status);
     }
 
     [Fact]
@@ -175,6 +197,32 @@ public class MeasureMappingsControllerTests : IDisposable
         Assert.Equal("Original Measure", persisted.Measure);
         Assert.Equal("Original DQM", persisted.DQM);
         Assert.Equal(Frequency.Daily, persisted.Frequency);
+    }
+
+    [Fact]
+    public async Task UpdateMeasureMapping_WhenMeasureEvalFails_ReturnsBadGatewayProblemDetails()
+    {
+        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"Original Measure {Guid.NewGuid()}",
+            DQM = $"Original DQM {Guid.NewGuid()}",
+            Frequency = Frequency.Daily
+        }, CancellationToken.None);
+        var created = Assert.IsType<MeasureMappingModel>(((CreatedResult)createResult).Value);
+
+        var result = await _controller.UpdateMeasureMapping(created.Id!, new MeasureMappingModel
+        {
+            Id = created.Id,
+            Measure = "Updated Measure",
+            DQM = "Unavailable DQM",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
+
+        var badGateway = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status502BadGateway, badGateway.StatusCode);
+
+        var problemDetails = Assert.IsType<ProblemDetails>(badGateway.Value);
+        Assert.Equal(StatusCodes.Status502BadGateway, problemDetails.Status);
     }
 
     [Fact]

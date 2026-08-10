@@ -17,6 +17,8 @@ namespace LantanaGroup.Link.DMRP.Models
         public void Sanitize()
         {
             SortBy = SortBy?.Sanitize();
+            Measure = Measure?.Sanitize();
+            DQM = DQM?.Sanitize();
 
             if (PageSize < 1 || PageSize > 100)
             {
