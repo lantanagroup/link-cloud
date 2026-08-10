@@ -17,9 +17,11 @@ import java.util.UUID;
 /**
  * Cached form of a rubric version + its live checks, so one cache hit covers everything the
  * evaluate path reads. The entities themselves can't be cached: their lazy associations
- * don't survive serialization. LOB/dry-run/audit columns are left out on purpose — the
- * evaluate path never touches them, and no dry-run fields means recordDryRun doesn't have
- * to evict.
+ * don't survive serialization. Only columns the evaluate path never reads are left out
+ * (definition/dimensions/applicable-context LOBs, dry-run and audit fields) — scoringPolicyJson
+ * IS carried because the assembler scores with it; dropping a field the evaluate path reads
+ * silently falls back to defaults (see ResultEnvelopeAssembler). No dry-run fields means
+ * recordDryRun doesn't have to evict.
  *
  * Has to stay a plain non-final class (same for CheckSnapshot) — the redis serializer uses
  * NON_FINAL default typing, so a record would come back as a LinkedHashMap.
@@ -35,6 +37,7 @@ public class RubricVersionSnapshot {
     private String semver;
     private RubricVersionStatus status;
     private String checksum;
+    private String scoringPolicyJson;
     private List<CheckSnapshot> checks;
 
     @Data
@@ -60,6 +63,7 @@ public class RubricVersionSnapshot {
                 .semver(version.getSemver())
                 .status(version.getStatus())
                 .checksum(version.getChecksum())
+                .scoringPolicyJson(version.getScoringPolicyJson())
                 .checks(checks.stream()
                         .map(c -> CheckSnapshot.builder()
                                 .checkId(c.getCheckId())
@@ -84,6 +88,7 @@ public class RubricVersionSnapshot {
                 .semver(semver)
                 .status(status)
                 .checksum(checksum)
+                .scoringPolicyJson(scoringPolicyJson)
                 .build();
     }
 
