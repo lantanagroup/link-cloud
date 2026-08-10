@@ -16,7 +16,8 @@ public class FacilityReportingPlan : BaseEntityExtended
     public string FacilityId { get; set; } = string.Empty;
 
     /// <summary>
-    /// The NHSN measure-to-dQM mapping this plan reports against.
+    /// The mapping this plan reports against, relating the NHSN measure to the digital quality
+    /// measure (dQM) Link evaluates patients against.
     /// </summary>
     public string MeasureMappingId { get; set; } = string.Empty;
 

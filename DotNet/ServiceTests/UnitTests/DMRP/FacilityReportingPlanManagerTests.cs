@@ -1,7 +1,9 @@
-using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Data.Repository.Mappings;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -67,9 +69,12 @@ namespace UnitTests.DMRP
 
             var result = await _manager.CreateAsync(plan);
 
-            Assert.Equal(plan.Id, result.Id);
+            Assert.Same(plan, result);
+            Assert.False(string.IsNullOrWhiteSpace(result.Id));
+
             _mockRepository.Verify(r => r.AddAsync(plan, It.IsAny<CancellationToken>()), Times.Once);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockFacilityExistence.Verify(s => s.ExistsAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -78,16 +83,18 @@ namespace UnitTests.DMRP
             var plan = ValidPlan();
             plan.FacilityId = "  ";
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal("FacilityId is required.", ex.Message);
         }
 
         [Fact]
         public async Task CreateAsync_FacilityIdLongerThanTheColumn_IsRejected()
         {
             var plan = ValidPlan();
-            plan.FacilityId = new string('9', 101);
+            plan.FacilityId = new string('9', FacilityReportingPlanConfigMap.FacilityIdMaxLength + 1);
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal($"FacilityId must be {FacilityReportingPlanConfigMap.FacilityIdMaxLength} characters or fewer.", ex.Message);
         }
 
         [Theory]
@@ -98,7 +105,7 @@ namespace UnitTests.DMRP
             var plan = ValidPlan();
             plan.MeasureMappingId = measureMappingId!;
 
-            var ex = await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
             Assert.Equal("MeasureMappingId is required.", ex.Message);
         }
 
@@ -113,7 +120,8 @@ namespace UnitTests.DMRP
             var update = ValidPlan();
             update.MeasureMappingId = string.Empty;
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.UpdateAsync(existing.Id, update));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.UpdateAsync(existing.Id, update));
+            Assert.Equal("MeasureMappingId is required.", ex.Message);
 
             Assert.NotEmpty(existing.MeasureMappingId);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -128,7 +136,8 @@ namespace UnitTests.DMRP
             var plan = ValidPlan();
             plan.ReportingMonth = month;
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal("ReportingMonth must be between 1 and 12.", ex.Message);
         }
 
         [Theory]
@@ -140,7 +149,10 @@ namespace UnitTests.DMRP
             var plan = ValidPlan();
             plan.ReportingYear = year;
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal(
+                $"ReportingYear must be between {ReportingPeriodLimits.MinimumReportingYear} and {ReportingPeriodLimits.MaximumReportingYear}.",
+                ex.Message);
         }
 
         [Fact]
@@ -150,7 +162,10 @@ namespace UnitTests.DMRP
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(false);
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(ValidPlan()));
+            var plan = ValidPlan();
+
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal($"Measure mapping with Id: {plan.MeasureMappingId} not found.", ex.Message);
         }
 
         [Fact]
@@ -160,7 +175,8 @@ namespace UnitTests.DMRP
                 .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(false);
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(ValidPlan()));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(ValidPlan()));
+            Assert.Equal($"Facility with Id: {FacilityId} not found.", ex.Message);
 
             _mockFacilityExistence.Verify(
                 s => s.ExistsAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
@@ -173,7 +189,13 @@ namespace UnitTests.DMRP
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
-            await Assert.ThrowsAsync<DmrpConflictException>(() => _manager.CreateAsync(ValidPlan()));
+            var plan = ValidPlan();
+
+            var ex = await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(plan));
+            Assert.Equal(
+                $"A reporting plan already exists for facility {plan.FacilityId}, measure mapping " +
+                $"{plan.MeasureMappingId} and period {plan.ReportingMonth}/{plan.ReportingYear}.",
+                ex.Message);
         }
 
         [Fact]
@@ -182,7 +204,8 @@ namespace UnitTests.DMRP
             var plan = ValidPlan();
             plan.ReportingMonth = 13;
 
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.CreateAsync(plan));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+            Assert.Equal("ReportingMonth must be between 1 and 12.", ex.Message);
 
             _mockRepository.Verify(r => r.AddAsync(It.IsAny<FacilityReportingPlan>(), It.IsAny<CancellationToken>()), Times.Never);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -203,7 +226,7 @@ namespace UnitTests.DMRP
                 .Callback(() => duplicateExists = true)
                 .ThrowsAsync(new DbUpdateException("unique index violated"));
 
-            await Assert.ThrowsAsync<DmrpConflictException>(() => _manager.CreateAsync(ValidPlan()));
+            await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(ValidPlan()));
         }
 
         [Fact]
@@ -245,7 +268,8 @@ namespace UnitTests.DMRP
             _mockRepository.Setup(r => r.GetAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((FacilityReportingPlan?)null);
 
-            await Assert.ThrowsAsync<DmrpNotFoundException>(() => _manager.UpdateAsync("missing-id", ValidPlan()));
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => _manager.UpdateAsync("missing-id", ValidPlan()));
+            Assert.Equal("Facility reporting plan with Id: missing-id not found", ex.Message);
         }
 
         [Fact]
@@ -288,8 +312,9 @@ namespace UnitTests.DMRP
             var update = ValidPlan();
             update.ReportingMonth = 13;
 
-            // An ApplicationException, not a DmrpNotFoundException: the row exists, the request is bad.
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.UpdateAsync(existing.Id, update));
+            // Bad input, not a missing row: the plan exists and the request is what is wrong.
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.UpdateAsync(existing.Id, update));
+            Assert.Equal("ReportingMonth must be between 1 and 12.", ex.Message);
 
             Assert.Equal(3, existing.ReportingMonth);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -301,7 +326,8 @@ namespace UnitTests.DMRP
             _mockRepository.Setup(r => r.GetAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((FacilityReportingPlan?)null);
 
-            await Assert.ThrowsAsync<DmrpNotFoundException>(() => _manager.DeleteAsync("missing-id"));
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => _manager.DeleteAsync("missing-id"));
+            Assert.Equal("Facility reporting plan with Id: missing-id not found", ex.Message);
         }
 
         [Fact]
@@ -363,7 +389,8 @@ namespace UnitTests.DMRP
         [Fact]
         public async Task DeleteForFacilityAsync_BlankFacilityId_IsRejected()
         {
-            await Assert.ThrowsAsync<ApplicationException>(() => _manager.DeleteForFacilityAsync("  "));
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.DeleteForFacilityAsync("  "));
+            Assert.Equal("FacilityId is required.", ex.Message);
         }
     }
 }

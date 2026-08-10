@@ -245,8 +245,9 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync(month: 6);
         await CreatedPlanAsync(facilityId: OtherFacilityId, month: 5);
 
-        var result = await _controller.SearchFacilityReportingPlans(FacilityId, null, null, null, null, null, null,
-            pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
+        var result = await _controller.SearchFacilityReportingPlans(
+            new FacilityReportingPlanSearchFilters { FacilityId = FacilityId },
+            sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         var paged = Assert.IsType<PagedFacilityReportingPlanDto>(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal(2, paged.Metadata.TotalCount);
@@ -258,8 +259,9 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         await CreatedPlanAsync();
 
-        var result = await _controller.SearchFacilityReportingPlans("no-such-facility", null, null, null, null, null,
-            null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
+        var result = await _controller.SearchFacilityReportingPlans(
+            new FacilityReportingPlanSearchFilters { FacilityId = "no-such-facility" },
+            sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }
@@ -267,7 +269,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task SearchFacilityReportingPlans_UnsortableColumn_ReturnsBadRequest()
     {
-        var result = await _controller.SearchFacilityReportingPlans(null, null, null, null, null,
+        var result = await _controller.SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(),
             sortBy: "DROP TABLE", sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
@@ -280,7 +282,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         await CreatedPlanAsync();
 
-        var result = await _controller.SearchFacilityReportingPlans(null, null, null, null, null,
+        var result = await _controller.SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(),
             sortBy: sortBy, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -409,8 +411,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.DeleteFacilityReportingPlans(CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
 
-        var remaining = await _controller.SearchFacilityReportingPlans(null, null, null, null, null, null, null,
-            pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
+        var remaining = await _controller.SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(),
+            sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         Assert.IsType<NoContentResult>(remaining);
     }

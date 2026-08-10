@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
         /// Facility ids are NHSN Org Ids. Bounded so the column can take part in an index; an
         /// unbounded string maps to nvarchar(max), which SQL Server refuses to index.
         /// </summary>
-        internal const int FacilityIdMaxLength = 100;
+        public const int FacilityIdMaxLength = 100;
 
         /// <summary>
         /// Matches the length EF Core gives a string primary key, so the foreign key column and

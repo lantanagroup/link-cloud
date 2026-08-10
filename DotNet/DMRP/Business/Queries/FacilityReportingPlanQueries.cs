@@ -1,3 +1,4 @@
+using LantanaGroup.Link.DMRP.Business.Mapping;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -72,16 +73,7 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             };
         }
 
-        private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) => new()
-        {
-            Id = entity.Id,
-            FacilityId = entity.FacilityId,
-            MeasureMappingId = entity.MeasureMappingId,
-            ReportingMonth = entity.ReportingMonth,
-            ReportingYear = entity.ReportingYear,
-            IsReporting = entity.IsReporting,
-            CreateDate = entity.CreateDate,
-            ModifyDate = entity.ModifyDate
-        };
+        private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) =>
+            FacilityReportingPlanMapper.ToModel(entity);
     }
 }

@@ -1,7 +1,8 @@
-using LantanaGroup.Link.DMRP.Data.Entities;
+﻿using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Data.Repository.Mappings;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -25,12 +26,8 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
     public class FacilityReportingPlanManager : IFacilityReportingPlanManager
     {
-        /// <summary>
-        /// Bounds the reporting year to something a reporting period could plausibly fall in, which
-        /// catches transposed or defaulted values without hard-coding a single valid year.
-        /// </summary>
-        internal const int MinimumReportingYear = 2000;
-        internal const int MaximumReportingYear = 2100;
+        internal const int MinimumReportingYear = ReportingPeriodLimits.MinimumReportingYear;
+        internal const int MaximumReportingYear = ReportingPeriodLimits.MaximumReportingYear;
 
         private readonly ILogger<FacilityReportingPlanManager> _logger;
         private readonly IEntityRepository<FacilityReportingPlan> _repository;
@@ -67,8 +64,8 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             }
             catch (DbUpdateException ex)
             {
-                Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.AddException(ex);
+                activity?.SetStatus(ActivityStatusCode.Error);
+                activity?.AddException(ex);
 
                 var translated = await TranslateSaveFailureAsync(newFacilityReportingPlan, null, ex, cancellationToken);
                 if (translated is null)
@@ -92,7 +89,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             if (existing is null)
             {
                 _logger.LogError("Facility reporting plan with Id: {Id} not found", id.SanitizeForLog());
-                throw new DmrpNotFoundException($"Facility reporting plan with Id: {id} not found");
+                throw new KeyNotFoundException($"Facility reporting plan with Id: {id} not found");
             }
 
             await ValidateAsync(facilityReportingPlan, id, cancellationToken);
@@ -114,8 +111,8 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             }
             catch (DbUpdateException ex)
             {
-                Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.AddException(ex);
+                activity?.SetStatus(ActivityStatusCode.Error);
+                activity?.AddException(ex);
 
                 var translated = await TranslateSaveFailureAsync(existing, id, ex, cancellationToken);
                 if (translated is null)
@@ -135,7 +132,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             if (existing is null)
             {
                 _logger.LogError("Facility reporting plan with Id: {Id} not found", id.SanitizeForLog());
-                throw new DmrpNotFoundException($"Facility reporting plan with Id: {id} not found");
+                throw new KeyNotFoundException($"Facility reporting plan with Id: {id} not found");
             }
 
             _repository.Remove(existing);
@@ -155,7 +152,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                throw new ApplicationException("FacilityId is required.");
+                throw new ReportingPlanValidationException("FacilityId is required.");
             }
 
             var removed = await _repository.ExecuteDeleteAsync(p => p.FacilityId == facilityId, cancellationToken);
@@ -175,28 +172,28 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         {
             if (string.IsNullOrWhiteSpace(plan.FacilityId))
             {
-                throw new ApplicationException("FacilityId is required.");
+                throw new ReportingPlanValidationException("FacilityId is required.");
             }
 
             if (plan.FacilityId.Length > FacilityReportingPlanConfigMap.FacilityIdMaxLength)
             {
-                throw new ApplicationException(
+                throw new ReportingPlanValidationException(
                     $"FacilityId must be {FacilityReportingPlanConfigMap.FacilityIdMaxLength} characters or fewer.");
             }
 
             if (string.IsNullOrWhiteSpace(plan.MeasureMappingId))
             {
-                throw new ApplicationException("MeasureMappingId is required.");
+                throw new ReportingPlanValidationException("MeasureMappingId is required.");
             }
 
             if (plan.ReportingMonth is < 1 or > 12)
             {
-                throw new ApplicationException("ReportingMonth must be between 1 and 12.");
+                throw new ReportingPlanValidationException("ReportingMonth must be between 1 and 12.");
             }
 
             if (plan.ReportingYear is < MinimumReportingYear or > MaximumReportingYear)
             {
-                throw new ApplicationException(
+                throw new ReportingPlanValidationException(
                     $"ReportingYear must be between {MinimumReportingYear} and {MaximumReportingYear}.");
             }
 
@@ -205,21 +202,20 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
             if (!measureMappingExists)
             {
-                throw new ApplicationException($"Measure mapping with Id: {plan.MeasureMappingId} not found.");
+                throw new ReportingPlanValidationException($"Measure mapping with Id: {plan.MeasureMappingId} not found.");
             }
 
             var facilityExists = await _facilityExistence.ExistsAsync(plan.FacilityId, cancellationToken);
 
             if (!facilityExists)
             {
-                throw new ApplicationException($"Facility with Id: {plan.FacilityId} not found.");
+                throw new ReportingPlanValidationException($"Facility with Id: {plan.FacilityId} not found.");
             }
 
             if (await IsDuplicateAsync(plan, currentId, cancellationToken))
             {
-                throw new DmrpConflictException(
-                    $"A reporting plan already exists for facility {plan.FacilityId}, measure mapping " +
-                    $"{plan.MeasureMappingId} and period {plan.ReportingMonth}/{plan.ReportingYear}.");
+                throw new DuplicateReportingPlanException(plan.FacilityId, plan.MeasureMappingId,
+                    plan.ReportingMonth, plan.ReportingYear);
             }
         }
 
@@ -238,9 +234,8 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 _logger.LogWarning(ex, "Reporting plan for facility {FacilityId} lost a race for the unique period index",
                     plan.FacilityId.SanitizeForLog());
 
-                return new DmrpConflictException(
-                    $"A reporting plan already exists for facility {plan.FacilityId}, measure mapping " +
-                    $"{plan.MeasureMappingId} and period {plan.ReportingMonth}/{plan.ReportingYear}.");
+                return new DuplicateReportingPlanException(plan.FacilityId, plan.MeasureMappingId,
+                    plan.ReportingMonth, plan.ReportingYear);
             }
 
             return null;

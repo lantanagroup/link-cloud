@@ -1,4 +1,5 @@
-using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business.Managers;
+using LantanaGroup.Link.DMRP.Business.Mapping;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
@@ -58,8 +59,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [HttpGet(Name = "GetFacilityReportingPlans")]
         public Task<IActionResult> GetFacilityReportingPlans(string? sortBy, SortOrder? sortOrder,
             int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default) =>
-            SearchFacilityReportingPlans(null, null, null, null, null, sortBy, sortOrder, pageSize, pageNumber,
-                cancellationToken);
+            SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(), sortBy, sortOrder,
+                pageSize, pageNumber, cancellationToken);
 
         /// <summary>
         /// Search facility reporting plans by any combination of facility, measure mapping, reporting
@@ -70,16 +71,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("search", Name = "SearchFacilityReportingPlans")]
-        public async Task<IActionResult> SearchFacilityReportingPlans(string? facilityId, string? measureMappingId,
-            int? month, int? year, bool? isReporting, string? sortBy, SortOrder? sortOrder,
-            int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> SearchFacilityReportingPlans([FromQuery] FacilityReportingPlanSearchFilters filters,
+            string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
+            CancellationToken cancellationToken = default)
         {
-            facilityId = NullIfBlank(facilityId?.Sanitize());
-            measureMappingId = NullIfBlank(measureMappingId?.Sanitize());
+            var facilityId = NullIfBlank(filters.FacilityId?.Sanitize());
+            var measureMappingId = NullIfBlank(filters.MeasureMappingId?.Sanitize());
 
             sortBy = NullIfBlank(sortBy?.Sanitize());
 
-            var periodError = ValidatePeriodFilters(month, year);
+            var periodError = ValidatePeriodFilters(filters.Month, filters.Year);
             if (periodError is not null)
             {
                 return BadRequest(periodError);
@@ -99,7 +100,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Facility Reporting Plans");
 
             var result = await _queries.PagedSearchAsync(facilityId, measureMappingId,
-                month, year, isReporting, sortBy ?? nameof(FacilityReportingPlan.Id),
+                filters.Month, filters.Year, filters.IsReporting, sortBy ?? nameof(FacilityReportingPlan.Id),
                 sortOrder ?? SortOrder.Descending, pageSize, pageNumber, cancellationToken);
 
             if (result.Records.Count == 0)
@@ -173,22 +174,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanRequest request, CancellationToken cancellationToken)
         {
-            if (request is null)
-            {
-                return BadRequest("A facility reporting plan is required.");
-            }
-
             FacilityReportingPlan created;
 
             try
             {
                 created = await _manager.CreateAsync(ToEntity(request), cancellationToken);
             }
-            catch (DmrpConflictException ex)
+            catch (DuplicateReportingPlanException ex)
             {
                 return Conflict(ex.Message);
             }
-            catch (ApplicationException ex)
+            catch (ReportingPlanValidationException ex)
             {
                 return BadRequest(ex.Message);
             }
@@ -216,11 +212,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
         {
             id = id.Sanitize();
 
-            if (request is null)
-            {
-                return BadRequest("A facility reporting plan is required.");
-            }
-
             var requestId = request.Id?.Sanitize();
 
             if (string.IsNullOrWhiteSpace(requestId))
@@ -237,15 +228,15 @@ namespace LantanaGroup.Link.DMRP.Controllers
             {
                 await _manager.UpdateAsync(id, ToEntity(request), cancellationToken);
             }
-            catch (DmrpNotFoundException ex)
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(ex.Message);
             }
-            catch (DmrpConflictException ex)
+            catch (DuplicateReportingPlanException ex)
             {
                 return Conflict(ex.Message);
             }
-            catch (ApplicationException ex)
+            catch (ReportingPlanValidationException ex)
             {
                 return BadRequest(ex.Message);
             }
@@ -298,7 +289,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             {
                 await _manager.DeleteAsync(id, cancellationToken);
             }
-            catch (DmrpNotFoundException ex)
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(ex.Message);
             }
@@ -320,15 +311,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [HttpDelete("facilities/{facilityId}")]
         public async Task<IActionResult> DeleteFacilityReportingPlansForFacility(string facilityId, CancellationToken cancellationToken)
         {
-            facilityId = facilityId.Sanitize();
+            facilityId = NullIfBlank(facilityId.Sanitize());
+
+            if (facilityId is null)
+            {
+                return BadRequest("FacilityId is required.");
+            }
 
             try
             {
                 await _manager.DeleteForFacilityAsync(facilityId, cancellationToken);
-            }
-            catch (ApplicationException ex)
-            {
-                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -380,25 +372,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
         private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-        private static FacilityReportingPlan ToEntity(FacilityReportingPlanRequest request) => new()
-        {
-            FacilityId = request.FacilityId?.Sanitize() ?? string.Empty,
-            MeasureMappingId = request.MeasureMappingId?.Sanitize() ?? string.Empty,
-            ReportingMonth = request.ReportingMonth,
-            ReportingYear = request.ReportingYear,
-            IsReporting = request.IsReporting
-        };
+        private static FacilityReportingPlan ToEntity(FacilityReportingPlanRequest request) =>
+            FacilityReportingPlanMapper.ToEntity(request);
 
-        private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) => new()
-        {
-            Id = entity.Id,
-            FacilityId = entity.FacilityId,
-            MeasureMappingId = entity.MeasureMappingId,
-            ReportingMonth = entity.ReportingMonth,
-            ReportingYear = entity.ReportingYear,
-            IsReporting = entity.IsReporting,
-            CreateDate = entity.CreateDate,
-            ModifyDate = entity.ModifyDate
-        };
+        private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) =>
+            FacilityReportingPlanMapper.ToModel(entity);
     }
 }
