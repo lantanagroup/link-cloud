@@ -27,6 +27,27 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         private readonly ConcurrentDictionary<string, ResourceCacheType> _correlationCacheTypes = new();
 
+        /// <summary>
+        /// Memory statistics pulled out of Redis <c>INFO memory</c> and echoed on every selection
+        /// decision. <c>maxmemory</c> is included deliberately: Azure Managed Redis is not expected
+        /// to report it (the reason LEGLINK-770 moved the limit into configuration), and logging it
+        /// confirms whether that assumption still holds for a given instance.
+        /// </summary>
+        private static readonly string[] DiagnosticMemoryKeys =
+        {
+            "used_memory",
+            "used_memory_human",
+            "used_memory_rss",
+            "used_memory_dataset",
+            "used_memory_peak",
+            "maxmemory",
+            "maxmemory_human",
+            "maxmemory_policy",
+            "total_system_memory"
+        };
+
+        private int _infoSectionLogged;
+
         public HybridResourceCache(
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
@@ -114,32 +135,57 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
+        /// <remarks>
+        /// Runs once per correlationId (memoized by <see cref="DetermineAndRecordCacheAsync"/>), not
+        /// per resource, so logging here is roughly once per patient-correlation and is safe at
+        /// Information. Every path is logged at Information or above on purpose: the Redis-vs-ABS
+        /// decision is otherwise invisible in deployed environments, which run at Information and
+        /// therefore cannot distinguish "Redis is genuinely under pressure" from "the memory probe
+        /// failed" (LEGLINK-948).
+        /// </remarks>
         private async Task<ResourceCacheType> SelectCacheTypeAsync(CancellationToken cancellationToken)
         {
+            var endpoint = "unknown";
+
             try
             {
-                var server = _redisDatabase.Database.Multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
+                var multiplexer = _redisDatabase.Database.Multiplexer;
+                var server = multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
 
                 if (server == null)
                 {
-                    _logger.LogDebug("No connected Redis server found; falling back to ABS resource cache.");
+                    _logger.LogWarning(
+                        "Redis memory probe found no connected server; using ABS resource cache. " +
+                        "Configured endpoints: [{ConfiguredEndpoints}]. Server states: [{ServerStates}].",
+                        DescribeConfiguredEndpoints(multiplexer),
+                        DescribeServerStates(multiplexer));
                     return ResourceCacheType.ABS;
                 }
+
+                endpoint = server.EndPoint?.ToString() ?? "unknown";
 
                 var memoryInfo = (await server.InfoAsync("memory").WaitAsync(cancellationToken)).FirstOrDefault();
 
                 if (memoryInfo == null)
                 {
-                    _logger.LogDebug("Redis INFO memory returned no results; falling back to ABS resource cache.");
+                    _logger.LogWarning(
+                        "Redis INFO memory returned no results from {Endpoint}; using ABS resource cache.",
+                        endpoint);
                     return ResourceCacheType.ABS;
                 }
 
-                var infoDict = memoryInfo.ToDictionary(e => e.Key, e => e.Value);
+                var infoDict = BuildInfoDictionary(memoryInfo);
+                LogRawInfoSectionOnce(endpoint, infoDict);
 
                 if (!infoDict.TryGetValue("used_memory", out var usedMemoryStr) ||
                     !long.TryParse(usedMemoryStr, out var usedMemory))
                 {
-                    _logger.LogDebug("Could not parse Redis used_memory; defaulting to Redis resource cache.");
+                    _logger.LogWarning(
+                        "Redis INFO memory from {Endpoint} has no parsable used_memory (raw value '{UsedMemoryRaw}'); " +
+                        "using Redis resource cache. Reported memory: [{MemoryDiagnostics}].",
+                        endpoint,
+                        usedMemoryStr ?? "<absent>",
+                        FormatDiagnostics(infoDict));
                     return ResourceCacheType.Redis;
                 }
 
@@ -150,28 +196,100 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 {
                     _logger.LogWarning(
                         "ResourceCache:Redis:MaxMemoryBytes is not configured or invalid ({MaxMemoryBytes}); " +
-                        "cannot evaluate Redis memory pressure. Defaulting to Redis resource cache.",
-                        maxMemoryBytes);
+                        "cannot evaluate Redis memory pressure on {Endpoint}. Using Redis resource cache. " +
+                        "Reported memory: [{MemoryDiagnostics}].",
+                        maxMemoryBytes,
+                        endpoint,
+                        FormatDiagnostics(infoDict));
                     return ResourceCacheType.Redis;
                 }
 
                 double usagePercent = (double)usedMemory / maxMemoryBytes.Value * 100.0;
+                var threshold = _settings.Redis.MemoryThresholdPercent;
+                var selected = usagePercent >= threshold ? ResourceCacheType.ABS : ResourceCacheType.Redis;
 
-                if (usagePercent >= _settings.Redis.MemoryThresholdPercent)
-                {
-                    _logger.LogDebug(
-                        "Redis memory usage {UsagePercent:F1}% meets or exceeds threshold {Threshold}%; using ABS resource cache.",
-                        usagePercent, _settings.Redis.MemoryThresholdPercent);
-                    return ResourceCacheType.ABS;
-                }
+                _logger.LogInformation(
+                    "Redis memory probe on {Endpoint}: used_memory={UsedMemoryBytes} bytes of configured " +
+                    "MaxMemoryBytes={MaxMemoryBytes} = {UsagePercent:F1}% against threshold {Threshold}% " +
+                    "=> selected {CacheType} resource cache. Server-reported memory: [{MemoryDiagnostics}].",
+                    endpoint,
+                    usedMemory,
+                    maxMemoryBytes.Value,
+                    usagePercent,
+                    threshold,
+                    selected,
+                    FormatDiagnostics(infoDict));
 
-                return ResourceCacheType.Redis;
+                return selected;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking Redis memory; falling back to ABS resource cache.");
+                _logger.LogError(
+                    ex,
+                    "Error checking Redis memory on {Endpoint}; falling back to ABS resource cache.",
+                    endpoint);
                 return ResourceCacheType.ABS;
             }
+        }
+
+        /// <summary>
+        /// Builds a lookup from an INFO section without <see cref="Enumerable.ToDictionary{TSource,TKey,TElement}(IEnumerable{TSource},Func{TSource,TKey},Func{TSource,TElement})"/>,
+        /// which throws on duplicate keys. Azure Managed Redis proxies Redis Enterprise and is not
+        /// guaranteed to return the same unique-key INFO shape as open-source Redis; a duplicate key
+        /// would otherwise surface as an opaque exception and silently force the ABS fallback.
+        /// </summary>
+        private static Dictionary<string, string> BuildInfoDictionary(
+            IGrouping<string, KeyValuePair<string, string>> memoryInfo)
+        {
+            var infoDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in memoryInfo)
+            {
+                infoDict[entry.Key] = entry.Value;
+            }
+
+            return infoDict;
+        }
+
+        private static string FormatDiagnostics(Dictionary<string, string> infoDict)
+        {
+            return string.Join(
+                ", ",
+                DiagnosticMemoryKeys
+                    .Where(infoDict.ContainsKey)
+                    .Select(key => $"{key}={infoDict[key]}"));
+        }
+
+        /// <summary>
+        /// Dumps the complete INFO memory section once per process. The curated
+        /// <see cref="DiagnosticMemoryKeys"/> subset rides every decision; this exists so the raw
+        /// server output can be inspected without shell access to the Redis instance, which is what
+        /// distinguishes a mis-sized denominator from a metric that does not mean what we assume.
+        /// </summary>
+        private void LogRawInfoSectionOnce(string endpoint, Dictionary<string, string> infoDict)
+        {
+            if (Interlocked.Exchange(ref _infoSectionLogged, 1) != 0)
+            {
+                return;
+            }
+
+            _logger.LogInformation(
+                "Redis INFO memory section from {Endpoint} (logged once per process to diagnose Hybrid " +
+                "cache selection): [{InfoSection}].",
+                endpoint,
+                string.Join("; ", infoDict.Select(entry => $"{entry.Key}={entry.Value}")));
+        }
+
+        private static string DescribeConfiguredEndpoints(StackExchange.Redis.IConnectionMultiplexer multiplexer)
+        {
+            return string.Join(", ", multiplexer.GetEndPoints().Select(e => e.ToString()));
+        }
+
+        private static string DescribeServerStates(StackExchange.Redis.IConnectionMultiplexer multiplexer)
+        {
+            return string.Join(
+                ", ",
+                multiplexer.GetServers().Select(s => $"{s.EndPoint}: IsConnected={s.IsConnected}"));
         }
 
         private static string ExtractCorrelationId(string cacheKey)

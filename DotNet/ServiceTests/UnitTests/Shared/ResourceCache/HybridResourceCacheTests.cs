@@ -79,9 +79,14 @@ public class HybridResourceCacheTests
 
     private void VerifyWarningLogged(Times times)
     {
+        VerifyLogged(LogLevel.Warning, times);
+    }
+
+    private void VerifyLogged(LogLevel level, Times times)
+    {
         _logger.Verify(
             log => log.Log(
-                LogLevel.Warning,
+                level,
                 It.IsAny<EventId>(),
                 It.IsAny<It.IsAnyType>(),
                 It.IsAny<Exception>(),
@@ -159,6 +164,54 @@ public class HybridResourceCacheTests
         await Write(sut, "corr-throws");
 
         VerifyWroteTo(_absCache, _redisCache);
+    }
+
+    /// <summary>
+    /// The selection decision must be visible in deployed environments, which run at Information.
+    /// Logging it at Debug left LEGLINK-948 undiagnosable: an ABS result could not be distinguished
+    /// from a failed probe without redeploying at a different log level.
+    /// </summary>
+    [Fact]
+    public async Task Selection_decision_is_logged_at_Information()
+    {
+        SetupRedisUsedMemory(100L * 1024 * 1024);
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-logged");
+
+        VerifyLogged(LogLevel.Information, Times.AtLeastOnce());
+    }
+
+    [Fact]
+    public async Task No_connected_server_logs_a_warning()
+    {
+        SetupNoConnectedServer();
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-noserver-warn");
+
+        VerifyWarningLogged(Times.Once());
+    }
+
+    /// <summary>
+    /// Azure Managed Redis proxies Redis Enterprise and is not guaranteed to return the unique-key
+    /// INFO shape that open-source Redis does. A duplicate key previously threw out of
+    /// <c>ToDictionary</c> and was swallowed by the catch-all into a silent ABS fallback.
+    /// </summary>
+    [Fact]
+    public async Task Duplicate_keys_in_info_memory_do_not_force_the_ABS_fallback()
+    {
+        var usedMemory = (100L * 1024 * 1024).ToString();
+        SetupRedisInfo(new[]
+        {
+            new KeyValuePair<string, string>("used_memory", usedMemory),
+            new KeyValuePair<string, string>("used_memory", usedMemory)
+        });
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-duplicate-keys");
+
+        VerifyWroteTo(_redisCache, _absCache);
     }
 
     [Fact]
