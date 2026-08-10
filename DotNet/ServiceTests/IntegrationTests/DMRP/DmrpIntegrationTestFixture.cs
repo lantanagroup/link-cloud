@@ -1,3 +1,4 @@
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using System.Reflection;
 
 namespace IntegrationTests.DMRP
@@ -19,6 +21,9 @@ namespace IntegrationTests.DMRP
     public class DmrpIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
+
+        public Mock<IFacilityExistence> FacilityExistenceMock { get; } = new();
+
         private readonly WebApplication _host;
         private readonly string _dbPath;
 
@@ -50,6 +55,10 @@ namespace IntegrationTests.DMRP
                 ["DMRP:Enabled"] = "true"
             });
 
+            ResetFacilityExistence();
+
+            builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
+
             var registered = builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
             if (!registered)
             {
@@ -66,6 +75,19 @@ namespace IntegrationTests.DMRP
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
             dbContext.Database.EnsureCreated();
+        }
+
+        /// <summary>
+        /// Restores the default "every facility exists" stub, dropping any setup a test added to the
+        /// shared mock.
+        /// </summary>
+        public void ResetFacilityExistence()
+        {
+            FacilityExistenceMock.Reset();
+
+            FacilityExistenceMock
+                .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
         }
 
         public void Dispose()

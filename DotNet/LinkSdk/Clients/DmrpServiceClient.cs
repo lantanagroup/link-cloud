@@ -60,7 +60,7 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(
-        FacilityReportingPlanModel request,
+        FacilityReportingPlanRequest request,
         CancellationToken cancellationToken = default) =>
         SendAsync<FacilityReportingPlanModel>(() => Request("/dmrp/reporting-plans")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
@@ -73,7 +73,7 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(
         string id,
-        FacilityReportingPlanModel request,
+        FacilityReportingPlanUpdateRequest request,
         CancellationToken cancellationToken = default) =>
         SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
@@ -92,4 +92,66 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
+
+    public async Task<LinkApiResponse<List<FacilityReportingPlanModel>>> GetFacilityReportingPlansForFacilityAsync(
+        string facilityId,
+        int? month = null,
+        int? year = null,
+        bool? isReporting = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await SendAsync<List<FacilityReportingPlanModel>>(
+            () => Request($"/dmrp/reporting-plans/facilities/{facilityId}")
+                .SetQueryParam("month", month)
+                .SetQueryParam("year", year)
+                .SetQueryParam("isReporting", isReporting)
+                .GetAsync(cancellationToken: cancellationToken));
+
+        if (response.IsSuccessStatusCode && response.Body is null)
+        {
+            return new LinkApiResponse<List<FacilityReportingPlanModel>>
+            {
+                StatusCode = response.StatusCode,
+                Body = [],
+                RawBody = response.RawBody,
+                ContentType = response.ContentType,
+                RequestUrl = response.RequestUrl,
+                RequestMethod = response.RequestMethod,
+                RequestBody = response.RequestBody,
+                TraceId = response.TraceId
+            };
+        }
+
+        return response;
+    }
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(
+        string? facilityId,
+        string? measureMappingId = null,
+        int? month = null,
+        int? year = null,
+        bool? isReporting = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityReportingPlanModel>>(() => Request("/dmrp/reporting-plans/search")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("measureMappingId", measureMappingId)
+            .SetQueryParam("month", month)
+            .SetQueryParam("year", year)
+            .SetQueryParam("isReporting", isReporting)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityReportingPlansAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("/dmrp/reporting-plans")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityReportingPlansForFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/dmrp/reporting-plans/facilities/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 }
