@@ -463,6 +463,63 @@ public class MockControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    // --------------------------------------------------------- sanitizing
+
+    [Fact]
+    public async Task Create_SanitizesIsReportingBeforeStoringIt()
+    {
+        // The search filter is sanitized, so a write that is not would store a value no
+        // search can express. "Y;" loses the semicolon, leaving exactly the "Y" the contract
+        // endpoints select on.
+        var response = await _client.PostAsJsonAsync(
+            "/api/mock-dmrp/entries", MonthlyBody(isReporting: "Y;"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await response.Content.ReadFromJsonAsync<MockEntryModel>();
+        created!.IsReporting.Should().Be("Y");
+    }
+
+    [Fact]
+    public async Task Update_SanitizesIsReportingBeforeStoringIt()
+    {
+        var seeded = Seed(isReporting: "Y");
+
+        var response = await _client.PutAsJsonAsync($"/api/mock-dmrp/entries/{seeded.Id}", new
+        {
+            id = seeded.Id,
+            facilityId = "F1",
+            component = "MSC",
+            measure = "HOB",
+            reportingMonth = 5,
+            reportingYear = 2026,
+            isReporting = "N;"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var updated = await response.Content.ReadFromJsonAsync<MockEntryModel>();
+        updated!.IsReporting.Should().Be("N");
+    }
+
+    [Fact]
+    public async Task AnIsReportingThatChangesUnderSanitization_IsStillFindable()
+    {
+        // The payoff. Sanitizing the filter but not the write stored "Y;" and then searched
+        // for "Y", so the row that had just been created could not be found again -- and,
+        // because the contract endpoints select on IsReporting == "Y", it was also absent
+        // from every plan they serve.
+        var created = await _client.PostAsJsonAsync(
+            "/api/mock-dmrp/entries", MonthlyBody(isReporting: "Y;"));
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var response = await _client.GetAsync("/api/mock-dmrp/entries/search?isReporting=Y");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
+        page!.Records.Should().ContainSingle();
+    }
+
     // ------------------------------------------------------------- paging
 
     [Theory]

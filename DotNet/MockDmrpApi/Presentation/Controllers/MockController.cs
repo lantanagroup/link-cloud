@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using LantanaGroup.Link.MockDmrpApi.Application.Models;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
+using LantanaGroup.Link.MockDmrpApi.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -177,9 +178,7 @@ public class MockController : ControllerBase
         [FromBody] MockEntryRequest body, CancellationToken cancellationToken = default)
     {
         var entity = MockEntryMapper.ToEntity(body);
-        entity.FacilityId = entity.FacilityId.SanitizeAndRemove();
-        entity.Component = entity.Component.SanitizeAndRemove();
-        entity.Measure = entity.Measure.SanitizeAndRemove();
+        Sanitize(entity);
 
         try
         {
@@ -220,9 +219,7 @@ public class MockController : ControllerBase
         }
 
         var entity = MockEntryMapper.ToEntity(body);
-        entity.FacilityId = entity.FacilityId.SanitizeAndRemove();
-        entity.Component = entity.Component.SanitizeAndRemove();
-        entity.Measure = entity.Measure.SanitizeAndRemove();
+        Sanitize(entity);
 
         try
         {
@@ -429,6 +426,26 @@ public class MockController : ControllerBase
         statusCode: StatusCodes.Status409Conflict,
         title: "Duplicate Reporting Plan Entry",
         type: DmrpProblemTypes.Conflict);
+
+    /// <summary>
+    /// Sanitizes every stored string on an entry, so a write stores what a read searches for.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Blank"/> sanitizes the search filters, so any field sanitized on one side and
+    /// not the other becomes unsearchable: a value that changes under sanitization would be
+    /// stored in its original form and then compared against its sanitized form, which never
+    /// matches. <c>IsReporting</c> carries a further cost, because
+    /// <c>ReportingPlanService.GetReportingPlanAsync</c> selects on <c>IsReporting == "Y"</c> --
+    /// a row stored as anything else silently drops out of the plan the contract endpoints
+    /// serve.
+    /// </remarks>
+    private static void Sanitize(ReportingPlanEntryEntity entry)
+    {
+        entry.FacilityId = entry.FacilityId.SanitizeAndRemove();
+        entry.Component = entry.Component.SanitizeAndRemove();
+        entry.Measure = entry.Measure.SanitizeAndRemove();
+        entry.IsReporting = entry.IsReporting.SanitizeAndRemove();
+    }
 
     /// <summary>Sanitizes a filter, treating blank as "not supplied".</summary>
     private static string? Blank(string? value)
