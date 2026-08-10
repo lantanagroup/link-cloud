@@ -69,6 +69,9 @@ class RubricRegistryServiceTest {
         when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
                 .thenReturn(Optional.of(version));
         when(versionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // atomic guarded transitions win by default (1 row affected)
+        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any())).thenReturn(1);
+        when(versionRepository.retireIfNotRetired(any(), any(), any(), any())).thenReturn(1);
     }
 
     @Test
@@ -305,6 +308,51 @@ class RubricRegistryServiceTest {
 
         assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
                 .isInstanceOf(RubricLifecycleException.class);
+    }
+
+    @Test
+    @DisplayName("publish that loses the atomic transition (0 rows) -> 409, no duplicate event, no evict")
+    void publish_losesAtomicRace() {
+        // read sees DRAFT and passes the guard, but the guarded UPDATE affects 0 rows because a
+        // concurrent publish already flipped the row to PUBLISHED — the loser must 409, not double-publish
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
+                .thenReturn(Optional.of(draftVersion()))
+                .thenReturn(Optional.of(versionOf("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED)));
+        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricLifecycleException.class);
+        verify(eventRepository, never()).save(any());
+        verify(cacheService, never()).evictVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("retire that loses the atomic transition (0 rows) -> 409, no duplicate event, no evict")
+    void retire_losesAtomicRace() {
+        RubricVersion published = draftVersion();
+        published.setStatus(RubricVersionStatus.PUBLISHED);
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
+                .thenReturn(Optional.of(published))
+                .thenReturn(Optional.of(versionOf("piqi.core", "1.0.0", RubricVersionStatus.RETIRED)));
+        when(versionRepository.retireIfNotRetired(any(), any(), any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> service().retire("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricLifecycleException.class);
+        verify(eventRepository, never()).save(any());
+        verify(cacheService, never()).evictVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("publish performs the transition atomically (guarded UPDATE), not a read-modify-save")
+    void publish_usesAtomicGuardedUpdate() {
+        stubVersion(draftVersion());
+
+        service().publish("piqi.core", "1.0.0", "qa");
+
+        verify(versionRepository).publishIfStatus(any(),
+                org.mockito.ArgumentMatchers.eq(RubricVersionStatus.DRAFT),
+                org.mockito.ArgumentMatchers.eq(RubricVersionStatus.PUBLISHED), any(), org.mockito.ArgumentMatchers.eq("qa"));
+        verify(versionRepository, never()).save(any());
     }
 
     @Test
