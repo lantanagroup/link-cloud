@@ -39,4 +39,28 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     int recordDryRun(@Param("rubricVersionId") UUID rubricVersionId,
                      @Param("status") RubricResultStatus status,
                      @Param("completedAt") OffsetDateTime completedAt);
+
+    // guarded DRAFT->PUBLISHED: keep the status check in the WHERE so it runs under the update's
+    // row lock. two concurrent publishes can't both win — the first flips the row (1), the rest
+    // see it's no longer DRAFT and touch nothing (0). returns rows affected.
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update RubricVersion v set v.status = :target, v.publishedAt = :publishedAt, v.publishedBy = :publishedBy "
+            + "where v.rubricVersionId = :rubricVersionId and v.status = :expected")
+    int publishIfStatus(@Param("rubricVersionId") UUID rubricVersionId,
+                        @Param("expected") RubricVersionStatus expected,
+                        @Param("target") RubricVersionStatus target,
+                        @Param("publishedAt") OffsetDateTime publishedAt,
+                        @Param("publishedBy") String publishedBy);
+
+    // same trick for retire: status <> RETIRED makes a double retire a no-op (0 rows) so we don't
+    // overwrite retiredAt/retiredBy or record a second event
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update RubricVersion v set v.status = :retired, v.retiredAt = :retiredAt, v.retiredBy = :retiredBy "
+            + "where v.rubricVersionId = :rubricVersionId and v.status <> :retired")
+    int retireIfNotRetired(@Param("rubricVersionId") UUID rubricVersionId,
+                           @Param("retired") RubricVersionStatus retired,
+                           @Param("retiredAt") OffsetDateTime retiredAt,
+                           @Param("retiredBy") String retiredBy);
 }

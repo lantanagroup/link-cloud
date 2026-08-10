@@ -97,7 +97,17 @@ public class FhirPathCheckExecutor implements CheckExecutor {
 
     private List<IBaseResource> resolveTargets(ExecutionContext context, String expression) {
         if (context.getBundleEntries().isEmpty()) {
-            return List.of(context.getResource());
+            IBaseResource root = context.getResource();
+            // an empty bundle and a bare single-resource payload both have no entries, but they
+            // mean opposite things. don't run Patient.*/Observation.* checks against an empty
+            // bundle's envelope — that just invents findings. a real Bundle.* expression still
+            // evaluates against it (e.g. "Bundle.entry.count() >= 1" to flag an empty bundle).
+            if (root != null && "Bundle".equals(root.fhirType())) {
+                return "Bundle".equals(leadingResourceType(expression))
+                        ? List.of(root)
+                        : Collections.emptyList();
+            }
+            return List.of(root);
         }
         String resourceType = leadingResourceType(expression);
         if (resourceType == null) {

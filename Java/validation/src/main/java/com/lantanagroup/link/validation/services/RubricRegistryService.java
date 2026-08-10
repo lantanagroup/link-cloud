@@ -171,10 +171,21 @@ public class RubricRegistryService {
                 throw new RubricDryRunRequiredException(rubricId, semver, v.getDryRunStatus());
             }
         }
+        // the status check above can go stale before we write, so flip it with a guarded update
+        // instead of setStatus + save. only one concurrent publish gets a row back.
+        OffsetDateTime publishedAt = OffsetDateTime.now();
+        int updated = rubricVersionRepository.publishIfStatus(
+                v.getRubricVersionId(), RubricVersionStatus.DRAFT, RubricVersionStatus.PUBLISHED, publishedAt, publishedBy);
+        if (updated == 0) {
+            // someone else transitioned it first — re-read so the 409 reports the real status
+            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
+                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
+            throw new RubricLifecycleException(rubricId, semver, current.getStatus(), "publish");
+        }
+        // the update cleared the persistence context; patch the fields on the entity we return
         v.setStatus(RubricVersionStatus.PUBLISHED);
-        v.setPublishedAt(OffsetDateTime.now());
+        v.setPublishedAt(publishedAt);
         v.setPublishedBy(publishedBy);
-        v = rubricVersionRepository.save(v);
         // drop the stale DRAFT snapshot and the latest pointer — this may be the new latest
         rubricCacheService.evictVersion(rubricId, semver);
         recordEvent(rubricId, semver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
@@ -192,10 +203,18 @@ public class RubricRegistryService {
         if (v.getStatus() == RubricVersionStatus.RETIRED) {
             throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
         }
+        // guarded update like publish — if it was retired between our read and here we get 0 rows
+        OffsetDateTime retiredAt = OffsetDateTime.now();
+        int updated = rubricVersionRepository.retireIfNotRetired(
+                v.getRubricVersionId(), RubricVersionStatus.RETIRED, retiredAt, retiredBy);
+        if (updated == 0) {
+            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
+                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
+            throw new RubricLifecycleException(rubricId, semver, current.getStatus(), "retire");
+        }
         v.setStatus(RubricVersionStatus.RETIRED);
-        v.setRetiredAt(OffsetDateTime.now());
+        v.setRetiredAt(retiredAt);
         v.setRetiredBy(retiredBy);
-        v = rubricVersionRepository.save(v);
         // drop the cached entry and the latest pointer so nothing keeps evaluating this version
         rubricCacheService.evictVersion(rubricId, semver);
         recordEvent(rubricId, semver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
