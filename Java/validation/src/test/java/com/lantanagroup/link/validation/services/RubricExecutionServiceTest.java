@@ -50,7 +50,7 @@ class RubricExecutionServiceTest {
     // Sequential mode (parallel=false), so the pool is never touched — a synchronous executor suffices.
     private final RubricExecutionService service = new RubricExecutionService(
             resolver, versionRepository, registry, assembler,
-            resultPersister, fhirContext, objectMapper,
+            new ScoreAggregator(), resultPersister, fhirContext, objectMapper,
             Runnable::run, false);
 
     private final UUID versionId = UUID.randomUUID();
@@ -84,7 +84,7 @@ class RubricExecutionServiceTest {
         List<RubricFinding> findingEntities = List.of(RubricFinding.builder().findingId(UUID.randomUUID()).build());
         ResultEnvelopeAssembler.AssembleOutput out =
                 new ResultEnvelopeAssembler.AssembleOutput(envelope, resultEntity, findingEntities);
-        when(assembler.assemble(any(ExecutionContext.class), eq(version), anyList(), anyMap(), any(OffsetDateTime.class)))
+        when(assembler.assemble(any(ExecutionContext.class), eq(version), anyList(), anyList(), anyMap(), any(OffsetDateTime.class)))
                 .thenReturn(out);
         return out;
     }
@@ -152,7 +152,7 @@ class RubricExecutionServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<RawFinding>> captor = ArgumentCaptor.forClass(List.class);
         verify(assembler).assemble(any(ExecutionContext.class), eq(version), captor.capture(),
-                anyMap(), any(OffsetDateTime.class));
+                anyList(), anyMap(), any(OffsetDateTime.class));
         assertThat(captor.getValue())
                 .anySatisfy(f -> assertThat(f.getCode()).isEqualTo("check-execution-error"));
         // the failure finding still carries the originating check_id so it can be persisted
@@ -179,7 +179,7 @@ class RubricExecutionServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<RawFinding>> captor = ArgumentCaptor.forClass(List.class);
         verify(assembler).assemble(any(ExecutionContext.class), eq(version), captor.capture(),
-                anyMap(), any(OffsetDateTime.class));
+                anyList(), anyMap(), any(OffsetDateTime.class));
         assertThat(captor.getValue()).allSatisfy(f -> assertThat(f.getCheckId()).isEqualTo(c.getCheckId()));
     }
 }

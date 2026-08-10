@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
 import com.lantanagroup.link.validation.enums.Severity;
@@ -37,6 +38,7 @@ public class RubricExecutionService {
     private final RubricVersionRepository rubricVersionRepository;
     private final CheckExecutorRegistry executorRegistry;
     private final ResultEnvelopeAssembler envelopeAssembler;
+    private final ScoreAggregator scoreAggregator;
     private final RubricResultPersister resultPersister;
     private final FhirContext fhirContext;
     private final ObjectMapper objectMapper;
@@ -48,6 +50,7 @@ public class RubricExecutionService {
                                   RubricVersionRepository rubricVersionRepository,
                                   CheckExecutorRegistry executorRegistry,
                                   ResultEnvelopeAssembler envelopeAssembler,
+                                  ScoreAggregator scoreAggregator,
                                   RubricResultPersister resultPersister,
                                   FhirContext fhirContext,
                                   ObjectMapper objectMapper,
@@ -57,6 +60,7 @@ public class RubricExecutionService {
         this.rubricVersionRepository = rubricVersionRepository;
         this.executorRegistry = executorRegistry;
         this.envelopeAssembler = envelopeAssembler;
+        this.scoreAggregator = scoreAggregator;
         this.resultPersister = resultPersister;
         this.fhirContext = fhirContext;
         this.objectMapper = objectMapper;
@@ -118,9 +122,22 @@ public class RubricExecutionService {
             checkDurations.put(outcome.checkLocalId(), outcome.durationMs());
         }
 
+        // per-check results (every check, pass or fail) so check-based scoring policies can score
+        Map<String, RubricCheck> checkByLocalId = enabled.stream()
+                .collect(Collectors.toMap(RubricCheck::getCheckLocalId, c -> c, (a, b) -> a, LinkedHashMap::new));
+        List<CheckExecutionResult> checkResults = new ArrayList<>(outcomes.size());
+        for (CheckOutcome outcome : outcomes) {
+            RubricCheck c = checkByLocalId.get(outcome.checkLocalId());
+            checkResults.add(CheckExecutionResult.builder()
+                    .checkLocalId(outcome.checkLocalId())
+                    .dimension(c != null ? c.getDimension() : null)
+                    .status(scoreAggregator.collapseCheckStatus(outcome.findings()))
+                    .build());
+        }
+
         OffsetDateTime completedAt = OffsetDateTime.now();
         ResultEnvelopeAssembler.AssembleOutput out =
-                envelopeAssembler.assemble(ctx, version, allFindings, checkDurations, completedAt);
+                envelopeAssembler.assemble(ctx, version, allFindings, checkResults, checkDurations, completedAt);
 
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());

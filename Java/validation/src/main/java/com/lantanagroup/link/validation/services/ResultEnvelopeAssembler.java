@@ -6,6 +6,7 @@ import com.lantanagroup.link.validation.entities.RubricResult;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.*;
+import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class ResultEnvelopeAssembler {
             ExecutionContext ctx,
             RubricVersion version,
             List<RawFinding> raw,
+            List<CheckExecutionResult> checkResults,
             Map<String, Long> checkDurationsMs,
             OffsetDateTime completedAt) {
 
@@ -33,7 +35,8 @@ public class ResultEnvelopeAssembler {
         long checkWorkMs = checkDurationsMs == null ? 0L
                 : checkDurationsMs.values().stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
 
-        ScoreCardDto score = scoreAggregator.aggregate(raw);
+        ScoringPolicyDto scoringPolicy = ScoringPolicyDto.from(version.getScoringPolicyJson(), objectMapper);
+        ScoreCardDto score = scoreAggregator.aggregate(raw, checkResults, scoringPolicy);
 
         SummaryDto summary = SummaryDto.builder()
                 .errorCount(countBy(raw, Severity.ERROR))

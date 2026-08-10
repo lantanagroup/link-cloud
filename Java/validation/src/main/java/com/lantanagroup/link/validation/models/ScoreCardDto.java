@@ -20,5 +20,6 @@ import java.util.Map;
 public class ScoreCardDto {
     private RubricResultStatus interpretation;
     private Map<PiqiDimension, RubricResultStatus> byDimension;
+    private Map<String, RubricResultStatus> byCheck;
     private Double value;
 }
