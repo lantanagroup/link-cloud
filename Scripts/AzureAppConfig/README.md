@@ -152,14 +152,12 @@ It reports **warnings** for secret-shaped keys holding a plain literal, for
 malformed entries, and for duplicate `(key, label)` pairs. Not every such value is
 a credential, so these are surfaced for review rather than failing the build.
 
-A few keys are named `...ConnectionString` but hold only a bare `host:port` --
-`ConnectionStrings:Redis` and `ResourceCache:Redis:ConnectionString`. Both are
-assigned to `ConfigurationOptions.EndPoints` with the password supplied separately
-from Key Vault, so they are listed in `ENDPOINT_ONLY_KEYS` and exempt from the
-secret-shaped-key warning. They are still checked for credential shapes, and they
-warn if given comma-delimited StackExchange.Redis config syntax, which
-`EndPoints.Add()` cannot parse. Add to that list only when the code assigns the
-value to an endpoint rather than parsing it as a connection string.
+`ConnectionStrings:Redis` and `ResourceCache:Redis:ConnectionString` are Redis
+connection strings with the password supplied separately from Key Vault. They are
+listed in `PASSWORDLESS_CONNECTION_STRING_KEYS`, which permits comma-delimited
+StackExchange.Redis connection parameters while exempting these keys from the
+secret-shaped-key warning. Inline `password` or `pwd` values remain credential
+errors. Add to that list only when the password is sourced separately.
 
 Run automatically in two places:
 
