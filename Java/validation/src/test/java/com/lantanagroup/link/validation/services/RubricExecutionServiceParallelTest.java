@@ -14,7 +14,6 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
-import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
@@ -63,7 +62,6 @@ class RubricExecutionServiceParallelTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private RubricVersionResolver versionResolver;
-    private RubricCheckRepository rubricCheckRepository;
     private CheckExecutorRegistry executorRegistry;
     private ThreadPoolTaskExecutor pool;
 
@@ -79,11 +77,7 @@ class RubricExecutionServiceParallelTest {
                 .build();
 
         versionResolver = mock(RubricVersionResolver.class);
-        rubricCheckRepository = mock(RubricCheckRepository.class);
         executorRegistry = mock(CheckExecutorRegistry.class);
-
-        // Every evaluation in this suite is a dry run (persist=false).
-        when(versionResolver.resolve(RUBRIC_ID, null, false)).thenReturn(version);
     }
 
     @AfterEach
@@ -270,12 +264,12 @@ class RubricExecutionServiceParallelTest {
 
     private RubricExecutionService service(List<RubricCheck> checks, CheckExecutor executor,
                                            ThreadPoolTaskExecutor checkPool, boolean parallel) {
-        when(rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(version.getRubricVersionId()))
-                .thenReturn(checks);
+        // every evaluation in this suite is a dry run (persist=false)
+        when(versionResolver.resolve(RUBRIC_ID, null, false))
+                .thenReturn(new RubricVersionResolver.ResolvedRubric(version, checks));
         when(executorRegistry.get(any())).thenReturn(executor);
         return new RubricExecutionService(
                 versionResolver,
-                rubricCheckRepository,
                 mock(RubricVersionRepository.class),
                 executorRegistry,
                 new ResultEnvelopeAssembler(objectMapper, new ScoreAggregator()),

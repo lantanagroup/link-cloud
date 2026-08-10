@@ -72,6 +72,8 @@ cache:
   type: redis   # or "redis" and uncomment spring.data.redis properties
   validate-code:
     ttl: 3600
+  rubric:
+    ttl: 3600   # seconds; backstop only — register/publish/retire evict explicitly
 
 management:
   endpoints:

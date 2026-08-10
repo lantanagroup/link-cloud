@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.lantanagroup.link.validation.providers.RubricCacheService;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
 import org.slf4j.Logger;
@@ -79,8 +80,15 @@ public class RedisCacheConfig {
     @Bean
     public CacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory, RedisCacheConfiguration redisCacheConfiguration) {
         logger.info("Cache type set to 'redis'");
+        // deliberately not .transactionAware() — its deferred evicts run outside the cache
+        // error handler, so a redis outage would 500 lifecycle calls whose commit already
+        // went through. RubricCacheService defers its own evictions to after-commit instead.
+        RedisCacheConfiguration rubricConfiguration = redisCacheConfiguration
+                .entryTtl(Duration.ofSeconds(this.cacheConfig.getRubric().getTtl()));
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration)
+                .withCacheConfiguration(RubricCacheService.VERSION_CACHE, rubricConfiguration)
+                .withCacheConfiguration(RubricCacheService.LATEST_SEMVER_CACHE, rubricConfiguration)
                 .build();
     }
 
