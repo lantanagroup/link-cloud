@@ -256,5 +256,41 @@
     "method": "GET",
     "url": "/api/entries/schedules/{reportScheduleId}",
     "description": ""
+  },
+  "rdColPreQual": {
+    "service": "Validation",
+    "method": "GET",
+    "url": "/api/validation/result/{facilityId}/{reportId}/{patientId}",
+    "description": ""
+  },
+  "locOrgMethod": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "locTypeList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "locIdentifierList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "managingOrgList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "customFhirPath": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
   }
 }

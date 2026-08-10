@@ -1327,6 +1327,163 @@
       </div>
     </section>
 
+    <!-- ============ MRN IDENTIFIER INTAKE ============ -->
+    <section class="panel" id="panel-mrn-intake" hidden>
+      <div class="card">
+        <h1>MRN Identifier Intake</h1>
+        <p class="subtitle">When multiple patient identifiers are present in FHIR, the facility reporting digital quality measures (dQMs) to NHSN should identify the one that is operationally used by end users in the source EHR. This allows NHSN to provide back to the facility the medical record number (MRN) end user can use to recognize and retrieve the patients based on their NHSN analysis reports. In FHIR implementations, Patient.identifier is a repeating element, and more than one identifier may be represented as MRN or may appear to be the MRN. Fields such as type, use, system, assigner, and period can help distinguish identifiers. If more than one identifier is coded as the MRN, NHSN needs to differentiate the usable MRN using FHIR fields such as identifier.system, identifier.use, identifier.assigner, and identifier.period.
+
+        NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided in this form ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients.
+
+        This form should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.</p>
+
+        <div class="section-title" style="margin-top:0;">1. Multiple MRN Candidates</div>
+        <div class="form-group">
+          <label>In your facility's EHR, are there multiple MRN-like patient identifiers?<span class="backend-support-slot" data-support-key="mrnHasMultiple"></span></label>
+          <div class="btn-group" id="mrnHasMultipleQuestion">
+            <button type="button" class="choice-btn" data-value="true">Yes</button>
+            <button type="button" class="choice-btn" data-value="false">No</button>
+          </div>
+          <div class="error-text" id="mrnHasMultipleError">Please select Yes or No.</div>
+        </div>
+        <div id="mrnMultipleTypesWrap" hidden>
+          <div class="form-group">
+            <label>Select all that apply (these will not be used for displaying your data in NHSN reports):</label>
+            <div class="checkbox-row"><input type="checkbox" id="mrnTypeEmpi"><label for="mrnTypeEmpi" style="margin:0;">Enterprise identifier (EMPI)</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnTypeLegacy"><label for="mrnTypeLegacy" style="margin:0;">Legacy MRN</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnTypeFacility"><label for="mrnTypeFacility" style="margin:0;">Facility-specific MRN</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnTypeVisit"><label for="mrnTypeVisit" style="margin:0;">Visit identifier</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnTypeOther"><label for="mrnTypeOther" style="margin:0;">Other identifier</label></div>
+            <div class="error-text" id="mrnMultipleTypesError">Please select at least one option.</div>
+          </div>
+          <div class="form-group" id="mrnTypeOtherTextWrap" hidden>
+            <label for="mrnTypeOtherText">Other identifier</label>
+            <input type="text" id="mrnTypeOtherText">
+            <div class="error-text" id="mrnTypeOtherTextError">Please describe the other identifier.</div>
+          </div>
+        </div>
+
+        <div class="section-title">2. User-Facing MRN in the EHR</div>
+        <div class="form-group">
+          <label for="mrnUserFacingName">From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)<span class="backend-support-slot" data-support-key="mrnUserFacingIdentifierName"></span></label>
+          <input type="text" id="mrnUserFacingName">
+          <div class="error-text" id="mrnUserFacingNameError">This field is required.</div>
+        </div>
+        <div class="form-group">
+          <label>Is this the identifier staff call the MRN?<span class="backend-support-slot" data-support-key="mrnIsCalledMrn"></span></label>
+          <div class="btn-group" id="mrnIsCalledMrnQuestion">
+            <button type="button" class="choice-btn" data-value="true">Yes</button>
+            <button type="button" class="choice-btn" data-value="false">No</button>
+          </div>
+          <div class="error-text" id="mrnIsCalledMrnError">Please select Yes or No.</div>
+        </div>
+        <div class="form-group" id="mrnOtherTermWrap" hidden>
+          <label for="mrnOtherTerm">If no, what term is used?</label>
+          <input type="text" id="mrnOtherTerm">
+          <div class="error-text" id="mrnOtherTermError">This field is required.</div>
+        </div>
+        <div class="form-group">
+          <label>Can staff search for patients using this identifier?<span class="backend-support-slot" data-support-key="mrnCanSearchByIdentifier"></span></label>
+          <div class="btn-group" id="mrnCanSearchQuestion">
+            <button type="button" class="choice-btn" data-value="true">Yes</button>
+            <button type="button" class="choice-btn" data-value="false">No</button>
+          </div>
+          <div class="error-text" id="mrnCanSearchError">Please select Yes or No.</div>
+        </div>
+
+        <div class="section-title">3. Corresponding FHIR Identifier</div>
+        <p class="form-hint" style="margin-top:-8px;">In the FHIR Patient.identifier array, which identifier represents the user-facing MRN identified in Question 2?</p>
+        <div class="form-group"><label for="mrnFhirValue">FHIR identifier.value<span class="backend-support-slot" data-support-key="mrnFhirIdentifierValue"></span></label><input type="text" id="mrnFhirValue"><div class="error-text" id="mrnFhirValueError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirTypeCode">FHIR identifier.type code<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeCode"></span></label><input type="text" id="mrnFhirTypeCode"><div class="error-text" id="mrnFhirTypeCodeError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirTypeSystem">FHIR identifier.type coding system<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeSystem"></span></label><input type="text" id="mrnFhirTypeSystem"><div class="error-text" id="mrnFhirTypeSystemError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirTypeDisplay">FHIR identifier.type display text<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeDisplay"></span></label><input type="text" id="mrnFhirTypeDisplay"><div class="error-text" id="mrnFhirTypeDisplayError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirUse">FHIR identifier.use<span class="backend-support-slot" data-support-key="mrnFhirIdentifierUse"></span></label><input type="text" id="mrnFhirUse"><div class="error-text" id="mrnFhirUseError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirSystem">FHIR identifier.system (URI/OID)<span class="backend-support-slot" data-support-key="mrnFhirIdentifierSystem"></span></label><input type="text" id="mrnFhirSystem"><div class="error-text" id="mrnFhirSystemError">This field is required.</div></div>
+        <div class="form-group"><label for="mrnFhirAssigner">FHIR identifier.assigner<span class="backend-support-slot" data-support-key="mrnFhirIdentifierAssigner"></span></label><input type="text" id="mrnFhirAssigner"><div class="error-text" id="mrnFhirAssignerError">This field is required.</div></div>
+        <div class="triplet">
+          <div class="form-group"><label for="mrnFhirPeriodStart">FHIR identifier.period.start<span class="backend-support-slot" data-support-key="mrnFhirIdentifierPeriodStart"></span></label><input type="date" id="mrnFhirPeriodStart"><div class="error-text" id="mrnFhirPeriodStartError">This field is required.</div></div>
+          <div class="form-group"><label for="mrnFhirPeriodEnd">FHIR identifier.period.end<span class="backend-support-slot" data-support-key="mrnFhirIdentifierPeriodEnd"></span></label><input type="date" id="mrnFhirPeriodEnd"><div class="error-text" id="mrnFhirPeriodEndError">This field is required.</div></div>
+        </div>
+
+        <div class="section-title">4. Rule to Identify the Usable MRN</div>
+        <div class="form-group">
+          <label>What rule should NHSN use to identify the usable MRN when multiple identifiers are present? Select all that apply.<span class="backend-support-slot" data-support-key="mrnUsableRule"></span></label>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleTypeMr"><label for="mrnRuleTypeMr" style="margin:0;">identifier.type = MR</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificSystem"><label for="mrnRuleSpecificSystem" style="margin:0;">Specific identifier.system</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificOid"><label for="mrnRuleSpecificOid" style="margin:0;">Specific OID/namespace</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleUseUsual"><label for="mrnRuleUseUsual" style="margin:0;">identifier.use = usual</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleUseOfficial"><label for="mrnRuleUseOfficial" style="margin:0;">identifier.use = official</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleStartDate"><label for="mrnRuleStartDate" style="margin:0;">Start date (if more than one present, use the latest start date)</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleNoEndDate"><label for="mrnRuleNoEndDate" style="margin:0;">No end date (end date is null)</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleMostRecentPeriod"><label for="mrnRuleMostRecentPeriod" style="margin:0;">Most recent period</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificAssigner"><label for="mrnRuleSpecificAssigner" style="margin:0;">Specific assigner</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="mrnRuleOther"><label for="mrnRuleOther" style="margin:0;">Other rule</label></div>
+          <div class="error-text" id="mrnUsableRuleError">Please select at least one option.</div>
+        </div>
+        <div class="form-group" id="mrnRuleOtherTextWrap" hidden>
+          <label for="mrnRuleOtherText">Other rule</label>
+          <input type="text" id="mrnRuleOtherText">
+          <div class="error-text" id="mrnRuleOtherTextError">Please describe the other rule.</div>
+        </div>
+
+        <div class="section-title">5. Variability Across Facilities or Settings</div>
+        <div class="form-group">
+          <label>Does MRN vary by facility/campus/setting within your health system (e.g., another hospital within your health system, but on the same EHR instance)?<span class="backend-support-slot" data-support-key="mrnVariesByFacility"></span></label>
+          <div class="btn-group" id="mrnVariesQuestion">
+            <button type="button" class="choice-btn" data-value="true">Yes</button>
+            <button type="button" class="choice-btn" data-value="false">No</button>
+          </div>
+          <div class="error-text" id="mrnVariesError">Please select Yes or No.</div>
+        </div>
+        <div id="mrnVarianceTypesWrap" hidden>
+          <div class="form-group">
+            <label>If Yes, select all that apply:</label>
+            <div class="checkbox-row"><input type="checkbox" id="mrnVarianceFacility"><label for="mrnVarianceFacility" style="margin:0;">Varies by facility</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnVarianceCampus"><label for="mrnVarianceCampus" style="margin:0;">Varies by campus</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnVarianceSetting"><label for="mrnVarianceSetting" style="margin:0;">Varies by care setting</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnVarianceEhrInstance"><label for="mrnVarianceEhrInstance" style="margin:0;">Varies by EHR instance</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnVarianceOther"><label for="mrnVarianceOther" style="margin:0;">Varies by other</label></div>
+            <div class="error-text" id="mrnVarianceTypesError">Please select at least one option.</div>
+          </div>
+          <div class="form-group" id="mrnVarianceOtherTextWrap" hidden>
+            <label for="mrnVarianceOtherText">Varies by other</label>
+            <input type="text" id="mrnVarianceOtherText">
+            <div class="error-text" id="mrnVarianceOtherTextError">Please describe the other variance.</div>
+          </div>
+        </div>
+
+        <div class="section-title">6. MRN Changes Over Time</div>
+        <div class="form-group">
+          <label>Can the usable MRN change over time for the same patient?<span class="backend-support-slot" data-support-key="mrnChangesOverTime"></span></label>
+          <div class="btn-group" id="mrnChangesQuestion">
+            <button type="button" class="choice-btn" data-value="true">Yes</button>
+            <button type="button" class="choice-btn" data-value="false">No</button>
+          </div>
+          <div class="error-text" id="mrnChangesError">Please select Yes or No.</div>
+        </div>
+        <div id="mrnChangeTypesWrap" hidden>
+          <div class="form-group">
+            <label>If Yes, select all that apply:</label>
+            <div class="checkbox-row"><input type="checkbox" id="mrnChangeMerge"><label for="mrnChangeMerge" style="margin:0;">Changes by patient merge</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnChangeTransfer"><label for="mrnChangeTransfer" style="margin:0;">Changes on facility transfer</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnChangeCorrection"><label for="mrnChangeCorrection" style="margin:0;">Changes by identifier correction</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="mrnChangeOther"><label for="mrnChangeOther" style="margin:0;">Change by other</label></div>
+            <div class="error-text" id="mrnChangeTypesError">Please select at least one option.</div>
+          </div>
+          <div class="form-group" id="mrnChangeOtherTextWrap" hidden>
+            <label for="mrnChangeOtherText">Change by other</label>
+            <input type="text" id="mrnChangeOtherText">
+            <div class="error-text" id="mrnChangeOtherTextError">Please describe the other change.</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="mrnIntakeBackBtn">Back</button>
+          <button class="btn" id="mrnIntakeNextBtn">Continue</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ GENERATE REPORT ============ -->
     <section class="panel" id="panel-report" hidden>
       <div class="card">
@@ -1923,6 +2080,7 @@
     steps.push({ id: 'location-org', label: 'Location Org Resolution', panel: 'panel-location-org' });
     steps.push({ id: 'hsloc', label: 'HSLOC Location Mapping', panel: 'panel-hsloc' });
     steps.push({ id: 'encounter', label: 'Encounter Mapping', panel: 'panel-encounter' });
+    steps.push({ id: 'mrn-intake', label: 'MRN Identifier Intake', panel: 'panel-mrn-intake' });
     steps.push({ id: 'report', label: 'Generate Report', panel: 'panel-report' });
     steps.push({ id: 'report-results', label: 'Report Results', panel: 'panel-report-results' });
     steps.push({ id: 'reporting-plan', label: 'Facility Reporting Plan', panel: 'panel-reporting-plan' });
@@ -1976,6 +2134,23 @@
     { key: 'hslocMappingList', page: 'HSLOC Location Mapping', label: 'HSLOC Code Mappings' },
 
     { key: 'encounterCodeSystems', page: 'Encounter Mapping', label: 'Encounter.type Code Systems' },
+
+    { key: 'mrnHasMultiple', page: 'MRN Identifier Intake', label: 'Multiple MRN Candidates' },
+    { key: 'mrnUserFacingIdentifierName', page: 'MRN Identifier Intake', label: 'User-Facing Identifier Name' },
+    { key: 'mrnIsCalledMrn', page: 'MRN Identifier Intake', label: 'Is This Identifier Called MRN?' },
+    { key: 'mrnCanSearchByIdentifier', page: 'MRN Identifier Intake', label: 'Can Staff Search By This Identifier?' },
+    { key: 'mrnFhirIdentifierValue', page: 'MRN Identifier Intake', label: 'FHIR identifier.value' },
+    { key: 'mrnFhirIdentifierTypeCode', page: 'MRN Identifier Intake', label: 'FHIR identifier.type code' },
+    { key: 'mrnFhirIdentifierTypeSystem', page: 'MRN Identifier Intake', label: 'FHIR identifier.type coding system' },
+    { key: 'mrnFhirIdentifierTypeDisplay', page: 'MRN Identifier Intake', label: 'FHIR identifier.type display text' },
+    { key: 'mrnFhirIdentifierUse', page: 'MRN Identifier Intake', label: 'FHIR identifier.use' },
+    { key: 'mrnFhirIdentifierSystem', page: 'MRN Identifier Intake', label: 'FHIR identifier.system (URI/OID)' },
+    { key: 'mrnFhirIdentifierAssigner', page: 'MRN Identifier Intake', label: 'FHIR identifier.assigner' },
+    { key: 'mrnFhirIdentifierPeriodStart', page: 'MRN Identifier Intake', label: 'FHIR identifier.period.start' },
+    { key: 'mrnFhirIdentifierPeriodEnd', page: 'MRN Identifier Intake', label: 'FHIR identifier.period.end' },
+    { key: 'mrnUsableRule', page: 'MRN Identifier Intake', label: 'Rule to Identify the Usable MRN' },
+    { key: 'mrnVariesByFacility', page: 'MRN Identifier Intake', label: 'Varies by Facility/Campus/Setting?' },
+    { key: 'mrnChangesOverTime', page: 'MRN Identifier Intake', label: 'Can the Usable MRN Change Over Time?' },
 
     { key: 'measuresSelect', page: 'Generate Report', label: 'Measures' },
     { key: 'reportStartDate', page: 'Generate Report', label: 'Report Start Date' },
@@ -3023,6 +3198,35 @@
     });
   }
 
+  function defaultMrnIntake() {
+    return {
+      hasMultipleMrn: null,
+      multipleMrnTypes: [],
+      multipleMrnOtherText: '',
+      userFacingIdentifierName: '',
+      isCalledMrn: null,
+      otherTermUsed: '',
+      canSearchByIdentifier: null,
+      fhirIdentifierValue: '',
+      fhirIdentifierTypeCode: '',
+      fhirIdentifierTypeSystem: '',
+      fhirIdentifierTypeDisplay: '',
+      fhirIdentifierUse: '',
+      fhirIdentifierSystem: '',
+      fhirIdentifierAssigner: '',
+      fhirIdentifierPeriodStart: '',
+      fhirIdentifierPeriodEnd: '',
+      mrnRules: [],
+      mrnRuleOtherText: '',
+      variesByFacility: null,
+      varianceTypes: [],
+      varianceOtherText: '',
+      changesOverTime: null,
+      changeTypes: [],
+      changeOtherText: ''
+    };
+  }
+
   function newFacility(facilityId, facilityName, jwt) {
     return {
       facilityId: facilityId,
@@ -3073,6 +3277,8 @@
       hslocMappings: [],
       encounterCodeSystems: [],
       encounterMappingAcknowledged: false,
+
+      mrnIntake: defaultMrnIntake(),
 
       report: {
         patientIds: [],
@@ -3189,6 +3395,7 @@
       case 'location-org': renderLocationOrgPanel(); goTo('panel-location-org', 'location-org'); break;
       case 'hsloc': renderHslocPanel(); goTo('panel-hsloc', 'hsloc'); break;
       case 'encounter': renderEncounterPanel(); goTo('panel-encounter', 'encounter'); break;
+      case 'mrn-intake': renderMrnIntakeConditionals(); goTo('panel-mrn-intake', 'mrn-intake'); break;
       case 'report': renderReportPanelState(); goTo('panel-report', 'report'); break;
       case 'report-results': renderReportResultsState(); goTo('panel-report-results', 'report-results'); break;
       case 'reporting-plan': renderReportingPlanPanel(); goTo('panel-reporting-plan', 'reporting-plan'); break;
@@ -4796,6 +5003,212 @@
   $('encounterBackBtn').addEventListener('click', function () { enterStep('hsloc'); });
   $('encounterNextBtn').addEventListener('click', function () {
     facility.encounterMappingAcknowledged = true;
+    unlockStep('mrn-intake');
+    saveFacility().then(function () { enterStep('mrn-intake'); });
+  });
+
+  // ---------- MRN identifier intake ----------
+  var MRN_TYPE_CHECKBOXES = [
+    { id: 'mrnTypeEmpi', value: 'empi' },
+    { id: 'mrnTypeLegacy', value: 'legacy' },
+    { id: 'mrnTypeFacility', value: 'facility' },
+    { id: 'mrnTypeVisit', value: 'visit' },
+    { id: 'mrnTypeOther', value: 'other' }
+  ];
+  var MRN_RULE_CHECKBOXES = [
+    { id: 'mrnRuleTypeMr', value: 'type_mr' },
+    { id: 'mrnRuleSpecificSystem', value: 'specific_system' },
+    { id: 'mrnRuleSpecificOid', value: 'specific_oid' },
+    { id: 'mrnRuleUseUsual', value: 'use_usual' },
+    { id: 'mrnRuleUseOfficial', value: 'use_official' },
+    { id: 'mrnRuleStartDate', value: 'start_date' },
+    { id: 'mrnRuleNoEndDate', value: 'no_end_date' },
+    { id: 'mrnRuleMostRecentPeriod', value: 'most_recent_period' },
+    { id: 'mrnRuleSpecificAssigner', value: 'specific_assigner' },
+    { id: 'mrnRuleOther', value: 'other' }
+  ];
+  var MRN_VARIANCE_CHECKBOXES = [
+    { id: 'mrnVarianceFacility', value: 'facility' },
+    { id: 'mrnVarianceCampus', value: 'campus' },
+    { id: 'mrnVarianceSetting', value: 'setting' },
+    { id: 'mrnVarianceEhrInstance', value: 'ehr_instance' },
+    { id: 'mrnVarianceOther', value: 'other' }
+  ];
+  var MRN_CHANGE_CHECKBOXES = [
+    { id: 'mrnChangeMerge', value: 'merge' },
+    { id: 'mrnChangeTransfer', value: 'transfer' },
+    { id: 'mrnChangeCorrection', value: 'correction' },
+    { id: 'mrnChangeOther', value: 'other' }
+  ];
+
+  function ensureMrnIntake() {
+    if (!facility.mrnIntake) facility.mrnIntake = defaultMrnIntake();
+    return facility.mrnIntake;
+  }
+
+  function paintMrnYesNoGroup(groupId, value) {
+    $(groupId).querySelectorAll('.choice-btn').forEach(function (b) {
+      b.classList.toggle('selected', value !== null && (b.getAttribute('data-value') === 'true') === value);
+    });
+  }
+
+  function wireMrnYesNoGroup(groupId, getValue, setValue) {
+    $(groupId).querySelectorAll('.choice-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setValue(btn.getAttribute('data-value') === 'true');
+        paintMrnYesNoGroup(groupId, getValue());
+        renderMrnIntakeConditionals();
+        saveFacility();
+      });
+    });
+  }
+
+  function wireMrnCheckboxGroup(defs, setArray) {
+    defs.forEach(function (d) {
+      $(d.id).addEventListener('change', function () {
+        setArray(defs.filter(function (dd) { return $(dd.id).checked; }).map(function (dd) { return dd.value; }));
+        renderMrnIntakeConditionals();
+        saveFacility();
+      });
+    });
+  }
+
+  function paintMrnCheckboxGroup(defs, values) {
+    defs.forEach(function (d) { $(d.id).checked = (values || []).indexOf(d.value) !== -1; });
+  }
+
+  wireMrnYesNoGroup('mrnHasMultipleQuestion', function () { return ensureMrnIntake().hasMultipleMrn; }, function (v) { ensureMrnIntake().hasMultipleMrn = v; });
+  wireMrnYesNoGroup('mrnIsCalledMrnQuestion', function () { return ensureMrnIntake().isCalledMrn; }, function (v) { ensureMrnIntake().isCalledMrn = v; });
+  wireMrnYesNoGroup('mrnCanSearchQuestion', function () { return ensureMrnIntake().canSearchByIdentifier; }, function (v) { ensureMrnIntake().canSearchByIdentifier = v; });
+  wireMrnYesNoGroup('mrnVariesQuestion', function () { return ensureMrnIntake().variesByFacility; }, function (v) { ensureMrnIntake().variesByFacility = v; });
+  wireMrnYesNoGroup('mrnChangesQuestion', function () { return ensureMrnIntake().changesOverTime; }, function (v) { ensureMrnIntake().changesOverTime = v; });
+
+  wireMrnCheckboxGroup(MRN_TYPE_CHECKBOXES, function (v) { ensureMrnIntake().multipleMrnTypes = v; });
+  wireMrnCheckboxGroup(MRN_RULE_CHECKBOXES, function (v) { ensureMrnIntake().mrnRules = v; });
+  wireMrnCheckboxGroup(MRN_VARIANCE_CHECKBOXES, function (v) { ensureMrnIntake().varianceTypes = v; });
+  wireMrnCheckboxGroup(MRN_CHANGE_CHECKBOXES, function (v) { ensureMrnIntake().changeTypes = v; });
+
+  function renderMrnIntakeConditionals() {
+    var m = ensureMrnIntake();
+    $('mrnMultipleTypesWrap').hidden = m.hasMultipleMrn !== true;
+    $('mrnTypeOtherTextWrap').hidden = !$('mrnTypeOther').checked;
+    $('mrnOtherTermWrap').hidden = m.isCalledMrn !== false;
+    $('mrnRuleOtherTextWrap').hidden = !$('mrnRuleOther').checked;
+    $('mrnVarianceTypesWrap').hidden = m.variesByFacility !== true;
+    $('mrnVarianceOtherTextWrap').hidden = !$('mrnVarianceOther').checked;
+    $('mrnChangeTypesWrap').hidden = m.changesOverTime !== true;
+    $('mrnChangeOtherTextWrap').hidden = !$('mrnChangeOther').checked;
+  }
+
+  function populateMrnIntakeForm() {
+    var m = ensureMrnIntake();
+    paintMrnYesNoGroup('mrnHasMultipleQuestion', m.hasMultipleMrn);
+    paintMrnCheckboxGroup(MRN_TYPE_CHECKBOXES, m.multipleMrnTypes);
+    $('mrnTypeOtherText').value = m.multipleMrnOtherText || '';
+    $('mrnUserFacingName').value = m.userFacingIdentifierName || '';
+    paintMrnYesNoGroup('mrnIsCalledMrnQuestion', m.isCalledMrn);
+    $('mrnOtherTerm').value = m.otherTermUsed || '';
+    paintMrnYesNoGroup('mrnCanSearchQuestion', m.canSearchByIdentifier);
+    $('mrnFhirValue').value = m.fhirIdentifierValue || '';
+    $('mrnFhirTypeCode').value = m.fhirIdentifierTypeCode || '';
+    $('mrnFhirTypeSystem').value = m.fhirIdentifierTypeSystem || '';
+    $('mrnFhirTypeDisplay').value = m.fhirIdentifierTypeDisplay || '';
+    $('mrnFhirUse').value = m.fhirIdentifierUse || '';
+    $('mrnFhirSystem').value = m.fhirIdentifierSystem || '';
+    $('mrnFhirAssigner').value = m.fhirIdentifierAssigner || '';
+    $('mrnFhirPeriodStart').value = m.fhirIdentifierPeriodStart || '';
+    $('mrnFhirPeriodEnd').value = m.fhirIdentifierPeriodEnd || '';
+    paintMrnCheckboxGroup(MRN_RULE_CHECKBOXES, m.mrnRules);
+    $('mrnRuleOtherText').value = m.mrnRuleOtherText || '';
+    paintMrnYesNoGroup('mrnVariesQuestion', m.variesByFacility);
+    paintMrnCheckboxGroup(MRN_VARIANCE_CHECKBOXES, m.varianceTypes);
+    $('mrnVarianceOtherText').value = m.varianceOtherText || '';
+    paintMrnYesNoGroup('mrnChangesQuestion', m.changesOverTime);
+    paintMrnCheckboxGroup(MRN_CHANGE_CHECKBOXES, m.changeTypes);
+    $('mrnChangeOtherText').value = m.changeOtherText || '';
+    renderMrnIntakeConditionals();
+  }
+
+  function collectMrnIntakeForm() {
+    var m = ensureMrnIntake();
+    m.multipleMrnOtherText = $('mrnTypeOtherText').value.trim();
+    m.userFacingIdentifierName = $('mrnUserFacingName').value.trim();
+    m.otherTermUsed = $('mrnOtherTerm').value.trim();
+    m.fhirIdentifierValue = $('mrnFhirValue').value.trim();
+    m.fhirIdentifierTypeCode = $('mrnFhirTypeCode').value.trim();
+    m.fhirIdentifierTypeSystem = $('mrnFhirTypeSystem').value.trim();
+    m.fhirIdentifierTypeDisplay = $('mrnFhirTypeDisplay').value.trim();
+    m.fhirIdentifierUse = $('mrnFhirUse').value.trim();
+    m.fhirIdentifierSystem = $('mrnFhirSystem').value.trim();
+    m.fhirIdentifierAssigner = $('mrnFhirAssigner').value.trim();
+    m.fhirIdentifierPeriodStart = $('mrnFhirPeriodStart').value;
+    m.fhirIdentifierPeriodEnd = $('mrnFhirPeriodEnd').value;
+    m.mrnRuleOtherText = $('mrnRuleOtherText').value.trim();
+    m.varianceOtherText = $('mrnVarianceOtherText').value.trim();
+    m.changeOtherText = $('mrnChangeOtherText').value.trim();
+  }
+
+  function validateMrnYesNo(groupId, value, errId) {
+    var ok = value !== null;
+    $(errId).classList.toggle('show', !ok);
+    return ok;
+  }
+
+  function validateMrnCheckboxGroup(values, errId, visible) {
+    if (!visible) { $(errId).classList.remove('show'); return true; }
+    var ok = (values || []).length > 0;
+    $(errId).classList.toggle('show', !ok);
+    return ok;
+  }
+
+  function validateMrnTextField(id, errId) {
+    var el = $(id);
+    var ok = !!el.value.trim();
+    if (ok) clearFieldError(el, $(errId)); else showFieldError(el, $(errId));
+    return ok;
+  }
+
+  function validateMrnIntakeFields() {
+    var m = ensureMrnIntake();
+    var results = [];
+    var firstInvalid = null;
+    function track(ok, el) {
+      results.push(ok);
+      if (!ok && !firstInvalid) firstInvalid = el;
+    }
+
+    track(validateMrnYesNo('mrnHasMultipleQuestion', m.hasMultipleMrn, 'mrnHasMultipleError'), $('mrnHasMultipleQuestion'));
+    track(validateMrnCheckboxGroup(m.multipleMrnTypes, 'mrnMultipleTypesError', !$('mrnMultipleTypesWrap').hidden), $('mrnTypeEmpi'));
+    if (!$('mrnTypeOtherTextWrap').hidden) track(validateMrnTextField('mrnTypeOtherText', 'mrnTypeOtherTextError'), $('mrnTypeOtherText'));
+
+    track(validateMrnTextField('mrnUserFacingName', 'mrnUserFacingNameError'), $('mrnUserFacingName'));
+    track(validateMrnYesNo('mrnIsCalledMrnQuestion', m.isCalledMrn, 'mrnIsCalledMrnError'), $('mrnIsCalledMrnQuestion'));
+    if (!$('mrnOtherTermWrap').hidden) track(validateMrnTextField('mrnOtherTerm', 'mrnOtherTermError'), $('mrnOtherTerm'));
+    track(validateMrnYesNo('mrnCanSearchQuestion', m.canSearchByIdentifier, 'mrnCanSearchError'), $('mrnCanSearchQuestion'));
+
+    ['mrnFhirValue', 'mrnFhirTypeCode', 'mrnFhirTypeSystem', 'mrnFhirTypeDisplay', 'mrnFhirUse', 'mrnFhirSystem', 'mrnFhirAssigner', 'mrnFhirPeriodStart', 'mrnFhirPeriodEnd'].forEach(function (id) {
+      track(validateMrnTextField(id, id + 'Error'), $(id));
+    });
+
+    track(validateMrnCheckboxGroup(m.mrnRules, 'mrnUsableRuleError', true), $('mrnRuleTypeMr'));
+    if (!$('mrnRuleOtherTextWrap').hidden) track(validateMrnTextField('mrnRuleOtherText', 'mrnRuleOtherTextError'), $('mrnRuleOtherText'));
+
+    track(validateMrnYesNo('mrnVariesQuestion', m.variesByFacility, 'mrnVariesError'), $('mrnVariesQuestion'));
+    track(validateMrnCheckboxGroup(m.varianceTypes, 'mrnVarianceTypesError', !$('mrnVarianceTypesWrap').hidden), $('mrnVarianceFacility'));
+    if (!$('mrnVarianceOtherTextWrap').hidden) track(validateMrnTextField('mrnVarianceOtherText', 'mrnVarianceOtherTextError'), $('mrnVarianceOtherText'));
+
+    track(validateMrnYesNo('mrnChangesQuestion', m.changesOverTime, 'mrnChangesError'), $('mrnChangesQuestion'));
+    track(validateMrnCheckboxGroup(m.changeTypes, 'mrnChangeTypesError', !$('mrnChangeTypesWrap').hidden), $('mrnChangeMerge'));
+    if (!$('mrnChangeOtherTextWrap').hidden) track(validateMrnTextField('mrnChangeOtherText', 'mrnChangeOtherTextError'), $('mrnChangeOtherText'));
+
+    if (firstInvalid && firstInvalid.focus) firstInvalid.focus();
+    return results.every(function (ok) { return ok; });
+  }
+
+  $('mrnIntakeBackBtn').addEventListener('click', function () { enterStep('encounter'); });
+  $('mrnIntakeNextBtn').addEventListener('click', function () {
+    collectMrnIntakeForm();
+    if (!validateMrnIntakeFields()) { showToast('Please complete all fields before continuing.'); return; }
     unlockStep('report');
     saveFacility().then(function () { enterStep('report'); });
   });
@@ -7187,6 +7600,8 @@
     $('freqLagDays').value = af.patientLag.days || '';
     $('freqLagHours').value = af.patientLag.hours || '';
     $('freqLagMinutes').value = af.patientLag.minutes || '';
+
+    populateMrnIntakeForm();
 
     renderNav();
   }
