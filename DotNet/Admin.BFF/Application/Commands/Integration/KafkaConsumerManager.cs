@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        private void ClearCache(string facility)
+        private async Task ClearCache(string facility, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -75,9 +75,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     {
                         String cacheKey = topic.Item2 + delimiter + facility;
-                        _cache.Remove(cacheKey);
+                        await _cache.RemoveAsync(cacheKey, cancellationToken);
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (InvalidOperationException ex)
             {
@@ -115,10 +119,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
         }
 
-        public void CreateAllConsumers(string reportTrackingId)
+        public async Task CreateAllConsumers(string reportTrackingId, CancellationToken cancellationToken = default)
         {
             //clear  cache for that reportTrackingId
-            ClearCache(reportTrackingId);
+            await ClearCache(reportTrackingId, cancellationToken);
 
             // create consumers
             var topicsList = kafkaTopics.Select(t => t.Item2).ToList();
@@ -159,7 +163,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        public Dictionary<string, string> readAllConsumers(string reportTrackingId)
+        public async Task<Dictionary<string, string>> readAllConsumers(string reportTrackingId, CancellationToken cancellationToken = default)
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
@@ -170,7 +174,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     string facilityKey = topic.Item2 + delimiter + reportTrackingId;
 
-                    var json = _cache.Get<string>(facilityKey);
+                    var json = await _cache.GetAsync<string>(facilityKey, cancellationToken);
                     List<CorrelationCacheEntry> entries;
                     if (string.IsNullOrEmpty(json))
                     {
@@ -197,10 +201,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         }
 
 
-        public async Task StopAllConsumers(string reportTrackingId)
+        public async Task StopAllConsumers(string reportTrackingId, CancellationToken cancellationToken = default)
         {
             //clear  cache for that facility
-            ClearCache(reportTrackingId);
+            await ClearCache(reportTrackingId, cancellationToken);
 
             // stop consumers for that facility
             foreach (var consumer in _consumers)
@@ -233,7 +237,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             // remove only consumers for that reprtTrackingId
             RemoveConsumersBasedOnReportTrackingId(_consumers, reportTrackingId);
 
-            await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId);
+            await DeleteConsumerGroupAsync(_kafkaConnection, "Dynamic:" + reportTrackingId, cancellationToken);
 
         }
 

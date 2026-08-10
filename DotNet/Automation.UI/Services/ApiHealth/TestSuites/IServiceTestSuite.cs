@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Models.ApiHealth;
-using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;

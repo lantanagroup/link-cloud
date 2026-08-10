@@ -1,7 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Helpers;
-using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
 
@@ -41,10 +40,12 @@ public static class FhirBundleGenerator
     /// Run-scoped shared infrastructure IDs. A short GUID tag (RunTag) ensures concurrent
     /// test runs against the same FHIR server don't conflict on infrastructure resources.
     /// </summary>
-    public sealed record SharedIds()
+    public sealed record SharedIds(string? RunTagOverride = null)
     {
         /// <summary>Short unique tag for this generation run (8 hex chars from a GUID).</summary>
-        public string RunTag { get; } = Guid.NewGuid().ToString("N")[..8];
+        public string RunTag { get; } = string.IsNullOrWhiteSpace(RunTagOverride)
+            ? Guid.NewGuid().ToString("N")[..8]
+            : RunTagOverride.Trim();
 
         public string HospitalLocation => $"{RunTag}-Loc-Hospital";
         public string IcuLocation => $"{RunTag}-Loc-ICU";

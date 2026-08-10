@@ -140,7 +140,7 @@ public class ImportedBundleBlobMigrationServiceTests
             ]
             """;
 
-        var remapped = ImportedBundleBlobMigrationService.RemapUploadedBundleIdsInJson(
+        var remapped = PatientBundleExternalizationMigrationService.RemapUploadedBundleIdsInJson(
             json,
             new Dictionary<Guid, Guid> { [sourceId] = replacementId });
 
@@ -165,7 +165,7 @@ public class ImportedBundleBlobMigrationServiceTests
             }
             """;
 
-        var remapped = ImportedBundleBlobMigrationService.RemapUploadedBundleIdsInJson(
+        var remapped = PatientBundleExternalizationMigrationService.RemapUploadedBundleIdsInJson(
             json,
             new Dictionary<Guid, Guid> { [sourceId] = replacementId });
 
@@ -181,20 +181,20 @@ public class ImportedBundleBlobMigrationServiceTests
     {
         const string malformed = "{not valid json";
 
-        var remapped = ImportedBundleBlobMigrationService.RemapUploadedBundleIdsInJson(
+        var remapped = PatientBundleExternalizationMigrationService.RemapUploadedBundleIdsInJson(
             malformed,
             new Dictionary<Guid, Guid>());
 
         Assert.Equal(malformed, remapped);
     }
 
-    private static (ImportedBundleBlobMigrationService Service, Mock<IMongoCollection<ImportedBundleDocument>> BundlesMock, Mock<IImportedBundleContentStore> ContentStoreMock) CreateService()
+    private static (PatientBundleExternalizationMigrationService Service, Mock<IMongoCollection<ImportedBundleDocument>> BundlesMock, Mock<IImportedBundleContentStore> ContentStoreMock) CreateService()
     {
         var bundlesMock = new Mock<IMongoCollection<ImportedBundleDocument>>();
         var scenariosMock = new Mock<IMongoCollection<TestScenarioDocument>>();
         var runInputsMock = new Mock<IMongoCollection<AutomationRunInputDocument>>();
         var contentStoreMock = new Mock<IImportedBundleContentStore>();
-        var loggerMock = new Mock<ILogger<ImportedBundleBlobMigrationService>>();
+        var loggerMock = new Mock<ILogger<PatientBundleExternalizationMigrationService>>();
         var lifetimeMock = new Mock<IHostApplicationLifetime>();
         var dbMock = new Mock<IMongoDatabase>();
 
@@ -205,7 +205,7 @@ public class ImportedBundleBlobMigrationServiceTests
         dbMock.Setup(d => d.GetCollection<AutomationRunInputDocument>("automation_run_inputs", null))
             .Returns(runInputsMock.Object);
 
-        var service = new ImportedBundleBlobMigrationService(
+        var service = new PatientBundleExternalizationMigrationService(
             dbMock.Object,
             contentStoreMock.Object,
             loggerMock.Object,
