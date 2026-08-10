@@ -1,9 +1,11 @@
 package com.lantanagroup.link.validation.services;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricResult;
 import com.lantanagroup.link.validation.entities.RubricVersion;
+import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.*;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
@@ -36,7 +38,8 @@ public class ResultEnvelopeAssembler {
                 : checkDurationsMs.values().stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
 
         ScoringPolicyDto scoringPolicy = ScoringPolicyDto.from(version.getScoringPolicyJson(), objectMapper);
-        ScoreCardDto score = scoreAggregator.aggregate(raw, checkResults, scoringPolicy);
+        Set<PiqiDimension> declaredDimensions = parseDeclaredDimensions(version.getDimensionsJson());
+        ScoreCardDto score = scoreAggregator.aggregate(raw, checkResults, scoringPolicy, declaredDimensions);
 
         SummaryDto summary = SummaryDto.builder()
                 .errorCount(countBy(raw, Severity.ERROR))
@@ -122,6 +125,32 @@ public class ResultEnvelopeAssembler {
 
     private int countBy(List<RawFinding> findings, Severity sev) {
         return (int) findings.stream().filter(f -> f.getSeverity() == sev).count();
+    }
+
+    private Set<PiqiDimension> parseDeclaredDimensions(String dimensionsJson) {
+        Set<PiqiDimension> dims = EnumSet.noneOf(PiqiDimension.class);
+        if (dimensionsJson == null || dimensionsJson.isBlank()) {
+            return dims;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(dimensionsJson);
+            if (node.isArray()) {
+                for (JsonNode n : node) {
+                    String v = n.asText(null);
+                    if (v == null || v.isBlank()) {
+                        continue;
+                    }
+                    try {
+                        dims.add(PiqiDimension.valueOf(v.trim().toUpperCase(Locale.ROOT)));
+                    } catch (IllegalArgumentException ex) {
+                        log.warn("Ignoring unknown PIQI dimension '{}' in rubric definition", v);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse rubric dimensions JSON; falling back to observed dimensions: {}", e.getMessage());
+        }
+        return dims;
     }
 
     private String writeJson(Object value) {
