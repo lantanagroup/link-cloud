@@ -46,11 +46,12 @@ public class DmrpApiSettings
     /// and by docker-compose locally.
     /// </para>
     /// <para>
-    /// Note where that failure surfaces. <see cref="Application.Services.AuthTokenService"/>
-    /// is a lazily-constructed singleton, so a deployment missing this key still starts and
-    /// still reports healthy; the first token issued or validated throws, and both the token
-    /// endpoint and the contract endpoints answer 500. Provision it before enabling the mock
-    /// in an environment rather than relying on the health check to notice.
+    /// An enabled deployment missing this key fails to start. Program.cs resolves
+    /// <see cref="Application.Services.AuthTokenService"/> during startup, so the constructor
+    /// runs -- and throws -- before the server listens, rather than leaving a healthy-looking
+    /// service that answers 500 on the first token issued or validated. A disabled deployment
+    /// skips that resolution and stays dormant, so the key is only required where the mock
+    /// actually serves.
     /// </para>
     /// </remarks>
     public string SigningKey { get; set; } = string.Empty;

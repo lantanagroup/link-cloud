@@ -595,7 +595,7 @@ services:
       required: false
       sensitive: true
     - key: "MockDmrpApi:SigningKey"
-      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository -- but note it will still start and still report healthy: the token service is constructed lazily, so the failure surfaces as a 500 on the first token issued or validated, not at startup. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
       required: false
       sensitive: true
 

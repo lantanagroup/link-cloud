@@ -88,6 +88,14 @@ var app = builder.Build();
 
 if (enabled)
 {
+    // Resolve the token service here, while the host is still starting, so a missing or
+    // too-short signing key stops the process rather than surfacing as a 500 on the first
+    // token request. It is a singleton, so this is the only construction that happens.
+    // Deliberately inside this branch and ahead of migration: a disabled deployment must
+    // stay dormant rather than crash-loop, and a key that is going to fail should fail
+    // before any schema is altered.
+    _ = app.Services.GetRequiredService<IAuthTokenService>();
+
     app.AutoMigrateEF<ReportingPlanDbContext>();
 }
 else

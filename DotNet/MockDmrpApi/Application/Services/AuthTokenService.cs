@@ -30,7 +30,8 @@ public class AuthTokenService : IAuthTokenService
         var keyBytes = Encoding.UTF8.GetBytes(_settings.SigningKey ?? string.Empty);
         if (keyBytes.Length < MinimumSigningKeyBytes)
         {
-            // Fail at startup rather than on the first token request, where it would
+            // Program.cs resolves this service during startup whenever the mock is enabled,
+            // so this throws there rather than on the first token request, where it would
             // surface as an opaque 500 from an endpoint that looks unrelated.
             throw new InvalidOperationException(
                 $"{DmrpApiSettings.ConfigSectionName}:{nameof(DmrpApiSettings.SigningKey)} must be at least " +
