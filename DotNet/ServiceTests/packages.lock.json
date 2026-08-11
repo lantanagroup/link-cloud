@@ -56,6 +56,12 @@
           "SQLitePCLRaw.core": "2.1.6"
         }
       },
+      "Microsoft.Extensions.TimeProvider.Testing": {
+        "type": "Direct",
+        "requested": "[8.10.0, )",
+        "resolved": "8.10.0",
+        "contentHash": "PqISLycRh3Ym1xBNcmc8OMuqpik0wXkR2uPh8HstyYNXmH06l09hkBaDnRCPo6zBekhaHiGX91Lhbks8nVSZKg=="
+      },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
         "requested": "[17.14.1, )",
@@ -2722,6 +2728,7 @@
       "dmrp": {
         "type": "Project",
         "dependencies": {
+          "LinkSdk": "[1.0.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
@@ -2736,6 +2743,19 @@
         "dependencies": {
           "Flurl.Http": "[4.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.10, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
+      "mockdmrpapi": {
+        "type": "Project",
+        "dependencies": {
+          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
+          "Serilog": "[4.3.1, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
