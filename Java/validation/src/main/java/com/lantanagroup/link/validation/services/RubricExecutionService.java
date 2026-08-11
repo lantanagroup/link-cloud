@@ -12,9 +12,12 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.services.categoryoverride.CategoryOverrideEngine;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +41,7 @@ public class RubricExecutionService {
     private final RubricVersionRepository rubricVersionRepository;
     private final CheckExecutorRegistry executorRegistry;
     private final ResultEnvelopeAssembler envelopeAssembler;
+    private final CategoryOverrideEngine categoryOverrideEngine;
     private final ScoreAggregator scoreAggregator;
     private final RubricResultPersister resultPersister;
     private final FhirContext fhirContext;
@@ -50,6 +54,7 @@ public class RubricExecutionService {
                                   RubricVersionRepository rubricVersionRepository,
                                   CheckExecutorRegistry executorRegistry,
                                   ResultEnvelopeAssembler envelopeAssembler,
+                                  CategoryOverrideEngine categoryOverrideEngine,
                                   ScoreAggregator scoreAggregator,
                                   RubricResultPersister resultPersister,
                                   FhirContext fhirContext,
@@ -60,6 +65,7 @@ public class RubricExecutionService {
         this.rubricVersionRepository = rubricVersionRepository;
         this.executorRegistry = executorRegistry;
         this.envelopeAssembler = envelopeAssembler;
+        this.categoryOverrideEngine = categoryOverrideEngine;
         this.scoreAggregator = scoreAggregator;
         this.resultPersister = resultPersister;
         this.fhirContext = fhirContext;
@@ -115,29 +121,48 @@ public class RubricExecutionService {
                 ? runParallel(enabled, ctx, resource)
                 : runSequential(enabled, ctx, resource);
 
+        // Findings are flattened into one list before per-check statuses are derived, because
+        // category override has to see every finding at once -- both so the category rules are
+        // read once per evaluation rather than once per check, and so a check's status is derived
+        // from post-override severities. Slices (index ranges), not groupingBy(checkLocalId): two
+        // checks in one version can share a local id, and grouping would give each of them the
+        // other's findings.
         List<RawFinding> allFindings = new ArrayList<>();
+        List<CheckSlice> slices = new ArrayList<>(outcomes.size());
         Map<String, Long> checkDurations = new LinkedHashMap<>();
         for (CheckOutcome outcome : outcomes) {
+            int from = allFindings.size();
             allFindings.addAll(outcome.findings());
+            slices.add(new CheckSlice(outcome.checkLocalId(), from, allFindings.size()));
             checkDurations.put(outcome.checkLocalId(), outcome.durationMs());
         }
 
-        // per-check results (every check, pass or fail) so check-based scoring policies can score
         Map<String, RubricCheck> checkByLocalId = enabled.stream()
                 .collect(Collectors.toMap(RubricCheck::getCheckLocalId, c -> c, (a, b) -> a, LinkedHashMap::new));
-        List<CheckExecutionResult> checkResults = new ArrayList<>(outcomes.size());
-        for (CheckOutcome outcome : outcomes) {
-            RubricCheck c = checkByLocalId.get(outcome.checkLocalId());
+        Map<String, CheckType> checkTypeByLocalId = new LinkedHashMap<>();
+        checkByLocalId.forEach((localId, c) -> checkTypeByLocalId.put(localId, c.getType()));
+
+        List<EvaluatedFinding> evaluated = categoryOverrideEngine.apply(allFindings, checkTypeByLocalId);
+        if (evaluated.size() != allFindings.size()) {
+            throw new IllegalStateException(String.format(
+                    "Category override returned %d finding(s) for %d input(s); slices would be misaligned",
+                    evaluated.size(), allFindings.size()));
+        }
+
+        // per-check results (every check, pass or fail) so check-based scoring policies can score
+        List<CheckExecutionResult> checkResults = new ArrayList<>(slices.size());
+        for (CheckSlice slice : slices) {
+            RubricCheck c = checkByLocalId.get(slice.checkLocalId());
             checkResults.add(CheckExecutionResult.builder()
-                    .checkLocalId(outcome.checkLocalId())
+                    .checkLocalId(slice.checkLocalId())
                     .dimension(c != null ? c.getDimension() : null)
-                    .status(scoreAggregator.collapseCheckStatus(outcome.findings()))
+                    .status(scoreAggregator.collapseCheckStatus(slice.findingsIn(evaluated)))
                     .build());
         }
 
         OffsetDateTime completedAt = OffsetDateTime.now();
         ResultEnvelopeAssembler.AssembleOutput out =
-                envelopeAssembler.assemble(ctx, version, allFindings, checkResults, checkDurations, completedAt);
+                envelopeAssembler.assemble(ctx, version, evaluated, checkResults, checkDurations, completedAt);
 
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
@@ -199,6 +224,12 @@ public class RubricExecutionService {
             return fhirContext.newJsonParser().parseResource(objectMapper.writeValueAsString(payload));
         } catch (Exception e) {
             throw new PayloadParseException("Failed to parse FHIR payload: " + e.getMessage(), e);
+        }
+    }
+
+    private record CheckSlice(String checkLocalId, int fromIndex, int toIndex) {
+        List<EvaluatedFinding> findingsIn(List<EvaluatedFinding> evaluated) {
+            return evaluated.subList(fromIndex, toIndex);
         }
     }
 }

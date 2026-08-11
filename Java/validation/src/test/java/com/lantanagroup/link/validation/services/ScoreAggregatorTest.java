@@ -4,9 +4,13 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.RollupStrategy;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.ScoringPolicyType;
+import com.lantanagroup.link.validation.enums.Severity;
+import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.ScoreCardDto;
 import com.lantanagroup.link.validation.models.ScoringPolicyDto;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ScoreAggregatorTest {
 
-    private final ScoreAggregator aggregator = new ScoreAggregator();
+    private final ScoreAggregator aggregator = new ScoreAggregator(new FindingStatusResolver());
 
     /** A per-check result carrying a dimension (what the dimension scorecard scores from). */
     private static CheckExecutionResult dimResult(PiqiDimension dimension, RubricResultStatus status) {
@@ -156,14 +160,43 @@ class ScoreAggregatorTest {
         assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE);
     }
 
+    /**
+     * ALL_MUST_PASS is an alias of WORST_OF, so warnings alone no longer fail the result — they
+     * surface as ACCEPTABLE_WITH_WARNINGS. It previously collapsed anything short of a clean
+     * ACCEPTABLE to UNACCEPTABLE; that was the stricter reading and is the one behaviour change in
+     * this rollup. PASS_FAIL remains the strategy that erases the distinction, passing warnings as
+     * a plain ACCEPTABLE.
+     */
     @Test
-    @DisplayName("dimension + ALL_MUST_PASS fails overall on a mere WARNING (stricter than a clean pass)")
-    void dimensionAllMustPassFailsOnWarning() {
+    @DisplayName("dimension + ALL_MUST_PASS behaves as WORST_OF: warnings surface, they do not fail")
+    void dimensionAllMustPassIsAnAliasOfWorstOf() {
         ScoreCardDto score = aggregator.aggregate(
                 List.of(dimResult(PiqiDimension.TERMINOLOGY, RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)),
                 policy(ScoringPolicyType.PIQI_DIMENSION_SCORECARD, RollupStrategy.ALL_MUST_PASS));
 
-        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.UNACCEPTABLE);
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+    }
+
+    @Test
+    @DisplayName("ALL_MUST_PASS agrees with WORST_OF for every input, not just the warnings-only case")
+    void allMustPassAgreesWithWorstOfAcrossMixedStatuses() {
+        List<List<CheckExecutionResult>> cases = List.of(
+                List.of(),
+                List.of(dimResult(PiqiDimension.CURRENCY, RubricResultStatus.ACCEPTABLE)),
+                List.of(dimResult(PiqiDimension.CURRENCY, RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)),
+                List.of(dimResult(PiqiDimension.CURRENCY, RubricResultStatus.UNACCEPTABLE)),
+                List.of(dimResult(PiqiDimension.CURRENCY, RubricResultStatus.ACCEPTABLE_WITH_WARNINGS),
+                        dimResult(PiqiDimension.COMPLETENESS, RubricResultStatus.UNACCEPTABLE)));
+
+        for (List<CheckExecutionResult> results : cases) {
+            RubricResultStatus worstOf = aggregator.aggregate(results,
+                    policy(ScoringPolicyType.PIQI_DIMENSION_SCORECARD, RollupStrategy.WORST_OF)).getInterpretation();
+            RubricResultStatus allMustPass = aggregator.aggregate(results,
+                    policy(ScoringPolicyType.PIQI_DIMENSION_SCORECARD, RollupStrategy.ALL_MUST_PASS)).getInterpretation();
+            assertThat(allMustPass)
+                    .as("ALL_MUST_PASS diverged from WORST_OF for %d check(s)", results.size())
+                    .isEqualTo(worstOf);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -234,5 +267,52 @@ class ScoreAggregatorTest {
                 policy(ScoringPolicyType.PIQI_PASS_FAIL, null));
 
         assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE);
+    }
+
+    // ------------------------------------------------------------------
+    // collapseCheckStatus — post-override findings drive per-check status
+    // ------------------------------------------------------------------
+
+    private static EvaluatedFinding uncategorized(Severity severity) {
+        return EvaluatedFinding.identity(RawFinding.builder()
+                .checkLocalId("c1").dimension(PiqiDimension.CONFORMANCE).severity(severity).build());
+    }
+
+    private static EvaluatedFinding categorized(Severity effective, boolean acceptable) {
+        RawFinding raw = RawFinding.builder()
+                .checkLocalId("c1").dimension(PiqiDimension.CONFORMANCE).severity(Severity.ERROR).build();
+        return new EvaluatedFinding(raw, Severity.ERROR, effective, acceptable, List.of("cat-1"), "cat-1");
+    }
+
+    @Test
+    @DisplayName("collapse takes the worst of multiple findings on one check, whatever their order")
+    void collapseTakesTheWorstFinding() {
+        List<EvaluatedFinding> findings = List.of(
+                uncategorized(Severity.WARNING),
+                uncategorized(Severity.ERROR),
+                uncategorized(Severity.INFORMATION));
+
+        assertThat(aggregator.collapseCheckStatus(findings)).isEqualTo(RubricResultStatus.UNACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("an error a category declared acceptable no longer fails its check")
+    void acceptableErrorDoesNotFailTheCheck() {
+        assertThat(aggregator.collapseCheckStatus(List.of(categorized(Severity.ERROR, true))))
+                .isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+    }
+
+    @Test
+    @DisplayName("an unacceptable category fails its check even at INFORMATION severity")
+    void unacceptableCategoryFailsTheCheck() {
+        assertThat(aggregator.collapseCheckStatus(List.of(categorized(Severity.INFORMATION, false))))
+                .isEqualTo(RubricResultStatus.UNACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("null or empty findings collapse to ACCEPTABLE")
+    void nullOrEmptyFindingsAreAcceptable() {
+        assertThat(aggregator.collapseCheckStatus(null)).isEqualTo(RubricResultStatus.ACCEPTABLE);
+        assertThat(aggregator.collapseCheckStatus(List.of())).isEqualTo(RubricResultStatus.ACCEPTABLE);
     }
 }

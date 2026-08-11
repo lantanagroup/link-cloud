@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.CheckType;
@@ -15,8 +16,12 @@ import com.lantanagroup.link.validation.models.RubricVersionSnapshot;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.services.categoryoverride.CategoryOverrideEngine;
+import com.lantanagroup.link.validation.services.categoryoverride.CategorySequenceProvider;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
+import com.lantanagroup.link.validation.services.scoring.ScoringPolicyResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -43,11 +48,18 @@ class RubricExecutionServiceScoringPolicyTest {
     private final CheckExecutorRegistry registry = mock(CheckExecutorRegistry.class);
     private final RubricResultPersister resultPersister = mock(RubricResultPersister.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ScoreAggregator scoreAggregator = new ScoreAggregator();
-    private final ResultEnvelopeAssembler assembler = new ResultEnvelopeAssembler(objectMapper, scoreAggregator);
+    private final ValidationPolicyConfig policyConfig = new ValidationPolicyConfig();
+    private final ScoreAggregator scoreAggregator = new ScoreAggregator(new FindingStatusResolver());
+    private final ResultEnvelopeAssembler assembler = new ResultEnvelopeAssembler(
+            objectMapper, scoreAggregator, new ScoringPolicyResolver(policyConfig, objectMapper), policyConfig);
+
+    // Override engine on its default (disabled) configuration: scoring behaviour under test is
+    // exactly the pre-override one.
+    private final CategoryOverrideEngine overrideEngine = new CategoryOverrideEngine(
+            mock(CategorizationService.class), new CategorySequenceProvider(objectMapper), policyConfig);
 
     private final RubricExecutionService service = new RubricExecutionService(
-            resolver, versionRepository, registry, assembler,
+            resolver, versionRepository, registry, assembler, overrideEngine,
             scoreAggregator, resultPersister, FhirContext.forR4(), objectMapper,
             Runnable::run, false);
 

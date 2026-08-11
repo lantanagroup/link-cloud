@@ -23,21 +23,27 @@ public class ScoringPolicyDto {
     private ScoringPolicyType type;
     private RollupStrategy rollup;
 
+    /**
+     * Parses a persisted scoring policy, preserving absent fields as null so that
+     * {@code ScoringPolicyResolver} can apply its precedence (rubric, then configuration, then
+     * WORST_OF). Defaulting at parse time would silently outrank the configuration fallback.
+     * {@code ScoreAggregator}-side null handling keeps direct callers safe.
+     */
     public static ScoringPolicyDto from(String scoringPolicyJson, ObjectMapper objectMapper) {
         if (scoringPolicyJson == null || scoringPolicyJson.isBlank()) {
-            return defaultPolicy();
+            return ScoringPolicyDto.builder().build();
         }
         try {
             JsonNode node = objectMapper.readTree(scoringPolicyJson);
             ScoringPolicyType type = ScoringPolicyType.fromValue(node.path("type").asText(null))
-                    .orElse(ScoringPolicyType.PIQI_DIMENSION_SCORECARD);
+                    .orElse(null);
             RollupStrategy rollup = RollupStrategy.fromValue(node.path("rollup").asText(null))
-                    .orElse(RollupStrategy.WORST_OF);
+                    .orElse(null);
             return ScoringPolicyDto.builder().type(type).rollup(rollup).build();
         } catch (Exception e) {
             log.warn("Failed to parse scoring policy '{}'; falling back to default: {}",
                     scoringPolicyJson, e.getMessage());
-            return defaultPolicy();
+            return ScoringPolicyDto.builder().build();
         }
     }
 

@@ -16,9 +16,14 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.services.categoryoverride.CategoryOverrideEngine;
+import com.lantanagroup.link.validation.services.categoryoverride.CategorySequenceProvider;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,10 +52,16 @@ class RubricExecutionServiceTest {
     private final FhirContext fhirContext = FhirContext.forR4();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // A real override engine on its default (disabled) configuration, so these cases keep
+    // asserting the pre-override behaviour end to end rather than through a mocked engine.
+    private final CategoryOverrideEngine overrideEngine = new CategoryOverrideEngine(
+            mock(CategorizationService.class), new CategorySequenceProvider(objectMapper),
+            new ValidationPolicyConfig());
+
     // Sequential mode (parallel=false), so the pool is never touched — a synchronous executor suffices.
     private final RubricExecutionService service = new RubricExecutionService(
-            resolver, versionRepository, registry, assembler,
-            new ScoreAggregator(), resultPersister, fhirContext, objectMapper,
+            resolver, versionRepository, registry, assembler, overrideEngine,
+            new ScoreAggregator(new FindingStatusResolver()), resultPersister, fhirContext, objectMapper,
             Runnable::run, false);
 
     private final UUID versionId = UUID.randomUUID();
@@ -150,14 +161,14 @@ class RubricExecutionServiceTest {
         service.evaluate("piqi.core", "1.0.0", request(), true);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<RawFinding>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<EvaluatedFinding>> captor = ArgumentCaptor.forClass(List.class);
         verify(assembler).assemble(any(ExecutionContext.class), eq(version), captor.capture(),
                 anyList(), anyMap(), any(OffsetDateTime.class));
         assertThat(captor.getValue())
-                .anySatisfy(f -> assertThat(f.getCode()).isEqualTo("check-execution-error"));
+                .anySatisfy(f -> assertThat(f.raw().getCode()).isEqualTo("check-execution-error"));
         // the failure finding still carries the originating check_id so it can be persisted
         assertThat(captor.getValue())
-                .anySatisfy(f -> assertThat(f.getCheckId()).isEqualTo(c.getCheckId()));
+                .anySatisfy(f -> assertThat(f.raw().getCheckId()).isEqualTo(c.getCheckId()));
     }
 
     @Test
@@ -177,9 +188,9 @@ class RubricExecutionServiceTest {
         service.evaluate("piqi.core", "1.0.0", request(), true);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<RawFinding>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<EvaluatedFinding>> captor = ArgumentCaptor.forClass(List.class);
         verify(assembler).assemble(any(ExecutionContext.class), eq(version), captor.capture(),
                 anyList(), anyMap(), any(OffsetDateTime.class));
-        assertThat(captor.getValue()).allSatisfy(f -> assertThat(f.getCheckId()).isEqualTo(c.getCheckId()));
+        assertThat(captor.getValue()).allSatisfy(f -> assertThat(f.raw().getCheckId()).isEqualTo(c.getCheckId()));
     }
 }
