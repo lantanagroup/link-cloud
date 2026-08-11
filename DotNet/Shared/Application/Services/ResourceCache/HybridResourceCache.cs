@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Collections.Concurrent;
 using Task = System.Threading.Tasks.Task;
@@ -164,61 +165,50 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 endpoint = server.EndPoint?.ToString() ?? "unknown";
 
-                var memoryInfo = (await server.InfoAsync("memory").WaitAsync(cancellationToken)).FirstOrDefault();
+                var reading = await ResolveUsedMemoryAsync(server, endpoint, cancellationToken);
 
-                if (memoryInfo == null)
+                if (reading == null)
                 {
                     _logger.LogWarning(
-                        "Redis INFO memory returned no results from {Endpoint}; using ABS resource cache.",
+                        "Could not determine Redis used memory on {Endpoint} from INFO memory, MEMORY STATS or a " +
+                        "full INFO dump; memory pressure cannot be evaluated. Using ABS resource cache.",
                         endpoint);
                     return ResourceCacheType.ABS;
                 }
 
-                var infoDict = BuildInfoDictionary(memoryInfo);
-                LogRawInfoSectionOnce(endpoint, infoDict);
-
-                if (!infoDict.TryGetValue("used_memory", out var usedMemoryStr) ||
-                    !long.TryParse(usedMemoryStr, out var usedMemory))
-                {
-                    _logger.LogWarning(
-                        "Redis INFO memory from {Endpoint} has no parsable used_memory (raw value '{UsedMemoryRaw}'); " +
-                        "using Redis resource cache. Reported memory: [{MemoryDiagnostics}].",
-                        endpoint,
-                        usedMemoryStr ?? "<absent>",
-                        FormatDiagnostics(infoDict));
-                    return ResourceCacheType.Redis;
-                }
-
                 // Azure Managed Redis does not return `maxmemory` via INFO, so the limit is
-                // supplied through configuration instead. Continue reading `used_memory` above.
+                // supplied through configuration instead. Only the numerator comes from the server.
                 var maxMemoryBytes = _settings.Redis.MaxMemoryBytes;
                 if (maxMemoryBytes is null or <= 0)
                 {
                     _logger.LogWarning(
                         "ResourceCache:Redis:MaxMemoryBytes is not configured or invalid ({MaxMemoryBytes}); " +
                         "cannot evaluate Redis memory pressure on {Endpoint}. Using Redis resource cache. " +
-                        "Reported memory: [{MemoryDiagnostics}].",
+                        "Used memory was {UsedMemoryBytes} bytes via {MemorySource}. Reported memory: [{MemoryDiagnostics}].",
                         maxMemoryBytes,
                         endpoint,
-                        FormatDiagnostics(infoDict));
+                        reading.UsedMemory,
+                        reading.Source,
+                        FormatDiagnostics(reading.Diagnostics));
                     return ResourceCacheType.Redis;
                 }
 
-                double usagePercent = (double)usedMemory / maxMemoryBytes.Value * 100.0;
+                double usagePercent = (double)reading.UsedMemory / maxMemoryBytes.Value * 100.0;
                 var threshold = _settings.Redis.MemoryThresholdPercent;
                 var selected = usagePercent >= threshold ? ResourceCacheType.ABS : ResourceCacheType.Redis;
 
                 _logger.LogInformation(
-                    "Redis memory probe on {Endpoint}: used_memory={UsedMemoryBytes} bytes of configured " +
-                    "MaxMemoryBytes={MaxMemoryBytes} = {UsagePercent:F1}% against threshold {Threshold}% " +
+                    "Redis memory probe on {Endpoint}: used memory {UsedMemoryBytes} bytes (via {MemorySource}) of " +
+                    "configured MaxMemoryBytes={MaxMemoryBytes} = {UsagePercent:F1}% against threshold {Threshold}% " +
                     "=> selected {CacheType} resource cache. Server-reported memory: [{MemoryDiagnostics}].",
                     endpoint,
-                    usedMemory,
+                    reading.UsedMemory,
+                    reading.Source,
                     maxMemoryBytes.Value,
                     usagePercent,
                     threshold,
                     selected,
-                    FormatDiagnostics(infoDict));
+                    FormatDiagnostics(reading.Diagnostics));
 
                 return selected;
             }
@@ -232,23 +222,194 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        /// <summary>
-        /// Builds a lookup from an INFO section without <see cref="Enumerable.ToDictionary{TSource,TKey,TElement}(IEnumerable{TSource},Func{TSource,TKey},Func{TSource,TElement})"/>,
-        /// which throws on duplicate keys. Azure Managed Redis proxies Redis Enterprise and is not
-        /// guaranteed to return the same unique-key INFO shape as open-source Redis; a duplicate key
-        /// would otherwise surface as an opaque exception and silently force the ABS fallback.
-        /// </summary>
-        private static Dictionary<string, string> BuildInfoDictionary(
-            IGrouping<string, KeyValuePair<string, string>> memoryInfo)
-        {
-            var infoDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>A used-memory figure and the server command it was recovered from.</summary>
+        private sealed record UsedMemoryReading(
+            long UsedMemory,
+            string Source,
+            Dictionary<string, string> Diagnostics);
 
-            foreach (var entry in memoryInfo)
+        /// <summary>
+        /// Recovers a used-memory figure, trying progressively more general commands. Only the
+        /// numerator is sourced from the server — the limit it is measured against comes from
+        /// <c>ResourceCache:Redis:MaxMemoryBytes</c>, because Azure Managed Redis does not report
+        /// <c>maxmemory</c> via INFO (LEGLINK-770). AMR proxies Redis Enterprise, so the same
+        /// restrictions that hide <c>maxmemory</c> may hide <c>used_memory</c> or the whole INFO
+        /// memory section; falling straight through to a cache choice on the first miss would
+        /// decide on no evidence (LEGLINK-948).
+        /// </summary>
+        private async Task<UsedMemoryReading?> ResolveUsedMemoryAsync(
+            IServer server,
+            string endpoint,
+            CancellationToken cancellationToken)
+        {
+            var infoDict = await ReadInfoAsync(server, "memory", cancellationToken);
+
+            if (infoDict != null)
             {
-                infoDict[entry.Key] = entry.Value;
+                LogRawInfoSectionOnce(endpoint, infoDict);
+
+                if (TryParseUsedMemory(infoDict, out var usedMemory))
+                {
+                    return new UsedMemoryReading(usedMemory, "INFO memory", infoDict);
+                }
+
+                _logger.LogWarning(
+                    "Redis INFO memory from {Endpoint} has no parsable used_memory (raw value '{UsedMemoryRaw}'); " +
+                    "trying MEMORY STATS. Reported memory: [{MemoryDiagnostics}].",
+                    endpoint,
+                    infoDict.GetValueOrDefault("used_memory") ?? "<absent>",
+                    FormatDiagnostics(infoDict));
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Redis INFO memory returned no results from {Endpoint}; trying MEMORY STATS.",
+                    endpoint);
             }
 
-            return infoDict;
+            var diagnostics = infoDict ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var totalAllocated = await TryReadTotalAllocatedAsync(server, endpoint, cancellationToken);
+            if (totalAllocated.HasValue)
+            {
+                return new UsedMemoryReading(totalAllocated.Value, "MEMORY STATS total.allocated", diagnostics);
+            }
+
+            var fullInfo = await ReadInfoAsync(server, section: null, cancellationToken);
+            if (fullInfo != null && TryParseUsedMemory(fullInfo, out var fullUsedMemory))
+            {
+                return new UsedMemoryReading(fullUsedMemory, "INFO (full)", fullInfo);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Reads an INFO section (or the whole of INFO when <paramref name="section"/> is null) into
+        /// a flat lookup. Built with an indexer rather than
+        /// <see cref="Enumerable.ToDictionary{TSource,TKey,TElement}(IEnumerable{TSource},Func{TSource,TKey},Func{TSource,TElement})"/>,
+        /// which throws on duplicate keys: Azure Managed Redis is not guaranteed to return the same
+        /// unique-key INFO shape as open-source Redis, and a duplicate would otherwise surface as an
+        /// opaque exception and silently force the ABS fallback.
+        /// </summary>
+        private async Task<Dictionary<string, string>?> ReadInfoAsync(
+            IServer server,
+            string? section,
+            CancellationToken cancellationToken)
+        {
+            IGrouping<string, KeyValuePair<string, string>>[]? groups;
+
+            try
+            {
+                groups = section == null
+                    ? await server.InfoAsync().WaitAsync(cancellationToken)
+                    : await server.InfoAsync(section).WaitAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A rejected or unsupported INFO is a reason to try another source, not a reason to
+                // abandon the probe: letting this reach the outer catch would decide the cache on a
+                // command restriction rather than on memory pressure.
+                _logger.LogWarning(
+                    ex,
+                    "Redis INFO {Section} failed on {Endpoint}.",
+                    section ?? "(full)",
+                    server.EndPoint?.ToString() ?? "unknown");
+                return null;
+            }
+
+            if (groups == null)
+            {
+                return null;
+            }
+
+            var infoDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var group in groups)
+            {
+                foreach (var entry in group)
+                {
+                    infoDict[entry.Key] = entry.Value;
+                }
+            }
+
+            return infoDict.Count == 0 ? null : infoDict;
+        }
+
+        private static bool TryParseUsedMemory(Dictionary<string, string> infoDict, out long usedMemory)
+        {
+            usedMemory = 0;
+            return infoDict.TryGetValue("used_memory", out var raw) && long.TryParse(raw, out usedMemory);
+        }
+
+        /// <summary>
+        /// Reads <c>total.allocated</c> from MEMORY STATS as a second opinion when INFO does not
+        /// yield <c>used_memory</c>. MEMORY STATS may itself be restricted, so failure is expected
+        /// and non-fatal.
+        /// </summary>
+        private async Task<long?> TryReadTotalAllocatedAsync(
+            IServer server,
+            string endpoint,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var stats = await server.MemoryStatsAsync().WaitAsync(cancellationToken);
+                var totalAllocated = ReadTotalAllocated(stats);
+
+                if (totalAllocated == null)
+                {
+                    _logger.LogWarning(
+                        "MEMORY STATS on {Endpoint} did not report total.allocated; trying a full INFO dump.",
+                        endpoint);
+                }
+
+                return totalAllocated;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "MEMORY STATS is unavailable on {Endpoint}; trying a full INFO dump.",
+                    endpoint);
+                return null;
+            }
+        }
+
+        private static long? ReadTotalAllocated(RedisResult? stats)
+        {
+            if (stats == null || stats.IsNull)
+            {
+                return null;
+            }
+
+            RedisResult[]? entries;
+
+            try
+            {
+                entries = (RedisResult[]?)stats;
+            }
+            catch (InvalidCastException)
+            {
+                // MEMORY STATS replies as a flat array; anything else is not something we can read.
+                return null;
+            }
+
+            if (entries == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i + 1 < entries.Length; i += 2)
+            {
+                if (string.Equals(entries[i].ToString(), "total.allocated", StringComparison.OrdinalIgnoreCase) &&
+                    long.TryParse(entries[i + 1].ToString(), out var totalAllocated))
+                {
+                    return totalAllocated;
+                }
+            }
+
+            return null;
         }
 
         private static string FormatDiagnostics(Dictionary<string, string> infoDict)

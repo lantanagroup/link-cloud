@@ -66,6 +66,23 @@ public class HybridResourceCacheTests
         _multiplexer.Setup(m => m.GetServers()).Returns(Array.Empty<IServer>());
     }
 
+    /// <summary>Configures a connected Redis server whose INFO memory section omits used_memory.</summary>
+    private Mock<IServer> SetupServerWithoutUsedMemory()
+    {
+        var server = new Mock<IServer>();
+        server.SetupGet(s => s.IsConnected).Returns(true);
+        server.Setup(s => s.InfoAsync(It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(new[] { new[] { new KeyValuePair<string, string>("some_other_stat", "123") }.GroupBy(_ => "memory").First() });
+        _multiplexer.Setup(m => m.GetServers()).Returns(new[] { server.Object });
+        return server;
+    }
+
+    private static void SetupMemoryStats(Mock<IServer> server, long totalAllocated)
+    {
+        server.Setup(s => s.MemoryStatsAsync(It.IsAny<CommandFlags>()))
+            .ReturnsAsync(RedisResult.Create(new RedisValue[] { "total.allocated", totalAllocated.ToString() }));
+    }
+
     private Task Write(HybridResourceCache sut, string correlationId)
     {
         return sut.UpdateCorrelationCacheAsync(correlationId, new List<DomainResource>(), ResourceType.Patient);
@@ -133,15 +150,49 @@ public class HybridResourceCacheTests
         VerifyWarningLogged(Times.Once());
     }
 
+    /// <summary>
+    /// Azure Managed Redis proxies Redis Enterprise and may not expose used_memory via INFO memory,
+    /// the same restriction that hides maxmemory and drove LEGLINK-770. Deciding the cache on the
+    /// first miss would be deciding on no evidence, so MEMORY STATS is consulted before giving up.
+    /// </summary>
     [Fact]
-    public async Task UsedMemory_missing_from_info_uses_Redis()
+    public async Task UsedMemory_missing_from_info_falls_back_to_MEMORY_STATS()
     {
-        SetupRedisInfo(new[] { new KeyValuePair<string, string>("some_other_stat", "123") });
+        var server = SetupServerWithoutUsedMemory();
+        SetupMemoryStats(server, 100L * 1024 * 1024); // 100 MB of 1000 MB = 10%, under the 80% threshold
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-memorystats-under");
+
+        VerifyWroteTo(_redisCache, _absCache);
+    }
+
+    [Fact]
+    public async Task MEMORY_STATS_total_allocated_is_measured_against_the_configured_max()
+    {
+        var server = SetupServerWithoutUsedMemory();
+        SetupMemoryStats(server, 900L * 1024 * 1024); // 900 MB of 1000 MB = 90%, over the 80% threshold
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-memorystats-over");
+
+        VerifyWroteTo(_absCache, _redisCache);
+    }
+
+    /// <summary>
+    /// When INFO memory, MEMORY STATS and a full INFO dump all fail to yield a used-memory figure
+    /// there is no numerator to measure against the configured limit, so the pressure-safe choice
+    /// is ABS.
+    /// </summary>
+    [Fact]
+    public async Task UsedMemory_unavailable_from_every_source_uses_ABS()
+    {
+        SetupServerWithoutUsedMemory(); // MEMORY STATS left unconfigured, so it yields nothing
         var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
 
         await Write(sut, "corr-nousedmem");
 
-        VerifyWroteTo(_redisCache, _absCache);
+        VerifyWroteTo(_absCache, _redisCache);
     }
 
     [Fact]
@@ -164,6 +215,26 @@ public class HybridResourceCacheTests
         await Write(sut, "corr-throws");
 
         VerifyWroteTo(_absCache, _redisCache);
+    }
+
+    /// <summary>
+    /// A rejected INFO means the command is restricted, not that Redis is under pressure. It must
+    /// not short-circuit the probe before MEMORY STATS has been consulted.
+    /// </summary>
+    [Fact]
+    public async Task Rejected_INFO_still_falls_back_to_MEMORY_STATS()
+    {
+        var server = new Mock<IServer>();
+        server.SetupGet(s => s.IsConnected).Returns(true);
+        server.Setup(s => s.InfoAsync(It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
+            .ThrowsAsync(new RedisCommandException("This operation is not available unless admin mode is enabled: INFO"));
+        SetupMemoryStats(server, 100L * 1024 * 1024);
+        _multiplexer.Setup(m => m.GetServers()).Returns(new[] { server.Object });
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-info-rejected");
+
+        VerifyWroteTo(_redisCache, _absCache);
     }
 
     /// <summary>
