@@ -67,26 +67,52 @@ public class FhirConfig {
 
     /**
      * Terminology/profile validation support chain used by the rubric execution engine's
-     * FHIR-conformance, terminology, and value-set check executors. When
-     * {@code vaas.terminology-service-url} is set, a remote terminology service is added to the chain.
+     * FHIR-conformance, terminology, and value-set check executors.
+     *
+     * <p>The remote terminology server is resolved from the same {@code link.*} properties the
+     * legacy validator uses ({@code ValidationService.loadTerminologyValidationSupport}), so one
+     * configuration drives both engines:
+     * <ol>
+     *   <li>{@code link.fhir-terminology-service-url} — a generic FHIR terminology server, used as-is;</li>
+     *   <li>{@code link.terminology-service-url} — the Link terminology service <em>root</em>
+     *       (e.g. {@code http://terminology:8076}); {@code /api/terminology/fhir} is appended.</li>
+     * </ol>
      */
     @Bean
-    public ValidationSupportChain validationSupportChain(
-            FhirContext fhirContext,
-            @Value("${vaas.terminology-service-url:}") String terminologyServiceUrl) {
+    public ValidationSupportChain validationSupportChain(FhirContext fhirContext, LinkConfig linkConfig) {
         ValidationSupportChain chain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 new InMemoryTerminologyServerValidationSupport(fhirContext),
                 new CommonCodeSystemsTerminologyService(fhirContext),
                 new SnapshotGeneratingValidationSupport(fhirContext)
         );
+        String terminologyServiceUrl = resolveTerminologyServiceUrl(linkConfig);
         if (terminologyServiceUrl != null && !terminologyServiceUrl.isBlank()) {
             chain.addValidationSupport(new RemoteTerminologyServiceValidationSupport(fhirContext, terminologyServiceUrl));
             logger.info("Validation support chain: DefaultProfile -> InMemoryTerminology -> CommonCodeSystems -> SnapshotGenerating -> RemoteTerminology({}); TERMINOLOGY/VALUESET checks will call the remote server for code systems the in-memory modules cannot answer", terminologyServiceUrl);
         } else {
-            logger.warn("Validation support chain: no remote terminology server configured (vaas.terminology-service-url is blank) — TERMINOLOGY/VALUESET checks will SKIP codes in unknown code systems (silent pass)");
+            logger.warn("Validation support chain: no remote terminology server configured (link.fhir-terminology-service-url and link.terminology-service-url are blank) — TERMINOLOGY/VALUESET checks will SKIP codes in unknown code systems (silent pass)");
         }
         return chain;
+    }
+
+    /**
+     * Resolves the remote terminology base URL for the rubric engine; see the bean javadoc for the
+     * precedence order. Returns an empty string when nothing is configured.
+     */
+    // Package-private for testing.
+    static String resolveTerminologyServiceUrl(LinkConfig linkConfig) {
+        String fhirUrl = linkConfig.getFhirTerminologyServiceUrl();
+        if (fhirUrl != null && !fhirUrl.isEmpty()) {
+            return fhirUrl;
+        }
+        String linkUrl = linkConfig.getTerminologyServiceUrl();
+        if (linkUrl != null && !linkUrl.isEmpty()) {
+            // Same convention as the legacy validator: link.terminology-service-url is the service
+            // root, and the Link terminology service exposes its FHIR interface under this path.
+            return (linkUrl.endsWith("/") ? linkUrl : linkUrl + "/") + "api/terminology/fhir";
+        }
+        return "";
     }
 
     /**
