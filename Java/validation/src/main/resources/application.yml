@@ -147,7 +147,6 @@ pre-qualification:
   write-expressions-in-operation-outcome: true
 
 vaas:
-  terminology-service-url: ''
   checks:
     parallel: true
     core-pool-size: 4
