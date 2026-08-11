@@ -8,7 +8,7 @@ namespace Automation.UI.Services;
 /// Periodically checks for active runs and ensures each one has a poller.
 /// When a run completes, its poller is stopped and removed.
 ///
-/// This is the single place that does API polling — the UI controllers
+/// This is the single place that does API polling ï¿½ the UI controllers
 /// only read from <see cref="ISnapshotStore"/>.
 /// </summary>
 public sealed class RunSnapshotOrchestrator : BackgroundService
@@ -98,7 +98,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
-        // 2. Now safe to update meta and clear stale domain snapshots — no writer
+        // 2. Now safe to update meta and clear stale domain snapshots ï¿½ no writer
         //    can re-populate them with old-report data.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
@@ -141,9 +141,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         try
         {
             var schedule = await _store.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule");
-            if (schedule?.Data is { CreateDate: not null, SubmitReportDateTime: not null })
+            var createDate = schedule?.Data?.CreateDate;
+            var submitReportDateTime = schedule?.Data?.SubmitReportDateTime;
+            if (createDate.HasValue && submitReportDateTime.HasValue)
             {
-                var span = schedule.Data.SubmitReportDateTime.Value - schedule.Data.CreateDate.Value;
+                var span = submitReportDateTime.Value - createDate.Value;
                 if (span.TotalSeconds >= 1)
                     duration = span.TotalHours >= 1
                         ? $"{(int)span.TotalHours}h {span.Minutes}m {span.Seconds}s"
@@ -249,7 +251,28 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         else
         {
             cts.Cancel();
+            _ = DisposeUnregisteredPollerAsync(task, cts, scope);
+        }
+    }
+
+    private async Task DisposeUnregisteredPollerAsync(Task task, CancellationTokenSource cts, IServiceScope scope)
+    {
+        try
+        {
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected after cancellation because another poller is already registered.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while disposing unregistered poller task.");
+        }
+        finally
+        {
             scope.Dispose();
+            cts.Dispose();
         }
     }
 

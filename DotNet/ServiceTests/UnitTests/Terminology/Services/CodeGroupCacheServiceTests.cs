@@ -1,7 +1,6 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
@@ -9,7 +8,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Terminology;
@@ -135,6 +133,12 @@ public class CodeGroupCacheServiceTests
             CallBase = true
         };
 
+        mockService
+            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()));
+
+        mockService
+            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()));
+
         // Arrange
         var codeGroup = new CodeGroup
         {
@@ -258,6 +262,52 @@ http://test.system,123,Test Display,Active,Extra Value";
             Times.Once);
     }
 
+    [Fact]
+    public void ProcessValueSetCsv_WithScientificNotationCodes_LogsSingleAggregatedWarning()
+    {
+        var mockCache = new Mock<IMemoryCache>();
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var mockService = new Mock<CodeGroupCacheService>(
+            _loggerMock.Object,
+            mockCache.Object,
+            mockConfig.Object)
+        {
+            CallBase = true
+        };
+
+        mockService
+            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()));
+
+        var csvData = "system,code,display\r\n" +
+                      "http://test.system,1e10,One\r\n" +
+                      "http://test.system,123,Two\r\n" +
+                      "http://test.system,2E+05,Three";
+
+        using var reader = new StringReader(csvData);
+        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
+        var codeGroup = new CodeGroup
+        {
+            Id = "test-id",
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Url = "http://test.valueset",
+            Version = "1.0",
+            Resource = new ValueSet
+            {
+                Id = "test-id",
+                Url = "http://test.valueset",
+                Version = "1.0"
+            }
+        };
+
+        mockService.Object.ProcessValueSetCsv(codeGroup, csv);
+
+        VerifyScientificNotationWarning(2, "test-id");
+    }
+
     [Theory]
     [InlineData("code,display\r\n" +
                 "123,Test Display\r\n" +
@@ -376,6 +426,51 @@ http://test.system,123,Test Display,Active,Extra Value";
             cg.Codes["http://test.codesystem"][1].Value == "456" &&
             cg.Codes["http://test.codesystem"][1].Display == "Another Display")),
             Times.Once);
+    }
+
+    [Fact]
+    public void ProcessCodeSystemCsv_WithScientificNotationCodes_LogsSingleAggregatedWarning()
+    {
+        var mockCache = new Mock<IMemoryCache>();
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var mockService = new Mock<CodeGroupCacheService>(
+            _loggerMock.Object,
+            mockCache.Object,
+            mockConfig.Object)
+        {
+            CallBase = true
+        };
+
+        mockService
+            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()));
+
+        var csvData = "code,display\r\n" +
+                      "1e10,One\r\n" +
+                      "123,Two\r\n" +
+                      "2E+05,Three";
+
+        using var csv = CreateCsvReader(csvData);
+
+        var codeGroup = new CodeGroup
+        {
+            Id = "test-id",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Url = "http://test.codesystem",
+            Version = "1.0",
+            Resource = new CodeSystem
+            {
+                Id = "test-id",
+                Url = "http://test.codesystem",
+                Version = "1.0"
+            }
+        };
+
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
+
+        VerifyScientificNotationWarning(2, "test-id");
     }
 
     [Fact]
@@ -773,6 +868,20 @@ http://test.system,123,Test Display,Active,Extra Value";
                "\"url\": \"http://test.codesystem\"" + versionField + " }";
     }
 
+    private void VerifyScientificNotationWarning(int expectedCount, string expectedCodeGroupId)
+    {
+        _loggerMock.Verify(
+            x => x.Log(
+                It.Is<LogLevel>(level => level == LogLevel.Warning),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) =>
+                    state.ToString()!.Contains($"Found {expectedCount} code(s)") &&
+                    state.ToString()!.Contains($"code group {expectedCodeGroupId}")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     [Fact]
     public async Task GetCodeGroup_NoVersion_ReturnsSemanticallyLatestVersion()
     {
@@ -872,7 +981,7 @@ http://test.system,123,Test Display,Active,Extra Value";
                 : Array.Empty<string>();
         }
 
-        protected internal override System.Threading.Tasks.Task<string> ReadAllTextAsync(string path) =>
-            System.Threading.Tasks.Task.FromResult(_fileContents[path]);
+        protected internal override Task<string> ReadAllTextAsync(string path) =>
+            Task.FromResult(_fileContents[path]);
     }
 }

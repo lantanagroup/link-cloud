@@ -1,6 +1,5 @@
 ﻿using Automation.UI.Models.ApiHealth;
 using MongoDB.Driver;
-using Automation.UI.Models.ApiHealth;
 
 namespace Automation.UI.Services.Persistence;
 

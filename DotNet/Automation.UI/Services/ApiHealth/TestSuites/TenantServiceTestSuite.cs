@@ -8,7 +8,7 @@ using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary
 namespace Automation.UI.Services.ApiHealth.TestSuites;
 
 /// <summary>
-/// Exercises the Tenant (Facility) service endpoints via LinkSdk.
+/// Exercises Tenant facility and Vendor service endpoints via LinkSdk.
 /// Tests the full CRUD lifecycle plus soft-delete/restore, search, and error paths.
 /// </summary>
 public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
@@ -40,11 +40,11 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
     {
         var results = new List<ApiTestRunResult>();
-
+        var testVendor = new VendorModel { Name = $"ApiHealth-Vendor-{Guid.NewGuid():N}" };
         FacilityModel BuildFacility(
             string id,
             string? name = null,
-            Vendor? vendor = Vendor.Epic,
+            VendorModel? vendor = null,
             bool allowNullName = false) => new()
             {
                 FacilityId = id,
@@ -67,6 +67,9 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
         var facilityId = $"ApiHealth-Tenant-{Guid.NewGuid():N}";
         var fakeFacilityId = $"ApiHealth-Tenant-Fake-{Guid.NewGuid():N}";
         var created = false;
+        var vendorName = $"ApiHealth-Vendor-{Guid.NewGuid():N}";
+        var vendorCreated = false;
+        var vendorId = Guid.Empty;
 
         var seededFacilityId = _seedContext.Current?.Report?.FacilityId;
         var seededScheduleId = _seedContext.Current?.Report?.ScheduleId;
@@ -87,7 +90,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
             // Create → 201
             results.Add(await RunStepAsync(StepNames.Create201, 201, async () =>
             {
-                var model = BuildFacility(facilityId);
+                var model = BuildFacility(facilityId, vendor: testVendor);
                 var result = await _client.CreateAsync(model, ct);
                 if (result.IsSuccessStatusCode) created = true;
                 return result;
@@ -95,15 +98,43 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
 
             // Create → 400 (duplicate)
             results.Add(await RunStepAsync(StepNames.Create400Duplicate, 400, async () =>
-                await _client.CreateAsync(BuildFacility(facilityId), ct), ct: ct));
-
-            // Create → 400 (no vendor)
-            results.Add(await RunStepAsync(StepNames.Create400NoVendor, 400, async () =>
-                await _client.CreateAsync(BuildFacility($"ApiHealth-NoVendor-{Guid.NewGuid():N}", "NoVendor", null), ct), ct: ct));
+                await _client.CreateAsync(BuildFacility(facilityId, vendor: testVendor), ct), ct: ct));
 
             // Create → 400 (no name)
             results.Add(await RunStepAsync(StepNames.Create400NoName, 400, async () =>
-                await _client.CreateAsync(BuildFacility($"ApiHealth-NoName-{Guid.NewGuid():N}", name: null, allowNullName: true), ct), ct: ct));
+                await _client.CreateAsync(BuildFacility($"ApiHealth-NoName-{Guid.NewGuid():N}", name: null, allowNullName: true, vendor: testVendor), ct), ct: ct));
+
+            // === POST /api/Vendor ===
+
+            // Vendor POST → 201
+            results.Add(await RunStepAsync(StepNames.VendorPost201, 201, async () =>
+            {
+                var response = await _client.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    vendorId = response.Body?.Id ?? Guid.Empty;
+                    vendorCreated = vendorId != Guid.Empty;
+                }
+
+                return response;
+            }, ct: ct));
+
+            // Vendor POST → 409 (duplicate)
+            results.Add(await RunStepAsync(StepNames.VendorPost409, 409, async () =>
+                await _client.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, ct), ct: ct));
+
+            // Vendor GET → 200
+            results.Add(await RunStepAsync(StepNames.VendorGet200, 200, async () =>
+            {
+                if (vendorId == Guid.Empty)
+                    throw new InvalidOperationException("Expected a vendor id after creating the Vendor.");
+
+                return await _client.GetVendorAsync(vendorId, ct);
+            }, ct: ct));
+
+            // Vendors GET → 200
+            results.Add(await RunStepAsync(StepNames.VendorsGet200, 200, async () =>
+                await _client.GetVendorsAsync(ct), ct: ct));
 
             // === GET /api/Facility (search) ===
 
@@ -142,7 +173,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
                     FacilityId = facilityId,
                     FacilityName = facilityId + "-Updated",
                     TimeZone = "America/Chicago",
-                    Vendor = Vendor.Epic,
+                    Vendor = new VendorModel { Name = "Epic" },
                     ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
                 };
                 return await _client.UpdateAsync(facilityId, updated, ct);
@@ -151,10 +182,6 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
             // Update → 404 (non-existent)
             results.Add(await RunStepAsync(StepNames.Update404NonExistent, 404, async () =>
                 await _client.UpdateAsync(fakeFacilityId, BuildFacility(fakeFacilityId), ct), ct: ct));
-
-            // Update → 400 (no vendor)
-            results.Add(await RunStepAsync(StepNames.Update400NoVendor, 400, async () =>
-                await _client.UpdateAsync(facilityId, BuildFacility(facilityId, vendor: null), ct), ct: ct));
 
             // === GET /api/Facility/{id} (exists check) ===
 
@@ -265,6 +292,19 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
                     ReportId = Guid.NewGuid().ToString()
                 }, ct), ct: ct));
 
+            // Vendor DELETE → 204
+            results.Add(await RunStepAsync(StepNames.VendorDelete204, 204, async () =>
+            {
+                if (vendorId == Guid.Empty)
+                    throw new InvalidOperationException("Expected a vendor id before deleting the Vendor.");
+
+                var response = await _client.DeleteVendorAsync(vendorId, ct);
+                if (response.IsSuccessStatusCode)
+                    vendorCreated = false;
+
+                return response;
+            }, ct: ct));
+
             // === DELETE /api/Facility/{id} (hard delete) ===
 
             // Delete → 204
@@ -281,6 +321,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
         }
         finally
         {
+            if (vendorCreated) await TryCleanupAsync(() => _client.DeleteVendorAsync(vendorId, ct));
             if (created) await TryCleanupAsync(() => _client.DeleteAsync(facilityId, ct));
         }
 

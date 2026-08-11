@@ -42,7 +42,10 @@ public static class FacilitySetupHelper
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Name = "Epic"
+            },
             ScheduledReports = new TenantScheduledReportConfig
             {
                 Monthly = measureIds.ToArray(),
@@ -109,7 +112,7 @@ public static class FacilitySetupHelper
                     TargetFhirPath = "type[0].coding.code"
                 },
                 Description = "Copy Location Identifier to Code",
-                VendorIds = []
+                VendorVersionIds = []
             });
 
             if (!normResp.IsSuccessStatusCode)
