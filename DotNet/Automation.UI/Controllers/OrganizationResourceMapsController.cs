@@ -23,23 +23,47 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveInline([FromBody] OrganizationResourceMapTemplate model, CancellationToken ct)
+    public async Task<IActionResult> SaveInline(
+    [FromBody] OrganizationResourceMapTemplate model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Template name is required.");
+
         if (model.Conditions == null || model.Conditions.Count == 0)
             return BadRequest("At least one mapping condition is required.");
+
         if (model.Conditions.Any(c => string.IsNullOrWhiteSpace(c.FhirPath)))
             return BadRequest("All mapping conditions must include a FHIRPath.");
 
+        model.Name = model.Name.Trim();
+
+        var templates = await store.GetAllAsync(ct);
+
+        var duplicateName = templates.Any(t =>
+            t.Id != model.Id &&
+            string.Equals(
+                t.Name?.Trim(),
+                model.Name,
+                StringComparison.OrdinalIgnoreCase));
+
+        if (duplicateName)
+            return Conflict(
+                $"An Organization Resource Map named '{model.Name}' already exists.");
+
         var existing = await store.GetByIdAsync(model.Id, ct);
+
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System template cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System template cannot be modified.");
 
         model.IsSystem = false;
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
@@ -71,10 +95,25 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         var source = await store.GetByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
+        var templates = await store.GetAllAsync(ct);
+
+        var cloneName = $"{source.Name} (Copy)";
+        var copyNumber = 2;
+
+        while (templates.Any(t =>
+            string.Equals(
+                t.Name?.Trim(),
+                cloneName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            cloneName = $"{source.Name} (Copy {copyNumber})";
+            copyNumber++;
+        }
+
         var clone = new OrganizationResourceMapTemplate
         {
             Id = Guid.NewGuid(),
-            Name = $"{source.Name} (Copy)",
+            Name = cloneName,
             Description = source.Description,
             Conditions = source.Conditions.Select(c => new OrganizationResourceMapCondition
             {
