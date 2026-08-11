@@ -53,7 +53,12 @@ namespace UnitTests.DMRP
         /// </summary>
         private static MeasureMapping AddMapping(TenantDbContext context)
         {
-            var mapping = new MeasureMapping();
+            var mappingNumber = context.ChangeTracker.Entries<MeasureMapping>().Count() + 1;
+            var mapping = new MeasureMapping
+            {
+                Measure = $"test-measure-{mappingNumber}",
+                DQM = $"test-dqm-{mappingNumber}"
+            };
             context.MeasureMappings.Add(mapping);
             return mapping;
         }

@@ -10,14 +10,7 @@ namespace LantanaGroup.Link.DMRP.Data.Entities;
 /// </summary>
 public class MeasureMapping : BaseEntityExtended
 {
-
-    public string Measure { get; set; } = string.Empty;
-
-
-    public string? Dqm { get; set; }
-
-
-    public Frequency? Frequency { get; set; }
-
-    public bool IsIncomplete => string.IsNullOrWhiteSpace(Dqm) || Frequency is null;
+    public string Measure { get; set; } = "";
+    public string DQM { get; set; } = "";
+    public Frequency Frequency { get; set; } = Frequency.Adhoc;
 }

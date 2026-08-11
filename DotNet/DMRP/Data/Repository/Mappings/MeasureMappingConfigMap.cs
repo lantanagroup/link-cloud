@@ -11,6 +11,20 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
             builder.ToTable("MeasureMappings");
 
             builder.HasKey(m => m.Id);
+
+            builder.Property(m => m.Measure)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            builder.Property(m => m.DQM)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            builder.Property(m => m.Frequency)
+                .IsRequired();
+
+            builder.HasIndex(m => new { m.Measure, m.DQM })
+                .IsUnique();
         }
     }
 }
