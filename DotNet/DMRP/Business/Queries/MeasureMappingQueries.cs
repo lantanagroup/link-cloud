@@ -10,8 +10,7 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
     {
         Task<MeasureMappingModel?> GetAsync(string id, CancellationToken cancellationToken = default);
 
-        Task<PagedMeasureMappingDto> PagedSearchAsync(string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending,
-            int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+        Task<PagedMeasureMappingDto> PagedSearchAsync(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default);
     }
 
     public class MeasureMappingQueries : IMeasureMappingQueries
@@ -30,12 +29,18 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             return entity == null ? null : ToModel(entity);
         }
 
-        public async Task<PagedMeasureMappingDto> PagedSearchAsync(string sortBy = "Id",
-            SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1,
-            CancellationToken cancellationToken = default)
+        public async Task<PagedMeasureMappingDto> PagedSearchAsync(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
         {
-            var (records, metadata) = await _repository.SearchAsync(m => true, sortBy, sortOrder,
-                pageSize, pageNumber, cancellationToken);
+            var measure = string.IsNullOrWhiteSpace(searchDto.Measure) ? null : searchDto.Measure;
+            var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM;
+            var frequency = searchDto.Frequency;
+
+            var (records, metadata) = await _repository.SearchAsync(
+                m => (measure == null || m.Measure == measure)
+                    && (dqm == null || m.DQM == dqm)
+                    && (!frequency.HasValue || m.Frequency == frequency.Value),
+                searchDto.SortBy, searchDto.SortOrder,
+                searchDto.PageSize, searchDto.PageNumber, cancellationToken);
 
             return new PagedMeasureMappingDto
             {
@@ -44,6 +49,12 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             };
         }
 
-        private static MeasureMappingModel ToModel(MeasureMapping entity) => new() { Id = entity.Id };
+        private static MeasureMappingModel ToModel(MeasureMapping entity) => new()
+        {
+            Id = entity.Id,
+            Measure = entity.Measure,
+            DQM = entity.DQM,
+            Frequency = entity.Frequency
+        };
     }
 }
