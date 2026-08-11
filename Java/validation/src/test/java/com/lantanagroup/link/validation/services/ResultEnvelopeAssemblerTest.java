@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
@@ -11,6 +12,9 @@ import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
+import com.lantanagroup.link.validation.services.scoring.ScoringPolicyResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -23,8 +27,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ResultEnvelopeAssemblerTest {
 
-    private final ResultEnvelopeAssembler assembler =
-            new ResultEnvelopeAssembler(new ObjectMapper(), new ScoreAggregator());
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ValidationPolicyConfig policyConfig = new ValidationPolicyConfig();
+    private final ResultEnvelopeAssembler assembler = new ResultEnvelopeAssembler(
+            objectMapper, new ScoreAggregator(new FindingStatusResolver()),
+            new ScoringPolicyResolver(policyConfig, objectMapper), policyConfig);
+
+    /**
+     * Wraps raw findings as uncategorized, which is what the assembler receives whenever category
+     * override is disabled — so the pre-override envelope shape stays pinned by these cases.
+     */
+    private static List<EvaluatedFinding> identity(List<RawFinding> raw) {
+        return raw.stream().map(EvaluatedFinding::identity).toList();
+    }
 
     private static RawFinding finding(UUID checkId, PiqiDimension dimension, Severity severity, String code) {
         return RawFinding.builder()
@@ -78,7 +93,7 @@ class ResultEnvelopeAssemblerTest {
 
         RubricVersion version = version();
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version, raw, checkResults, Map.of("c-e1", 12L), completedAt);
+                assembler.assemble(ctx, version, identity(raw), checkResults, Map.of("c-e1", 12L), completedAt);
 
         // envelope
         assertThat(out.envelope().getRubricId()).isEqualTo("piqi.core");
@@ -122,7 +137,7 @@ class ResultEnvelopeAssemblerTest {
                 .build();
 
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version(), List.of(), List.of(), Map.of(), OffsetDateTime.now());
+                assembler.assemble(ctx, version(), identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
 
         assertThat(out.envelope().getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE);
         assertThat(out.envelope().getFindings()).isEmpty();
@@ -139,9 +154,90 @@ class ResultEnvelopeAssemblerTest {
                 .build();
 
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version(), List.of(), List.of(), Map.of(), OffsetDateTime.now());
+                assembler.assemble(ctx, version(), identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
 
         assertThat(out.resultEntity().getFacilityId()).isNull();
         assertThat(out.resultEntity().getPatientId()).isNull();
+    }
+
+    // ------------------------------------------------------------------
+    // Category-override decorations
+    // ------------------------------------------------------------------
+
+    private static EvaluatedFinding categorized(RawFinding raw, Severity effective, boolean acceptable) {
+        return new EvaluatedFinding(raw, raw.getSeverity(), effective, acceptable,
+                List.of("cat-1"), "cat-1");
+    }
+
+    private ExecutionContext ctx() {
+        return ExecutionContext.builder()
+                .requestId(UUID.randomUUID())
+                .requestedAt(OffsetDateTime.now())
+                .build();
+    }
+
+    @Test
+    @DisplayName("a categorized finding exposes original/overridden severity, acceptability, and category ids in the DTO")
+    void categorizedFindingCarriesOverrideFields() {
+        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
+                List.of(), Map.of(), OffsetDateTime.now());
+
+        FindingDto dto = out.envelope().getFindings().get(0);
+        assertThat(dto.getSeverity()).isEqualTo(Severity.WARNING);
+        assertThat(dto.getOriginalSeverity()).isEqualTo(Severity.ERROR);
+        assertThat(dto.getOverriddenSeverity()).isEqualTo(Severity.WARNING);
+        assertThat(dto.getAcceptable()).isTrue();
+        assertThat(dto.getCategoryIds()).containsExactly("cat-1");
+        assertThat(dto.getGoverningCategoryId()).isEqualTo("cat-1");
+    }
+
+    @Test
+    @DisplayName("summary counts stay on the pre-override severities while the persisted finding stores the effective one")
+    void summaryCountsPreOverrideAndEntityStoresEffective() {
+        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
+                List.of(), Map.of(), OffsetDateTime.now());
+
+        assertThat(out.envelope().getSummary().getErrorCount()).isEqualTo(1);
+        assertThat(out.envelope().getSummary().getWarningCount()).isZero();
+        assertThat(out.findingEntities().get(0).getSeverity()).isEqualTo(Severity.WARNING);
+    }
+
+    @Test
+    @DisplayName("an uncategorized finding emits no override diagnostics at all")
+    void uncategorizedFindingHasNoOverrideFields() {
+        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version(), identity(List.of(raw)), List.of(), Map.of(), OffsetDateTime.now());
+
+        FindingDto dto = out.envelope().getFindings().get(0);
+        assertThat(dto.getOriginalSeverity()).isNull();
+        assertThat(dto.getOverriddenSeverity()).isNull();
+        assertThat(dto.getAcceptable()).isNull();
+        assertThat(dto.getGoverningCategoryId()).isNull();
+    }
+
+    @Test
+    @DisplayName("response config can suppress the diagnostic fields without touching the effective severity")
+    void responseConfigSuppressesDiagnostics() {
+        policyConfig.getResponse().setIncludeOriginalSeverity(false);
+        policyConfig.getResponse().setIncludeCategoryIds(false);
+        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
+                List.of(), Map.of(), OffsetDateTime.now());
+
+        FindingDto dto = out.envelope().getFindings().get(0);
+        assertThat(dto.getSeverity()).isEqualTo(Severity.WARNING);
+        assertThat(dto.getOriginalSeverity()).isNull();
+        assertThat(dto.getCategoryIds()).isNull();
+        assertThat(dto.getAcceptable()).isTrue();
     }
 }

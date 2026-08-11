@@ -4,6 +4,7 @@ import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.configs.CheckExecutionConfig;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
@@ -15,8 +16,12 @@ import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.validation.services.categoryoverride.CategoryOverrideEngine;
+import com.lantanagroup.link.validation.services.categoryoverride.CategorySequenceProvider;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
+import com.lantanagroup.link.validation.services.scoring.ScoringPolicyResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -268,12 +273,19 @@ class RubricExecutionServiceParallelTest {
         when(versionResolver.resolve(RUBRIC_ID, null, false))
                 .thenReturn(new RubricVersionResolver.ResolvedRubric(version, checks));
         when(executorRegistry.get(any())).thenReturn(executor);
+        ValidationPolicyConfig policyConfig = new ValidationPolicyConfig();
+        ScoreAggregator scoreAggregator = new ScoreAggregator(new FindingStatusResolver());
         return new RubricExecutionService(
                 versionResolver,
                 mock(RubricVersionRepository.class),
                 executorRegistry,
-                new ResultEnvelopeAssembler(objectMapper, new ScoreAggregator()),
-                new ScoreAggregator(),
+                new ResultEnvelopeAssembler(objectMapper, scoreAggregator,
+                        new ScoringPolicyResolver(policyConfig, objectMapper), policyConfig),
+                // default (disabled) override config: parallel-vs-sequential equivalence is about
+                // the fan-out, not the override feature
+                new CategoryOverrideEngine(mock(CategorizationService.class),
+                        new CategorySequenceProvider(objectMapper), policyConfig),
+                scoreAggregator,
                 mock(RubricResultPersister.class),
                 FHIR_CONTEXT,
                 objectMapper,

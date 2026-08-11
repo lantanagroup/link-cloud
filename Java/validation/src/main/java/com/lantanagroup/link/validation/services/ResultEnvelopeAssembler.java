@@ -1,12 +1,15 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricResult;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.*;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.services.scoring.ScoringPolicyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,11 +24,13 @@ public class ResultEnvelopeAssembler {
 
     private final ObjectMapper objectMapper;
     private final ScoreAggregator scoreAggregator;
+    private final ScoringPolicyResolver scoringPolicyResolver;
+    private final ValidationPolicyConfig policyConfig;
 
     public AssembleOutput assemble(
             ExecutionContext ctx,
             RubricVersion version,
-            List<RawFinding> raw,
+            List<EvaluatedFinding> evaluated,
             List<CheckExecutionResult> checkResults,
             Map<String, Long> checkDurationsMs,
             OffsetDateTime completedAt) {
@@ -35,37 +40,35 @@ public class ResultEnvelopeAssembler {
         long checkWorkMs = checkDurationsMs == null ? 0L
                 : checkDurationsMs.values().stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
 
-        ScoringPolicyDto scoringPolicy = ScoringPolicyDto.from(version.getScoringPolicyJson(), objectMapper);
+        ScoringPolicyDto scoringPolicy = scoringPolicyResolver.resolve(version.getScoringPolicyJson());
         ScoreCardDto score = scoreAggregator.aggregate(checkResults, scoringPolicy);
 
+        // Summary counts stay on the pre-override severities so the summary reconciles with what
+        // the checks actually emitted; the override's effect shows in the score and per finding.
         SummaryDto summary = SummaryDto.builder()
-                .errorCount(countBy(raw, Severity.ERROR))
-                .warningCount(countBy(raw, Severity.WARNING))
-                .informationCount(countBy(raw, Severity.INFORMATION))
+                .errorCount(countBy(evaluated, Severity.ERROR))
+                .warningCount(countBy(evaluated, Severity.WARNING))
+                .informationCount(countBy(evaluated, Severity.INFORMATION))
                 .build();
 
         UUID resultId = UUID.randomUUID();
+        ValidationPolicyConfig.Response responseConfig = policyConfig.getResponse();
 
-        List<FindingDto> findingDtos = new ArrayList<>(raw.size());
-        List<RubricFinding> findingEntities = new ArrayList<>(raw.size());
-        for (RawFinding r : raw) {
+        List<FindingDto> findingDtos = new ArrayList<>(evaluated.size());
+        List<RubricFinding> findingEntities = new ArrayList<>(evaluated.size());
+        for (EvaluatedFinding f : evaluated) {
+            RawFinding r = f.raw();
             UUID fid = UUID.randomUUID();
-            findingDtos.add(FindingDto.builder()
-                    .id(fid)
-                    .checkId(r.getCheckLocalId())
-                    .dimension(r.getDimension())
-                    .severity(r.getSeverity())
-                    .code(r.getCode())
-                    .message(r.getMessage())
-                    .location(r.getLocation())
-                    .expression(r.getExpression())
-                    .build());
+            findingDtos.add(toDto(fid, f, r, responseConfig));
             findingEntities.add(RubricFinding.builder()
                     .findingId(fid)
                     .resultId(resultId)
                     .checkId(r.getCheckId())
                     .dimension(r.getDimension())
-                    .severity(r.getSeverity())
+                    // Effective severity, so persisted findings reconcile with the persisted status.
+                    // The pre-override severity is reported in the response but not stored; keeping
+                    // both would need a schema change.
+                    .severity(f.effectiveSeverity())
                     .code(r.getCode())
                     .message(r.getMessage())
                     .location(r.getLocation())
@@ -120,8 +123,37 @@ public class ResultEnvelopeAssembler {
         return new AssembleOutput(envelope, resultEntity, findingEntities);
     }
 
-    private int countBy(List<RawFinding> findings, Severity sev) {
-        return (int) findings.stream().filter(f -> f.getSeverity() == sev).count();
+    private FindingDto toDto(UUID findingId, EvaluatedFinding f, RawFinding r,
+                             ValidationPolicyConfig.Response responseConfig) {
+        FindingDto.FindingDtoBuilder builder = FindingDto.builder()
+                .id(findingId)
+                .checkId(r.getCheckLocalId())
+                .dimension(r.getDimension())
+                .severity(f.effectiveSeverity())
+                .code(r.getCode())
+                .message(r.getMessage())
+                .location(r.getLocation())
+                .expression(r.getExpression());
+
+        if (!f.hasCategories()) {
+            return builder.build();
+        }
+        builder.acceptable(f.acceptable());
+        if (responseConfig.isIncludeOriginalSeverity()) {
+            builder.originalSeverity(f.originalSeverity());
+            if (f.severityWasOverridden()) {
+                builder.overriddenSeverity(f.effectiveSeverity());
+            }
+        }
+        if (responseConfig.isIncludeCategoryIds()) {
+            builder.categoryIds(f.categoryIds());
+            builder.governingCategoryId(f.governingCategoryId());
+        }
+        return builder.build();
+    }
+
+    private int countBy(List<EvaluatedFinding> findings, Severity sev) {
+        return (int) findings.stream().filter(f -> f.originalSeverity() == sev).count();
     }
 
     private String writeJson(Object value) {

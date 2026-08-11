@@ -4,11 +4,12 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.RollupStrategy;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.ScoringPolicyType;
-import com.lantanagroup.link.validation.enums.Severity;
-import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.ScoreCardDto;
 import com.lantanagroup.link.validation.models.ScoringPolicyDto;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
+import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
+import com.lantanagroup.link.validation.services.scoring.FindingStatusResolver;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -22,7 +23,10 @@ import java.util.stream.Collectors;
 
 
 @Component
+@RequiredArgsConstructor
 public class ScoreAggregator {
+
+    private final FindingStatusResolver statusResolver;
 
     public ScoreCardDto aggregate(List<CheckExecutionResult> checkResults, ScoringPolicyDto policy) {
         List<CheckExecutionResult> safeCheckResults = checkResults != null ? checkResults : List.of();
@@ -75,12 +79,16 @@ public class ScoreAggregator {
                 .build();
     }
 
-    /** Collapse a single check's findings into one status (used to build per-check results). */
-    public RubricResultStatus collapseCheckStatus(List<RawFinding> findings) {
+    /**
+     * Collapse a single check's findings into one status (used to build per-check results).
+     * Findings arrive post category override, so an "acceptable" error no longer fails its check
+     * while an uncategorized error still does — see {@link FindingStatusResolver}.
+     */
+    public RubricResultStatus collapseCheckStatus(List<EvaluatedFinding> findings) {
         RubricResultStatus status = RubricResultStatus.ACCEPTABLE;
         if (findings != null) {
-            for (RawFinding f : findings) {
-                status = upgrade(status, f.getSeverity());
+            for (EvaluatedFinding f : findings) {
+                status = worse(status, statusResolver.statusOf(f));
             }
         }
         return status;
@@ -102,16 +110,6 @@ public class ScoreAggregator {
                 .build();
     }
 
-    private RubricResultStatus upgrade(RubricResultStatus current, Severity severity) {
-        return switch (severity) {
-            case ERROR -> RubricResultStatus.UNACCEPTABLE;
-            case WARNING -> current == RubricResultStatus.UNACCEPTABLE
-                    ? RubricResultStatus.UNACCEPTABLE
-                    : RubricResultStatus.ACCEPTABLE_WITH_WARNINGS;
-            case INFORMATION -> current;
-        };
-    }
-
     /** Keeps whichever of two statuses is worse (higher severity rank). */
     private RubricResultStatus worse(RubricResultStatus current, RubricResultStatus candidate) {
         return severityRank(candidate) > severityRank(current) ? candidate : current;
@@ -120,11 +118,14 @@ public class ScoreAggregator {
     private RubricResultStatus rollUp(Collection<RubricResultStatus> statuses, RollupStrategy rollup) {
         RollupStrategy strategy = rollup != null ? rollup : RollupStrategy.WORST_OF;
         return switch (strategy) {
-            case WORST_OF -> worstOf(statuses);
+            // ALL_MUST_PASS is a documented alias of WORST_OF, not a stricter variant: "every entry
+            // must pass" and "the overall status is the worst status present" are the same rule once
+            // a warning is not treated as a failure. It is retained rather than removed because it
+            // is a persisted value in rubric_version.scoring_policy_json.
+            case WORST_OF, ALL_MUST_PASS -> worstOf(statuses);
             case BEST_OF -> bestOf(statuses);
             case PASS_FAIL -> passFail(statuses);
             case MAJORITY -> majority(statuses);
-            case ALL_MUST_PASS -> allMustPass(statuses);
         };
     }
 
@@ -149,12 +150,6 @@ public class ScoreAggregator {
         return severityRank(status) >= severityRank(RubricResultStatus.UNACCEPTABLE)
                 ? RubricResultStatus.UNACCEPTABLE
                 : RubricResultStatus.ACCEPTABLE;
-    }
-
-    private RubricResultStatus allMustPass(Collection<RubricResultStatus> statuses) {
-        return worstOf(statuses) == RubricResultStatus.ACCEPTABLE
-                ? RubricResultStatus.ACCEPTABLE
-                : RubricResultStatus.UNACCEPTABLE;
     }
 
     private RubricResultStatus majority(Collection<RubricResultStatus> statuses) {
