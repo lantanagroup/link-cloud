@@ -96,7 +96,7 @@ services:
     ports:
       - '6379:6379'
     container_name: redis_cache
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS} --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes: 
       - redis_cache:/data
     networks:
@@ -598,8 +598,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
       ResourceCache__CacheImplementation: Hybrid
-      ResourceCache__Redis__ConnectionString: redis_cache:6379
-      ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
@@ -641,8 +640,7 @@ services:
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
        ResourceCache__CacheImplementation: Hybrid
-       ResourceCache__Redis__ConnectionString: redis_cache:6379
-       ResourceCache__Redis__Password: ${REDIS_PASS}
+       ResourceCache__Redis__MaxMemoryBytes: 268435456
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
        ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
        ResourceCache__BlobStorage__BlobRoot: resource-cache
@@ -699,10 +697,18 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
+      KafkaConnection__BootstrapServers__0: kafka_b:9092
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
+      PreQualification__WritePreQualOperationOutcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
+      pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
+      InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -736,6 +742,7 @@ services:
       resource-cache.blob-storage.blob-root: resource-cache
       link.report.base-url: http://report:8072
       spring.data.redis.password: ${REDIS_PASS}
+      authentication.signing-key: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
     ports:
       - "8067:8067"
     build:
@@ -766,8 +773,9 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
       ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
@@ -838,6 +846,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
+      PreQualification__WritePreQualOperationOutcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
@@ -953,6 +962,7 @@ services:
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
       spring.data.redis.password: ${REDIS_PASS}
+      authentication.signing-key: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       pre-qualification.write-expressions-in-operation-outcome: ${VALIDATION_WRITE_OO_EXPRESSIONS:-true}
     ports:

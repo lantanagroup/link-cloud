@@ -5,8 +5,9 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Collections.Concurrent;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
@@ -20,7 +21,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly IResourceCache _redisCache;
         private readonly IResourceCache _absCache;
-        private readonly IConnectionMultiplexer _multiplexer;
+        private readonly IRedisDatabase _redisDatabase;
         private readonly ResourceCacheSettings _settings;
         private readonly ILogger<HybridResourceCache> _logger;
 
@@ -29,29 +30,29 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public HybridResourceCache(
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
-            IConnectionMultiplexer multiplexer,
+            IRedisDatabase redisDatabase,
             IOptions<ResourceCacheSettings> settings,
             ILogger<HybridResourceCache> logger)
         {
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
-            _multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
+            _redisDatabase = redisDatabase ?? throw new ArgumentNullException(nameof(redisDatabase));
             _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
-            var cache = DetermineAndRecordCache(correlationId);
-            cache.UpdateCorrelationCache(correlationId, resources, resourceType);
+            var cache = await DetermineAndRecordCacheAsync(correlationId, cancellationToken);
+            await cache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
         }
 
         /// <inheritdoc/>
-        public List<DomainResource> Get(string cacheKey)
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             var cache = ResolveFromKey(cacheKey);
-            return cache.Get(cacheKey);
+            return await cache.GetAsync(cacheKey, cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -62,7 +63,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public void Delete(List<string> cacheKeys)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
             var byType = cacheKeys
                 .GroupBy(k => _correlationCacheTypes.GetValueOrDefault(ExtractCorrelationId(k), ResourceCacheType.Redis));
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             foreach (var group in byType)
             {
                 var cache = group.Key == ResourceCacheType.ABS ? _absCache : _redisCache;
-                cache.Delete(group.ToList());
+                await cache.DeleteAsync(group.ToList(), cancellationToken);
             }
 
             // Clean up recorded decisions for deleted keys
@@ -94,10 +95,15 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         // -------------------------------------------------------------------------
 
-        private IResourceCache DetermineAndRecordCache(string correlationId)
+        private async Task<IResourceCache> DetermineAndRecordCacheAsync(string correlationId, CancellationToken cancellationToken)
         {
             var key = ExtractCorrelationId(correlationId);
-            var cacheType = _correlationCacheTypes.GetOrAdd(key, _ => SelectCacheType());
+            if (!_correlationCacheTypes.TryGetValue(key, out var cacheType))
+            {
+                cacheType = await SelectCacheTypeAsync(cancellationToken);
+                cacheType = _correlationCacheTypes.GetOrAdd(key, cacheType);
+            }
+
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
@@ -108,11 +114,11 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
-        private ResourceCacheType SelectCacheType()
+        private async Task<ResourceCacheType> SelectCacheTypeAsync(CancellationToken cancellationToken)
         {
             try
             {
-                var server = _multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
+                var server = _redisDatabase.Database.Multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
 
                 if (server == null)
                 {
@@ -120,7 +126,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     return ResourceCacheType.ABS;
                 }
 
-                var memoryInfo = server.Info("memory").FirstOrDefault();
+                var memoryInfo = (await server.InfoAsync("memory").WaitAsync(cancellationToken)).FirstOrDefault();
 
                 if (memoryInfo == null)
                 {
@@ -137,16 +143,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     return ResourceCacheType.Redis;
                 }
 
-                if (!infoDict.TryGetValue("maxmemory", out var maxMemoryStr) ||
-                    !long.TryParse(maxMemoryStr, out var maxMemory) ||
-                    maxMemory == 0)
+                // Azure Managed Redis does not return `maxmemory` via INFO, so the limit is
+                // supplied through configuration instead. Continue reading `used_memory` above.
+                var maxMemoryBytes = _settings.Redis.MaxMemoryBytes;
+                if (maxMemoryBytes is null or <= 0)
                 {
-                    // No memory limit configured — Redis is unconstrained, always use it.
-                    _logger.LogDebug("Redis maxmemory is not configured or unlimited; defaulting to Redis resource cache.");
+                    _logger.LogWarning(
+                        "ResourceCache:Redis:MaxMemoryBytes is not configured or invalid ({MaxMemoryBytes}); " +
+                        "cannot evaluate Redis memory pressure. Defaulting to Redis resource cache.",
+                        maxMemoryBytes);
                     return ResourceCacheType.Redis;
                 }
 
-                double usagePercent = (double)usedMemory / maxMemory * 100.0;
+                double usagePercent = (double)usedMemory / maxMemoryBytes.Value * 100.0;
 
                 if (usagePercent >= _settings.Redis.MemoryThresholdPercent)
                 {

@@ -227,8 +227,8 @@ public class AcquisitionProcessorBackgroundServiceTests
         // stopping the service mid-tail. The resource cache returns an empty encounter set so the
         // non-org strip in the tail path runs without touching a real cache.
         _fixture.ResourceCacheMock
-            .Setup(c => c.Get(It.IsAny<string>()))
-            .Returns(new List<Hl7.Fhir.Model.DomainResource>());
+            .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Hl7.Fhir.Model.DomainResource>());
 
         var tailProducedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _fixture.ResourcesAcquiredProducerMock.Reset();

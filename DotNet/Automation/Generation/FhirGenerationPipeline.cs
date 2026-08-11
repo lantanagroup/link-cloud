@@ -1,7 +1,11 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Helpers;
+using System.Reflection;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -27,6 +31,8 @@ public static class FhirGenerationPipeline
 {
     private const int MaxEntriesPerBundle = 500;
     private const int MaxConcurrentPatients = 4;
+    private const string TemplateRunTag = "template-run";
+    private static readonly Lazy<string> GeneratorDependencyFingerprint = new(ComputeGeneratorDependencyFingerprint);
 
     /// <summary>
     /// Result of a pipeline run. Contains all metadata needed by validators and the
@@ -47,6 +53,12 @@ public static class FhirGenerationPipeline
 
         /// <summary>Total number of transaction bundle chunks uploaded.</summary>
         public int TotalBundlesUploaded { get; init; }
+
+        /// <summary>
+        /// Deterministic template cache keys used for generated patients, ordered by
+        /// generated patient ordinal. Used for immutable cache-version pinning.
+        /// </summary>
+        public IReadOnlyList<string> GeneratedTemplateKeys { get; init; } = [];
     }
 
     /// <summary>
@@ -92,7 +104,8 @@ public static class FhirGenerationPipeline
         GenerationRequirementsPlan? generationRequirementsPlan = null,
         AcquisitionSimulationConfig? acquisitionSimulation = null,
         string? runId = null,
-        IReadOnlyList<ImportedPatientInput>? importedPatients = null)
+        IReadOnlyList<ImportedPatientInput>? importedPatients = null,
+        IGeneratedPatientTemplateCache? generatedTemplateCache = null)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
@@ -157,7 +170,13 @@ public static class FhirGenerationPipeline
         // ------------------------------------------------------------------
         // Shared infrastructure — generated once, uploaded first
         // ------------------------------------------------------------------
-        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan);
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan, effectiveRunId);
+
+        if (generatedTemplateCache != null && !IsSafeRunTagForTemplateCache(ids.RunTag))
+        {
+            output.WriteLine($"[Pipeline] Run tag '{ids.RunTag}' is not in the expected generated format; skipping generated template cache for this run.");
+            generatedTemplateCache = null;
+        }
 
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
@@ -179,6 +198,7 @@ public static class FhirGenerationPipeline
         // sequential within each patient's chunk sequence)
         // ------------------------------------------------------------------
         var patientIds = new string[profiles.Count];
+        var generatedTemplateKeys = new string[profiles.Count];
         var totalBundlesUploaded = sharedBundles.Count;
         var completedPatients = 0;
         var semaphore = new SemaphoreSlim(MaxConcurrentPatients, MaxConcurrentPatients);
@@ -192,7 +212,7 @@ public static class FhirGenerationPipeline
                 await semaphore.WaitAsync();
                 try
                 {
-                    var (patientId, profile, bundleCount) = await GenerateAndUploadSinglePatientAsync(
+                    var (patientId, profile, bundleCount, templateKey) = await GenerateAndUploadSinglePatientAsync(
                         output,
                         fhirDataLoader,
                         manifestBuilder,
@@ -209,9 +229,11 @@ public static class FhirGenerationPipeline
                         generationClinicalPeriodEnd,
                         config,
                         generationRequirementsPlan,
-                        ids);
+                        ids,
+                        generatedTemplateCache);
 
                     patientIds[patientIndex] = patientId;
+                    generatedTemplateKeys[patientIndex] = templateKey;
                     Interlocked.Add(ref totalBundlesUploaded, bundleCount);
 
                     var done = Interlocked.Increment(ref completedPatients);
@@ -243,7 +265,9 @@ public static class FhirGenerationPipeline
                     imported,
                     measures,
                     sharedSimEntries,
-                    acquisitionSimulation);
+                    acquisitionSimulation,
+                    generationClinicalPeriodStart,
+                    generationClinicalPeriodEnd);
 
                 importedPatientIds.Add(patientId);
                 totalBundlesUploaded += bundleCount;
@@ -265,7 +289,8 @@ public static class FhirGenerationPipeline
         {
             PatientIds = allPatientIds,
             Manifest = manifest,
-            TotalBundlesUploaded = totalBundlesUploaded
+            TotalBundlesUploaded = totalBundlesUploaded,
+            GeneratedTemplateKeys = generatedTemplateKeys.Where(k => !string.IsNullOrWhiteSpace(k)).ToList()
         };
     }
 
@@ -273,7 +298,7 @@ public static class FhirGenerationPipeline
     /// Generates a single patient's FHIR resources, uploads them, accumulates manifest
     /// metadata, optionally runs acquisition simulation, then discards all FHIR data.
     /// </summary>
-    private static async Task<(string PatientId, PatientProfile Profile, int BundleCount)> GenerateAndUploadSinglePatientAsync(
+    private static async Task<(string PatientId, PatientProfile Profile, int BundleCount, string TemplateKey)> GenerateAndUploadSinglePatientAsync(
         IAutomationOutput output,
         FhirDataLoader fhirDataLoader,
         GenerationManifest.IncrementalBuilder manifestBuilder,
@@ -290,7 +315,8 @@ public static class FhirGenerationPipeline
         DateTime? generationClinicalPeriodEnd,
         FhirGenerationConfig? config,
         GenerationRequirementsPlan? generationRequirementsPlan,
-        FhirBundleGenerator.SharedIds ids)
+        FhirBundleGenerator.SharedIds ids,
+        IGeneratedPatientTemplateCache? generatedTemplateCache)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
@@ -299,11 +325,54 @@ public static class FhirGenerationPipeline
         // Falls back to run-level default for profiles that do not specify a concrete target.
         var effectiveResourcesPerPatient = profile.ResourcesPerPatient ?? totalResourcesPerPatient;
 
-        // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
-        var entries = GeneratePatientEntries(
-            profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
-            sharedPractitionerIds, sharedMedicationIds, measures,
-            generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
+        var templateCacheKey = ComputeTemplateCacheKey(
+            profile,
+            patientIndex,
+            baseSeed,
+            effectiveResourcesPerPatient,
+            measures,
+            generationClinicalPeriodStart,
+            generationClinicalPeriodEnd,
+            config,
+            generationRequirementsPlan);
+
+        List<Bundle.EntryComponent> entries;
+        List<(string Name, string Json)> bundles;
+
+        var cachedTemplate = generatedTemplateCache == null
+            ? null
+            : await generatedTemplateCache.GetAsync(templateCacheKey);
+
+        if (cachedTemplate == null)
+        {
+            // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
+            entries = GeneratePatientEntries(
+                profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
+                sharedPractitionerIds, sharedMedicationIds, measures,
+                generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
+
+            bundles = ChunkEntries(entries, patientId, 0);
+
+            if (generatedTemplateCache != null)
+            {
+                var templateBundles = bundles.Select(b => ReplaceRunTag(b.Json, ids.RunTag, TemplateRunTag)).ToList();
+                await generatedTemplateCache.StoreAsync(templateCacheKey, new GeneratedPatientTemplate(TemplateRunTag, templateBundles));
+                output.WriteLine($"  [cache] Miss for {patientId}; stored template key={templateCacheKey}.");
+            }
+        }
+        else
+        {
+            var materialized = cachedTemplate.BundleJson
+                .Select(json => ReplaceRunTag(json, cachedTemplate.TemplateRunTag, ids.RunTag))
+                .ToList();
+
+            bundles = materialized
+                .Select((json, idx) => (Name: $"{patientId}-bundle-{idx + 1:D3}", Json: json))
+                .ToList();
+
+            entries = ParseBundleEntriesFromJson(materialized);
+            output.WriteLine($"  [cache] Hit for {patientId}; reused template key={templateCacheKey}.");
+        }
 
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
                        ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
@@ -316,6 +385,35 @@ public static class FhirGenerationPipeline
             generationClinicalPeriodEnd);
 
         var encounterId = $"{patientId}-Enc-001";
+        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
+        // (inspects in-memory Encounter + Condition attributes — no seed replay).
+        //
+        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
+        // measure's MeasureReport does not contain the patient's resources, so its SDE
+        // semantics do not contribute to the intersection of exclusions that determines
+        // whether a resource reaches ABS.
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureEligibilityLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -325,7 +423,7 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            var eligible = profile.QualifiesFor(m) ? "Q" : "NQ";
+            var eligible = effectiveProfile.QualifiesFor(m) ? "Q" : "NQ";
             return $"{shortName}={eligible}";
         }));
 
@@ -333,26 +431,8 @@ public static class FhirGenerationPipeline
                          $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
         // Record patient in manifest builder
-        manifestBuilder.AddPatient(patientId, profile);
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
-        // (inspects in-memory Encounter + Condition attributes — no seed replay).
-        //
-        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
-        // measure's MeasureReport does not contain the patient's resources, so its SDE
-        // semantics do not contribute to the intersection of exclusions that determines
-        // whether a resource reaches ABS.
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // Run acquisition simulation BEFORE we serialize and discard
         if (acquisitionSimulation != null)
@@ -376,9 +456,6 @@ public static class FhirGenerationPipeline
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
 
-        // Serialize into chunks, upload sequentially, then discard
-        var bundles = ChunkEntries(entries, patientId, 0);
-
         // Entries list is no longer needed — allow GC before upload
         entries.Clear();
 
@@ -390,7 +467,7 @@ public static class FhirGenerationPipeline
         // Bundles are no longer needed — allow GC
         bundles.Clear();
 
-        return (patientId, profile, bundleCount);
+        return (patientId, profile, bundleCount, templateCacheKey);
     }
 
     /// <summary>
@@ -409,7 +486,9 @@ public static class FhirGenerationPipeline
         ImportedPatientInput imported,
         IReadOnlyList<ProfiledMeasureType> measures,
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
-        AcquisitionSimulationConfig? acquisitionSimulation)
+        AcquisitionSimulationConfig? acquisitionSimulation,
+        DateTime? generationClinicalPeriodStart,
+        DateTime? generationClinicalPeriodEnd)
     {
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
@@ -469,6 +548,28 @@ public static class FhirGenerationPipeline
 
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
+        // 3. CQL filter simulation + period-aware eligibility prediction
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -478,25 +579,13 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            return $"{shortName}={(profile.QualifiesFor(m) ? "Q" : "NQ")}";
+            return $"{shortName}={(effectiveProfile.QualifiesFor(m) ? "Q" : "NQ")}";
         }));
         output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{measureLabel}] | source={imported.Source}");
 
-        // 3. Manifest
-        manifestBuilder.AddPatient(patientId, profile);
+        // 4. Manifest
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // 4. CQL filter simulation (same as generated path)
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // 5. Acquisition simulation (same as generated path)
         if (acquisitionSimulation != null)
@@ -538,6 +627,52 @@ public static class FhirGenerationPipeline
         }
 
         return (patientId, bundleCount);
+    }
+
+    private static PatientProfile ApplyMeasurementPeriodEligibilityPrediction(
+        string patientId,
+        PatientProfile profile,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        CqlFilterSimulator.PatientCqlInput cqlInput,
+        DateTime? measurementPeriodStart,
+        DateTime? measurementPeriodEnd,
+        IAutomationOutput output)
+    {
+        if (!measurementPeriodStart.HasValue || !measurementPeriodEnd.HasValue)
+            return profile;
+
+        var constrainedInput = cqlInput with
+        {
+            MeasurementPeriodStart = measurementPeriodStart.Value,
+            MeasurementPeriodEnd = measurementPeriodEnd.Value
+        };
+
+        var adjusted = new Dictionary<ProfiledMeasureType, MeasureEligibility>(profile.MeasureEligibilities);
+        var downgraded = new List<string>();
+
+        foreach (var measure in measures)
+        {
+            if (!adjusted.TryGetValue(measure, out var eligibility)
+                || eligibility != MeasureEligibility.Qualifying)
+            {
+                continue;
+            }
+
+            var hasInPeriodIpOverlap = MeasureInitialPopulationResolver.Resolve([measure], constrainedInput).Count > 0;
+            if (hasInPeriodIpOverlap)
+                continue;
+
+            adjusted[measure] = MeasureEligibility.NonQualifying;
+            downgraded.Add(measure.ToString());
+        }
+
+        if (downgraded.Count > 0)
+        {
+            output.WriteLine(
+                $"  [prediction] Patient {patientId}: downgraded to NQ for {string.Join(", ", downgraded)} due to no initial-population encounter overlap with report period.");
+        }
+
+        return profile with { MeasureEligibilities = adjusted };
     }
 
     /// <summary>
@@ -626,7 +761,9 @@ public static class FhirGenerationPipeline
             encStart, encEnd, scenario, anchors, encounter,
             sharedPractitionerIds, sharedMedicationIds, config, ids,
             generationRequirementsPlan,
-            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication());
+            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication(),
+            measurementPeriodStart: generationClinicalPeriodStart,
+            measurementPeriodEnd: generationClinicalPeriodEnd);
 
         return entries;
     }
@@ -636,14 +773,160 @@ public static class FhirGenerationPipeline
     // ------------------------------------------------------------------
 
     private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds, FhirBundleGenerator.SharedIds Ids)
-        GenerateSharedInfrastructure(GenerationRequirementsPlan? generationRequirementsPlan)
+        GenerateSharedInfrastructure(GenerationRequirementsPlan? generationRequirementsPlan, string runTag)
     {
         // All shared-infrastructure construction lives in ScenarioResourceGeneration so
         // FhirBundleGenerator (bulk path) and FhirGenerationPipeline (streaming path)
         // can never drift on shared-resource shape, IDs, or order.
-        var ids = new FhirBundleGenerator.SharedIds();
+        var ids = new FhirBundleGenerator.SharedIds(runTag);
         var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
         return (entries, practitionerIds, medicationIds, ids);
+    }
+
+    private static string ComputeTemplateCacheKey(
+        PatientProfile profile,
+        int patientIndex,
+        int baseSeed,
+        int resourcesPerPatient,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        DateTime? periodStart,
+        DateTime? periodEnd,
+        FhirGenerationConfig? config,
+        GenerationRequirementsPlan? requirements)
+    {
+        var keyPayload = JsonSerializer.Serialize(new
+        {
+            PatientProfile = profile,
+            PatientIndex = patientIndex,
+            BaseSeed = baseSeed,
+            ResourcesPerPatient = resourcesPerPatient,
+            Measures = measures.Select(m => m.ToString()).ToArray(),
+            PeriodStart = periodStart,
+            PeriodEnd = periodEnd,
+            Config = config,
+            Requirements = requirements,
+            GeneratorDependencyFingerprint = GeneratorDependencyFingerprint.Value
+        });
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(keyPayload));
+        return Convert.ToHexString(hash);
+    }
+
+    private static string ComputeGeneratorDependencyFingerprint()
+    {
+        var assembly = typeof(FhirGenerationPipeline).Assembly;
+        var dependencyNames = new[]
+        {
+            "Automation",
+            "Hl7.Fhir.Base",
+            "Hl7.Fhir.Support"
+        };
+
+        var dependencies = assembly
+            .GetReferencedAssemblies()
+            .Where(reference => dependencyNames.Contains(reference.Name, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(reference => reference.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var payload = new StringBuilder();
+        payload.Append("pipeline=").Append(GetAssemblyIdentityHash(assembly));
+
+        foreach (var dependency in dependencies)
+        {
+            payload.Append('|')
+                .Append(dependency.Name)
+                .Append('=')
+                .Append(dependency.Version?.ToString() ?? "none")
+                .Append(':')
+                .Append(GetLoadedAssemblyHash(dependency.Name ?? string.Empty));
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload.ToString()));
+        return Convert.ToHexString(hash);
+    }
+
+    private static string GetLoadedAssemblyHash(string assemblyName)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyName))
+            return "none";
+
+        var loaded = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .FirstOrDefault(a => string.Equals(a.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));
+
+        return loaded == null ? "unloaded" : GetAssemblyIdentityHash(loaded);
+    }
+
+    private static string GetAssemblyIdentityHash(Assembly assembly)
+    {
+        var version = assembly.GetName().Version?.ToString() ?? "none";
+        var moduleVersion = assembly.ManifestModule.ModuleVersionId.ToString("N");
+        var locationHash = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(assembly.Location) && File.Exists(assembly.Location))
+        {
+            try
+            {
+                using var stream = File.OpenRead(assembly.Location);
+                var bytes = SHA256.HashData(stream);
+                locationHash = Convert.ToHexString(bytes);
+            }
+            catch
+            {
+                locationHash = "io-error";
+            }
+        }
+
+        var payload = $"{assembly.GetName().Name}:{version}:{moduleVersion}:{locationHash}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
+    }
+
+    private static string ReplaceRunTag(string json, string sourceRunTag, string targetRunTag)
+    {
+        if (!IsAllowedTemplateReplacementTag(sourceRunTag) || !IsAllowedTemplateReplacementTag(targetRunTag))
+            return json;
+
+        if (string.Equals(sourceRunTag, targetRunTag, StringComparison.Ordinal))
+            return json;
+
+        return json.Replace(sourceRunTag, targetRunTag, StringComparison.Ordinal);
+    }
+
+    private static bool IsAllowedTemplateReplacementTag(string runTag)
+    {
+        return string.Equals(runTag, TemplateRunTag, StringComparison.Ordinal)
+            || IsSafeRunTagForTemplateCache(runTag);
+    }
+
+    private static bool IsSafeRunTagForTemplateCache(string? runTag)
+    {
+        if (string.IsNullOrWhiteSpace(runTag) || runTag.Length != 8)
+            return false;
+
+        foreach (var ch in runTag)
+        {
+            if (!Uri.IsHexDigit(ch))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static List<Bundle.EntryComponent> ParseBundleEntriesFromJson(IReadOnlyList<string> bundleJson)
+    {
+        var parser = new FhirJsonParser();
+        var entries = new List<Bundle.EntryComponent>();
+
+        foreach (var json in bundleJson)
+        {
+            var bundle = parser.Parse<Bundle>(json);
+            if (bundle?.Entry is { Count: > 0 })
+            {
+                entries.AddRange(bundle.Entry.Where(entry => entry?.Resource != null));
+            }
+        }
+
+        return entries;
     }
 
     private static (DateTime Start, DateTime End) DeriveEncounterWindowForProfile(

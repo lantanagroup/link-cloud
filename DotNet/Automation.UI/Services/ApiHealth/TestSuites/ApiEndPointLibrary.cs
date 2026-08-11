@@ -14,6 +14,7 @@ public static class ApiEndPointLibrary
         var services = new[]
         {
             ServiceNames.AdminBff,
+            ServiceNames.AdminBffAuth,
             ServiceNames.Census,
             ServiceNames.DataAcquisition,
             ServiceNames.MeasureEval,
@@ -68,6 +69,7 @@ public static class ApiEndPointLibrary
         serviceName switch
         {
             ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps)),
+            ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
             ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps)),
             ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps)),
@@ -128,6 +130,19 @@ public static class ApiEndPointLibrary
         [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffAuthMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AdminBffAuthSteps.ValidBearerGet200] = new EndpointMeta("Valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.TokenReuseGet200] = new EndpointMeta("Reused valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.InvalidSignatureBearerGet401] = new EndpointMeta("Invalid-signature Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.ExpiredBearerGet401Or403] = new EndpointMeta("Expired Bearer token GET \u2192 401/403", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.EmptyBearerGet401] = new EndpointMeta("Empty Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.MalformedBearerGet401] = new EndpointMeta("Malformed Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.MissingAuthHeaderGet401] = new EndpointMeta("Missing Authorization header GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.InvalidAuthSchemeGet401] = new EndpointMeta("Invalid auth scheme (Basic) GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.CrossApiTokenReuseGet401] = new EndpointMeta("Cross-API token reuse GET \u2192 401", "GET /aggregate/reports/summaries (auth)")
+    };
+
     private sealed record EndpointMeta(string? Description, string? Group, string? SkipReason = null);
 
     private static ApiEndpointDefinition Step(string service, string name, string desc, string? group = null) => new()
@@ -152,6 +167,7 @@ public static class ApiEndPointLibrary
     public static class ServiceNames
     {
         public const string AdminBff = "AdminBff";
+        public const string AdminBffAuth = "AdminBffAuth";
         public const string Census = "Census";
         public const string DataAcquisition = "DataAcquisition";
         public const string MeasureEval = "MeasureEval";
@@ -177,6 +193,19 @@ public static class ApiEndPointLibrary
         public const string ReportDelete404 = "Report DELETE → 404";
         public const string ReportRestorePatch204 = "Report Restore PATCH → 204";
         public const string ReportRestorePatch404 = "Report Restore PATCH → 404";
+    }
+
+    public static class AdminBffAuthSteps
+    {
+        public const string ValidBearerGet200 = "Valid credentials/token → access granted";
+        public const string TokenReuseGet200 = "Valid token reuse → access granted";
+        public const string InvalidSignatureBearerGet401 = "Invalid credentials/token → access denied (401)";
+        public const string ExpiredBearerGet401Or403 = "Expired credentials/token → access denied (401/403)";
+        public const string EmptyBearerGet401 = "Missing access token (Bearer empty) → 401";
+        public const string MalformedBearerGet401 = "Invalid access token (malformed) → 401";
+        public const string MissingAuthHeaderGet401 = "Missing auth header → 401";
+        public const string InvalidAuthSchemeGet401 = "Invalid auth scheme (Basic) → 401";
+        public const string CrossApiTokenReuseGet401 = "Cross-API token reuse → 401";
     }
 
     public static class CensusSteps
@@ -296,14 +325,6 @@ public static class ApiEndPointLibrary
         public const string SequencesDelete204 = "SEQUENCES DELETE → 204";
         public const string SequencesDelete404 = "SEQUENCES DELETE → 404";
         public const string SequencesDelete400EmptyFacility = "SEQUENCES DELETE → 400 (empty facility)";
-        public const string VendorPost201 = "VENDOR POST → 201";
-        public const string VendorPost409 = "VENDOR POST → 409";
-        public const string VendorGet200 = "VENDOR GET → 200";
-        public const string VendorsGet200 = "VENDORS GET → 200";
-        public const string PresetPost201 = "PRESET POST → 201";
-        public const string PresetsGet200 = "PRESETS GET → 200";
-        public const string PresetDelete204 = "PRESET DELETE → 204";
-        public const string VendorDelete204 = "VENDOR DELETE → 204";
     }
 
     public static class QueryDispatchSteps
@@ -385,7 +406,6 @@ public static class ApiEndPointLibrary
     {
         public const string Create201 = "Create → 201";
         public const string Create400Duplicate = "Create → 400 (duplicate)";
-        public const string Create400NoVendor = "Create → 400 (no vendor)";
         public const string Create400NoName = "Create → 400 (no name)";
         public const string Search200 = "Search → 200";
         public const string Search204NoResults = "Search → 204 (no results)";
@@ -395,7 +415,6 @@ public static class ApiEndPointLibrary
         public const string Get404 = "Get → 404";
         public const string Update200 = "Update → 200";
         public const string Update404NonExistent = "Update → 404 (non-existent)";
-        public const string Update400NoVendor = "Update → 400 (no vendor)";
         public const string CheckExists200 = "CheckExists → 200";
         public const string CheckExists404 = "CheckExists → 404";
         public const string SoftDelete204 = "SoftDelete → 204";
@@ -404,6 +423,11 @@ public static class ApiEndPointLibrary
         public const string Restore204 = "Restore → 204";
         public const string Restore400NotDeleted = "Restore → 400 (not deleted)";
         public const string Restore404NonExistent = "Restore → 404 (non-existent)";
+        public const string VendorPost201 = "Vendor POST → 201";
+        public const string VendorPost409 = "Vendor POST → 409";
+        public const string VendorGet200 = "Vendor GET → 200";
+        public const string VendorsGet200 = "Vendors GET → 200";
+        public const string VendorDelete204 = "Vendor DELETE → 204";
         public const string Delete204 = "Delete → 204";
         public const string Delete404NonExistent = "Delete → 404 (non-existent)";
         public const string AdHoc200Seeded = "AdHocReport → 200 (seeded)";

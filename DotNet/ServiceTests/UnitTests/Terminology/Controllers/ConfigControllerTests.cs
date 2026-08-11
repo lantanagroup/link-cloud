@@ -161,6 +161,28 @@ public class ConfigControllerTests
     }
 
     [Fact]
+    public void GetCodeSystemCode_DuplicateCode_ReturnsLastOccurrence()
+    {
+        // A CSV may list the same code twice with differing status (Active then Inactive).
+        // Last-one-wins (LEGLINK-599/814): the endpoint must return the last occurrence's status,
+        // agreeing with $validate-code rather than returning the first (Active) entry.
+        const string code = "ACCTRECEIVABLE";
+        var codeGroup = CodeSystemWithCodes(
+            new CodeSystemCode { Value = code, Display = "account receivable", Status = CodeStatus.Active },
+            new CodeSystemCode { Value = code, Display = "account receivable", Status = CodeStatus.Inactive });
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null))
+            .Returns(codeGroup);
+
+        var result = _controller.GetCodeSystemCode(CodeSystemId, code);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var match = Assert.IsType<CodeSystemCode>(ok.Value);
+        Assert.Equal(code, match.Value);
+        Assert.Equal(CodeStatus.Inactive, match.Status);
+    }
+
+    [Fact]
     public void GetCodeSystemCode_Match_ReturnsOkWithCode()
     {
         var expected = new Code { Value = "12345", Display = "Matching code" };

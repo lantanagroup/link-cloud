@@ -40,7 +40,7 @@ public static class StartScenarioRequestResolver
             {
                 NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
             },
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], [])
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 30, 30, false, true, defaultMeasures, [], [])
             {
                 NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
             },
@@ -82,6 +82,14 @@ public static class StartScenarioRequestResolver
               ?? [];
 
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
+
+        var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
+        if (hasImportedPatients && (!reportStart.HasValue || !reportEnd.HasValue))
+        {
+            throw new InvalidOperationException(
+                "Report period start and end are required when imported patients are included in a run.");
+        }
+
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
 

@@ -15,18 +15,16 @@ public class LokiScraper
     {
         if (lokiClient.BaseAddress == null)
         {
-            var configuredBaseUrl = string.IsNullOrWhiteSpace(config.LokiBaseUrl)
-                ? "http://localhost:3100"
-                : config.LokiBaseUrl;
+            if (!Uri.TryCreate(config.LokiBaseUrl, UriKind.Absolute, out var lokiBaseUri))
+                throw new InvalidOperationException("LokiBaseUrl must be an absolute URI.");
 
-            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var lokiBaseUri))
-                lokiClient.BaseAddress = lokiBaseUri;
+            lokiClient.BaseAddress = lokiBaseUri;
         }
 
         _output = output;
         _lokiClient = lokiClient;
         _lokiAppLabel = string.IsNullOrWhiteSpace(config.LokiAppLabel)
-            ? "link-cloud"
+            ? throw new InvalidOperationException("LokiAppLabel is required.")
             : config.LokiAppLabel.Trim();
     }
 

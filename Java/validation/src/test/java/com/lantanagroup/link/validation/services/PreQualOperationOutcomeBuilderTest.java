@@ -71,6 +71,16 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
+    void build_setsOperationOutcomeId() {
+        Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, true).orElseThrow();
+
+        assertNotNull(oo.getIdElement().getIdPart());
+        assertFalse(oo.getIdElement().getIdPart().isBlank());
+    }
+
+    @Test
     void build_issueCarriesSeverityCodeMessageAndCategoryExtension() {
         Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
 

@@ -195,12 +195,13 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
-                // FHIR Observation/DiagnosticReport `date` matching may consider either
-                // effective[x] or issued, while our generic extractor returns only one range.
-                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                // Observation `date` can be represented by different effective shapes; keep
+                // a multi-shape check there. For DiagnosticReport, use effective[x] only.
+                // Including issued here can over-predict boundary resources (issued slightly
+                // after period start while effective is before it), which does not match the
+                // DataAcquisition behavior observed in scheduled runs.
                 if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+                    && string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
                 {
                     var matchedAny = false;
                     var recognizedAny = false;
@@ -209,12 +210,6 @@ public static class QueryPlanAcquisitionSimulator
                     {
                         recognizedAny = true;
                         matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
-                    }
-
-                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
-                    {
-                        recognizedAny = true;
-                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
                     }
 
                     if (!recognizedAny)
@@ -478,7 +473,7 @@ public static class QueryPlanAcquisitionSimulator
     /// <summary>
     /// Determines whether a FHIR search parameter name is a temporal (date-like) filter.
     /// Recognized names: <c>date</c>, <c>authoredon</c>, <c>authored</c>, <c>issued</c>,
-    /// <c>effective</c>, <c>onset-date</c>, <c>recorded-date</c>.
+    /// <c>effective</c>, <c>effective-time</c>, <c>onset-date</c>, <c>recorded-date</c>.
     /// </summary>
     private static bool IsTemporalSearchParam(string paramName)
         => string.Equals(paramName, "date", StringComparison.OrdinalIgnoreCase)
@@ -486,6 +481,7 @@ public static class QueryPlanAcquisitionSimulator
            || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase);
 
@@ -509,7 +505,8 @@ public static class QueryPlanAcquisitionSimulator
             return TryGetInstant(resource, "issued", out start, out end);
         }
 
-        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase))
         {
             return TryGetEffective(resource, out start, out end);
         }
@@ -634,7 +631,52 @@ public static class QueryPlanAcquisitionSimulator
     {
         return TryGetInstant(resource, "effectiveDateTime", out start, out end)
             || TryGetInstant(resource, "effectiveInstant", out start, out end)
-            || TryGetPeriod(resource, "effectivePeriod", out start, out end);
+            || TryGetPeriod(resource, "effectivePeriod", out start, out end)
+            || TryGetTiming(resource, "effectiveTiming", out start, out end);
+    }
+
+    /// <summary>
+    /// Reads a Timing-shaped property as (start, end) by using either event instants
+    /// (min..max) or repeat.boundsPeriod when events are absent.
+    /// </summary>
+    private static bool TryGetTiming(JsonElement element, string propertyName,
+        out DateTimeOffset start, out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+
+        if (!element.TryGetProperty(propertyName, out var timing) || timing.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (timing.TryGetProperty("event", out var events)
+            && events.ValueKind == JsonValueKind.Array)
+        {
+            var parsedEvents = events.EnumerateArray()
+                .Where(e => e.ValueKind == JsonValueKind.String)
+                .Select(e => e.GetString())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+                    ? (DateTimeOffset?)parsed
+                    : null)
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .ToList();
+
+            if (parsedEvents.Count > 0)
+            {
+                start = parsedEvents.Min();
+                end = parsedEvents.Max();
+                return true;
+            }
+        }
+
+        if (timing.TryGetProperty("repeat", out var repeat)
+            && repeat.ValueKind == JsonValueKind.Object)
+        {
+            return TryGetPeriod(repeat, "boundsPeriod", out start, out end);
+        }
+
+        return false;
     }
 
     private static void AddByType(Dictionary<string, HashSet<string>> acquiredByType, string resourceType, string resourceId)
