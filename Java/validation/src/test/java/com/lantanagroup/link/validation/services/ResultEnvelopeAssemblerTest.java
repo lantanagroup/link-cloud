@@ -10,6 +10,7 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
+import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,9 +69,16 @@ class ResultEnvelopeAssemblerTest {
                 finding(checkW1, PiqiDimension.TERMINOLOGY, Severity.WARNING, "w1"),
                 finding(checkI1, PiqiDimension.COMPLETENESS, Severity.INFORMATION, "i1"));
 
+        // Per-check results the dimension scorecard scores from — findings alone no longer drive
+        // scoring, so an assembler test must supply the check results that mirror the findings.
+        List<CheckExecutionResult> checkResults = List.of(
+                CheckExecutionResult.builder().checkLocalId("c-e1").dimension(PiqiDimension.CONFORMANCE).status(RubricResultStatus.UNACCEPTABLE).build(),
+                CheckExecutionResult.builder().checkLocalId("c-w1").dimension(PiqiDimension.TERMINOLOGY).status(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS).build(),
+                CheckExecutionResult.builder().checkLocalId("c-i1").dimension(PiqiDimension.COMPLETENESS).status(RubricResultStatus.ACCEPTABLE).build());
+
         RubricVersion version = version();
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version, raw, List.of(), Map.of("c-e1", 12L), completedAt);
+                assembler.assemble(ctx, version, raw, checkResults, Map.of("c-e1", 12L), completedAt);
 
         // envelope
         assertThat(out.envelope().getRubricId()).isEqualTo("piqi.core");
