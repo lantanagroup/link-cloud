@@ -345,6 +345,23 @@
   .repeat-row input { flex: 1; }
   .repeat-row select { flex: 1; }
 
+  .mrn-patient-card { border: 1px solid var(--gray-200); border-radius: 8px; padding: 4px 14px 12px; margin-bottom: 10px; }
+  .mrn-patient-card-header { font-weight: 700; padding: 8px 0; cursor: pointer; list-style: none; }
+  .mrn-patient-card-header::-webkit-details-marker { display: none; }
+  .mrn-patient-card-header::before { content: '\25B8'; display: inline-block; margin-right: 8px; transition: transform .15s; color: var(--gray-600); }
+  .mrn-patient-card[open] > .mrn-patient-card-header::before { transform: rotate(90deg); }
+  .mrn-patient-noid { color: var(--gray-600); font-size: 13.5px; margin: 4px 0; }
+  .mrn-identifier-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 4px; }
+  .mrn-identifier-card { border: 1px solid var(--gray-200); border-radius: 8px; padding: 10px 12px; background: var(--gray-50); min-width: 0; }
+  .mrn-identifier-card-title { font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--gray-600); margin-bottom: 6px; }
+  .mrn-id-field { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; padding: 3px 0; font-size: 13px; border-top: 1px solid var(--gray-100); }
+  .mrn-id-field:first-of-type { border-top: none; }
+  .mrn-id-field-label { flex: 0 0 88px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--gray-600); }
+  .mrn-id-field-value { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .mrn-id-field-value.mrn-na { color: var(--gray-400); font-style: italic; }
+  .mrn-id-check { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--gray-600); flex: 0 0 auto; white-space: nowrap; }
+  .mrn-id-check input { margin: 0; }
+
   #panel-census.census-two-col { max-width: 1400px; }
   .census-outer-layout { display: flex; gap: 22px; align-items: flex-start; }
   .census-outer-layout > .card { flex: 1; min-width: 0; }
@@ -675,6 +692,7 @@
   .icon-btn:hover { border-color: var(--blue); background: var(--gray-50); }
 
   #panel-report-detail { max-width: 1160px; }
+  #panel-mrn-intake { max-width: 1160px; }
   .rd-status-table { table-layout: fixed; }
   .rd-status-table th, .rd-status-table td { word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
   #panel-backend-support { max-width: 1200px; }
@@ -1337,7 +1355,7 @@
 
         This form should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.</p>
 
-        <div class="section-title" style="margin-top:0;">1. Multiple MRN Candidates</div>
+        <div class="section-title" style="margin-top:0;">Multiple MRN Candidates</div>
         <div class="form-group">
           <label>In your facility's EHR, are there multiple MRN-like patient identifiers?<span class="backend-support-slot" data-support-key="mrnHasMultiple"></span></label>
           <div class="btn-group" id="mrnHasMultipleQuestion">
@@ -1363,70 +1381,48 @@
           </div>
         </div>
 
-        <div class="section-title">2. User-Facing MRN in the EHR</div>
-        <div class="form-group">
-          <label for="mrnUserFacingName">From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)<span class="backend-support-slot" data-support-key="mrnUserFacingIdentifierName"></span></label>
-          <input type="text" id="mrnUserFacingName">
-          <div class="error-text" id="mrnUserFacingNameError">This field is required.</div>
-        </div>
-        <div class="form-group">
-          <label>Is this the identifier staff call the MRN?<span class="backend-support-slot" data-support-key="mrnIsCalledMrn"></span></label>
-          <div class="btn-group" id="mrnIsCalledMrnQuestion">
-            <button type="button" class="choice-btn" data-value="true">Yes</button>
-            <button type="button" class="choice-btn" data-value="false">No</button>
+        <div id="mrnQ2Section">
+          <div class="section-title">User-Facing MRN in the EHR</div>
+          <div class="form-group">
+            <label for="mrnUserFacingName">From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)<span class="backend-support-slot" data-support-key="mrnUserFacingIdentifierName"></span></label>
+            <input type="text" id="mrnUserFacingName">
+            <div class="error-text" id="mrnUserFacingNameError">This field is required.</div>
           </div>
-          <div class="error-text" id="mrnIsCalledMrnError">Please select Yes or No.</div>
-        </div>
-        <div class="form-group" id="mrnOtherTermWrap" hidden>
-          <label for="mrnOtherTerm">If no, what term is used?</label>
-          <input type="text" id="mrnOtherTerm">
-          <div class="error-text" id="mrnOtherTermError">This field is required.</div>
-        </div>
-        <div class="form-group">
-          <label>Can staff search for patients using this identifier?<span class="backend-support-slot" data-support-key="mrnCanSearchByIdentifier"></span></label>
-          <div class="btn-group" id="mrnCanSearchQuestion">
-            <button type="button" class="choice-btn" data-value="true">Yes</button>
-            <button type="button" class="choice-btn" data-value="false">No</button>
+          <div class="form-group">
+            <label>Is this the identifier staff call the MRN?<span class="backend-support-slot" data-support-key="mrnIsCalledMrn"></span></label>
+            <div class="btn-group" id="mrnIsCalledMrnQuestion">
+              <button type="button" class="choice-btn" data-value="true">Yes</button>
+              <button type="button" class="choice-btn" data-value="false">No</button>
+            </div>
+            <div class="error-text" id="mrnIsCalledMrnError">Please select Yes or No.</div>
           </div>
-          <div class="error-text" id="mrnCanSearchError">Please select Yes or No.</div>
+          <div class="form-group" id="mrnOtherTermWrap" hidden>
+            <label for="mrnOtherTerm">If no, what term is used?</label>
+            <input type="text" id="mrnOtherTerm">
+            <div class="error-text" id="mrnOtherTermError">This field is required.</div>
+          </div>
+          <div class="form-group">
+            <label>Can staff search for patients using this identifier?<span class="backend-support-slot" data-support-key="mrnCanSearchByIdentifier"></span></label>
+            <div class="btn-group" id="mrnCanSearchQuestion">
+              <button type="button" class="choice-btn" data-value="true">Yes</button>
+              <button type="button" class="choice-btn" data-value="false">No</button>
+            </div>
+            <div class="error-text" id="mrnCanSearchError">Please select Yes or No.</div>
+          </div>
         </div>
 
-        <div class="section-title">3. Corresponding FHIR Identifier</div>
-        <p class="form-hint" style="margin-top:-8px;">In the FHIR Patient.identifier array, which identifier represents the user-facing MRN identified in Question 2?</p>
-        <div class="form-group"><label for="mrnFhirValue">FHIR identifier.value<span class="backend-support-slot" data-support-key="mrnFhirIdentifierValue"></span></label><input type="text" id="mrnFhirValue"><div class="error-text" id="mrnFhirValueError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirTypeCode">FHIR identifier.type code<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeCode"></span></label><input type="text" id="mrnFhirTypeCode"><div class="error-text" id="mrnFhirTypeCodeError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirTypeSystem">FHIR identifier.type coding system<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeSystem"></span></label><input type="text" id="mrnFhirTypeSystem"><div class="error-text" id="mrnFhirTypeSystemError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirTypeDisplay">FHIR identifier.type display text<span class="backend-support-slot" data-support-key="mrnFhirIdentifierTypeDisplay"></span></label><input type="text" id="mrnFhirTypeDisplay"><div class="error-text" id="mrnFhirTypeDisplayError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirUse">FHIR identifier.use<span class="backend-support-slot" data-support-key="mrnFhirIdentifierUse"></span></label><input type="text" id="mrnFhirUse"><div class="error-text" id="mrnFhirUseError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirSystem">FHIR identifier.system (URI/OID)<span class="backend-support-slot" data-support-key="mrnFhirIdentifierSystem"></span></label><input type="text" id="mrnFhirSystem"><div class="error-text" id="mrnFhirSystemError">This field is required.</div></div>
-        <div class="form-group"><label for="mrnFhirAssigner">FHIR identifier.assigner<span class="backend-support-slot" data-support-key="mrnFhirIdentifierAssigner"></span></label><input type="text" id="mrnFhirAssigner"><div class="error-text" id="mrnFhirAssignerError">This field is required.</div></div>
-        <div class="triplet">
-          <div class="form-group"><label for="mrnFhirPeriodStart">FHIR identifier.period.start<span class="backend-support-slot" data-support-key="mrnFhirIdentifierPeriodStart"></span></label><input type="date" id="mrnFhirPeriodStart"><div class="error-text" id="mrnFhirPeriodStartError">This field is required.</div></div>
-          <div class="form-group"><label for="mrnFhirPeriodEnd">FHIR identifier.period.end<span class="backend-support-slot" data-support-key="mrnFhirIdentifierPeriodEnd"></span></label><input type="date" id="mrnFhirPeriodEnd"><div class="error-text" id="mrnFhirPeriodEndError">This field is required.</div></div>
-        </div>
+        <div class="section-title">Corresponding FHIR Identifier</div>
+        <p class="form-hint" style="margin-top:-8px;">Below are the patients queried from your facility's reports along with each patient's Patient.identifier entries. Expand a patient to browse their identifiers. Flag any individual element (value, type, system, use, assigner, or period) that must be present to identify the usable MRN; flagged elements are added automatically as rules in the rule questionnaire. Not every patient needs to be reviewed to idenitfy all of the required identifer elements needed to identify the usable MRN.<span class="backend-support-slot" data-support-key="mrnPatientIdentifierSelections"></span></p>
+        <div id="mrnPatientIdentifierList"></div>
 
-        <div class="section-title">4. Rule to Identify the Usable MRN</div>
-        <div class="form-group">
-          <label>What rule should NHSN use to identify the usable MRN when multiple identifiers are present? Select all that apply.<span class="backend-support-slot" data-support-key="mrnUsableRule"></span></label>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleTypeMr"><label for="mrnRuleTypeMr" style="margin:0;">identifier.type = MR</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificSystem"><label for="mrnRuleSpecificSystem" style="margin:0;">Specific identifier.system</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificOid"><label for="mrnRuleSpecificOid" style="margin:0;">Specific OID/namespace</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleUseUsual"><label for="mrnRuleUseUsual" style="margin:0;">identifier.use = usual</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleUseOfficial"><label for="mrnRuleUseOfficial" style="margin:0;">identifier.use = official</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleStartDate"><label for="mrnRuleStartDate" style="margin:0;">Start date (if more than one present, use the latest start date)</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleNoEndDate"><label for="mrnRuleNoEndDate" style="margin:0;">No end date (end date is null)</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleMostRecentPeriod"><label for="mrnRuleMostRecentPeriod" style="margin:0;">Most recent period</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleSpecificAssigner"><label for="mrnRuleSpecificAssigner" style="margin:0;">Specific assigner</label></div>
-          <div class="checkbox-row"><input type="checkbox" id="mrnRuleOther"><label for="mrnRuleOther" style="margin:0;">Other rule</label></div>
-          <div class="error-text" id="mrnUsableRuleError">Please select at least one option.</div>
-        </div>
-        <div class="form-group" id="mrnRuleOtherTextWrap" hidden>
-          <label for="mrnRuleOtherText">Other rule</label>
-          <input type="text" id="mrnRuleOtherText">
-          <div class="error-text" id="mrnRuleOtherTextError">Please describe the other rule.</div>
-        </div>
+        <div class="section-title">Rule to Identify the Usable MRN</div>
+        <p class="form-hint" style="margin-top:-8px;">Build one or more rules NHSN should use to identify the usable MRN when multiple identifiers are present. Checking "must be present" in the question before automatically adds a matching rule here. You can add, edit or remove any rule.<span class="backend-support-slot" data-support-key="mrnUsableRule"></span></p>
+        <div class="repeat-list" id="mrnRuleList"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="mrnRuleAddBtn">+ Add Rule</button>
+        <div class="error-text" id="mrnUsableRuleError">Please add at least one rule.</div>
+        <div class="error-text" id="mrnRuleValueError">Please provide a value for every rule that requires one.</div>
 
-        <div class="section-title">5. Variability Across Facilities or Settings</div>
+        <div class="section-title">Variability Across Facilities or Settings</div>
         <div class="form-group">
           <label>Does MRN vary by facility/campus/setting within your health system (e.g., another hospital within your health system, but on the same EHR instance)?<span class="backend-support-slot" data-support-key="mrnVariesByFacility"></span></label>
           <div class="btn-group" id="mrnVariesQuestion">
@@ -1452,7 +1448,7 @@
           </div>
         </div>
 
-        <div class="section-title">6. MRN Changes Over Time</div>
+        <div class="section-title">MRN Changes Over Time</div>
         <div class="form-group">
           <label>Can the usable MRN change over time for the same patient?<span class="backend-support-slot" data-support-key="mrnChangesOverTime"></span></label>
           <div class="btn-group" id="mrnChangesQuestion">
@@ -2080,9 +2076,9 @@
     steps.push({ id: 'location-org', label: 'Location Org Resolution', panel: 'panel-location-org' });
     steps.push({ id: 'hsloc', label: 'HSLOC Location Mapping', panel: 'panel-hsloc' });
     steps.push({ id: 'encounter', label: 'Encounter Mapping', panel: 'panel-encounter' });
-    steps.push({ id: 'mrn-intake', label: 'MRN Identifier Intake', panel: 'panel-mrn-intake' });
     steps.push({ id: 'report', label: 'Generate Report', panel: 'panel-report' });
     steps.push({ id: 'report-results', label: 'Report Results', panel: 'panel-report-results' });
+    steps.push({ id: 'mrn-intake', label: 'MRN Identifier Intake', panel: 'panel-mrn-intake' });
     steps.push({ id: 'reporting-plan', label: 'Facility Reporting Plan', panel: 'panel-reporting-plan' });
     steps.push({ id: 'complete', label: 'Enrollment Complete', panel: 'panel-complete' });
     return steps;
@@ -2139,16 +2135,8 @@
     { key: 'mrnUserFacingIdentifierName', page: 'MRN Identifier Intake', label: 'User-Facing Identifier Name' },
     { key: 'mrnIsCalledMrn', page: 'MRN Identifier Intake', label: 'Is This Identifier Called MRN?' },
     { key: 'mrnCanSearchByIdentifier', page: 'MRN Identifier Intake', label: 'Can Staff Search By This Identifier?' },
-    { key: 'mrnFhirIdentifierValue', page: 'MRN Identifier Intake', label: 'FHIR identifier.value' },
-    { key: 'mrnFhirIdentifierTypeCode', page: 'MRN Identifier Intake', label: 'FHIR identifier.type code' },
-    { key: 'mrnFhirIdentifierTypeSystem', page: 'MRN Identifier Intake', label: 'FHIR identifier.type coding system' },
-    { key: 'mrnFhirIdentifierTypeDisplay', page: 'MRN Identifier Intake', label: 'FHIR identifier.type display text' },
-    { key: 'mrnFhirIdentifierUse', page: 'MRN Identifier Intake', label: 'FHIR identifier.use' },
-    { key: 'mrnFhirIdentifierSystem', page: 'MRN Identifier Intake', label: 'FHIR identifier.system (URI/OID)' },
-    { key: 'mrnFhirIdentifierAssigner', page: 'MRN Identifier Intake', label: 'FHIR identifier.assigner' },
-    { key: 'mrnFhirIdentifierPeriodStart', page: 'MRN Identifier Intake', label: 'FHIR identifier.period.start' },
-    { key: 'mrnFhirIdentifierPeriodEnd', page: 'MRN Identifier Intake', label: 'FHIR identifier.period.end' },
-    { key: 'mrnUsableRule', page: 'MRN Identifier Intake', label: 'Rule to Identify the Usable MRN' },
+    { key: 'mrnPatientIdentifierSelections', page: 'MRN Identifier Intake', label: 'Patient Identifier Selections (Question 3)' },
+    { key: 'mrnUsableRule', page: 'MRN Identifier Intake', label: 'Rule to Identify the Usable MRN (rule builder)' },
     { key: 'mrnVariesByFacility', page: 'MRN Identifier Intake', label: 'Varies by Facility/Campus/Setting?' },
     { key: 'mrnChangesOverTime', page: 'MRN Identifier Intake', label: 'Can the Usable MRN Change Over Time?' },
 
@@ -3207,17 +3195,8 @@
       isCalledMrn: null,
       otherTermUsed: '',
       canSearchByIdentifier: null,
-      fhirIdentifierValue: '',
-      fhirIdentifierTypeCode: '',
-      fhirIdentifierTypeSystem: '',
-      fhirIdentifierTypeDisplay: '',
-      fhirIdentifierUse: '',
-      fhirIdentifierSystem: '',
-      fhirIdentifierAssigner: '',
-      fhirIdentifierPeriodStart: '',
-      fhirIdentifierPeriodEnd: '',
-      mrnRules: [],
-      mrnRuleOtherText: '',
+      patientIdentifierSelections: {},
+      mrnRuleList: [],
       variesByFacility: null,
       varianceTypes: [],
       varianceOtherText: '',
@@ -3395,9 +3374,9 @@
       case 'location-org': renderLocationOrgPanel(); goTo('panel-location-org', 'location-org'); break;
       case 'hsloc': renderHslocPanel(); goTo('panel-hsloc', 'hsloc'); break;
       case 'encounter': renderEncounterPanel(); goTo('panel-encounter', 'encounter'); break;
-      case 'mrn-intake': renderMrnIntakeConditionals(); goTo('panel-mrn-intake', 'mrn-intake'); break;
       case 'report': renderReportPanelState(); goTo('panel-report', 'report'); break;
       case 'report-results': renderReportResultsState(); goTo('panel-report-results', 'report-results'); break;
+      case 'mrn-intake': renderMrnPatientIdentifierList(); drawMrnRuleList(); renderMrnIntakeConditionals(); goTo('panel-mrn-intake', 'mrn-intake'); break;
       case 'reporting-plan': renderReportingPlanPanel(); goTo('panel-reporting-plan', 'reporting-plan'); break;
       case 'complete': renderCompleteSummary(); goTo('panel-complete', 'complete'); break;
       default: goTo('panel-welcome', 'welcome');
@@ -5003,8 +4982,8 @@
   $('encounterBackBtn').addEventListener('click', function () { enterStep('hsloc'); });
   $('encounterNextBtn').addEventListener('click', function () {
     facility.encounterMappingAcknowledged = true;
-    unlockStep('mrn-intake');
-    saveFacility().then(function () { enterStep('mrn-intake'); });
+    unlockStep('report');
+    saveFacility().then(function () { enterStep('report'); });
   });
 
   // ---------- MRN identifier intake ----------
@@ -5015,18 +4994,75 @@
     { id: 'mrnTypeVisit', value: 'visit' },
     { id: 'mrnTypeOther', value: 'other' }
   ];
-  var MRN_RULE_CHECKBOXES = [
-    { id: 'mrnRuleTypeMr', value: 'type_mr' },
-    { id: 'mrnRuleSpecificSystem', value: 'specific_system' },
-    { id: 'mrnRuleSpecificOid', value: 'specific_oid' },
-    { id: 'mrnRuleUseUsual', value: 'use_usual' },
-    { id: 'mrnRuleUseOfficial', value: 'use_official' },
-    { id: 'mrnRuleStartDate', value: 'start_date' },
-    { id: 'mrnRuleNoEndDate', value: 'no_end_date' },
-    { id: 'mrnRuleMostRecentPeriod', value: 'most_recent_period' },
-    { id: 'mrnRuleSpecificAssigner', value: 'specific_assigner' },
-    { id: 'mrnRuleOther', value: 'other' }
+  // Rule builder vocabulary: pick a FHIR Patient.identifier element, then a rule/operator to
+  // apply to it. Operator lists are keyed by element since not every operator makes sense for
+  // every element (e.g. "no end date" only applies to period.end).
+  var MRN_RULE_ELEMENT_DEFS = [
+    { key: 'value', label: 'identifier.value' },
+    { key: 'type', label: 'identifier.type' },
+    { key: 'system', label: 'identifier.system' },
+    { key: 'use', label: 'identifier.use' },
+    { key: 'assigner', label: 'identifier.assigner' },
+    { key: 'periodStart', label: 'identifier.period.start' },
+    { key: 'periodEnd', label: 'identifier.period.end' }
   ];
+  var MRN_RULE_OPERATOR_DEFS = {
+    value: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'e.g. 100234' }
+    ],
+    type: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'e.g. MR' }
+    ],
+    system: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'e.g. http://hospital.org/fhir/identifier/mrn' }
+    ],
+    use: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'e.g. usual' }
+    ],
+    assigner: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: "e.g. St. Mary's Medical Center" }
+    ],
+    periodStart: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'YYYY-MM-DD' },
+      { key: 'latest', label: 'Use the latest start date' }
+    ],
+    periodEnd: [
+      { key: 'must_be_present', label: 'Must be present' },
+      { key: 'equals', label: 'Equals', needsValue: true, placeholder: 'YYYY-MM-DD' },
+      { key: 'absent', label: 'Must be absent (no end date)' },
+      { key: 'most_recent', label: 'Use the most recent period' }
+    ]
+  };
+  // Legacy checkbox-style rule shape (field/value) -> new element/rule shape, for facilities
+  // that saved rules under the previous design.
+  var MRN_LEGACY_RULE_FIELD_MAP = {
+    type_mr: { element: 'type', rule: 'equals', value: 'MR' },
+    specific_system: { element: 'system', rule: 'equals' },
+    specific_oid: { element: 'system', rule: 'equals' },
+    use_usual: { element: 'use', rule: 'equals', value: 'usual' },
+    use_official: { element: 'use', rule: 'equals', value: 'official' },
+    start_date: { element: 'periodStart', rule: 'latest' },
+    no_end_date: { element: 'periodEnd', rule: 'absent' },
+    most_recent_period: { element: 'periodEnd', rule: 'most_recent' },
+    specific_assigner: { element: 'assigner', rule: 'equals' },
+    other: { element: 'value', rule: 'equals' }
+  };
+  function migrateMrnRuleList(list) {
+    (list || []).forEach(function (row) {
+      if (row.element) return;
+      var legacy = MRN_LEGACY_RULE_FIELD_MAP[row.field] || { element: 'value', rule: 'equals' };
+      row.element = legacy.element;
+      row.rule = legacy.rule;
+      if (legacy.value && !row.value) row.value = legacy.value;
+      delete row.field;
+    });
+  }
   var MRN_VARIANCE_CHECKBOXES = [
     { id: 'mrnVarianceFacility', value: 'facility' },
     { id: 'mrnVarianceCampus', value: 'campus' },
@@ -5043,6 +5079,9 @@
 
   function ensureMrnIntake() {
     if (!facility.mrnIntake) facility.mrnIntake = defaultMrnIntake();
+    if (!facility.mrnIntake.patientIdentifierSelections) facility.mrnIntake.patientIdentifierSelections = {};
+    if (!facility.mrnIntake.mrnRuleList) facility.mrnIntake.mrnRuleList = [];
+    migrateMrnRuleList(facility.mrnIntake.mrnRuleList);
     return facility.mrnIntake;
   }
 
@@ -5084,7 +5123,6 @@
   wireMrnYesNoGroup('mrnChangesQuestion', function () { return ensureMrnIntake().changesOverTime; }, function (v) { ensureMrnIntake().changesOverTime = v; });
 
   wireMrnCheckboxGroup(MRN_TYPE_CHECKBOXES, function (v) { ensureMrnIntake().multipleMrnTypes = v; });
-  wireMrnCheckboxGroup(MRN_RULE_CHECKBOXES, function (v) { ensureMrnIntake().mrnRules = v; });
   wireMrnCheckboxGroup(MRN_VARIANCE_CHECKBOXES, function (v) { ensureMrnIntake().varianceTypes = v; });
   wireMrnCheckboxGroup(MRN_CHANGE_CHECKBOXES, function (v) { ensureMrnIntake().changeTypes = v; });
 
@@ -5092,13 +5130,278 @@
     var m = ensureMrnIntake();
     $('mrnMultipleTypesWrap').hidden = m.hasMultipleMrn !== true;
     $('mrnTypeOtherTextWrap').hidden = !$('mrnTypeOther').checked;
+    $('mrnQ2Section').hidden = m.hasMultipleMrn !== true;
     $('mrnOtherTermWrap').hidden = m.isCalledMrn !== false;
-    $('mrnRuleOtherTextWrap').hidden = !$('mrnRuleOther').checked;
     $('mrnVarianceTypesWrap').hidden = m.variesByFacility !== true;
     $('mrnVarianceOtherTextWrap').hidden = !$('mrnVarianceOther').checked;
     $('mrnChangeTypesWrap').hidden = m.changesOverTime !== true;
     $('mrnChangeOtherTextWrap').hidden = !$('mrnChangeOther').checked;
   }
+
+  // ---------- Question 3: patient FHIR identifier picker ----------
+  function getMrnIntakePatients() {
+    var map = {};
+    (facility.reports || []).forEach(function (r) {
+      (r.patientIds || []).forEach(function (pid) {
+        var entry = r.patients && r.patients[pid];
+        if (!entry) return;
+        var existing = map[pid];
+        if (!existing || new Date(r.createdAt) >= new Date(existing.createdAt)) {
+          map[pid] = {
+            patientId: pid,
+            identifiers: (entry.resources && entry.resources.patient && entry.resources.patient.identifier) || [],
+            createdAt: r.createdAt
+          };
+        }
+      });
+    });
+    return Object.keys(map).sort().map(function (pid) { return map[pid]; });
+  }
+
+  function identifierFieldText(identifier, field) {
+    switch (field) {
+      case 'value': return identifier.value || 'N/A';
+      case 'type':
+        if (identifier.type && identifier.type.coding && identifier.type.coding[0]) {
+          var c = identifier.type.coding[0];
+          return (c.code || 'N/A') + (c.display ? ' (' + c.display + ')' : '');
+        }
+        return 'N/A';
+      case 'system': return identifier.system || 'N/A';
+      case 'use': return identifier.use || 'N/A';
+      case 'assigner': return (identifier.assigner && identifier.assigner.display) || 'N/A';
+      case 'periodStart': return (identifier.period && identifier.period.start) || 'N/A';
+      case 'periodEnd': return (identifier.period && identifier.period.end) || 'N/A';
+      default: return 'N/A';
+    }
+  }
+
+  var MRN_IDENTIFIER_FIELD_DEFS = [
+    { key: 'value', label: 'Value' },
+    { key: 'type', label: 'Type' },
+    { key: 'system', label: 'System' },
+    { key: 'use', label: 'Use' },
+    { key: 'assigner', label: 'Assigner' },
+    { key: 'periodStart', label: 'Period Start' },
+    { key: 'periodEnd', label: 'Period End' }
+  ];
+
+  function autoRuleForElement(identifier, field) {
+    // Q3's field keys (value/type/system/use/assigner/periodStart/periodEnd) map 1:1 onto the
+    // rule builder's elements, so flagging "must be present" on a patient's identifier just
+    // extracts that element's observed value into an "Equals" rule.
+    var value;
+    switch (field) {
+      case 'value': value = identifier.value; break;
+      case 'type': value = identifier.type && identifier.type.coding && identifier.type.coding[0] && identifier.type.coding[0].code; break;
+      case 'system': value = identifier.system; break;
+      case 'use': value = identifier.use; break;
+      case 'assigner': value = identifier.assigner && identifier.assigner.display; break;
+      case 'periodStart': value = identifier.period && identifier.period.start; break;
+      case 'periodEnd': value = identifier.period && identifier.period.end; break;
+    }
+    return { element: field, rule: 'equals', value: value || '' };
+  }
+
+  function addAutoMrnRule(pid, idx, field, identifier) {
+    var m = ensureMrnIntake();
+    var already = m.mrnRuleList.some(function (r) { return r.autoPatientId === pid && r.autoIdentifierIndex === idx && r.autoField === field; });
+    if (already) return;
+    var base = autoRuleForElement(identifier, field);
+    m.mrnRuleList.push({ id: generateGuid(), element: base.element, rule: base.rule, value: base.value, autoPatientId: pid, autoIdentifierIndex: idx, autoField: field });
+  }
+
+  function removeAutoMrnRule(pid, idx, field) {
+    var m = ensureMrnIntake();
+    m.mrnRuleList = m.mrnRuleList.filter(function (r) { return !(r.autoPatientId === pid && r.autoIdentifierIndex === idx && r.autoField === field); });
+  }
+
+  function ensureMrnPatientSelection(m, pid) {
+    var sel = m.patientIdentifierSelections[pid];
+    if (!sel) { sel = {}; m.patientIdentifierSelections[pid] = sel; }
+    if (!sel.mustBePresent || Array.isArray(sel.mustBePresent)) sel.mustBePresent = {};
+    delete sel.selectedIndex;
+    return sel;
+  }
+
+  function renderMrnPatientIdentifierList() {
+    var m = ensureMrnIntake();
+    var patients = getMrnIntakePatients();
+    var container = $('mrnPatientIdentifierList');
+    container.innerHTML = '';
+    if (!patients.length) {
+      var empty = document.createElement('p');
+      empty.className = 'form-hint';
+      empty.textContent = "No patients found in your facility's generated reports yet.";
+      container.appendChild(empty);
+      return;
+    }
+    patients.forEach(function (p) {
+      var sel = ensureMrnPatientSelection(m, p.patientId);
+
+      if (!p.identifiers.length) {
+        var none = document.createElement('p');
+        none.className = 'mrn-patient-noid';
+        none.textContent = 'Patient ' + p.patientId + ' — no identifiers found.';
+        container.appendChild(none);
+        return;
+      }
+
+      var hasFlag = Object.keys(sel.mustBePresent).some(function (idx) {
+        var flags = sel.mustBePresent[idx] || {};
+        return Object.keys(flags).some(function (f) { return flags[f]; });
+      });
+
+      var details = document.createElement('details');
+      details.className = 'mrn-patient-card';
+      details.open = hasFlag;
+      var summary = document.createElement('summary');
+      summary.className = 'mrn-patient-card-header';
+      summary.textContent = 'Patient ' + p.patientId + ' (' + p.identifiers.length + ' identifier' + (p.identifiers.length === 1 ? '' : 's') + ')';
+      details.appendChild(summary);
+
+      var grid = document.createElement('div');
+      grid.className = 'mrn-identifier-grid';
+
+      p.identifiers.forEach(function (identifier, idx) {
+        if (!sel.mustBePresent[idx]) sel.mustBePresent[idx] = {};
+        var flags = sel.mustBePresent[idx];
+
+        var idCard = document.createElement('div');
+        idCard.className = 'mrn-identifier-card';
+        var title = document.createElement('div');
+        title.className = 'mrn-identifier-card-title';
+        title.textContent = 'Identifier ' + (idx + 1);
+        idCard.appendChild(title);
+
+        MRN_IDENTIFIER_FIELD_DEFS.forEach(function (fd) {
+          var text = identifierFieldText(identifier, fd.key);
+          var isNa = text === 'N/A';
+
+          var row = document.createElement('div');
+          row.className = 'mrn-id-field';
+
+          var label = document.createElement('span');
+          label.className = 'mrn-id-field-label';
+          label.textContent = fd.label;
+          row.appendChild(label);
+
+          var value = document.createElement('span');
+          value.className = 'mrn-id-field-value' + (isNa ? ' mrn-na' : '');
+          value.textContent = text;
+          row.appendChild(value);
+
+          if (!isNa) {
+            var checkWrap = document.createElement('label');
+            checkWrap.className = 'mrn-id-check';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = !!flags[fd.key];
+            cb.addEventListener('change', function () {
+              flags[fd.key] = cb.checked;
+              if (cb.checked) addAutoMrnRule(p.patientId, idx, fd.key, identifier);
+              else removeAutoMrnRule(p.patientId, idx, fd.key);
+              drawMrnRuleList();
+              saveFacility();
+            });
+            checkWrap.appendChild(cb);
+            checkWrap.appendChild(document.createTextNode('Must be present'));
+            row.appendChild(checkWrap);
+          }
+
+          idCard.appendChild(row);
+        });
+
+        grid.appendChild(idCard);
+      });
+
+      details.appendChild(grid);
+      container.appendChild(details);
+    });
+  }
+
+  // ---------- Question 4: MRN rule builder ----------
+  function drawMrnRuleList() {
+    var m = ensureMrnIntake();
+    var container = $('mrnRuleList');
+    container.innerHTML = '';
+    m.mrnRuleList.forEach(function (row, idx) {
+      var rowDiv = document.createElement('div');
+      rowDiv.className = 'repeat-row';
+
+      var elSel = document.createElement('select');
+      MRN_RULE_ELEMENT_DEFS.forEach(function (ed) {
+        var opt = document.createElement('option');
+        opt.value = ed.key;
+        opt.textContent = ed.label;
+        elSel.appendChild(opt);
+      });
+      elSel.value = row.element;
+      elSel.addEventListener('change', function () {
+        row.element = elSel.value;
+        var ops = MRN_RULE_OPERATOR_DEFS[row.element] || [];
+        if (!ops.some(function (o) { return o.key === row.rule; })) row.rule = ops.length ? ops[0].key : '';
+        drawMrnRuleList();
+        saveFacility();
+      });
+      rowDiv.appendChild(elSel);
+
+      var operators = MRN_RULE_OPERATOR_DEFS[row.element] || MRN_RULE_OPERATOR_DEFS.value;
+      var ruleSel = document.createElement('select');
+      operators.forEach(function (od) {
+        var opt = document.createElement('option');
+        opt.value = od.key;
+        opt.textContent = od.label;
+        ruleSel.appendChild(opt);
+      });
+      ruleSel.value = row.rule;
+      ruleSel.addEventListener('change', function () { row.rule = ruleSel.value; drawMrnRuleList(); saveFacility(); });
+      rowDiv.appendChild(ruleSel);
+
+      var opDef = operators.filter(function (o) { return o.key === row.rule; })[0];
+      if (opDef && opDef.needsValue) {
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = opDef.placeholder || 'Value';
+        inp.value = row.value || '';
+        inp.addEventListener('input', function () { row.value = inp.value; });
+        inp.addEventListener('change', function () { saveFacility(); });
+        rowDiv.appendChild(inp);
+      }
+
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn btn-secondary btn-sm';
+      rm.textContent = 'Remove';
+      rm.addEventListener('click', function () {
+        var removed = m.mrnRuleList.splice(idx, 1)[0];
+        if (removed && removed.autoPatientId && m.patientIdentifierSelections[removed.autoPatientId]) {
+          var removedSel = m.patientIdentifierSelections[removed.autoPatientId];
+          var removedFlags = removedSel.mustBePresent && removedSel.mustBePresent[removed.autoIdentifierIndex];
+          if (removedFlags) removedFlags[removed.autoField] = false;
+          renderMrnPatientIdentifierList();
+        }
+        drawMrnRuleList();
+        saveFacility();
+      });
+      rowDiv.appendChild(rm);
+
+      container.appendChild(rowDiv);
+    });
+    if (!m.mrnRuleList.length) {
+      var emptyMsg = document.createElement('p');
+      emptyMsg.className = 'form-hint';
+      emptyMsg.textContent = 'None added yet.';
+      container.appendChild(emptyMsg);
+    }
+  }
+
+  $('mrnRuleAddBtn').addEventListener('click', function () {
+    var m = ensureMrnIntake();
+    m.mrnRuleList.push({ id: generateGuid(), element: 'system', rule: 'equals', value: '' });
+    drawMrnRuleList();
+    saveFacility();
+  });
 
   function populateMrnIntakeForm() {
     var m = ensureMrnIntake();
@@ -5109,17 +5412,8 @@
     paintMrnYesNoGroup('mrnIsCalledMrnQuestion', m.isCalledMrn);
     $('mrnOtherTerm').value = m.otherTermUsed || '';
     paintMrnYesNoGroup('mrnCanSearchQuestion', m.canSearchByIdentifier);
-    $('mrnFhirValue').value = m.fhirIdentifierValue || '';
-    $('mrnFhirTypeCode').value = m.fhirIdentifierTypeCode || '';
-    $('mrnFhirTypeSystem').value = m.fhirIdentifierTypeSystem || '';
-    $('mrnFhirTypeDisplay').value = m.fhirIdentifierTypeDisplay || '';
-    $('mrnFhirUse').value = m.fhirIdentifierUse || '';
-    $('mrnFhirSystem').value = m.fhirIdentifierSystem || '';
-    $('mrnFhirAssigner').value = m.fhirIdentifierAssigner || '';
-    $('mrnFhirPeriodStart').value = m.fhirIdentifierPeriodStart || '';
-    $('mrnFhirPeriodEnd').value = m.fhirIdentifierPeriodEnd || '';
-    paintMrnCheckboxGroup(MRN_RULE_CHECKBOXES, m.mrnRules);
-    $('mrnRuleOtherText').value = m.mrnRuleOtherText || '';
+    renderMrnPatientIdentifierList();
+    drawMrnRuleList();
     paintMrnYesNoGroup('mrnVariesQuestion', m.variesByFacility);
     paintMrnCheckboxGroup(MRN_VARIANCE_CHECKBOXES, m.varianceTypes);
     $('mrnVarianceOtherText').value = m.varianceOtherText || '';
@@ -5134,16 +5428,6 @@
     m.multipleMrnOtherText = $('mrnTypeOtherText').value.trim();
     m.userFacingIdentifierName = $('mrnUserFacingName').value.trim();
     m.otherTermUsed = $('mrnOtherTerm').value.trim();
-    m.fhirIdentifierValue = $('mrnFhirValue').value.trim();
-    m.fhirIdentifierTypeCode = $('mrnFhirTypeCode').value.trim();
-    m.fhirIdentifierTypeSystem = $('mrnFhirTypeSystem').value.trim();
-    m.fhirIdentifierTypeDisplay = $('mrnFhirTypeDisplay').value.trim();
-    m.fhirIdentifierUse = $('mrnFhirUse').value.trim();
-    m.fhirIdentifierSystem = $('mrnFhirSystem').value.trim();
-    m.fhirIdentifierAssigner = $('mrnFhirAssigner').value.trim();
-    m.fhirIdentifierPeriodStart = $('mrnFhirPeriodStart').value;
-    m.fhirIdentifierPeriodEnd = $('mrnFhirPeriodEnd').value;
-    m.mrnRuleOtherText = $('mrnRuleOtherText').value.trim();
     m.varianceOtherText = $('mrnVarianceOtherText').value.trim();
     m.changeOtherText = $('mrnChangeOtherText').value.trim();
   }
@@ -5181,17 +5465,24 @@
     track(validateMrnCheckboxGroup(m.multipleMrnTypes, 'mrnMultipleTypesError', !$('mrnMultipleTypesWrap').hidden), $('mrnTypeEmpi'));
     if (!$('mrnTypeOtherTextWrap').hidden) track(validateMrnTextField('mrnTypeOtherText', 'mrnTypeOtherTextError'), $('mrnTypeOtherText'));
 
-    track(validateMrnTextField('mrnUserFacingName', 'mrnUserFacingNameError'), $('mrnUserFacingName'));
-    track(validateMrnYesNo('mrnIsCalledMrnQuestion', m.isCalledMrn, 'mrnIsCalledMrnError'), $('mrnIsCalledMrnQuestion'));
-    if (!$('mrnOtherTermWrap').hidden) track(validateMrnTextField('mrnOtherTerm', 'mrnOtherTermError'), $('mrnOtherTerm'));
-    track(validateMrnYesNo('mrnCanSearchQuestion', m.canSearchByIdentifier, 'mrnCanSearchError'), $('mrnCanSearchQuestion'));
+    if (!$('mrnQ2Section').hidden) {
+      track(validateMrnTextField('mrnUserFacingName', 'mrnUserFacingNameError'), $('mrnUserFacingName'));
+      track(validateMrnYesNo('mrnIsCalledMrnQuestion', m.isCalledMrn, 'mrnIsCalledMrnError'), $('mrnIsCalledMrnQuestion'));
+      if (!$('mrnOtherTermWrap').hidden) track(validateMrnTextField('mrnOtherTerm', 'mrnOtherTermError'), $('mrnOtherTerm'));
+      track(validateMrnYesNo('mrnCanSearchQuestion', m.canSearchByIdentifier, 'mrnCanSearchError'), $('mrnCanSearchQuestion'));
+    }
 
-    ['mrnFhirValue', 'mrnFhirTypeCode', 'mrnFhirTypeSystem', 'mrnFhirTypeDisplay', 'mrnFhirUse', 'mrnFhirSystem', 'mrnFhirAssigner', 'mrnFhirPeriodStart', 'mrnFhirPeriodEnd'].forEach(function (id) {
-      track(validateMrnTextField(id, id + 'Error'), $(id));
+    var hasRules = m.mrnRuleList.length > 0;
+    $('mrnUsableRuleError').classList.toggle('show', !hasRules);
+    track(hasRules, $('mrnRuleAddBtn'));
+
+    var allRuleValuesFilled = m.mrnRuleList.every(function (row) {
+      var operators = MRN_RULE_OPERATOR_DEFS[row.element] || [];
+      var opDef = operators.filter(function (o) { return o.key === row.rule; })[0];
+      return !opDef || !opDef.needsValue || !!(row.value && row.value.trim());
     });
-
-    track(validateMrnCheckboxGroup(m.mrnRules, 'mrnUsableRuleError', true), $('mrnRuleTypeMr'));
-    if (!$('mrnRuleOtherTextWrap').hidden) track(validateMrnTextField('mrnRuleOtherText', 'mrnRuleOtherTextError'), $('mrnRuleOtherText'));
+    $('mrnRuleValueError').classList.toggle('show', hasRules && !allRuleValuesFilled);
+    track(!hasRules || allRuleValuesFilled, $('mrnRuleList'));
 
     track(validateMrnYesNo('mrnVariesQuestion', m.variesByFacility, 'mrnVariesError'), $('mrnVariesQuestion'));
     track(validateMrnCheckboxGroup(m.varianceTypes, 'mrnVarianceTypesError', !$('mrnVarianceTypesWrap').hidden), $('mrnVarianceFacility'));
@@ -5205,12 +5496,12 @@
     return results.every(function (ok) { return ok; });
   }
 
-  $('mrnIntakeBackBtn').addEventListener('click', function () { enterStep('encounter'); });
+  $('mrnIntakeBackBtn').addEventListener('click', function () { enterStep('report-results'); });
   $('mrnIntakeNextBtn').addEventListener('click', function () {
     collectMrnIntakeForm();
     if (!validateMrnIntakeFields()) { showToast('Please complete all fields before continuing.'); return; }
-    unlockStep('report');
-    saveFacility().then(function () { enterStep('report'); });
+    unlockStep('reporting-plan');
+    saveFacility().then(function () { enterStep('reporting-plan'); });
   });
 
   // ---------- report data helpers ----------
@@ -5583,11 +5874,58 @@
     return d.toISOString().slice(0, 10);
   }
 
+  // Identifier "kinds" a facility's EHR might expose on Patient.identifier - deliberately varied
+  // in which sub-fields are populated so the MRN Identifier Intake page (Question 3) has
+  // realistic, sometimes-sparse data to iterate through per patient.
+  var MOCK_IDENTIFIER_TEMPLATES = [
+    { kind: 'mrn', typeCode: 'MR', typeSystem: 'http://terminology.hl7.org/CodeSystem/v2-0203', typeDisplay: 'Medical record number', system: 'http://stmarys-health.org/fhir/identifier/mrn', use: 'usual', assigner: "St. Mary's Medical Center", hasPeriod: true, openEnded: true },
+    { kind: 'legacyMrn', typeCode: 'MR', typeSystem: 'http://terminology.hl7.org/CodeSystem/v2-0203', typeDisplay: 'Medical record number', system: 'http://stmarys-health.org/fhir/identifier/legacy-mrn', use: 'old', assigner: "St. Mary's Medical Center - Legacy System", hasPeriod: true, openEnded: false },
+    { kind: 'empi', typeCode: null, typeSystem: null, typeDisplay: null, system: 'http://stmarys-health.org/fhir/identifier/empi', use: 'usual', assigner: "St. Mary's Health System EMPI", hasPeriod: false },
+    { kind: 'visit', typeCode: 'PI', typeSystem: 'http://terminology.hl7.org/CodeSystem/v2-0203', typeDisplay: 'Patient internal identifier', system: 'http://stmarys-health.org/fhir/identifier/visit', use: 'temp', assigner: null, hasPeriod: true, openEnded: true },
+    { kind: 'ssn', typeCode: 'SS', typeSystem: 'http://terminology.hl7.org/CodeSystem/v2-0203', typeDisplay: 'Social Security number', system: null, use: 'secondary', assigner: null, hasPeriod: false }
+  ];
+
+  function mockIdentifierValue(kind, seed) {
+    var n = 100000 + ((seed * 9301 + 49297) % 900000);
+    switch (kind) {
+      case 'mrn': return 'MRN' + n;
+      case 'legacyMrn': return 'L' + n;
+      case 'empi': return 'EMPI-' + n;
+      case 'visit': return 'V' + n;
+      case 'ssn': return String(n).slice(0, 3) + '-' + String(n).slice(3, 5) + '-' + String(n).slice(5);
+      default: return String(n);
+    }
+  }
+
+  function buildMockPatientIdentifiers(seed) {
+    var count = 2 + (seed % 3); // 2-4 identifiers per patient
+    var start = seed % MOCK_IDENTIFIER_TEMPLATES.length;
+    var rotated = MOCK_IDENTIFIER_TEMPLATES.slice(start).concat(MOCK_IDENTIFIER_TEMPLATES.slice(0, start));
+    return rotated.slice(0, count).map(function (tpl, i) {
+      var s = seed * 13 + i * 7;
+      var identifier = { value: mockIdentifierValue(tpl.kind, s) };
+      if (tpl.system && s % 5 !== 0) identifier.system = tpl.system;
+      if (tpl.use && s % 4 !== 0) identifier.use = tpl.use;
+      if (tpl.typeCode && s % 3 !== 0) {
+        identifier.type = { coding: [{ system: tpl.typeSystem, code: tpl.typeCode, display: tpl.typeDisplay }] };
+      }
+      if (tpl.assigner && s % 3 !== 1) identifier.assigner = { display: tpl.assigner };
+      if (tpl.hasPeriod) {
+        var startYear = 2015 + (s % 8);
+        var period = { start: startYear + '-0' + (1 + (s % 9)) + '-01' };
+        if (!tpl.openEnded && s % 2 === 0) period.end = (startYear + 3) + '-06-30';
+        identifier.period = period;
+      }
+      return identifier;
+    });
+  }
+
   function buildMockPatientResources(patientId, seed) {
     var patientRef = 'Patient/' + patientId;
     var patient = {
       resourceType: 'Patient',
       id: patientId,
+      identifier: buildMockPatientIdentifiers(seed),
       name: [{ family: MOCK_LAST_NAMES[seed % MOCK_LAST_NAMES.length], given: [MOCK_FIRST_NAMES[(seed * 5 + 2) % MOCK_FIRST_NAMES.length]] }],
       gender: seed % 2 === 0 ? 'female' : 'male',
       birthDate: mockBirthDate(seed)
@@ -6615,8 +6953,8 @@
       .sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
     if (!completeReports.length) return;
     facility.completedReportId = completeReports[0].reportId;
-    unlockStep('reporting-plan');
-    saveFacility().then(function () { enterStep('reporting-plan'); });
+    unlockStep('mrn-intake');
+    saveFacility().then(function () { enterStep('mrn-intake'); });
   });
 
   // ---------- facility reporting plan ----------
@@ -6670,7 +7008,7 @@
     saveFacility();
   });
 
-  $('reportingPlanBackBtn').addEventListener('click', function () { enterStep('report-results'); });
+  $('reportingPlanBackBtn').addEventListener('click', function () { enterStep('mrn-intake'); });
 
   $('reportingPlanCompleteBtn').addEventListener('click', function () {
     if (!facility.reportingPlan.acknowledged) return;
