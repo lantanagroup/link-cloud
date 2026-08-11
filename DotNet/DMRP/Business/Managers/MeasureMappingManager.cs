@@ -2,6 +2,9 @@
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
@@ -12,6 +15,15 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         Task<MeasureMapping> CreateAsync(MeasureMapping newMeasureMapping, CancellationToken cancellationToken = default);
         Task UpdateAsync(string id, MeasureMapping measureMapping, CancellationToken cancellationToken = default);
         Task DeleteAsync(string id, CancellationToken cancellationToken = default);
+        Task DeleteAllAsync(CancellationToken cancellationToken = default);
+    }
+
+    internal sealed class DuplicateMeasureMappingException : ApplicationException
+    {
+        public DuplicateMeasureMappingException(Exception innerException)
+            : base("A measure mapping with this measure and DQM already exists.", innerException)
+        {
+        }
     }
 
     public class MeasureMappingManager : IMeasureMappingManager
@@ -38,15 +50,25 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             {
                 throw;
             }
+            catch (DbUpdateException ex) when (IsUniqueIndexViolation(ex))
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                throw new DuplicateMeasureMappingException(ex);
+            }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.AddException(ex);
-                throw new ApplicationException("Measure mapping failed to create. " + ex.Message);
+                throw new ApplicationException("Measure mapping failed to create. " + ex.Message, ex);
             }
 
             return newMeasureMapping;
         }
+
+        private static bool IsUniqueIndexViolation(DbUpdateException exception) =>
+            exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 }
+            || exception.InnerException is SqlException { Number: 2601 or 2627 };
 
         public async Task UpdateAsync(string id, MeasureMapping measureMapping, CancellationToken cancellationToken = default)
         {
@@ -59,7 +81,9 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 throw new ApplicationException($"Measure mapping with Id: {id} not found");
             }
 
-            // TODO: Map `measureMapping` to `existing`
+            existing.Measure = measureMapping.Measure;
+            existing.DQM = measureMapping.DQM;
+            existing.Frequency = measureMapping.Frequency;
 
             try
             {
@@ -69,6 +93,12 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             catch (OperationCanceledException)
             {
                 throw;
+            }
+            catch (DbUpdateException ex) when (IsUniqueIndexViolation(ex))
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                throw new DuplicateMeasureMappingException(ex);
             }
             catch (Exception ex)
             {
@@ -103,6 +133,31 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.AddException(ex);
                 throw new ApplicationException($"Measure mapping {id} failed to delete. " + ex.Message);
+            }
+        }
+
+        public async Task DeleteAllAsync(CancellationToken cancellationToken = default)
+        {
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete All Measure Mappings");
+
+            try
+            {
+                var measureMappings = await _repository.GetAllAsync(cancellationToken);
+                foreach (var measureMapping in measureMappings)
+                {
+                    _repository.Remove(measureMapping);
+                }
+                await _repository.SaveChangesAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                throw new ApplicationException("Failed to delete all measure mappings. " + ex.Message);
             }
         }
     }
