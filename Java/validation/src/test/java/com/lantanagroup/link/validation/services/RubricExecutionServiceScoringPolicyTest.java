@@ -101,4 +101,51 @@ class RubricExecutionServiceScoringPolicyTest {
         assertThat(envelope.getScore().getByDimension()).isNull();
         assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE);
     }
+
+    @Test
+    @DisplayName("dimension scorecard scopes to checked dimensions: a CONFORMANCE-only rubric scores only CONFORMANCE, not every PiqiDimension")
+    void dimensionScorecardScopesToCheckedDimensions() throws Exception {
+        RubricVersion entity = RubricVersion.builder()
+                .rubricVersionId(UUID.randomUUID())
+                .rubricId("piqi.conformance")
+                .semver("1.0.0")
+                .status(RubricVersionStatus.PUBLISHED)
+                .checksum("abc")
+                .scoringPolicyJson("{\"type\":\"piqi-dimension-scorecard\",\"rollup\":\"worst-of\"}")
+                .build();
+        RubricCheck check = RubricCheck.builder()
+                .checkId(UUID.randomUUID())
+                .rubricVersionId(entity.getRubricVersionId())
+                .checkLocalId("c1")
+                .type(CheckType.FHIRPATH)
+                .dimension(PiqiDimension.CONFORMANCE)
+                .parametersJson("{\"expression\":\"Patient.name.exists()\"}")
+                .ordinal(0)
+                .enabled(true)
+                .build();
+
+        RubricVersionSnapshot snapshot = RubricVersionSnapshot.from(entity, List.of(check));
+        when(resolver.resolve("piqi.conformance", "1.0.0", true))
+                .thenReturn(new RubricVersionResolver.ResolvedRubric(
+                        snapshot.toVersionEntity(), snapshot.toCheckEntities()));
+
+        CheckExecutor executor = mock(CheckExecutor.class);
+        when(executor.execute(any(RubricCheck.class), any(ExecutionContext.class))).thenReturn(List.of());
+        when(registry.get(eq(CheckType.FHIRPATH))).thenReturn(executor);
+
+        JsonNode payload = objectMapper.readTree("{\"resourceType\":\"Patient\",\"id\":\"p1\",\"name\":[{\"family\":\"Doe\"}]}");
+        EvaluateRequestDto request = EvaluateRequestDto.builder()
+                .subject(SubjectDto.builder().facilityId("f1").build())
+                .payload(payload)
+                .build();
+
+        ValidationResultEnvelope envelope = service.evaluate("piqi.conformance", "1.0.0", request, true);
+
+        // Only CONFORMANCE was checked, so only CONFORMANCE is scored -- the other PIQI dimensions
+        // are absent from the scorecard (not phantom-ACCEPTABLE, and no NA sentinel).
+        assertThat(envelope.getScore().getByDimension())
+                .containsOnlyKeys(PiqiDimension.CONFORMANCE)
+                .containsEntry(PiqiDimension.CONFORMANCE, RubricResultStatus.ACCEPTABLE);
+        assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE);
+    }
 }
