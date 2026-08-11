@@ -103,6 +103,7 @@ public class FhirConfig {
     // Package-private for testing.
     static String resolveTerminologyServiceUrl(LinkConfig linkConfig) {
         String fhirUrl = linkConfig.getFhirTerminologyServiceUrl();
+        logger.info("terminology url: {}", fhirUrl);
         if (fhirUrl != null && !fhirUrl.isEmpty()) {
             return fhirUrl;
         }

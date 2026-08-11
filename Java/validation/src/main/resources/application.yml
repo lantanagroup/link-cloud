@@ -111,7 +111,9 @@ authentication:
 
 link:
   info-route: /api/validation/info
-  terminology-service-url: ''
+  # Link Terminology service ROOT (no path) — consumers append /api/terminology/fhir.
+  # Overridden in docker by the compose environment (http://terminology:8076).
+  terminology-service-url: 'http://localhost:8076'
   rubric:
     # Max rubric definition payload size (256 KiB). Checked against Content-Length before
     # body binding, and against the parsed body for chunked requests.
