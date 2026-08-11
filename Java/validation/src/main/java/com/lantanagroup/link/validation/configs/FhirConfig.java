@@ -82,6 +82,9 @@ public class FhirConfig {
         );
         if (terminologyServiceUrl != null && !terminologyServiceUrl.isBlank()) {
             chain.addValidationSupport(new RemoteTerminologyServiceValidationSupport(fhirContext, terminologyServiceUrl));
+            logger.info("Validation support chain: DefaultProfile -> InMemoryTerminology -> CommonCodeSystems -> SnapshotGenerating -> RemoteTerminology({}); TERMINOLOGY/VALUESET checks will call the remote server for code systems the in-memory modules cannot answer", terminologyServiceUrl);
+        } else {
+            logger.warn("Validation support chain: no remote terminology server configured (vaas.terminology-service-url is blank) — TERMINOLOGY/VALUESET checks will SKIP codes in unknown code systems (silent pass)");
         }
         return chain;
     }

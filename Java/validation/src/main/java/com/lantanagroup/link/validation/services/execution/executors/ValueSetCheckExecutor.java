@@ -63,6 +63,12 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 ? List.of(context.getResource())
                 : context.getBundleEntries();
 
+        log.info("VALUESET check '{}': evaluating FHIRPath '{}' on {} resource(s), then checking membership in value set {} via the ValidationSupportChain",
+                check.getCheckLocalId(), path, targets.size(), valueSet);
+
+        int checked = 0;
+        int notMember = 0;
+        int skipped = 0;
         List<RawFinding> findings = new ArrayList<>();
         for (IBaseResource resource : targets) {
             List<IBase> nodes;
@@ -72,22 +78,40 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 log.debug("VALUESET path '{}' did not evaluate on {}: {}", path, resource.fhirType(), e.getMessage());
                 continue;
             }
+            if (!nodes.isEmpty()) {
+                log.info("VALUESET check '{}': FHIRPath '{}' matched {} node(s) on {}",
+                        check.getCheckLocalId(), path, nodes.size(), resource.fhirType());
+            }
             for (IBase node : nodes) {
                 for (String[] sc : extractCodes(node, fallbackSystem)) {
                     String system = sc[0];
                     String code = sc[1];
                     String display = sc[2];
                     if (code == null || code.isBlank()) continue;
+                    checked++;
                     IValidationSupport.CodeValidationResult result;
                     try {
                         result = validationSupportChain.validateCode(supportContext, options, system, code, display, valueSet);
                     } catch (Exception e) {
-                        log.debug("VALUESET validateCode threw for {}|{} in {}: {}", system, code, valueSet, e.getMessage());
+                        log.info("VALUESET check '{}': validateCode threw for {}|{} in {} — skipping this code: {}",
+                                check.getCheckLocalId(), system, code, valueSet, e.getMessage());
+                        skipped++;
                         continue;
                     }
                     if (result == null) {
-                        log.debug("VALUESET: unable to validate code {} against {}, skipping", code, valueSet);
+                        log.info("VALUESET check '{}': no validation support could answer for code {}|{} against {} — SKIPPED (counts as pass)",
+                                check.getCheckLocalId(), system, code, valueSet);
+                        skipped++;
                         continue;
+                    }
+                    if (result.isOk()) {
+                        log.info("VALUESET check '{}': code {}|{} -> IS a member of {}",
+                                check.getCheckLocalId(), system, code, valueSet);
+                    } else {
+                        notMember++;
+                        log.info("VALUESET check '{}': code {}|{} -> NOT a member of {}{}",
+                                check.getCheckLocalId(), system, code, valueSet,
+                                result.getMessage() != null ? " (" + result.getMessage() + ")" : "");
                     }
                     if (!result.isOk()) {
                         findings.add(RawFinding.builder()
@@ -104,6 +128,8 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 }
             }
         }
+        log.info("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} skipped -> {} finding(s)",
+                check.getCheckLocalId(), checked, valueSet, notMember, skipped, findings.size());
         return findings;
     }
 

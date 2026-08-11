@@ -63,6 +63,12 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 ? List.of(context.getResource())
                 : context.getBundleEntries();
 
+        log.info("TERMINOLOGY check '{}': sweeping {} resource(s) for Coding elements; codes are validated through the ValidationSupportChain",
+                check.getCheckLocalId(), targets.size());
+
+        int checked = 0;
+        int invalid = 0;
+        int skipped = 0;
         List<RawFinding> findings = new ArrayList<>();
         for (IBaseResource resource : targets) {
             List<Coding> codings = fhirContext.newTerser().getAllPopulatedChildElementsOfType(resource, Coding.class);
@@ -73,19 +79,35 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                     continue;
                 }
                 if (whitelist != null && whitelist.matcher(system).matches()) {
+                    log.info("TERMINOLOGY check '{}': code {}|{} skipped (system matches valueSetWhitelistRegex)",
+                            check.getCheckLocalId(), system, code);
+                    skipped++;
                     continue;
                 }
 
+                checked++;
                 IValidationSupport.CodeValidationResult result;
                 try {
                     result = validationSupportChain.validateCode(supportContext, options, system, code, coding.getDisplay(), null);
                 } catch (Exception e) {
-                    log.debug("TERMINOLOGY validateCode threw for {}|{}: {}", system, code, e.getMessage());
+                    log.info("TERMINOLOGY check '{}': validateCode threw for {}|{} — skipping this code: {}",
+                            check.getCheckLocalId(), system, code, e.getMessage());
+                    skipped++;
                     continue;
                 }
                 if (result == null) {
-                    log.debug("TERMINOLOGY: no support for system {} (code {}), skipping", system, code);
+                    log.info("TERMINOLOGY check '{}': no validation support could answer for system {} (code {}) — SKIPPED (counts as pass)",
+                            check.getCheckLocalId(), system, code);
+                    skipped++;
                     continue;
+                }
+                if (result.isOk()) {
+                    log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> VALID",
+                            check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource));
+                } else {
+                    invalid++;
+                    log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> INVALID: {}",
+                            check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource), result.getMessage());
                 }
                 if (!result.isOk()) {
                     String detail = result.getMessage() != null ? ": " + result.getMessage() : "";
@@ -101,6 +123,8 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 }
             }
         }
+        log.info("TERMINOLOGY check '{}' done: {} coding(s) validated, {} invalid, {} skipped -> {} finding(s)",
+                check.getCheckLocalId(), checked, invalid, skipped, findings.size());
         return findings;
     }
 
