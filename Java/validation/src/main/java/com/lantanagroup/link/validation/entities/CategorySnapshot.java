@@ -35,6 +35,16 @@ public class CategorySnapshot {
 
     public Category toCategory(Category category) {
         category.setId(id);
+        return applyTo(category);
+    }
+
+    /**
+     * Copies the snapshot's mutable fields onto an existing category, leaving its identifier alone.
+     * Assigning the ID of an already-persisted category is not safe: under a case-insensitive collation
+     * the stored ID may differ from this snapshot's ID only by case, and writing it would alter the
+     * identifier of a managed entity.
+     */
+    public Category applyTo(Category category) {
         category.setTitle(title);
         category.setSeverity(severity);
         category.setAcceptable(acceptable);
