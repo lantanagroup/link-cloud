@@ -1,15 +1,30 @@
 # Azure App Configuration tooling
 
 Everything here is run **from the repository root**, not from this folder - the default
-paths (`app-config.yaml`, `Config/`, `docs/`) are all root-relative.
+paths (`app-config.yaml`, `docs/`, `Scripts/`) are all root-relative.
 
-The JSON files under `Config/` are exports of the Azure App Configuration stores,
-committed to this **public** repository.
+**The exports are not in this repository.** They are the per-environment values behind the
+catalog - the deployed environments' real configuration - so LEGLINK-912 moved them to the
+private **`lantanagroup/link-cac`** repository, leaving the catalog and this tooling here.
 
-* `export-appconfigs.bat <app-config-name> <output-directory>` produces an export.
+Every tool that reads them resolves the directory the same way, through
+`config_key_matching.default_config_dir`:
+
+1. `--config-dir` if passed (`validate_aac_secrets.py` takes paths positionally instead),
+2. otherwise the `LINK_CAC_CONFIG_DIR` environment variable,
+3. otherwise `../link-cac/Config` - a sibling clone, which is what makes the no-argument
+   invocations below work.
+
+```powershell
+# One-time, if link-cac is not cloned beside link-cloud
+$env:LINK_CAC_CONFIG_DIR = "D:/src/link-cac/Config"
+```
+
+* `export-appconfigs.bat <app-config-name> <output-file>` produces an export.
 * `compare_aac_exports.py <left> <right>` diffs two exports.
 * `validate_aac_secrets.py [paths] [--strict]` fails if an export contains a
-  credential. Defaults to `Config/*.json`.
+  credential. With no paths it scans the resolved export directory, and exits `2` rather
+  than reporting success if that directory holds nothing.
 
 ### Configuration key inventory
 
@@ -24,8 +39,8 @@ dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Script
 python Scripts/AzureAppConfig/extract_config_keys.py
 ```
 
-Producing `Config/config-key-inventory.json` (machine-readable, consumed by the reconciler and
-the tagging tool) and `docs/config-key-inventory.md` (the human reference).
+Producing `Scripts/AzureAppConfig/config-key-inventory.json` (machine-readable, consumed by the
+reconciler and the tagging tool) and `docs/config-key-inventory.md` (the human reference).
 
 Only the markdown is committed. Both JSON files are gitignored: a committed derived file
 drifts from the code it describes the moment someone adds a `GetSection` call, which is the
@@ -54,6 +69,12 @@ not to warrant a parser.
 
 ### Catalog checks
 
+Only the first of these runs in this repository's CI. Everything that reads the exports runs
+in `link-cac` instead - see [Secret scanning](#secret-scanning) for why - so a catalog change
+made here is checked against the stores by `link-cac`'s pull request and its daily run, not by
+this repository's. **Run `check_required_config.py` locally before merging a change that adds a
+`required: true` key**; nothing here will stop you.
+
 ```powershell
 # Does app-config.yaml conform to the JSON Schema embedded in itself?
 python Scripts/AzureAppConfig/validate_app_config_schema.py
@@ -75,9 +96,10 @@ row whose `content_type` is the `keyvaultref` type is the environment declaring 
 secret. `check_required_config.py` holds the two in step in both directions.
 
 The direction that matters is the second one. An entry marked `sensitive: true` whose stores
-all hold a **literal** is a credential sitting in a file committed to a public repository -
-the same failure `validate_aac_secrets.py` scans for, caught from the catalog side. If it
-fires, rotate the value; deleting the line does not remove it from git history.
+all hold a **literal** is a credential sitting in a committed file - the same failure
+`validate_aac_secrets.py` scans for, caught from the catalog side. `link-cac` being private
+does not change the response: rotate the value, because deleting the line does not remove it
+from git history.
 
 A Key Vault backed key with no catalog entry warns rather than fails. A value held in Key
 Vault is per-environment with no safe default, which is exactly the catalog's admission rule,
@@ -138,8 +160,9 @@ App Configuration does not stop anyone storing a literal credential, so an expor
 can carry one into permanent git history. `validate_aac_secrets.py` gates that:
 
 ```powershell
-python Scripts/AzureAppConfig/validate_aac_secrets.py "Config/*.json"
-python Scripts/AzureAppConfig/validate_aac_secrets.py "Config/*.json" --strict   # warnings fatal
+python Scripts/AzureAppConfig/validate_aac_secrets.py            # resolved export directory
+python Scripts/AzureAppConfig/validate_aac_secrets.py --strict   # warnings fatal
+python Scripts/AzureAppConfig/validate_aac_secrets.py "D:/src/link-cac/Config/app-config.*.json" --strict
 ```
 
 It reports **errors** for values matching a known credential shape (storage
@@ -159,18 +182,29 @@ StackExchange.Redis connection parameters while exempting these keys from the
 secret-shaped-key warning. Inline `password` or `pwd` values remain credential
 errors. Add to that list only when the password is sourced separately.
 
-Run automatically in two places:
+**It runs in `link-cac`, never here.** `.github/workflows/appconfig-checks.yml` in that
+repository runs it on every PR and push to `main`, plus daily; it checks *this* repository
+out for the script, which is free because this one is public.
 
-* **CI** -- `.github/workflows/appconfig-secret-scan.yml`, on every PR and push to
-  `dev`, `main`, `release/**`, and `hotfix/**`.
-* **Pre-commit** -- `.githooks/pre-commit` validates the *staged* content of any
-  `Config/*.json`. Enable it per clone with:
+It deliberately does **not** run in this repository's CI, for two reasons that apply to any
+cross-repo check from here:
 
-  ```powershell
-  git config core.hooksPath .githooks
-  ```
+* **Actions logs on a public repository are world-readable.** Two of this script's warnings
+  quote the offending value -- the secret-shaped-key warning and the malformed-entry warning
+  -- so a finding would publish the very value it is complaining about.
+* **A read token for `link-cac` in this repository's secrets is readable by anyone with write
+  access here**, through a workflow change on a same-repo pull request. That is a larger
+  exposure than the check is worth.
 
-  Bypass a false positive with `git commit --no-verify`; CI still runs the check.
+Nothing is lost by that: a pull request *here* cannot change `link-cac`'s exports, so the scan
+had nothing to catch on this side.
+
+There is no pre-commit hook for the exports either. `.githooks/pre-commit` here still validates
+a staged `app-config.yaml` against its schema (enable per clone with
+`git config core.hooksPath .githooks`, bypass with `--no-verify`), but nothing under `Config/`
+can be staged in this repository any more. `link-cac` has no hook at all - running this
+scanner there would need a clone of this repository on every machine - so on that side CI is
+the only gate, and it first fires when a pull request opens.
 
 If a real credential is ever committed, **rotate it** -- deleting the line does
-not remove it from git history.
+not remove it from git history, in either repository.

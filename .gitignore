@@ -422,10 +422,14 @@ FodyWeavers.xsd
 #   dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Scripts/AzureAppConfig/config_symbols.json
 #   python Scripts/AzureAppConfig/extract_config_keys.py
 Scripts/AzureAppConfig/config_symbols.json
-Config/config-key-inventory.json
+Scripts/AzureAppConfig/config-key-inventory.json
 /Prompt Staging
 
 # Scratch build/agent output. Keep these outside the repo (e.g. %TEMP%).
 .agent-out/
 .tmp*/
 .tmp-*/
+
+# A local clone of the private link-cac repository, if one is put here. The tooling defaults
+# to a sibling ../link-cac instead; override with LINK_CAC_CONFIG_DIR or --config-dir.
+.link-cac/
