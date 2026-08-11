@@ -34,12 +34,6 @@ public sealed class GeneratedTemplateCacheVersionStore
     public GeneratedTemplateCacheVersionStore(IMongoDatabase database)
     {
         _versions = database.GetCollection<GeneratedTemplateCacheVersionDocument>("automation_generated_template_versions");
-        var uniqueScenarioHashIndex = new CreateIndexModel<GeneratedTemplateCacheVersionDocument>(
-            Builders<GeneratedTemplateCacheVersionDocument>.IndexKeys
-                .Ascending(version => version.ScenarioKey)
-                .Ascending(version => version.TemplateSetHash),
-            new CreateIndexOptions { Unique = true, Name = ScenarioHashUniqueIndexName });
-        _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
     }
 
     public async Task<GeneratedTemplateCacheVersionBinding?> BindRunAsync(
