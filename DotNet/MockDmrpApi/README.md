@@ -307,8 +307,8 @@ Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
 | `POST /api/mock-dmrp/entries` | Create an entry → `201` + `Location` |
 | `GET /api/mock-dmrp/entries/{id}` | One entry. `400` on a non-GUID, `404` if absent |
 | `PUT /api/mock-dmrp/entries/{id}` | Update → `202`. **Never creates**; `404` if absent |
-| `GET /api/mock-dmrp/facilities/{facilityId}/entries` | A facility's entries across both components, paged. `404` when it has none |
-| `GET /api/mock-dmrp/entries/search` | Filtered search, paged. `204` when none |
+| `GET /api/mock-dmrp/facilities/{facilityId}/entries` | A facility's entries across both components, paged. Empty page when it has none |
+| `GET /api/mock-dmrp/entries/search` | Filtered search, paged. Empty page when none |
 | `DELETE /api/mock-dmrp/entries/{id}` | `204`, or `404` if absent |
 | `DELETE /api/mock-dmrp/facilities/{facilityId}/entries` | Idempotent `204` |
 | `DELETE /api/mock-dmrp/entries` | Removes **every** entry. No confirmation step |
@@ -355,17 +355,18 @@ Seed only `HOB` for facility `100`, February 2020, then `GET /msc?nhsnorgid=100&
 The caller concludes "not enrolled in HTCDI" from its absence. `reporting` is only ever
 `"Y"`, so it carries no information a caller can act on — presence is the whole signal.
 
-A facility enrolled in nothing returns **`200` with `"plans": []`** — not `204`, not `404`
-— because an empty plan is a meaningful answer rather than an absent resource. This
-deliberately differs from `/api/mock-dmrp/entries/search`, which returns `204` when nothing matches.
+A facility enrolled in nothing returns **`200` with `"plans": []`** — not `204`, not `404` —
+because an empty plan is a meaningful answer rather than an absent resource.
 
-`GET /api/mock-dmrp/facilities/{id}/entries` returns **`404`**, not `204`. The distinction is where the
-identifier sits: a facility named in the path that matches nothing is an absent resource,
-while a search whose query-parameter filters match nothing is an empty result set. This
-service keeps no facility registry, so "a facility with no entries" and "a facility that does
-not exist" are the same observation, and the `404` claims only what it can support — nothing
-is stored under that identifier. An entry stored with `isReporting` other than `"Y"` is excluded from a plan
-entirely.
+**No read on either surface has an empty-result branch.** `GET
+/api/mock-dmrp/facilities/{id}/entries` and `GET /api/mock-dmrp/entries/search` both answer
+**`200` with an empty `records` array** and usable paging metadata, so a caller parses one
+shape whichever route it came from. Not `404` on the by-facility route — zero entries means
+the facility has no reporting plans, not that it does not exist, and `ReportingPlanEntry` is
+the only table this service has to check against. A **blank** facility identifier is still a
+`400`.
+
+An entry stored with `isReporting` other than `"Y"` is excluded from a plan entirely.
 
 An annual plan omits the root `month` from the response, rather than reporting a zero or a
 stale value that would tell a consumer the plan covers one particular month.

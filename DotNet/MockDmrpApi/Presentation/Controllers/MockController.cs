@@ -75,22 +75,15 @@ public class MockController : ControllerBase
         return Ok(MockEntryMapper.ToModel(entry));
     }
 
-    /// <summary>Gets a facility's entries, paged. Answers 404 when it has none.</summary>
+    /// <summary>Gets a facility's entries, paged. Answers an empty page when it has none.</summary>
     /// <remarks>
-    /// 404 rather than 204 because the facility is named in the path. An identifier in a URL
-    /// that matches nothing is an absent resource, not an empty collection —
-    /// <c>/api/mock-dmrp/entries/search</c> takes its filters as query parameters and does
-    /// answer 204.
-    /// <para>
-    /// This service keeps no facility registry, so "a facility with no entries" and "a
-    /// facility that does not exist" are the same observation. The 404 makes no claim beyond
-    /// the one it can support: nothing is stored under that identifier.
-    /// </para>
+    /// No 404: zero entries means the facility has no reporting plans, not that it does not
+    /// exist. <c>ReportingPlanEntry</c> is the only table here, so that second claim cannot be
+    /// checked. A blank identifier is still a 400.
     /// </remarks>
     [HttpGet("facilities/{facilityId}/entries")]
     [ProducesResponseType(typeof(MockEntryPage), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MockEntryPage>> GetByFacility(
         string facilityId,
         [FromQuery] [Range(1, ReportingPlanSearchCriteria.MaxPageSize)] int? pageSize = 10,
@@ -106,29 +99,14 @@ public class MockController : ControllerBase
         var (records, metadata) = await _reportingPlans.GetByFacilityAsync(
             sanitizedFacilityId, pageSize ?? 10, pageNumber ?? 1, cancellationToken);
 
-        if (records.Count == 0)
-        {
-            return Problem(
-                detail: $"No reporting plan entries were found for facility '{sanitizedFacilityId}'.",
-                statusCode: StatusCodes.Status404NotFound,
-                title: "Facility Not Found",
-                type: DmrpProblemTypes.NotFound);
-        }
-
         return Ok(MockEntryMapper.ToPage(records, metadata));
     }
 
     /// <summary>
-    /// Searches entries. Every filter is optional; answers 204 when nothing matches.
+    /// Searches entries. Every filter is optional; answers an empty page when nothing matches.
     /// </summary>
-    /// <remarks>
-    /// 204 rather than the 404 its by-facility sibling returns. Nothing here is named in the
-    /// path — the filters are query parameters, so "no matches" is an empty result set rather
-    /// than an absent resource.
-    /// </remarks>
     [HttpGet("entries/search")]
     [ProducesResponseType(typeof(MockEntryPage), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<MockEntryPage>> Search(
         [FromQuery] string? facilityId = null,
@@ -158,11 +136,6 @@ public class MockController : ControllerBase
         };
 
         var (records, metadata) = await _reportingPlans.SearchAsync(criteria, cancellationToken);
-
-        if (records.Count == 0)
-        {
-            return NoContent();
-        }
 
         return Ok(MockEntryMapper.ToPage(records, metadata));
     }

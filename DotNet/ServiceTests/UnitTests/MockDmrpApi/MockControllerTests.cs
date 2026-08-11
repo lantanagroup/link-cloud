@@ -233,17 +233,17 @@ public class MockControllerTests : IAsyncLifetime
         // /search, /facilities and /oauth2 must not be read as identifiers, which is how
         // they would surface: an "Invalid Id format" for a perfectly good URL.
         (await _client.GetAsync("/api/mock-dmrp/entries/search")).StatusCode
-            .Should().Be(HttpStatusCode.NoContent);
+            .Should().Be(HttpStatusCode.OK);
 
         var byFacility = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries");
-        byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        byFacility.StatusCode.Should().Be(HttpStatusCode.OK);
         (await byFacility.Content.ReadAsStringAsync()).Should().NotContain("Invalid Id format");
     }
 
     // ------------------------------------------------------- facility + search
 
     [Fact]
-    public async Task GetByFacility_ReturnsAPageAnd404WhenTheFacilityHasNothing()
+    public async Task GetByFacility_ReturnsAPageAndAnEmptyPageWhenTheFacilityHasNothing()
     {
         Seed();
         Seed(measure: "HTCDI");
@@ -255,27 +255,30 @@ public class MockControllerTests : IAsyncLifetime
         page!.Records.Should().HaveCount(2);
         page.Metadata.PageSize.Should().Be(10);
 
-        // 404, not 204: the facility is named in the path, so an identifier that matches
-        // nothing is an absent resource rather than an empty collection.
+        // 200 with an empty page, not 404: zero entries means no reporting plans, not a
+        // missing facility, and this service has no way to tell the difference.
         var empty = await _client.GetAsync("/api/mock-dmrp/facilities/NoSuchFacility/entries");
-        empty.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await empty.Content.ReadAsStringAsync()).Should().Contain("NoSuchFacility",
-            "the detail names the facility it looked for");
+        empty.StatusCode.Should().Be(HttpStatusCode.OK);
+        var emptyPage = await empty.Content.ReadFromJsonAsync<MockEntryPage>();
+        emptyPage!.Records.Should().BeEmpty();
+        emptyPage.Metadata.TotalCount.Should().Be(0);
     }
 
     [Fact]
-    public async Task SearchStillAnswers204WhenNothingMatches()
+    public async Task BothReadRoutesAnswerAnEmptyPageWhenNothingMatches()
     {
-        // The distinction the by-facility 404 rests on. Search takes its filters as query
-        // parameters, so no matches is an empty result set, not a missing resource. If these
-        // two ever agreed, one of them would be wrong.
+        // Pinned side by side: no read on this surface has an empty-result branch, so a
+        // caller parses one shape whichever route it came from.
         Seed();
 
         var byFacility = await _client.GetAsync("/api/mock-dmrp/facilities/NoSuchFacility/entries");
         var bySearch = await _client.GetAsync("/api/mock-dmrp/entries/search?facilityId=NoSuchFacility");
 
-        byFacility.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        bySearch.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        byFacility.StatusCode.Should().Be(HttpStatusCode.OK);
+        bySearch.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await byFacility.Content.ReadFromJsonAsync<MockEntryPage>())!.Records.Should().BeEmpty();
+        (await bySearch.Content.ReadFromJsonAsync<MockEntryPage>())!.Records.Should().BeEmpty();
     }
 
     [Fact]
@@ -335,13 +338,16 @@ public class MockControllerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Search_WithNoMatches_Returns204()
+    public async Task Search_WithNoMatches_ReturnsAnEmptyPage()
     {
         Seed();
 
         var response = await _client.GetAsync("/api/mock-dmrp/entries/search?measure=NOPE");
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<MockEntryPage>();
+        page!.Records.Should().BeEmpty();
+        page.Metadata.TotalCount.Should().Be(0);
     }
 
     [Fact]
