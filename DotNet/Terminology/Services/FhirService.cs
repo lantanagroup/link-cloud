@@ -784,34 +784,39 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             ? matches.Last(c => c.Display == display)
             : matches[matches.Count - 1];
 
-        var isActive = ResolveIsActive(codeObject, system);
+        var isActive = ResolveCodeStatus(codeObject, system) == CodeStatus.Active;
 
         return CreateValidationParameters(true, isActive: isActive);
     }
 
     /// <summary>
-    /// Determines whether a matched code is active. CodeSystem members carry their own status. ValueSet members
+    /// Resolves the effective status of a matched code. CodeSystem members carry their own status. ValueSet members
     /// that carry a membership status (loaded as a <see cref="ValueSetCode"/>) are authoritative and override the
     /// code system. ValueSet members with no membership status (plain <see cref="Application.Models.Code"/>) have
     /// their status rejoined from the CodeSystem identified by <paramref name="system"/>.
     /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
     /// </summary>
-    private bool ResolveIsActive(Code codeObject, string? system)
+    /// <remarks>
+    /// Public so <c>ConfigController</c>'s cached-code lookups report the same status the corresponding
+    /// <c>$validate-code</c> call would. The two disagreeing about one code is what LEGLINK-889 was raised over,
+    /// so there is deliberately one implementation rather than two.
+    /// </remarks>
+    public CodeStatus ResolveCodeStatus(Code codeObject, string? system)
     {
         if (codeObject is CodeSystemCode codeSystemCode)
         {
-            return codeSystemCode.Status == CodeStatus.Active;
+            return codeSystemCode.Status;
         }
 
         // Value set membership status, when present, is authoritative and overrides the code system.
         if (codeObject is ValueSetCode valueSetCode)
         {
-            return valueSetCode.Status == CodeStatus.Active;
+            return valueSetCode.Status;
         }
 
         if (string.IsNullOrEmpty(system))
         {
-            return true;
+            return CodeStatus.Active;
         }
 
         var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
@@ -822,6 +827,6 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             .OfType<CodeSystemCode>()
             .LastOrDefault(c => c.Value == codeObject.Value);
 
-        return match == null || match.Status == CodeStatus.Active;
+        return match?.Status ?? CodeStatus.Active;
     }
 }
