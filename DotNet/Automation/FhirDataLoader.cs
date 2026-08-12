@@ -403,7 +403,8 @@ public class FhirDataLoader
     public async Task<bool> UploadBundlesSequentiallyAsync(
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles,
-        string progressPrefix = "")
+        string progressPrefix = "",
+        bool logSuccessfulPosts = true)
     {
         for (var i = 0; i < bundles.Count; i++)
         {
@@ -412,7 +413,7 @@ public class FhirDataLoader
                 ? $"[{i + 1}/{bundles.Count}]"
                 : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
 
-            var response = await PostBundleWithRetryAsync(json, name, progress, output);
+            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts);
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -783,7 +784,8 @@ public class FhirDataLoader
         string bundleJson,
         string name,
         string progress,
-        IAutomationOutput output)
+        IAutomationOutput output,
+        bool logSuccessfulPosts = true)
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
@@ -802,10 +804,13 @@ public class FhirDataLoader
 
             if (lastResponse.IsSuccessful)
             {
-                if (attempt > 1)
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
-                else
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                if (logSuccessfulPosts)
+                {
+                    if (attempt > 1)
+                        output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
+                    else
+                        output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                }
                 return lastResponse;
             }
 
