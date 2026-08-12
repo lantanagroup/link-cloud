@@ -26,8 +26,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -109,6 +111,20 @@ public class CategorizationService {
                     .toList();
             result.setCategories(categories);
         });
+
+        // Shared by the legacy $categorize flow and the rubric engine's category override, so both
+        // paths log how many results a category claimed (and which categories did the claiming).
+        long matched = results.stream()
+                .filter(r -> r.getCategories() != null && !r.getCategories().isEmpty())
+                .count();
+        Map<String, Long> byCategory = results.stream()
+                .filter(r -> r.getCategories() != null)
+                .flatMap(r -> r.getCategories().stream())
+                .collect(Collectors.groupingBy(Category::getId, TreeMap::new, Collectors.counting()));
+
+        logger.info("Categorization matched {} of {} result(s) against {} category rule(s){}",
+                matched, results.size(), categoryRules.size(),
+                byCategory.isEmpty() ? "" : "; matches by category: " + byCategory);
     }
 
     public void categorize(List<Result> results) {

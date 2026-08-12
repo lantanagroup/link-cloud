@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -84,8 +86,19 @@ public class CategoryOverrideEngine {
         }
         log.debug("Category override matched {} of {} finding(s) using {}", matchedCount, findings.size(), strategy);
         if (overriddenCount > 0) {
-            log.info("Category override changed the severity of {} of {} finding(s) (scope {}, strategy {})",
-                    overriddenCount, findings.size(), scope, strategy);
+            // From->to breakdown, e.g. {ERROR->WARNING=5}, so the log shows exactly which
+            // severities were overridden — comparable against the legacy path, which never overrides.
+            Map<String, Long> transitions = evaluated.stream()
+                    .filter(EvaluatedFinding::severityWasOverridden)
+                    .collect(Collectors.groupingBy(
+                            d -> d.originalSeverity() + "->" + d.effectiveSeverity(),
+                            TreeMap::new, Collectors.counting()));
+            log.info("Category override changed the severity of {} of {} finding(s): {} (scope {}, strategy {})",
+                    overriddenCount, findings.size(), transitions, scope, strategy);
+            //remove these logs durign final merge
+        } else {
+            log.info("Category override changed no severities ({} of {} finding(s) matched a category; scope {}, strategy {})",
+                    matchedCount, findings.size(), scope, strategy);
         }
         return evaluated;
     }

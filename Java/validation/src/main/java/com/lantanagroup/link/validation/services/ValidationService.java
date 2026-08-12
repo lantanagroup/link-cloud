@@ -24,8 +24,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.Collectors;
 
 @Service
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -50,8 +53,9 @@ public class ValidationService {
         fhirValidator.setExecutorService(ForkJoinPool.commonPool());
     }
 
-    // Package-private for unit testing of the terminology support chain composition.
-    static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
+    // Public so FhirConfig can compose the rubric engine's chain from the same terminology
+    // supports (same remote support, same order, same whitelists) as this legacy validator.
+    public static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
         if (linkConfig.getFhirTerminologyServiceUrl() != null && !linkConfig.getFhirTerminologyServiceUrl().isEmpty()) {
             var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
@@ -81,7 +85,13 @@ public class ValidationService {
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
                     .toList();
-            return deduplicateInactiveResults(results);
+            List<Result> deduplicated = deduplicateInactiveResults(results);
+            Map<String, Long> bySeverity = deduplicated.stream()
+                    .collect(Collectors.groupingBy(
+                            r -> String.valueOf(r.getSeverity()), TreeMap::new, Collectors.counting()));
+            logger.info("HAPI validation (legacy) returned {} findings ({} after inactive-dedup); severities {} are raw HAPI output — the legacy path applies no category/severity overrides",
+                    results.size(), deduplicated.size(), bySeverity);
+            return deduplicated;
         } catch (Exception ex) {
             logger.error("Validation failed", ex);
             throw ex;

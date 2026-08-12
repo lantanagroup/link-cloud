@@ -2,14 +2,15 @@ package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
+import ca.uhn.fhir.context.support.IValidationSupport;
 import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.rest.client.api.IRestfulClientFactory;
 import ca.uhn.fhir.validation.FhirValidator;
+import com.lantanagroup.link.validation.providers.ValidationCacheService;
+import com.lantanagroup.link.validation.services.ArtifactService;
+import com.lantanagroup.link.validation.services.ValidationService;
 import com.lantanagroup.link.validation.services.execution.ThreadLocalFhirPath;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
-import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
-import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
-import org.hl7.fhir.common.hapi.validation.support.RemoteTerminologyServiceValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.SnapshotGeneratingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
@@ -21,6 +22,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HttpContext;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +31,7 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
@@ -69,51 +72,104 @@ public class FhirConfig {
      * Terminology/profile validation support chain used by the rubric execution engine's
      * FHIR-conformance, terminology, and value-set check executors.
      *
-     * <p>The remote terminology server is resolved from the same {@code link.*} properties the
-     * legacy validator uses ({@code ValidationService.loadTerminologyValidationSupport}), so one
-     * configuration drives both engines:
-     * <ol>
-     *   <li>{@code link.fhir-terminology-service-url} — a generic FHIR terminology server, used as-is;</li>
-     *   <li>{@code link.terminology-service-url} — the Link terminology service <em>root</em>
-     *       (e.g. {@code http://terminology:8076}); {@code /api/terminology/fhir} is appended.</li>
-     * </ol>
+     * <p>Composed to be identical to the legacy validator's chain ({@link ValidationService}) so
+     * both engines produce the same findings for the same payload: base FHIR definitions, the
+     * artifact registry's IG packages (US Core, QI-Core, ...), snapshot generation, then the same
+     * terminology supports via {@link ValidationService#loadTerminologyValidationSupport} — the
+     * existence-gated remote terminology support (resolved from {@code link.fhir-terminology-service-url}
+     * or {@code link.terminology-service-url}) followed by the in-memory fallbacks.
      */
     @Bean
-    public ValidationSupportChain validationSupportChain(FhirContext fhirContext, LinkConfig linkConfig) {
+    public ValidationSupportChain validationSupportChain(FhirContext fhirContext, LinkConfig linkConfig,
+            ArtifactService artifactService, ValidationCacheService validationCacheService) {
+        // Mirrors the legacy validator's chain (ValidationService) exactly — same supports, same
+        // order — so FHIR_CONFORMANCE checks produce the same findings as the legacy $validate
+        // endpoint. The artifact support (IG packages: US Core, QI-Core, ...) is wrapped lazily:
+        // ArtifactService rebuilds it when artifacts change, and this singleton chain must always
+        // see the current one.
         ValidationSupportChain chain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
-                new InMemoryTerminologyServerValidationSupport(fhirContext),
-                new CommonCodeSystemsTerminologyService(fhirContext),
+                new LazyArtifactValidationSupport(fhirContext, artifactService),
                 new SnapshotGeneratingValidationSupport(fhirContext)
         );
-        String terminologyServiceUrl = resolveTerminologyServiceUrl(linkConfig);
-        if (terminologyServiceUrl != null && !terminologyServiceUrl.isBlank()) {
-            chain.addValidationSupport(new RemoteTerminologyServiceValidationSupport(fhirContext, terminologyServiceUrl));
-            logger.info("Validation support chain: DefaultProfile -> InMemoryTerminology -> CommonCodeSystems -> SnapshotGenerating -> RemoteTerminology({}); TERMINOLOGY/VALUESET checks will call the remote server for code systems the in-memory modules cannot answer", terminologyServiceUrl);
-        } else {
-            logger.warn("Validation support chain: no remote terminology server configured (link.fhir-terminology-service-url and link.terminology-service-url are blank) — TERMINOLOGY/VALUESET checks will SKIP codes in unknown code systems (silent pass)");
-        }
+        // Same remote terminology support (existence-gated, Redis-cached, whitelist-aware), same
+        // position before the in-memory fallbacks, as the legacy validator.
+        ValidationService.loadTerminologyValidationSupport(fhirContext, linkConfig, chain, validationCacheService);
+        logger.info("Rubric-engine validation support chain composed to match legacy: DefaultProfile -> Artifacts(IG packages) -> SnapshotGenerating -> [RemoteTerminology] -> CommonCodeSystems -> InMemoryTerminology");
         return chain;
     }
 
     /**
-     * Resolves the remote terminology base URL for the rubric engine; see the bean javadoc for the
-     * precedence order. Returns an empty string when nothing is configured.
+     * Delegates every conformance-resource lookup to {@link ArtifactService#getValidationSupport()}
+     * at call time. The artifact support is rebuilt whenever artifacts are saved, deleted, or
+     * re-initialized ({@code POST /api/validation/artifact/$initialize}), so holding a fixed
+     * instance in the singleton chain would go stale; resolving per call always sees the current
+     * packages while still benefiting from ArtifactService's internal caching. Terminology
+     * questions ({@code isCodeSystemSupported}/{@code isValueSetSupported}) keep the interface
+     * default of {@code false}, matching {@link com.lantanagroup.link.validation.services.ArtifactValidationSupport}.
      */
     // Package-private for testing.
-    static String resolveTerminologyServiceUrl(LinkConfig linkConfig) {
-        String fhirUrl = linkConfig.getFhirTerminologyServiceUrl();
-        logger.info("terminology url: {}", fhirUrl);
-        if (fhirUrl != null && !fhirUrl.isEmpty()) {
-            return fhirUrl;
+    static class LazyArtifactValidationSupport implements IValidationSupport {
+        private final FhirContext fhirContext;
+        private final ArtifactService artifactService;
+
+        LazyArtifactValidationSupport(FhirContext fhirContext, ArtifactService artifactService) {
+            this.fhirContext = fhirContext;
+            this.artifactService = artifactService;
         }
-        String linkUrl = linkConfig.getTerminologyServiceUrl();
-        if (linkUrl != null && !linkUrl.isEmpty()) {
-            // Same convention as the legacy validator: link.terminology-service-url is the service
-            // root, and the Link terminology service exposes its FHIR interface under this path.
-            return (linkUrl.endsWith("/") ? linkUrl : linkUrl + "/") + "api/terminology/fhir";
+
+        private IValidationSupport delegate() {
+            try {
+                return artifactService.getValidationSupport();
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to load artifact validation support", e);
+            }
         }
-        return "";
+
+        @Override
+        public FhirContext getFhirContext() {
+            return fhirContext;
+        }
+
+        @Override
+        public String getName() {
+            return "LazyArtifactValidationSupport";
+        }
+
+        @Override
+        public IBaseResource fetchCodeSystem(String theSystem) {
+            return delegate().fetchCodeSystem(theSystem);
+        }
+
+        @Override
+        public IBaseResource fetchValueSet(String theValueSetUrl) {
+            return delegate().fetchValueSet(theValueSetUrl);
+        }
+
+        @Override
+        public IBaseResource fetchStructureDefinition(String theUrl) {
+            return delegate().fetchStructureDefinition(theUrl);
+        }
+
+        @Override
+        public <T extends IBaseResource> T fetchResource(Class<T> theClass, String theUri) {
+            return delegate().fetchResource(theClass, theUri);
+        }
+
+        @Override
+        public List<IBaseResource> fetchAllConformanceResources() {
+            return delegate().fetchAllConformanceResources();
+        }
+
+        @Override
+        public <T extends IBaseResource> List<T> fetchAllStructureDefinitions() {
+            return delegate().fetchAllStructureDefinitions();
+        }
+
+        @Override
+        public <T extends IBaseResource> List<T> fetchAllNonBaseStructureDefinitions() {
+            return delegate().fetchAllNonBaseStructureDefinitions();
+        }
     }
 
     /**

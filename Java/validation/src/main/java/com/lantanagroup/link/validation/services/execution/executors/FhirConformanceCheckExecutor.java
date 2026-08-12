@@ -49,6 +49,7 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
         }
 
         ValidationResult result = fhirValidator.validateWithResult(context.getResource(), options);
+        log.info("HAPI validation (rubric engine) returned {} messages for check {}", result.getMessages().size(), check.getCheckLocalId());
         List<RawFinding> findings = new ArrayList<>();
         for (SingleValidationMessage msg : result.getMessages()) {
             findings.add(RawFinding.builder()
