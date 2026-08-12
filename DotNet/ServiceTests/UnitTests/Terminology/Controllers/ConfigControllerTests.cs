@@ -405,21 +405,30 @@ public class ConfigControllerTests
     [Fact]
     public void GetValueSetCode_NoSystemSupplied_TakesFirstSystemListingTheCode()
     {
-        // Mirrors FhirService.ValidateCodeAcrossSystems: systems are walked in load order and the first one
-        // listing the code wins, so the endpoint and $validate-code name the same occurrence.
+        // Mirrors FhirService.ValidateCodeAcrossSystems: systems are walked in enumeration order and the
+        // first one listing the code wins, so the endpoint and $validate-code name the same occurrence.
         const string otherSystem = "http://example.org/other";
-        GivenValueSet(ValueSetWithSystems(new Dictionary<string, List<Code>>
+        var codeGroup = ValueSetWithSystems(new Dictionary<string, List<Code>>
         {
             [otherSystem] = [new ValueSetCode { Value = "postal", Display = "Other postal", Status = CodeStatus.Active }],
             [AddressTypeSystem] = [new ValueSetCode { Value = "postal", Display = "Postal", Status = CodeStatus.Inactive }]
-        }));
+        });
+        GivenValueSet(codeGroup);
+
+        // Both systems list the code, so which one wins is decided entirely by the order the group
+        // enumerates - and Dictionary does not contract that order. The expectation is therefore read from
+        // the same walk FindValueSetMember makes rather than naming a key, so the assertion is "the first
+        // system listing the code wins" and not "this particular system wins". Picking the last system, or
+        // an arbitrary one, still fails.
+        var expectedSystem = codeGroup.Codes.First(entry => entry.Value.Any(c => c.Value == "postal")).Key;
+        var expectedStatus = ((ValueSetCode)codeGroup.Codes[expectedSystem].Last(c => c.Value == "postal")).Status;
 
         var result = _controller.GetValueSetCode(ValueSetId, "postal");
 
         var lookup = Assert.IsType<ValueSetCodeLookupResult>(
             Assert.IsType<OkObjectResult>(result.Result).Value);
-        Assert.Equal(otherSystem, lookup.System);
-        Assert.Equal(CodeStatus.Active, lookup.MembershipStatus);
+        Assert.Equal(expectedSystem, lookup.System);
+        Assert.Equal(expectedStatus, lookup.MembershipStatus);
     }
 
     [Fact]
