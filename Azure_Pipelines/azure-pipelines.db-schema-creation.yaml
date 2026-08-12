@@ -34,6 +34,11 @@ parameters:
     - name: data
       artifact: data-db
       file: dataDb.sql
+    # No mock-dmrp entry. The Build stage publishes mock-dmrp-db, but no environment has a
+    # Mock DMRP database yet -- the service has no rows in any App Configuration store, so
+    # the apply stages have nothing to target. Add an entry here once one is provisioned,
+    # and note that ${{ db.name }} becomes a job identifier: it must be a single word with
+    # no hyphen, so 'mockdmrp' rather than 'mock-dmrp'.
     - name: normalization
       artifact: normalization-db
       file: normalizationDb.sql
@@ -101,7 +106,7 @@ stages:
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
             # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $dotnetServices = @("Account", "Audit", "Census", "MockDmrpApi", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" )
             $javaServices = @("validation" )
             $dataAcquisition = @("DataAcquisition" )
 
@@ -254,7 +259,30 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/dataDb.sql'
          ArtifactName: 'data-db'
          publishLocation: 'container'
-        displayName: Publish Data Acquisition SQL Script  
+        displayName: Publish Data Acquisition SQL Script
+  ###
+  # MockDmrpApi
+  - job: MockDmrpApi
+    displayName: "Generate Mock DMRP API Schema Script"
+    steps:
+      - script: |
+          cd DotNet/MockDmrpApi
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/MockDmrpApi
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportingPlanDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/mockDmrpDb.sql
+        displayName: Generate Mock DMRP API SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/mockDmrpDb.sql'
+         ArtifactName: 'mock-dmrp-db'
+         publishLocation: 'container'
+        displayName: Publish Mock DMRP API SQL Script
   ###
   # Normalization
   - job: Normalization
