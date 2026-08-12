@@ -11,6 +11,8 @@ public class CategorySnapshot {
     private String title;
     private CategorySeverity severity;
     private boolean acceptable;
+    private boolean submit = true;
+    private boolean review = true;
     private String guidance;
     private Matcher matcher;
 
@@ -22,6 +24,8 @@ public class CategorySnapshot {
         title = category.getTitle();
         severity = category.getSeverity();
         acceptable = category.isAcceptable();
+        submit = category.isSubmit();
+        review = category.isReview();
         guidance = category.getGuidance();
         CategoryRule latestRule = category.getLatestRule();
         if (latestRule != null) {
@@ -48,6 +52,8 @@ public class CategorySnapshot {
         category.setTitle(title);
         category.setSeverity(severity);
         category.setAcceptable(acceptable);
+        category.setSubmit(submit);
+        category.setReview(review);
         category.setGuidance(guidance);
         return category;
     }
