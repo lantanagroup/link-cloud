@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
@@ -156,7 +157,7 @@ public class CodeGroupCacheServiceTests
 
         // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            mockService.Object.ProcessCodeSystemCsv(codeGroup, csv));
+            mockService.Object.ProcessCodeSystemCsv(codeGroup, csv, CancellationToken.None));
 
         Assert.Contains("CodeSystem CSV must have", ex.Message);
     }
@@ -196,7 +197,7 @@ http://test.system,123,Test Display,Active,Extra Value";
 
         // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            mockService.Object.ProcessValueSetCsv(codeGroup, csv));
+            mockService.Object.ProcessValueSetCsv(codeGroup, csv, CancellationToken.None));
 
         Assert.Contains("ValueSet CSV must have", ex.Message);
     }
@@ -245,7 +246,7 @@ http://test.system,123,Test Display,Active,Extra Value";
         };
 
         // Act
-        mockService.Object.ProcessValueSetCsv(codeGroup, csv);
+        mockService.Object.ProcessValueSetCsv(codeGroup, csv, CancellationToken.None);
 
         // Verify that processing resulted in calling SetGroup with correct CodeGroup
         mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
@@ -303,7 +304,7 @@ http://test.system,123,Test Display,Active,Extra Value";
             }
         };
 
-        mockService.Object.ProcessValueSetCsv(codeGroup, csv);
+        mockService.Object.ProcessValueSetCsv(codeGroup, csv, CancellationToken.None);
 
         VerifyScientificNotationWarning(2, "test-id");
     }
@@ -352,7 +353,7 @@ http://test.system,123,Test Display,Active,Extra Value";
         };
 
         // Act
-        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv, CancellationToken.None);
 
         // Assert - both header shapes yield the same code/display parsing
         mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
@@ -411,7 +412,7 @@ http://test.system,123,Test Display,Active,Extra Value";
         };
 
         // Act
-        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv, CancellationToken.None);
 
         // Verify that processing resulted in calling SetGroup with correct CodeGroup
         mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
@@ -468,7 +469,7 @@ http://test.system,123,Test Display,Active,Extra Value";
             }
         };
 
-        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv, CancellationToken.None);
 
         VerifyScientificNotationWarning(2, "test-id");
     }
@@ -1191,32 +1192,37 @@ http://test.system,123,Test Display,Active,Extra Value";
         Assert.Equal(2, replaced.Codes.Values.Sum(c => c.Count));
     }
 
-    [Fact]
-    public async Task ReplaceCodesFromCsv_HeaderOnly_CachesAnEmptyCodeGroup()
+    [Theory]
+    [InlineData(CodeGroup.CodeGroupTypes.ValueSet, "test-vs", "system,code,display\r\n")]
+    [InlineData(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", "code,display\r\n")]
+    public async Task ReplaceCodesFromCsv_HeaderOnly_CachesAnEmptyCodeGroup(
+        CodeGroup.CodeGroupTypes type, string id, string csv)
     {
+        // Emptying a code group is a legitimate test setup, not an error. Both types are covered because
+        // only the CodeSystem loader indexed Codes[system] to log its count, which threw on a file that
+        // added no codes - after SetCodeGroup had already cached the emptied group, so the group was
+        // wiped and the caller was told it did not exist.
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var service = BuildServiceWithLoadedGroups(memoryCache);
         await service.LoadCache();
 
-        // Emptying a value set is a legitimate test setup, not an error.
-        var replaced = service.ReplaceCodesFromCsv(
-            CodeGroup.CodeGroupTypes.ValueSet, "test-vs", null, "system,code,display\r\n");
+        var replaced = service.ReplaceCodesFromCsv(type, id, null, csv);
 
         Assert.Equal(0, replaced.Codes.Values.Sum(c => c.Count));
-        var fromCache = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, "test-vs")!;
+        var fromCache = service.GetCodeGroupById(type, id)!;
         Assert.Equal(0, fromCache.Codes.Values.Sum(c => c.Count));
     }
 
     [Theory]
     [InlineData("unknown-id", null)]
     [InlineData("test-cs", "9.9")]
-    public async Task ReplaceCodesFromCsv_UnknownTarget_ThrowsKeyNotFound(string id, string? version)
+    public async Task ReplaceCodesFromCsv_UnknownTarget_ThrowsCodeGroupNotFound(string id, string? version)
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var service = BuildServiceWithLoadedGroups(memoryCache);
         await service.LoadCache();
 
-        Assert.Throws<KeyNotFoundException>(() => service.ReplaceCodesFromCsv(
+        Assert.Throws<CodeGroupNotFoundException>(() => service.ReplaceCodesFromCsv(
             CodeGroup.CodeGroupTypes.CodeSystem, id, version, "code,display\r\nZZZ,Injected\r\n"));
     }
 

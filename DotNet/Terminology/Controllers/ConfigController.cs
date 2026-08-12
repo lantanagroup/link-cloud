@@ -1,6 +1,7 @@
 using System.Net;
 using CsvHelper;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -84,11 +85,11 @@ public class ConfigController(
     /// </summary>
     /// <returns>An HTTP NoContent response indicating the operation was successful.</returns>
     [HttpPost("$reload-cache")]
-    public async Task<ActionResult> ReloadCache()
+    public async Task<ActionResult> ReloadCache(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Reloading cache");
         cacheService.ClearCache();
-        await cacheService.LoadCache();
+        await cacheService.LoadCache(cancellationToken);
         return NoContent();
     }
 
@@ -171,12 +172,14 @@ public class ConfigController(
     /// <param name="system">
     /// Optional code system URI. A value set groups its members by system and may list the same code under
     /// more than one; supplying this restricts the search to that system, and omitting it takes the first
-    /// system that lists the code — the same selection <c>$validate-code</c> makes.
+    /// system that lists the code — the same selection <c>$validate-code</c> makes. Supplying a value that
+    /// sanitizes away to nothing is rejected rather than treated as omitted, since widening the search is
+    /// not what the caller asked for.
     /// </param>
     /// <param name="version">Optional ValueSet version; when omitted the latest cached version is used.</param>
     /// <returns>
-    /// 200 with the matching member; 400 if <paramref name="id"/> or <paramref name="code"/> is missing;
-    /// 404 if the ValueSet or the code is not present in the cache.
+    /// 200 with the matching member; 400 if <paramref name="id"/> or <paramref name="code"/> is missing or
+    /// <paramref name="system"/> is unusable; 404 if the ValueSet or the code is not present in the cache.
     /// </returns>
     [HttpGet("value-sets/{id}/codes/{code}")]
     [SwaggerOperation(Summary = "Get a member of a cached ValueSet by its resource id.")]
@@ -195,7 +198,23 @@ public class ConfigController(
         // Blank/whitespace-only values are treated the same as omitting the parameter: null version means
         // the latest cached version, null system means "search every system in the value set".
         var cleanVersion = string.IsNullOrWhiteSpace(version) ? null : version.Sanitize();
-        var cleanSystem = string.IsNullOrWhiteSpace(system) ? null : SanitizeLookupValue(system);
+
+        // A supplied system that sanitizes away to nothing is rejected rather than quietly treated as
+        // omitted. Omitting the system widens the search to every system in the value set, so silently
+        // dropping an unusable one could answer with a match under a system the caller never asked about —
+        // a wrong answer dressed as a right one. FhirController.SanitizeTerminologyValue rejects an emptied
+        // value for the same reason. Note the blank check is on the SANITIZED value, not the raw one:
+        // markup-only input like "<b></b>" is not whitespace but sanitizes to nothing.
+        string? cleanSystem = null;
+        if (!string.IsNullOrWhiteSpace(system))
+        {
+            cleanSystem = SanitizeLookupValue(system);
+
+            if (string.IsNullOrWhiteSpace(cleanSystem))
+            {
+                ModelState.AddModelError("system", "Invalid value supplied for 'system'.");
+            }
+        }
 
         var invalid = ValidateLookupParameters(cleanId, cleanCode, "ValueSet");
         if (invalid != null)
@@ -437,12 +456,12 @@ public class ConfigController(
 
         try
         {
-            var replaced = cacheService.ReplaceCodesFromCsv(type, cleanId!, cleanVersion, csvContent);
+            var replaced = cacheService.ReplaceCodesFromCsv(type, cleanId!, cleanVersion, csvContent, cancellationToken);
             var codes = replaced.Codes.Values.SelectMany(c => c).ToList();
 
             logger.LogInformation(
                 "Replaced the codes of {Type} {Id} from uploaded file {FileName}",
-                type, cleanId, cleanFileName ?? "(unnamed)");
+                type, cleanId.SanitizeForLog(), cleanFileName ?? "(unnamed)");
 
             return Accepted(new ReplaceCodesResponse
             {
@@ -460,8 +479,12 @@ public class ConfigController(
                 FileName = cleanFileName
             });
         }
-        catch (KeyNotFoundException ex)
+        catch (CodeGroupNotFoundException ex)
         {
+            // Deliberately the narrow type rather than KeyNotFoundException: the message is echoed to the
+            // caller, and a dictionary lookup failing anywhere inside the cache is a defect whose message
+            // must not be dressed up as a 404. Anything else reaching here falls through to the
+            // service-wide handler as a 500 with a traceId.
             return Problem(
                 detail: ex.Message,
                 statusCode: StatusCodes.Status404NotFound,

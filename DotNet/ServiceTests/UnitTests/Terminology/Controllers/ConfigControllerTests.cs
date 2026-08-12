@@ -1,5 +1,6 @@
 using System.Globalization;
 using CsvHelper;
+using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -467,6 +468,51 @@ public class ConfigControllerTests
         Assert.Equal(AddressTypeSystem, lookup.System);
     }
 
+    [Theory]
+    [InlineData("<script>alert(1)</script>")]
+    [InlineData("<style>a{}</style>")]
+    public void GetValueSetCode_SystemSanitizesAwayToNothing_Returns400RatherThanWideningTheSearch(string system)
+    {
+        // These are not whitespace, so the "treat blank as omitted" path does not catch them, but the
+        // sanitizer drops the element and its content and leaves nothing. Quietly treating that as an omitted
+        // system would turn a single-system lookup into a search across every system in the value set and
+        // could answer with a member the caller never asked about, so it is rejected. The cache must not be
+        // consulted at all.
+        GivenValueSet(ValueSetWithCodes(
+            new ValueSetCode { Value = "postal", Display = "Postal", Status = CodeStatus.Inactive }));
+
+        var result = _controller.GetValueSetCode(ValueSetId, "postal", system: system);
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
+
+        var problem = Assert.IsAssignableFrom<ValidationProblemDetails>(objectResult.Value);
+        Assert.Contains("system", problem.Errors.Keys);
+
+        _mockCacheService.Verify(
+            x => x.GetCodeGroupById(It.IsAny<CodeGroup.CodeGroupTypes>(), It.IsAny<string>(), It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void GetValueSetCode_SystemSurvivesSanitizing_IsLookedUpNotRejected()
+    {
+        // The 400 above is narrow on purpose. HtmlSanitizer ships an allow-list, and "b" is on it, so
+        // "<b></b>" comes back intact rather than empty. That is a system the value set simply does not
+        // list, which is a 404 - not a rejected parameter. Pinning this keeps the guard from drifting into
+        // "anything that looks like markup is a 400", which would start rejecting real system URIs.
+        GivenValueSet(ValueSetWithCodes(
+            new ValueSetCode { Value = "postal", Display = "Postal", Status = CodeStatus.Inactive }));
+
+        var result = _controller.GetValueSetCode(ValueSetId, "postal", system: "<b></b>");
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status404NotFound, objectResult.StatusCode);
+
+        var problem = Assert.IsAssignableFrom<ProblemDetails>(objectResult.Value);
+        Assert.Equal("Code Not Found", problem.Title);
+    }
+
     private void GivenCodeSystemStatus(CodeStatus status) =>
         _mockCacheService
             .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, AddressTypeSystem, null))
@@ -516,7 +562,7 @@ public class ConfigControllerTests
         // Indistinguishable from a route that was never deployed.
         Assert.Equal("The requested terminology endpoint was not found.", problem.Detail);
         _mockCacheService.Verify(
-            x => x.ReplaceCodesFromCsv(It.IsAny<CodeGroup.CodeGroupTypes>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>()),
+            x => x.ReplaceCodesFromCsv(It.IsAny<CodeGroup.CodeGroupTypes>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -581,8 +627,8 @@ public class ConfigControllerTests
     public async Task ReplaceValueSetCodes_UnknownTarget_Returns404WithTypedTitle()
     {
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
-            .Throws(new KeyNotFoundException("No ValueSet found in the cache with id 'x' and version 'latest'"));
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Throws(new CodeGroupNotFoundException("No ValueSet found in the cache with id 'x' and version 'latest'"));
 
         var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\n"));
 
@@ -595,7 +641,7 @@ public class ConfigControllerTests
     {
         const string message = "ValueSet CSV must have 3 or 4 columns: system, code, display, and optionally status.";
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Throws(new InvalidOperationException(message));
 
         var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("a,b\r\n1,2\r\n"));
@@ -611,7 +657,7 @@ public class ConfigControllerTests
         const string secret = "PATIENT-SSN-123-45-6789";
         using var csvReader = new CsvReader(new StringReader("a,b\r\n1,2\r\n"), CultureInfo.InvariantCulture);
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Throws(new CsvHelperException(
                 csvReader.Context, $"The conversion cannot be performed. Text: '{secret}'"));
 
@@ -626,7 +672,7 @@ public class ConfigControllerTests
     public async Task ReplaceValueSetCodes_Success_Returns202WithCounts()
     {
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(new CodeGroup
             {
                 Type = CodeGroup.CodeGroupTypes.ValueSet,
@@ -658,7 +704,7 @@ public class ConfigControllerTests
     {
         const string csv = "code,display\r\nZZZ,Injected\r\n";
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv))
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv, It.IsAny<CancellationToken>()))
             .Returns(CodeSystemWithCodes(new CodeSystemCode { Value = "ZZZ", Display = "Injected", Status = CodeStatus.Active }));
 
         var result = await _controller.ReplaceCodeSystemCodes(CodeSystemId, BuildCsvFile(csv));
@@ -666,7 +712,29 @@ public class ConfigControllerTests
         Assert.IsType<AcceptedResult>(result.Result);
         // The route determines the type, so a CSV can never be applied to the wrong kind of group.
         _mockCacheService.Verify(
-            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv), Times.Once);
+            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_ForwardsTheRequestCancellationTokenToTheCache()
+    {
+        // The parse is synchronous and walks the CSV row by row, so the token the endpoint was handed is the
+        // only thing that lets a client disconnect stop it. It.IsAny<CancellationToken>() in the other tests
+        // would pass just as happily against the four-argument overload, so this asserts the exact token.
+        using var cts = new CancellationTokenSource();
+
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(
+                CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), cts.Token))
+            .Returns(new CodeGroup { Type = CodeGroup.CodeGroupTypes.ValueSet, Id = UploadValueSetId });
+
+        await _controller.ReplaceValueSetCodes(
+            UploadValueSetId, BuildCsvFile("system,code,display\r\n"), version: null, cancellationToken: cts.Token);
+
+        _mockCacheService.Verify(
+            x => x.ReplaceCodesFromCsv(
+                CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), cts.Token),
+            Times.Once);
     }
 
     [Theory]
@@ -676,13 +744,13 @@ public class ConfigControllerTests
     public async Task ReplaceValueSetCodes_BlankVersion_IsTreatedAsLatest(string? version)
     {
         _mockCacheService
-            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(new CodeGroup { Type = CodeGroup.CodeGroupTypes.ValueSet, Id = UploadValueSetId });
 
         await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\n"), version);
 
         _mockCacheService.Verify(
-            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()),
+            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

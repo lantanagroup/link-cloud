@@ -39,10 +39,11 @@ public interface ICodeGroupCacheService
     /// The CSV content, including a header row. A CodeSystem CSV has 2 or 3 columns (code, display and
     /// optionally status); a ValueSet CSV has 3 or 4 (system, code, display and optionally status).
     /// </param>
+    /// <param name="cancellationToken">Token to indicate if the operation should be cancelled.</param>
     /// <returns>The replaced code group, carrying the codes just loaded.</returns>
-    /// <exception cref="KeyNotFoundException">No such code group is cached.</exception>
+    /// <exception cref="Exceptions.CodeGroupNotFoundException">No such code group is cached.</exception>
     /// <exception cref="InvalidOperationException">The CSV does not have a supported number of columns.</exception>
-    CodeGroup ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes type, string id, string? version, string csvContent);
+    CodeGroup ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes type, string id, string? version, string csvContent, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Clears all cached code groups.
@@ -52,5 +53,5 @@ public interface ICodeGroupCacheService
     /// <summary>
     /// Loads (or reloads) the cache from the configured terminology source.
     /// </summary>
-    Task LoadCache();
+    Task LoadCache(CancellationToken cancellationToken = default);
 }

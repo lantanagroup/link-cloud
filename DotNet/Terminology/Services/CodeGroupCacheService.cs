@@ -6,6 +6,7 @@ using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -210,10 +211,15 @@ public class CodeGroupCacheService(
     /// Replaces the codes of an already-cached code group with the contents of a CSV, preserving the
     /// FHIR resource metadata loaded from disk. See <see cref="ICodeGroupCacheService.ReplaceCodesFromCsv"/>.
     /// </summary>
-    public virtual CodeGroup ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes type, string id, string? version, string csvContent)
+    public virtual CodeGroup ReplaceCodesFromCsv(
+        CodeGroup.CodeGroupTypes type,
+        string id,
+        string? version,
+        string csvContent,
+        CancellationToken cancellationToken = default)
     {
         var existing = GetCodeGroupById(type, id, version)
-            ?? throw new KeyNotFoundException(
+            ?? throw new CodeGroupNotFoundException(
                 $"No {type} found in the cache with id '{id}' and version '{version ?? "latest"}'");
 
         // Build a replacement rather than mutating the cached instance. ProcessValueSetCsv and
@@ -240,16 +246,19 @@ public class CodeGroupCacheService(
         var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
         using var csv = new CsvReader(reader, config);
 
-        // Both Process*Csv methods call SetCodeGroup as their final statement and enumerate the CSV
-        // lazily, so any parse failure throws before the cache is touched and the previously loaded
-        // codes survive intact. There is deliberately no rollback here, and no pre-clearing.
+        // Both Process*Csv methods enumerate the CSV lazily and reach SetCodeGroup only once every row
+        // has been read, so any parse failure throws before the cache is touched and the previously
+        // loaded codes survive intact. There is deliberately no rollback here, and no pre-clearing.
+        // Nothing after SetCodeGroup may throw, or the cache would be swapped and the caller still told
+        // the operation failed - which is exactly what the trailing LogDebug in ProcessCodeSystemCsv
+        // used to do on a header-only file.
         switch (type)
         {
             case CodeGroup.CodeGroupTypes.CodeSystem:
-                ProcessCodeSystemCsv(replacement, csv);
+                ProcessCodeSystemCsv(replacement, csv, cancellationToken);
                 break;
             case CodeGroup.CodeGroupTypes.ValueSet:
-                ProcessValueSetCsv(replacement, csv);
+                ProcessValueSetCsv(replacement, csv, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException($"Code group type {type} is not supported");
@@ -299,7 +308,7 @@ public class CodeGroupCacheService(
         return codeGroup;
     }
 
-    internal void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv, CancellationToken cancellationToken)
     {
         // Validate column count
         csv.Read();
@@ -323,6 +332,8 @@ public class CodeGroupCacheService(
 
         while (csv.Read())
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             string recordSystem = csv.GetField(0) ?? string.Empty;
             string code = csv.GetField(1) ?? string.Empty;
             string display = csv.GetField(2) ?? string.Empty;
@@ -387,7 +398,7 @@ public class CodeGroupCacheService(
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
 
-    internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv, CancellationToken cancellationToken)
     {
         if (codeGroup == null)
             throw new ArgumentNullException(nameof(codeGroup));
@@ -412,6 +423,7 @@ public class CodeGroupCacheService(
 
         foreach (var record in records)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string code = record.Code;
             string display = record.Display;
             CodeStatus status = statusParser.Parse(record.Status, code);
@@ -439,7 +451,14 @@ public class CodeGroupCacheService(
         LogInvalidStatusWarning(statusParser, codeGroup.Id);
 
         SetCodeGroup(codeGroup);
-        logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+
+        // TryGetValue rather than the indexer: a CSV with a header but no data rows never creates the
+        // system key, so the indexer threw KeyNotFoundException *after* SetCodeGroup had already swapped
+        // the emptied group into the cache. Log arguments are evaluated eagerly regardless of the
+        // configured level, so it threw even with Debug off. Emptying a code group is a legitimate
+        // outcome of a CSV upload, not an error.
+        var loadedCount = codeGroup.Codes.TryGetValue(system, out var loadedCodes) ? loadedCodes.Count : 0;
+        logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, loadedCount);
     }
 
     private void LogScientificNotationWarning(int scientificNotationCodeCount, string? codeGroupId, string? examples)
@@ -532,7 +551,7 @@ public class CodeGroupCacheService(
     /// Logs the number of successfully loaded code groups and warnings for directories
     /// that could not be processed.
     /// </summary>
-    public async Task LoadCache()
+    public async Task LoadCache(CancellationToken cancellationToken = default)
     {
         this.ClearCache();
 
@@ -584,12 +603,12 @@ public class CodeGroupCacheService(
                 {
                     case CodeGroup.CodeGroupTypes.CodeSystem:
                         logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
-                        this.ProcessCodeSystemCsv(codeGroup, csv);
+                        this.ProcessCodeSystemCsv(codeGroup, csv, cancellationToken);
                         loadedCodeSystems++;
                         break;
                     case CodeGroup.CodeGroupTypes.ValueSet:
                         logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
-                        this.ProcessValueSetCsv(codeGroup, csv);
+                        this.ProcessValueSetCsv(codeGroup, csv, cancellationToken);
                         loadedValueSets++;
                         break;
                     default:
