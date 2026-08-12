@@ -34,6 +34,17 @@ public class CodeGroupCacheService(
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
 
     /// <summary>
+    /// The number of cache keys currently tracked.
+    /// </summary>
+    /// <remarks>
+    /// Exposed for tests only. A duplicate key is invisible through the public surface — the lookups still
+    /// return the right group and merely scan further, and <see cref="GetAllCodeGroups"/> collapses
+    /// duplicates with its group-by on id — so this count is the only thing that can actually fail if the
+    /// composite-key guard in <see cref="SetCodeGroup"/> regresses to reference equality.
+    /// </remarks>
+    internal int CacheKeyCount => _cacheKeys.Count;
+
+    /// <summary>
     /// Determines whether the specified directory exists on the file system.
     /// </summary>
     /// <param name="path">The path to the directory whose existence is being checked.</param>

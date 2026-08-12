@@ -1277,14 +1277,25 @@ http://test.system,123,Test Display,Active,Extra Value";
         var service = BuildServiceWithLoadedGroups(memoryCache);
         await service.LoadCache();
 
+        var keysAfterLoad = service.CacheKeyCount;
+
         for (var i = 0; i < 3; i++)
         {
             service.ReplaceCodesFromCsv(
                 CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, $"code,display\r\nZ{i},Injected\r\n");
         }
 
-        // CacheKey has no value equality, so the pre-fix ConcurrentBag.Contains guard never matched
-        // and each replace leaked a key that lengthens every subsequent lookup scan.
+        // CacheKey has no value equality, so the pre-fix ConcurrentBag.Contains guard never matched and each
+        // replace leaked a key that lengthens every subsequent lookup scan.
+        //
+        // The key count is the assertion that carries this test. The leak cannot be seen through the public
+        // surface - the lookups below still find the right group with duplicates present, and
+        // GetAllCodeGroups collapses them with its group-by on id - so those two assertions pass either way
+        // and are kept only as a check that the replaces themselves worked. Compared against the post-load
+        // count rather than a literal, since the fixture loads both a CodeSystem and a ValueSet and the
+        // invariant is "replacing adds no keys", not "there is exactly one".
+        Assert.Equal(keysAfterLoad, service.CacheKeyCount);
+
         Assert.Single(service.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem));
         Assert.NotNull(service.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem"));
     }
