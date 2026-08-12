@@ -27,7 +27,7 @@ public class Result {
     private static final Logger logger = LoggerFactory.getLogger(Result.class);
 
     @Id
-    @SequenceGenerator(name = "result_seq", sequenceName = "result_sequence", schema = "dbo", allocationSize = 100)
+    @SequenceGenerator(name = "result_seq", sequenceName = "result_sequence", allocationSize = 100)
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "result_seq")
     private Long id;
 
