@@ -40,16 +40,11 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
         var templates = await store.GetAllAsync(ct);
 
-        var duplicateName = templates.Any(t =>
-            t.Id != model.Id &&
-            string.Equals(
-                t.Name?.Trim(),
-                model.Name,
-                StringComparison.OrdinalIgnoreCase));
-
-        if (duplicateName)
+        if (HasDuplicateName(templates, model.Name, model.Id))
+        {
             return Conflict(
                 $"An Organization Resource Map named '{model.Name}' already exists.");
+        }
 
         var existing = await store.GetByIdAsync(model.Id, ct);
 
@@ -100,11 +95,7 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         var cloneName = $"{source.Name} (Copy)";
         var copyNumber = 2;
 
-        while (templates.Any(t =>
-            string.Equals(
-                t.Name?.Trim(),
-                cloneName,
-                StringComparison.OrdinalIgnoreCase)))
+        while (HasDuplicateName(templates, cloneName))
         {
             cloneName = $"{source.Name} (Copy {copyNumber})";
             copyNumber++;
@@ -141,6 +132,21 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
         await store.SetDefaultAsync(request.Id, ct);
         return Ok();
+    }
+
+    private static bool HasDuplicateName(
+    IEnumerable<OrganizationResourceMapTemplate> templates,
+    string name,
+    Guid? excludeId = null)
+    {
+        var normalizedName = name.Trim();
+
+        return templates.Any(t =>
+            (!excludeId.HasValue || t.Id != excludeId.Value) &&
+            string.Equals(
+                t.Name?.Trim(),
+                normalizedName,
+                StringComparison.OrdinalIgnoreCase));
     }
 
 }
