@@ -1,0 +1,74 @@
+<div class="validation-categories-management" style="margin: 1em;">
+  <div class="validation-categories-management__header">
+    <div>
+      <h2 class="validation-categories-management__title">Validation Categories Management</h2>
+    </div>
+    <div class="validation-categories-management__actions">
+      <button matButton="filled" color="primary" type="button" (click)="confirmInitializeCategories()">$initialize</button>
+      <button matButton="filled" color="primary" type="button" (click)="openBulkImport()">$bulk-import</button>
+      <button matButton="filled" color="primary" type="button" (click)="exportCategories()">$bulk-export</button>
+    </div>
+  </div>
+
+  <div class="validation-categories-management__filter-row">
+    <mat-form-field appearance="outline" class="filter-input full-width">
+      <mat-label>Filter categories</mat-label>
+      <input matInput [(ngModel)]="filterText" (input)="applyFilter()" placeholder="Search by id, title, severity, guidance, rules" />
+      <button mat-icon-button matSuffix *ngIf="filterText" aria-label="Clear" (click)="filterText=''; applyFilter();">
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
+  </div>
+
+  <div class="validation-categories-management__table-container">
+    <div class="vd-mat-table">
+      <table mat-table #sort="matSort" [dataSource]="dataSource" matSort style="position:relative; z-index:0;">
+
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+          <td mat-cell *matCellDef="let category">{{ category.id }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+          <td mat-cell *matCellDef="let category">{{ category.title }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="severity">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Severity</th>
+          <td mat-cell *matCellDef="let category">{{ category.severity }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="acceptable">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Acceptable</th>
+          <td mat-cell *matCellDef="let category">{{ category.acceptable ? 'Yes' : 'No' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="submit">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Submit</th>
+          <td mat-cell *matCellDef="let category">{{ category.submit ? 'Yes' : 'No' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="review">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Review</th>
+          <td mat-cell *matCellDef="let category">{{ category.review ? 'Yes' : 'No' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="guidance">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Guidance</th>
+          <td mat-cell *matCellDef="let category">{{ category.guidance }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="rules">
+          <th mat-header-cell *matHeaderCellDef>Rules</th>
+          <td mat-cell *matCellDef="let category">
+            <button mat-button type="button" (click)="openRulesDialog(category.matcher)">View rules</button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columnKeys; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: columnKeys;"></tr>
+      </table>
+    </div>
+  </div>
+</div>
