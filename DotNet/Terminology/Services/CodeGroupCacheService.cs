@@ -247,31 +247,23 @@ public class CodeGroupCacheService(
 
         // A 4-column file carries value set membership status; a 3-column file does not.
         // Members loaded with membership status are authoritative; members without it fall back to
-        // the code system status when validated (see FhirService.ResolveIsActive).
+        // the code system status when validated (see FhirService.ResolveCodeStatus).
         bool hasStatusColumn = headers.Length == 4;
 
         string? system = null;
         List<Code>? systemCodes = null;
         int scientificNotationCodeCount = 0;
         string scientificNotationCodeExamples = "";
+        var statusParser = new CodeStatusParser();
 
         while (csv.Read())
         {
             string recordSystem = csv.GetField(0) ?? string.Empty;
             string code = csv.GetField(1) ?? string.Empty;
             string display = csv.GetField(2) ?? string.Empty;
-            CodeStatus status = CodeStatus.Active;
-
-            if (hasStatusColumn)
-            {
-                var rawStatus = csv.GetField(3);
-
-                if (!string.IsNullOrWhiteSpace(rawStatus)
-                    && !Enum.TryParse<CodeStatus>(rawStatus, true, out status))
-                {
-                    status = CodeStatus.Active;
-                }
-            }
+            CodeStatus status = hasStatusColumn
+                ? statusParser.Parse(csv.GetField(3), code)
+                : CodeStatus.Active;
 
             if (ScientificNotationPattern.IsMatch(code))
             {
@@ -324,6 +316,7 @@ public class CodeGroupCacheService(
         }
 
         LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
+        LogInvalidStatusWarning(statusParser, codeGroup.Id);
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
@@ -350,13 +343,14 @@ public class CodeGroupCacheService(
         string system = codeGroup.Url;
         int scientificNotationCodeCount = 0;
         string scientificNotationCodeExamples = "";
+        var statusParser = new CodeStatusParser();
 
         foreach (var record in records)
         {
             string code = record.Code;
             string display = record.Display;
-            CodeStatus status = record.Status;
-            
+            CodeStatus status = statusParser.Parse(record.Status, code);
+
             if (ScientificNotationPattern.IsMatch(code))
             {
                 scientificNotationCodeCount++;
@@ -377,6 +371,7 @@ public class CodeGroupCacheService(
         }
 
         LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
+        LogInvalidStatusWarning(statusParser, codeGroup.Id);
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
@@ -391,6 +386,78 @@ public class CodeGroupCacheService(
                 scientificNotationCodeCount,
                 codeGroupId.SanitizeForLog(),
                 examples.SanitizeForLog());
+        }
+    }
+
+    /// <summary>
+    /// Reports status cells that could not be understood, once per file rather than once per row.
+    /// </summary>
+    private void LogInvalidStatusWarning(CodeStatusParser statusParser, string? codeGroupId)
+    {
+        if (statusParser.InvalidCount > 0)
+        {
+            logger.LogWarning(
+                "Found {Count} code(s) in code group {CodeGroupId} with an unrecognized status; each was loaded as Active. Valid values are 'Active' and 'Inactive'. Example codes: {Examples}",
+                statusParser.InvalidCount,
+                codeGroupId.SanitizeForLog(),
+                statusParser.Examples.SanitizeForLog());
+        }
+    }
+
+    /// <summary>
+    /// Parses the optional trailing status column shared by CodeSystem and ValueSet CSVs, tallying the
+    /// values it could not understand so one warning can be logged per file.
+    /// </summary>
+    /// <remarks>
+    /// The tally exists because these loops run once per code, and a large code system carries hundreds of
+    /// thousands of them — a per-row warning on a malformed file would flood Loki.
+    /// </remarks>
+    private sealed class CodeStatusParser
+    {
+        private const int MaxExampleLength = 100;
+
+        private string _examples = string.Empty;
+
+        /// <summary>The number of rows whose status cell could not be parsed.</summary>
+        internal int InvalidCount { get; private set; }
+
+        /// <summary>A truncated, comma-separated sample of the offending codes and their raw values.</summary>
+        internal string Examples => _examples;
+
+        /// <summary>
+        /// Resolves one status cell. A blank cell means "not stated" and yields Active, matching the
+        /// 2- and 3-column forms that predate the status column. A value that is neither status name
+        /// also yields Active, but is tallied.
+        /// </summary>
+        /// <remarks>
+        /// Defaulting rather than rejecting is deliberate. Statuses are read into a strongly typed
+        /// enum, and letting a converter throw on a bad cell aborts the whole file: the enclosing
+        /// <see cref="LoadCache"/> catch would drop every code in the group — tens of thousands of good
+        /// rows — over one typo, and the group would then answer 404 rather than anything diagnosable.
+        /// One code loading as Active with a warning attached is the far smaller failure.
+        /// </remarks>
+        internal CodeStatus Parse(string? rawStatus, string code)
+        {
+            if (string.IsNullOrWhiteSpace(rawStatus))
+            {
+                return CodeStatus.Active;
+            }
+
+            // IsDefined rejects the out-of-range numerics TryParse otherwise accepts ("7" would
+            // parse to (CodeStatus)7 and compare equal to neither status).
+            if (Enum.TryParse<CodeStatus>(rawStatus, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+            {
+                return parsed;
+            }
+
+            InvalidCount++;
+
+            if (_examples.Length < MaxExampleLength)
+            {
+                _examples += (_examples.Length > 0 ? ", " : "") + $"{code}='{rawStatus}'";
+            }
+
+            return CodeStatus.Active;
         }
     }
 

@@ -675,6 +675,112 @@ http://test.system,123,Test Display,Active,Extra Value";
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
     }
 
+    [Theory]
+    [InlineData("Retired")]  // a plausible-looking status that is not one of the two
+    [InlineData("7")]        // numeric: parses as an enum but is not a defined member
+    [InlineData("!!")]
+    public async Task LoadCache_CodeSystemUnrecognizedStatus_KeepsTheCodeSystemAndDefaultsTheRow(string badStatus)
+    {
+        // Regression guard. The status column used to be read straight into the enum by CsvHelper, whose
+        // converter throws on anything else - and because the records are enumerated lazily that throw
+        // escaped ProcessCodeSystemCsv, was swallowed by LoadCache's catch, and cost the WHOLE code system.
+        // One malformed cell must not delete thousands of good codes, so the row defaults to Active instead
+        // and the rest of the file loads normally.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            ["cs.csv"] = "code,display,status\r\n" +
+                         "123,Test Display,Inactive\r\n" +
+                         $"456,Another Display,{badStatus}\r\n" +
+                         "789,Third Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - the code system is still cached, and the rows either side of the bad one kept their status.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(3, codes.Count);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[1]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
+
+        VerifyUnrecognizedStatusWarning();
+    }
+
+    [Fact]
+    public async Task LoadCache_ValueSetUnrecognizedStatus_DefaultsTheRowAndWarns()
+    {
+        // The value set loader already defaulted a bad status to Active, but did so silently, so a typo in
+        // the membership column looked exactly like a code that was meant to stay active. Both loaders now
+        // default the row AND say what they saw.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"1.0\" }",
+            ["vs.csv"] = "system,code,display,status\r\n" +
+                         "http://test.system,123,Test Display,Inactive\r\n" +
+                         "http://test.system,456,Another Display,Retired\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.ValueSet, "http://test.valueset");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.system"];
+        Assert.Equal(2, codes.Count);
+        Assert.Equal(CodeStatus.Inactive, ((ValueSetCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Active, ((ValueSetCode)codes[1]).Status);
+
+        VerifyUnrecognizedStatusWarning();
+    }
+
+    /// <summary>
+    /// Asserts the single per-file warning that names the unparseable status values. It is logged once per
+    /// code group rather than once per row: these loops run over every code in the file, and a large code
+    /// system carries hundreds of thousands of them.
+    /// </summary>
+    private void VerifyUnrecognizedStatusWarning() =>
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("unrecognized status")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+
     [Fact]
     public async Task LoadCache_ValueSetWithStatusColumn_LoadsValueSetCodeWithStatus()
     {
