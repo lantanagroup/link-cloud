@@ -65,6 +65,12 @@ public class AutomationConfig
     public class FhirGenerationSettings
     {
         /// <summary>
+        /// Maximum number of patients processed concurrently by the streaming
+        /// generation/upload pipeline. Lower values reduce memory pressure.
+        /// </summary>
+        public int MaxConcurrentPatients { get; set; } = 2;
+
+        /// <summary>
         /// Controls low-value optional cross-resource references in generated FHIR
         /// (e.g., Provenance.target, ImagingStudy.basedOn, MedicationAdministration.request).
         /// </summary>

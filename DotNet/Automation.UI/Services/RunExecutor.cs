@@ -354,7 +354,8 @@ internal sealed class RunExecutor
                         AllowEncounterAnchoredDateOverrideForOutOfRange = false
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null,
-                    generatedTemplateCache: _generatedTemplateCache);
+                    generatedTemplateCache: _generatedTemplateCache,
+                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
 
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
@@ -389,15 +390,31 @@ internal sealed class RunExecutor
             }
             else
             {
-                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
+                var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
+                var syntheticCohorts = new List<PatientCohortDefinition>
+                {
+                    PatientCohortDefinition.AllQualifying(
+                        selectedMeasures,
+                        patientCount: state.Options.PatientCount,
+                        resourcesMin: state.Options.ResourcesPerPatient,
+                        resourcesMax: state.Options.ResourcesPerPatient)
+                };
+
+                var syntheticProfiles = PatientCohortDefinition.ExpandProfiles(syntheticCohorts, state.Options.Seed);
+                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+                    output,
+                    fhirDataLoader,
+                    selectedMeasures,
+                    syntheticProfiles,
+                    state.Options.ResourcesPerPatient,
+                    state.Options.Seed,
                     generationConfig,
-                    generationRequirementsPlan);
+                    generationRequirementsPlan,
+                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
 
-                patientIds = genPatientIds;
+                patientIds = pipelineResult.PatientIds;
+                generationManifest = pipelineResult.Manifest;
                 expectedSubmittedPatientIds = patientIds.ToList();
-
-                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
