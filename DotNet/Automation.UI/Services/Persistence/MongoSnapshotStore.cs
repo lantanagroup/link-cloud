@@ -78,7 +78,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.IsActive, false)
-            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow)
             .Set(r => r.Duration, duration);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
@@ -89,23 +88,35 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var hasIdentifiers = !string.IsNullOrWhiteSpace(facilityId)
             && !string.IsNullOrWhiteSpace(reportId);
 
-        var update = Builders<AutomationRunDocument>.Update
-            .Set(r => r.RunName, summary.RunName)
-            .Set(r => r.Scenario, summary.Scenario.ToString())
-            .Set(r => r.SelectedMeasure, summary.SelectedMeasure)
-            .Set(r => r.PatientCount, summary.PatientCount)
-            .Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
-            .Set(r => r.Seed, summary.Seed)
-            .Set(r => r.Status, summary.Status.ToString())
-            .Set(r => r.CreatedAt, summary.CreatedAt)
-            .Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
-            .Set(r => r.FinishedAt, summary.FinishedAt)
-            .Set(r => r.Error, summary.Error)
-            .Set(r => r.FacilityId, facilityId ?? string.Empty)
-            .Set(r => r.ReportId, reportId ?? string.Empty)
-            .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
-            .Set(r => r.CompletedAt, summary.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled ? summary.FinishedAt ?? DateTimeOffset.UtcNow : null)
-            .SetOnInsert(r => r.RunId, summary.RunId);
+        var updates = new List<UpdateDefinition<AutomationRunDocument>>
+        {
+            Builders<AutomationRunDocument>.Update.Set(r => r.RunName, summary.RunName),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Scenario, summary.Scenario.ToString()),
+            Builders<AutomationRunDocument>.Update.Set(r => r.SelectedMeasure, summary.SelectedMeasure),
+            Builders<AutomationRunDocument>.Update.Set(r => r.PatientCount, summary.PatientCount),
+            Builders<AutomationRunDocument>.Update.Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Seed, summary.Seed),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Status, summary.Status.ToString()),
+            Builders<AutomationRunDocument>.Update.Set(r => r.CreatedAt, summary.CreatedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
+            Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
+            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled),
+            Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
+        };
+
+        if (summary.GeneratedTemplateCacheVersionId.HasValue)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionId, summary.GeneratedTemplateCacheVersionId));
+        if (summary.GeneratedTemplateCacheVersionNumber.HasValue)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionNumber, summary.GeneratedTemplateCacheVersionNumber));
+        if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateCacheScenarioKey))
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheScenarioKey, summary.GeneratedTemplateCacheScenarioKey));
+        if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateSetHash))
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash));
+
+        var update = Builders<AutomationRunDocument>.Update.Combine(updates);
 
         await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
     }
@@ -351,6 +362,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
+            GeneratedTemplateCacheVersionId = doc.GeneratedTemplateCacheVersionId,
+            GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,
+            GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
+            GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
             Logs = []
         };
     }

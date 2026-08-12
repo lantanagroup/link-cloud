@@ -576,10 +576,38 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsReporting")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MeasureMappingId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("ReportingMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReportingYear")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("MeasureMappingId");
+
+                    b.HasIndex("FacilityId", "ReportingYear", "ReportingMonth")
+                        .HasDatabaseName("IX_FacilityReportingPlans_Facility_Period");
+
+                    b.HasIndex("FacilityId", "MeasureMappingId", "ReportingMonth", "ReportingYear")
+                        .IsUnique()
+                        .HasDatabaseName("IX_FacilityReportingPlans_Facility_Mapping_Period");
 
                     b.ToTable("FacilityReportingPlans", (string)null);
                 });
@@ -592,10 +620,27 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DQM")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Measure")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Measure", "DQM")
+                        .IsUnique();
 
                     b.ToTable("MeasureMappings", (string)null);
                 });
@@ -733,6 +778,17 @@ namespace LantanaGroup.Link.Tenant.Migrations
                         .IsRequired();
 
                     b.Navigation("JobDetail");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DMRP.Data.Entities.FacilityReportingPlan", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DMRP.Data.Entities.MeasureMapping", "MeasureMapping")
+                        .WithMany()
+                        .HasForeignKey("MeasureMappingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("MeasureMapping");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>

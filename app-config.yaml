@@ -67,6 +67,7 @@ serviceMeta:
   DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
   MeasureEval:           { label: "MeasureEval",           runtime: "java" }
+  MockDmrpApi:           { label: "MockDmrpApi",           runtime: "dotnet" }
   Normalization:         { label: "Normalization",         runtime: "dotnet" }
   Notification:          { label: "Notification",          runtime: "dotnet" }
   QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
@@ -271,7 +272,7 @@ global:
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:Redis"
-    description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
+    description: "The Redis connection string. The password is supplied separately via Redis:Password. Required for distributed locks and Redis/Hybrid resource caching in DataAcquisition and DataAcquisitionWorker."
     required: true
     consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Redis:Password"
@@ -293,6 +294,11 @@ global:
     required: false
     defaultValue: "automation/imported-bundles"
     consumers: ["Report", "Submission", "AutomationUI"]
+  - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
+    description: "Optional blob-path prefix used by Automation.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
+    required: false
+    defaultValue: "automation/generated-bundles"
+    consumers: ["AutomationUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
@@ -488,6 +494,10 @@ services:
       description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
       required: true
       sensitive: true
+    - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
+      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI. Defaults to automation/generated-bundles."
+      required: false
+      defaultValue: "automation/generated-bundles"
     - key: "DataProtection:ApplicationName"
       description: "The Data Protection application name isolating Automation.UI's key ring from other services sharing the store. Falls back to 'Link.Automation.UI:{Environment}' when unset (Automation.UI/Program.cs:208), so it is only provisioned where that default is not wanted - currently dev alone."
       required: false
@@ -503,19 +513,15 @@ services:
       description: "The expiration time in minutes for distributed locks."
       required: false
       defaultValue: "10"
+    - key: "DistributedLockSettings:PoolSize"
+      description: "Optional shared Redis connection-pool size for distributed locks and resource caching. Defaults to 5."
+      required: false
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
-    - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
-      required: true
-    - key: "ResourceCache:Redis:Password"
-      description: "Optional Redis password for the resource cache. Defaults to empty."
-      required: false
-      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -544,19 +550,15 @@ services:
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
+    - key: "DistributedLockSettings:PoolSize"
+      description: "Optional shared Redis connection-pool size for distributed locks and resource caching. Defaults to 5."
+      required: false
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
-    - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
-      required: true
-    - key: "ResourceCache:Redis:Password"
-      description: "Optional Redis password for the resource cache. Defaults to empty."
-      required: false
-      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -576,6 +578,28 @@ services:
   # No service-specific required config: this service reads only global keys. An explicit
   # empty list keeps it paired with its serviceMeta entry.
   Census: []
+
+  # Stand-in for the CDC DMRP API, deployed to the lower environments only. Nothing is
+  # required: true because the service does not run in every environment -- provision these
+  # only where the mock is deployed, and never in a production store.
+  MockDmrpApi:
+    - key: "MockDmrpApi:Enabled"
+      description: "Master switch for the mock DMRP surface. When false, every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped. Absent means enabled, so provision a row only where the mock should be off. A production row would be misleading rather than effective: the service refuses to serve in the Production environment regardless of configuration."
+      required: false
+      defaultValue: "true"
+    - key: "MockDmrpApi:AuthClientId"
+      description: "Client id the mock's token endpoint accepts. Provision per environment to move off the shipped non-production value."
+      required: false
+      defaultValue: "link-cloud-dev"
+    - key: "MockDmrpApi:AuthClientSecret"
+      description: "Client secret the mock's token endpoint accepts. There is no code default: a deployed environment that does not provision this refuses to issue tokens rather than fall back to a value published in the repository. Supply it as a Key Vault reference. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      required: false
+      sensitive: true
+    - key: "MockDmrpApi:SigningKey"
+      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      required: false
+      sensitive: true
+
   MeasureEval:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
@@ -610,7 +634,7 @@ services:
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
       required: false
     - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      description: "The Redis connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
       required: true
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."

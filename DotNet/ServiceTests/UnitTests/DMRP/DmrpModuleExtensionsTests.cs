@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 
 namespace UnitTests.DMRP
 {
@@ -99,6 +101,30 @@ namespace UnitTests.DMRP
                 .Single();
 
             Assert.Equal(expectedRoute, route.Template);
+        }
+
+        [Fact]
+        public void AddDmrpModule_leaves_the_facility_lookup_to_the_host()
+        {
+            var builder = CreateBuilder(enabled: true);
+            var hostLookup = Mock.Of<IFacilityExistence>();
+
+            builder.Services.AddSingleton(hostLookup);
+
+            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+
+            var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
+            Assert.Same(hostLookup, registration.ImplementationInstance);
+        }
+
+        [Fact]
+        public void AddDmrpModule_registers_no_facility_lookup_of_its_own()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+
+            Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
 
         [Theory]

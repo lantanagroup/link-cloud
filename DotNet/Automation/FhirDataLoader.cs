@@ -99,6 +99,54 @@ public class FhirDataLoader
             $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for Patient/{patientId}. Response body: {response.Content}");
     }
 
+    /// <summary>
+    /// Waits until a Patient is no longer available from the FHIR server. This is used
+    /// after requesting an expunge, which can complete asynchronously on deployed servers.
+    /// </summary>
+    public async Task WaitForPatientDeletionAsync(
+        string patientId,
+        Action<string>? progress = null,
+        TimeSpan? timeout = null,
+        CancellationToken ct = default)
+    {
+        var maxWait = timeout ?? TimeSpan.FromSeconds(60);
+        var started = DateTime.UtcNow;
+        var attempt = 0;
+        var delay = TimeSpan.FromSeconds(1);
+        var maxDelay = TimeSpan.FromSeconds(5);
+
+        while (DateTime.UtcNow - started < maxWait)
+        {
+            ct.ThrowIfCancellationRequested();
+            attempt++;
+
+            try
+            {
+                if (!await PatientExistsAsync(patientId, ct))
+                {
+                    progress?.Invoke($"FHIR purge completed for patient '{patientId}'.");
+                    return;
+                }
+
+                progress?.Invoke($"Waiting for FHIR purge to complete for patient '{patientId}' (check {attempt}, elapsed {(DateTime.UtcNow - started).TotalSeconds:F1}s).");
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                progress?.Invoke($"Could not verify FHIR purge completion for patient '{patientId}' (check {attempt}): {ex.Message}");
+            }
+
+            var remaining = maxWait - (DateTime.UtcNow - started);
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            var nextDelay = delay <= remaining ? delay : remaining;
+            await Task.Delay(nextDelay, ct);
+            delay = delay + TimeSpan.FromSeconds(1) <= maxDelay ? delay + TimeSpan.FromSeconds(1) : maxDelay;
+        }
+
+        throw new TimeoutException($"Timed out waiting for FHIR purge to complete for patient '{patientId}' after {maxWait.TotalSeconds:F0}s.");
+    }
+
     private void GetAuthorization()
     {
         if (_oauthConfig?.ShouldAuthenticate != true &&

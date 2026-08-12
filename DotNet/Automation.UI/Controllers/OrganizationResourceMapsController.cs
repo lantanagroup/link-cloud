@@ -47,6 +47,9 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var template = await store.GetByIdAsync(request.Id, ct);
         if (template == null) return NotFound();
         if (template.IsSystem)
@@ -62,6 +65,9 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -88,6 +94,9 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetDefaultInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var template = await store.GetByIdAsync(request.Id, ct);
         if (template == null) return NotFound();
 
@@ -95,8 +104,4 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         return Ok();
     }
 
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
-    }
 }

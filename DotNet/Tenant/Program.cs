@@ -15,9 +15,11 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Sdk.DependencyInjection;
+using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
@@ -148,6 +150,7 @@ namespace Tenant
 
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
+            builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
             builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
 
             //Add problem details
