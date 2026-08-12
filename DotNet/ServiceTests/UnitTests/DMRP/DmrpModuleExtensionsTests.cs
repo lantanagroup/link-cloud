@@ -145,5 +145,30 @@ namespace UnitTests.DMRP
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
         }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(null)]
+        public void AddDmrpModule_removes_the_hosts_auto_discovered_part_when_disabled(bool? enabled)
+        {
+            var builder = CreateBuilder(enabled);
+            var mvcBuilder = builder.Services.AddControllers();
+
+            // The Tenant build emits [assembly: ApplicationPart("DMRP")] for the project reference, so
+            // in the real host the module's assembly is an application part before AddDmrpModule runs.
+            // Recreate that here: the module must strip the part, or its controllers would be routable
+            // without their services and every DMRP request would 500 instead of 404.
+            var dmrpAssembly = typeof(MeasureMapping).Assembly;
+            mvcBuilder.AddApplicationPart(dmrpAssembly);
+
+            var registered = builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+
+            Assert.False(registered);
+            Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
+
+            var controllers = new ControllerFeature();
+            mvcBuilder.PartManager.PopulateFeature(controllers);
+            Assert.DoesNotContain(controllers.Controllers, c => c.Assembly == dmrpAssembly);
+        }
     }
 }

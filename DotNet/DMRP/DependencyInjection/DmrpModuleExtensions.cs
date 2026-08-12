@@ -35,6 +35,16 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
             if (section.Get<DmrpSettings>()?.Enabled != true)
             {
+                // The host's build emits [assembly: ApplicationPart("DMRP")] for the project reference,
+                // so MVC discovers this module's controllers before AddDmrpModule runs. Left in place
+                // without their services, those controllers turn every DMRP request into a 500; strip
+                // the part so a disabled module has no routes at all.
+                var moduleAssemblyName = typeof(DmrpModuleExtensions).Assembly.GetName().Name;
+                foreach (var part in mvcBuilder.PartManager.ApplicationParts.Where(p => p.Name == moduleAssemblyName).ToList())
+                {
+                    mvcBuilder.PartManager.ApplicationParts.Remove(part);
+                }
+
                 return false;
             }
 
