@@ -783,6 +783,60 @@ http://test.system,123,Test Display,Active,Extra Value";
             Times.Once);
 
     [Fact]
+    public async Task LoadCache_UnrecognizedStatusWithOverlongValues_TruncatesTheLoggedExamples()
+    {
+        // Both halves of an example come straight from the CSV, and the upload endpoints accept up to
+        // 32 MB, so a single row could otherwise put an arbitrarily long value into the log line. The
+        // per-file cap alone does not prevent that: it stops further entries being added but never bounds
+        // the entry being appended.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var longCode = new string('C', 400);
+        var longStatus = new string('S', 400);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            ["cs.csv"] = "code,display,status\r\n" +
+                         $"{longCode},Long Display,{longStatus}\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        await service.LoadCache();
+
+        // The row still loads and still defaults to Active - truncation applies to the log sample only.
+        var codeGroup = service.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Single(codes);
+        Assert.Equal(longCode, ((CodeSystemCode)codes[0]).Value);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
+
+        // 800 characters of CSV content must not reach the log line.
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("unrecognized status")
+                    && !v.ToString()!.Contains(longCode)
+                    && !v.ToString()!.Contains(longStatus)
+                    && v.ToString()!.Contains("...")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task LoadCache_ValueSetWithStatusColumn_LoadsValueSetCodeWithStatus()
     {
         // A four-column value set file (system,code,display,status) carries its own membership

@@ -509,15 +509,37 @@ public class CodeGroupCacheService(
     /// </remarks>
     private sealed class CodeStatusParser
     {
+        /// <summary>The point at which the sample stops accepting further entries.</summary>
         private const int MaxExampleLength = 100;
+
+        /// <summary>
+        /// The cap applied to each half of an entry before it is appended.
+        /// </summary>
+        /// <remarks>
+        /// Both the code and the raw status are CSV content, and neither is length-limited by the format,
+        /// so without this one row could put an arbitrarily long value into the log line — the upload
+        /// endpoints accept up to 32 MB. Capping the parts rather than the finished string keeps every
+        /// entry readable instead of cutting the last one mid-token.
+        /// </remarks>
+        private const int MaxExampleValueLength = 24;
 
         private string _examples = string.Empty;
 
         /// <summary>The number of rows whose status cell could not be parsed.</summary>
         internal int InvalidCount { get; private set; }
 
-        /// <summary>A truncated, comma-separated sample of the offending codes and their raw values.</summary>
+        /// <summary>
+        /// A comma-separated sample of the offending codes and their raw values, each half truncated to
+        /// <see cref="MaxExampleValueLength"/>. Entries stop being added once the sample reaches
+        /// <see cref="MaxExampleLength"/>, so the result is bounded at roughly that plus one entry.
+        /// </summary>
         internal string Examples => _examples;
+
+        /// <summary>
+        /// Caps one caller-supplied value so a single row cannot dominate the sample.
+        /// </summary>
+        private static string Truncate(string value) =>
+            value.Length <= MaxExampleValueLength ? value : value[..MaxExampleValueLength] + "...";
 
         /// <summary>
         /// Resolves one status cell. A blank cell means "not stated" and yields Active, matching the
@@ -549,7 +571,7 @@ public class CodeGroupCacheService(
 
             if (_examples.Length < MaxExampleLength)
             {
-                _examples += (_examples.Length > 0 ? ", " : "") + $"{code}='{rawStatus}'";
+                _examples += (_examples.Length > 0 ? ", " : "") + $"{Truncate(code)}='{Truncate(rawStatus)}'";
             }
 
             return CodeStatus.Active;
