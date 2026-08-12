@@ -72,7 +72,8 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
     private static OrganizationResourceMapTemplateDocument ToDocument(OrganizationResourceMapTemplate model) => new()
     {
         Id = model.Id,
-        Name = model.Name,
+        Name = model.Name.Trim(),
+        NormalizedName = NormalizeName(model.Name),
         Description = model.Description,
         IsSystem = model.IsSystem,
         IsDefault = model.IsDefault,
@@ -84,10 +85,12 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
     {
         Id = doc.Id,
         Name = doc.Name,
+        NormalizedName = doc.NormalizedName,
         Description = doc.Description,
         IsSystem = doc.IsSystem,
         IsDefault = doc.IsDefault,
-        Conditions = Deserialize<List<OrganizationResourceMapCondition>>(doc.ConditionsJson) ?? [],
+        Conditions = Deserialize<List<OrganizationResourceMapCondition>>(
+        doc.ConditionsJson) ?? [],
         UpdatedAt = doc.UpdatedAt
     };
 
@@ -96,5 +99,10 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
         if (string.IsNullOrWhiteSpace(json)) return default;
         try { return JsonSerializer.Deserialize<T>(json, JsonOpts); }
         catch { return default; }
+    }
+
+    private static string NormalizeName(string name)
+    {
+        return name.Trim().ToUpperInvariant();
     }
 }

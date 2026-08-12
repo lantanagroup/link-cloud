@@ -1,11 +1,14 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 
 namespace Automation.UI.Controllers;
 
 public class OrganizationResourceMapsController(IOrganizationResourceMapTemplateStore store) : Controller
 {
+    private const int MaxNameLength = 120;
+
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -38,6 +41,14 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
         model.Name = model.Name.Trim();
 
+        if (model.Name.Length > MaxNameLength)
+        {
+            return BadRequest(
+                $"Template name cannot exceed {MaxNameLength} characters.");
+        }
+
+        model.NormalizedName = NormalizeName(model.Name);
+
         var templates = await store.GetAllAsync(ct);
 
         if (HasDuplicateName(templates, model.Name, model.Id))
@@ -57,7 +68,16 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await store.UpsertAsync(model, ct);
+        try
+        {
+            await store.UpsertAsync(model, ct);
+        }
+        catch (MongoWriteException ex)
+            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            return Conflict(
+                $"An Organization Resource Map named '{model.Name}' already exists.");
+        }
 
         return Json(new { id = model.Id });
     }
@@ -92,12 +112,12 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
         var templates = await store.GetAllAsync(ct);
 
-        var cloneName = $"{source.Name} (Copy)";
+        var cloneName = BuildCloneName(source.Name);
         var copyNumber = 2;
 
         while (HasDuplicateName(templates, cloneName))
         {
-            cloneName = $"{source.Name} (Copy {copyNumber})";
+            cloneName = BuildCloneName(source.Name, copyNumber);
             copyNumber++;
         }
 
@@ -105,6 +125,7 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         {
             Id = Guid.NewGuid(),
             Name = cloneName,
+            NormalizedName = NormalizeName(cloneName),
             Description = source.Description,
             Conditions = source.Conditions.Select(c => new OrganizationResourceMapCondition
             {
@@ -116,8 +137,18 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        await store.UpsertAsync(clone, ct);
-        return Json(new { id = clone.Id });
+        try
+        {
+            await store.UpsertAsync(clone, ct);
+        }
+        catch (MongoWriteException ex)
+            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            return Conflict(
+                $"An Organization Resource Map named '{clone.Name}' already exists.");
+        }
+
+        return CreatedAtAction(nameof(GetJson), new { id = clone.Id }, new { id = clone.Id });
     }
 
     [HttpPost]
@@ -139,14 +170,33 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
     string name,
     Guid? excludeId = null)
     {
-        var normalizedName = name.Trim();
+        var normalizedName = NormalizeName(name);
 
         return templates.Any(t =>
             (!excludeId.HasValue || t.Id != excludeId.Value) &&
-            string.Equals(
-                t.Name?.Trim(),
-                normalizedName,
-                StringComparison.OrdinalIgnoreCase));
+            NormalizeName(t.Name) == normalizedName);
     }
 
+    private static string BuildCloneName(
+    string sourceName,
+    int? copyNumber = null)
+    {
+        var suffix = copyNumber.HasValue
+            ? $" (Copy {copyNumber.Value})"
+            : " (Copy)";
+
+        var maxBaseLength = MaxNameLength - suffix.Length;
+
+        var baseName = sourceName.Trim();
+
+        if (baseName.Length > maxBaseLength)
+            baseName = baseName[..maxBaseLength];
+
+        return baseName + suffix;
+    }
+
+    private static string NormalizeName(string name)
+    {
+        return name.Trim().ToUpperInvariant();
+    }
 }

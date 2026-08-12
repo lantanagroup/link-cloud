@@ -47,9 +47,29 @@ public sealed class MongoIndexManager
 
     private void EnsureOrganizationResourceMapTemplateIndexes()
     {
-        var collection = _database.GetCollection<BsonDocument>("automation_org_resource_map_templates");
-        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
-        CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
+        var collection = _database.GetCollection<BsonDocument>(
+            "automation_org_resource_map_templates");
+
+        BackfillOrganizationResourceMapNormalizedNames(collection);
+
+        // Retain Name index because GetAllAsync sorts by display Name.
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Name", 1 } },
+            unique: false,
+            "idx_name_asc");
+
+        // Required uniqueness invariant used by SaveInline and CloneInline.
+        CreateRequiredUniqueIndex(
+            collection,
+            new BsonDocument { { "NormalizedName", 1 } },
+            "ux_normalizedName");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "IsDefault", 1 } },
+            unique: false,
+            "idx_isDefault");
     }
 
     // --- automation_runs ---
@@ -279,5 +299,131 @@ public sealed class MongoIndexManager
         }
 
         return true;
+    }
+
+    private void BackfillOrganizationResourceMapNormalizedNames(
+    IMongoCollection<BsonDocument> collection)
+    {
+        var documents = collection
+            .Find(FilterDefinition<BsonDocument>.Empty)
+            .ToList();
+
+        var normalizedDocuments = documents
+            .Select(document =>
+            {
+                var name = document.GetValue("Name", string.Empty).AsString;
+                var normalizedName = NormalizeOrganizationResourceMapName(name);
+
+                return new
+                {
+                    Document = document,
+                    Name = name,
+                    NormalizedName = normalizedName
+                };
+            })
+            .ToList();
+
+        var duplicates = normalizedDocuments
+            .GroupBy(x => x.NormalizedName, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (duplicates.Count > 0)
+        {
+            var duplicateNames = string.Join(
+                ", ",
+                duplicates.Select(g => $"'{g.Key}'"));
+
+            throw new InvalidOperationException(
+                "Duplicate Organization Resource Map names must be resolved " +
+                $"before the normalized-name unique index can be created: {duplicateNames}");
+        }
+
+        foreach (var item in normalizedDocuments)
+        {
+            var existingNormalizedName =
+                item.Document.TryGetValue("NormalizedName", out var value) &&
+                value.IsString
+                    ? value.AsString
+                    : string.Empty;
+
+            if (string.Equals(
+                    existingNormalizedName,
+                    item.NormalizedName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var id = item.Document["_id"];
+
+            collection.UpdateOne(
+                new BsonDocument("_id", id),
+                new BsonDocument(
+                    "$set",
+                    new BsonDocument(
+                        "NormalizedName",
+                        item.NormalizedName)));
+        }
+    }
+
+    private void CreateRequiredUniqueIndex(
+    IMongoCollection<BsonDocument> collection,
+    BsonDocument keys,
+    string name)
+    {
+        var indexes = collection.Indexes.List().ToList();
+
+        foreach (var index in indexes)
+        {
+            if (!index.TryGetValue("key", out var keyValue) ||
+                !keyValue.IsBsonDocument ||
+                !KeysEqual(keyValue.AsBsonDocument, keys))
+            {
+                continue;
+            }
+
+            var isUnique =
+                index.TryGetValue("unique", out var uniqueValue) &&
+                uniqueValue.IsBoolean &&
+                uniqueValue.AsBoolean;
+
+            if (!isUnique)
+            {
+                throw new InvalidOperationException(
+                    $"Index '{name}' on collection " +
+                    $"'{collection.CollectionNamespace.CollectionName}' " +
+                    "already exists with the required keys but is not unique.");
+            }
+
+            _logger.LogDebug(
+                "Required unique index {IndexName} already exists on {Collection}.",
+                name,
+                collection.CollectionNamespace.CollectionName);
+
+            return;
+        }
+
+        var options = new CreateIndexOptions
+        {
+            Name = name,
+            Unique = true
+        };
+
+        var model = new CreateIndexModel<BsonDocument>(
+            new BsonDocumentIndexKeysDefinition<BsonDocument>(keys),
+            options);
+
+        collection.Indexes.CreateOne(model);
+
+        _logger.LogInformation(
+            "Created required unique index {IndexName} on {Collection}.",
+            name,
+            collection.CollectionNamespace.CollectionName);
+    }
+
+    private static string NormalizeOrganizationResourceMapName(string name)
+    {
+        return name.Trim().ToUpperInvariant();
     }
 }
