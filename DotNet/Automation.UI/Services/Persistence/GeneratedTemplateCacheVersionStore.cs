@@ -1,4 +1,5 @@
 ﻿using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
@@ -30,16 +31,110 @@ public sealed class GeneratedTemplateCacheVersionStore
 {
     private readonly IMongoCollection<GeneratedTemplateCacheVersionDocument> _versions;
     private const string ScenarioHashUniqueIndexName = "ux_generated_template_versions_scenario_hash";
+    private const string ScenarioKeyField = "ScenarioKey";
+    private const string TemplateSetHashField = "TemplateSetHash";
 
     public GeneratedTemplateCacheVersionStore(IMongoDatabase database)
     {
         _versions = database.GetCollection<GeneratedTemplateCacheVersionDocument>("automation_generated_template_versions");
+
+        var indexes = _versions.Indexes.List().ToList();
+        var indexInvariant = GetScenarioHashIndexInvariant(indexes);
+        if (indexInvariant == ScenarioHashIndexInvariant.Satisfied)
+            return;
+
+        if (indexInvariant == ScenarioHashIndexInvariant.NonUniqueKeyShapePresent)
+            return;
+
         var uniqueScenarioHashIndex = new CreateIndexModel<GeneratedTemplateCacheVersionDocument>(
             Builders<GeneratedTemplateCacheVersionDocument>.IndexKeys
                 .Ascending(version => version.ScenarioKey)
                 .Ascending(version => version.TemplateSetHash),
             new CreateIndexOptions { Unique = true, Name = ScenarioHashUniqueIndexName });
-        _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
+
+        try
+        {
+            _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
+        }
+        catch
+        {
+            // Best-effort only: startup must not be blocked by index creation limitations
+            // in deployed environments (e.g., Cosmos DB collections with existing data).
+        }
+    }
+
+    private static ScenarioHashIndexInvariant GetScenarioHashIndexInvariant(IReadOnlyList<BsonDocument> indexes)
+    {
+        foreach (var index in indexes)
+        {
+            if (index.TryGetValue("key", out var keyValue)
+                && keyValue.IsBsonDocument
+                && IsScenarioHashKeyShape(keyValue.AsBsonDocument))
+            {
+                var unique = index.TryGetValue("unique", out var uniqueValue)
+                    && uniqueValue.IsBoolean
+                    && uniqueValue.AsBoolean;
+
+                return unique
+                    ? ScenarioHashIndexInvariant.Satisfied
+                    : ScenarioHashIndexInvariant.NonUniqueKeyShapePresent;
+            }
+        }
+
+        return ScenarioHashIndexInvariant.Missing;
+    }
+
+    private static bool IsScenarioHashKeyShape(BsonDocument key)
+    {
+        if (key.ElementCount != 2)
+            return false;
+
+        var elements = key.Elements.ToList();
+
+        if (!string.Equals(elements[0].Name, ScenarioKeyField, StringComparison.Ordinal))
+            return false;
+        if (!string.Equals(elements[1].Name, TemplateSetHashField, StringComparison.Ordinal))
+            return false;
+
+        return IsAscendingDirection(elements[0].Value)
+            && IsAscendingDirection(elements[1].Value);
+    }
+
+    private static bool IsAscendingDirection(BsonValue value)
+    {
+        if (!TryGetIntegralDirection(value, out var direction))
+            return false;
+
+        return direction == 1;
+    }
+
+    private static bool TryGetIntegralDirection(BsonValue value, out int direction)
+    {
+        direction = 0;
+
+        if (value is BsonInt32 int32)
+        {
+            direction = int32.Value;
+            return true;
+        }
+
+        if (value is BsonInt64 int64)
+        {
+            if (int64.Value is < int.MinValue or > int.MaxValue)
+                return false;
+
+            direction = (int)int64.Value;
+            return true;
+        }
+
+        return false;
+    }
+
+    private enum ScenarioHashIndexInvariant
+    {
+        Missing,
+        Satisfied,
+        NonUniqueKeyShapePresent
     }
 
     public async Task<GeneratedTemplateCacheVersionBinding?> BindRunAsync(
