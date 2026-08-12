@@ -221,7 +221,10 @@ export class ValidationCategoriesManagementComponent implements OnInit {
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-    window.URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl));
   }
 }
