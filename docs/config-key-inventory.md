@@ -1859,7 +1859,7 @@ value set in a store can never take effect.
 
 ### Terminology
 
-55 keys.
+56 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1917,6 +1917,7 @@ value set in a store can never take effect.
 | `Telemetry:OtelCollectorEndpoint` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:PatientTags` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Terminology` | dotnet | - | - | `DotNet/Terminology/Program.cs:128` |
+| `Terminology:EnableCodeUploadEndpoint` | dotnet | yes | - | `DotNet/Terminology/Program.cs:128` |
 | `Terminology:Path` | dotnet | yes | - | `DotNet/Terminology/Program.cs:128` |
 
 ### Validation

@@ -737,6 +737,10 @@ services:
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
       required: false
       defaultValue: "data/"
+    - key: "Terminology:EnableCodeUploadEndpoint"
+      description: "Enables the testing endpoints that replace a cached CodeSystem's or ValueSet's codes from an uploaded CSV (PUT /api/terminology/config/{code-systems|value-sets}/{id}/codes). The replacement is held in the memory of the single instance that served the request: nothing is written to Terminology:Path, and $reload-cache or a restart reverts it. Must remain false in production, and should only be enabled where the service runs a single instance, since an upload reaches one instance only."
+      required: false
+      defaultValue: "false"
   Validation:
     - key: "spring.datasource.url"
       description: "The SQL Server database connection URL for the validation service."
