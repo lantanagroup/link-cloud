@@ -78,11 +78,6 @@ public sealed class PatientBundleExternalizationMigrationService : IHostedServic
             var scenarios = await _scenarios
                 .Find(scenarioFilter)
                 .SortBy(s => s.Id)
-                .Project(s => new ScenarioEmbeddedPayloadProjection
-                {
-                    Id = s.Id,
-                    ImportedPatientBundlesJson = s.ImportedPatientBundlesJson
-                })
                 .Limit(MigrationBatchSize)
                 .ToListAsync(ct);
 
@@ -121,12 +116,6 @@ public sealed class PatientBundleExternalizationMigrationService : IHostedServic
             var runInputs = await _runInputs
                 .Find(runInputFilter)
                 .SortBy(r => r.RunId)
-                .Project(r => new RunInputEmbeddedPayloadProjection
-                {
-                    RunId = r.RunId,
-                    RunConfigurationJson = r.RunConfigurationJson,
-                    ImportedBundleIds = r.ImportedBundleIds
-                })
                 .Limit(MigrationBatchSize)
                 .ToListAsync(ct);
 
@@ -156,19 +145,6 @@ public sealed class PatientBundleExternalizationMigrationService : IHostedServic
         }
 
         return migrated;
-    }
-
-    private sealed class ScenarioEmbeddedPayloadProjection
-    {
-        public Guid Id { get; init; }
-        public string? ImportedPatientBundlesJson { get; init; }
-    }
-
-    private sealed class RunInputEmbeddedPayloadProjection
-    {
-        public Guid RunId { get; init; }
-        public string? RunConfigurationJson { get; init; }
-        public List<Guid> ImportedBundleIds { get; init; } = [];
     }
 
     private async Task<(bool Changed, string? Json, List<ImportedBundleReference> References, int MigratedCount)> ExternalizeBundleJsonAsync(
