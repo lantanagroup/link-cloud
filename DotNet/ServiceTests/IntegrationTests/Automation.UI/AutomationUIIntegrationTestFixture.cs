@@ -101,6 +101,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     public async Task ResetAsync()
     {
         await DropCollectionIfExistsAsync("automation_runs");
+        await DropCollectionIfExistsAsync("automation_run_inputs");
+        await DropCollectionIfExistsAsync("automation_snapshots");
         await DropCollectionIfExistsAsync("automation_logs");
         await DropCollectionIfExistsAsync("automation_log_sequences");
     }

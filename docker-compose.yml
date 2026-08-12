@@ -697,6 +697,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: link-automation-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
       KafkaConnection__BootstrapServers__0: kafka_b:9092
       KafkaConnection__SaslProtocolEnabled: true
@@ -721,6 +723,8 @@ services:
     networks:
       - link-nw
     depends_on:
+      azurite_init:
+        condition: service_completed_successfully
       mongo:
         condition: service_healthy
       admin-bff:
