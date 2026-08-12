@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.configs.ValidationResultIgnoreRuleConfig;
 import com.lantanagroup.link.validation.entities.Result;
@@ -43,9 +44,9 @@ public class ValidationResultIgnoreService {
                 ignoredCount++;
                 logger.debug(
                         "Ignoring validation result via rule {}: expression='{}', message='{}'",
-                        StringUtils.defaultIfBlank(matchingRule.id(), "<unnamed>"),
-                        StringUtils.defaultString(result.getExpression()),
-                        StringUtils.defaultString(result.getMessage()));
+                        LogUtils.sanitize(StringUtils.defaultIfBlank(matchingRule.id(), "<unnamed>")),
+                        LogUtils.sanitize(StringUtils.defaultString(result.getExpression())),
+                        LogUtils.sanitize(StringUtils.defaultString(result.getMessage())));
                 continue;
             }
 
