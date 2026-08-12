@@ -228,6 +228,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
 
 builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBundleContentStore>();
+builder.Services.AddSingleton<ISnapshotPayloadStore, AzureBlobSnapshotPayloadStore>();
 builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
 builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
