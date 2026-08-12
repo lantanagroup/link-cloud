@@ -197,8 +197,73 @@ public class CodeGroupCacheService(
         CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes)codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
         cache.Set(urlKey.Key, codeGroup, _cacheOptions);
 
-        if (!_cacheKeys.Contains(urlKey))
+        // Compare on the composite key rather than the instance: CacheKey overrides neither Equals nor
+        // GetHashCode, so ConcurrentBag.Contains is reference equality and never matches. That was
+        // harmless while LoadCache was the only caller (it clears the cache first), but replacing a
+        // loaded code group calls this a second time for a key already in the bag, and each duplicate
+        // lengthens the scans in GetCodeGroup/GetCodeGroupById/GetAllCodeGroups.
+        if (!_cacheKeys.Any(k => string.Equals(k.Key, urlKey.Key, StringComparison.Ordinal)))
             _cacheKeys.Add(urlKey);
+    }
+
+    /// <summary>
+    /// Replaces the codes of an already-cached code group with the contents of a CSV, preserving the
+    /// FHIR resource metadata loaded from disk. See <see cref="ICodeGroupCacheService.ReplaceCodesFromCsv"/>.
+    /// </summary>
+    public virtual CodeGroup ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes type, string id, string? version, string csvContent)
+    {
+        var existing = GetCodeGroupById(type, id, version)
+            ?? throw new KeyNotFoundException(
+                $"No {type} found in the cache with id '{id}' and version '{version ?? "latest"}'");
+
+        // Build a replacement rather than mutating the cached instance. ProcessValueSetCsv and
+        // ProcessCodeSystemCsv append to Codes without clearing it, so reusing the cached group would
+        // merge the old codes with the new ones. It is also what keeps this safe to call while requests
+        // are being served: this service is a singleton and FhirService enumerates CodeGroup.Codes, so
+        // an in-place edit could tear a reader's enumeration. The swap is the single cache.Set inside
+        // SetCodeGroup, leaving every reader with either the whole old group or the whole new one.
+        var replacement = new CodeGroup
+        {
+            Type = existing.Type,
+            Id = existing.Id,
+            Version = existing.Version,
+            Name = existing.Name,
+            Url = existing.Url,
+            Identifiers = [.. existing.Identifiers],
+            // Shared by reference on purpose: FhirService deep-copies the resource before attaching an
+            // expansion and otherwise returns it untouched, and an upload must never alter the metadata.
+            Resource = existing.Resource
+        };
+
+        using var reader = new StringReader(csvContent);
+        // Mirrors LoadCache: the optional trailing status column means a missing field is not an error.
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
+        using var csv = new CsvReader(reader, config);
+
+        // Both Process*Csv methods call SetCodeGroup as their final statement and enumerate the CSV
+        // lazily, so any parse failure throws before the cache is touched and the previously loaded
+        // codes survive intact. There is deliberately no rollback here, and no pre-clearing.
+        switch (type)
+        {
+            case CodeGroup.CodeGroupTypes.CodeSystem:
+                ProcessCodeSystemCsv(replacement, csv);
+                break;
+            case CodeGroup.CodeGroupTypes.ValueSet:
+                ProcessValueSetCsv(replacement, csv);
+                break;
+            default:
+                throw new InvalidOperationException($"Code group type {type} is not supported");
+        }
+
+        logger.LogWarning(
+            "Codes for {Type} {Id} version {Version} were replaced in memory from an uploaded CSV ({Count} codes). " +
+            "This instance no longer matches the terminology files on disk until the cache is reloaded.",
+            type,
+            id.SanitizeForLog(),
+            (existing.Version ?? "latest").SanitizeForLog(),
+            replacement.Codes.Values.Sum(codes => codes.Count));
+
+        return replacement;
     }
 
     private async Task<CodeGroup> GetCodeGroup(string jsonFilePath)

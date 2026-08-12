@@ -1,21 +1,27 @@
+using System.Globalization;
+using CsvHelper;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
+using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Controllers;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Terminology;
 
 /// <summary>
-/// Unit tests for <see cref="ConfigController"/>'s cached-code lookups: <see cref="ConfigController.GetCodeSystemCode"/>
-/// (LEGLINK-591) and its ValueSet counterpart <see cref="ConfigController.GetValueSetCode"/> (LEGLINK-889), both of
-/// which return RFC 7807/9457 Problem Details for their validation and not-found edge cases instead of bare status
-/// codes with plain-string bodies.
+/// Unit tests for <see cref="ConfigController"/>: the cached-code lookups
+/// (<see cref="ConfigController.GetCodeSystemCode"/>, LEGLINK-591, and its ValueSet counterpart
+/// <see cref="ConfigController.GetValueSetCode"/>, LEGLINK-889), which return RFC 7807/9457 Problem Details for
+/// their validation and not-found edge cases instead of bare status codes with plain-string bodies, and the
+/// non-production CSV upload endpoints that replace a cached code group's codes in memory.
 /// </summary>
 /// <remarks>
 /// No <see cref="Microsoft.AspNetCore.Http.HttpContext"/> is wired up: when the controller's
@@ -33,6 +39,7 @@ namespace UnitTests.Terminology;
 public class ConfigControllerTests
 {
     private readonly Mock<ICodeGroupCacheService> _mockCacheService;
+    private readonly FhirService _fhirService;
     private readonly ConfigController _controller;
 
     private const string CodeSystemId = "v3-ActCode";
@@ -43,11 +50,24 @@ public class ConfigControllerTests
     public ConfigControllerTests()
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
+        _fhirService = new FhirService(_mockCacheService.Object, Mock.Of<ILogger<FhirService>>());
 
-        var fhirService = new FhirService(_mockCacheService.Object, Mock.Of<ILogger<FhirService>>());
+        // The upload endpoints are enabled for most tests; BuildController(false) covers the
+        // production configuration where the feature is off.
+        _controller = BuildController(enableCodeUpload: true);
+    }
 
-        _controller = new ConfigController(
-            _mockCacheService.Object, fhirService, Mock.Of<ILogger<ConfigController>>());
+    private ConfigController BuildController(bool enableCodeUpload)
+    {
+        var options = new Mock<IOptions<TerminologyConfig>>();
+        options.Setup(x => x.Value).Returns(new TerminologyConfig
+        {
+            Path = "/test/path",
+            EnableCodeUploadEndpoint = enableCodeUpload
+        });
+
+        return new ConfigController(
+            _mockCacheService.Object, _fhirService, options.Object, Mock.Of<ILogger<ConfigController>>());
     }
 
     private static CodeGroup CodeSystemWithCodes(params Code[] codes) => new()
@@ -461,6 +481,210 @@ public class ConfigControllerTests
                     [AddressTypeSystem] = [new CodeSystemCode { Value = "postal", Display = "Postal", Status = status }]
                 }
             });
+
+    #endregion
+
+    #region Code upload
+
+    // A different value set from the lookup tests' address-type on purpose: the upload tests only ever reach a
+    // mocked ReplaceCodesFromCsv, so nothing about the fixture matters beyond the id being passed through
+    // unchanged, and keeping them distinct stops a lookup stub from accidentally satisfying an upload test.
+    private const string UploadValueSetId = "v3-ActEncounterCode";
+
+    private static IFormFile BuildCsvFile(string content, string fileName = "codes.csv")
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        return new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", fileName);
+    }
+
+    private static ProblemDetails AssertProblem(ActionResult<ReplaceCodesResponse> result, int expectedStatus)
+    {
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        Assert.Equal(expectedStatus, objectResult.StatusCode);
+        return Assert.IsAssignableFrom<ProblemDetails>(objectResult.Value);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_FeatureDisabled_Returns404AndNeverTouchesTheCache()
+    {
+        var controller = BuildController(enableCodeUpload: false);
+
+        var result = await controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\n"));
+
+        var problem = AssertProblem(result, StatusCodes.Status404NotFound);
+        Assert.Equal("Not Found", problem.Title);
+        // Indistinguishable from a route that was never deployed.
+        Assert.Equal("The requested terminology endpoint was not found.", problem.Detail);
+        _mockCacheService.Verify(
+            x => x.ReplaceCodesFromCsv(It.IsAny<CodeGroup.CodeGroupTypes>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ReplaceCodeSystemCodes_FeatureDisabled_Returns404()
+    {
+        var controller = BuildController(enableCodeUpload: false);
+
+        var result = await controller.ReplaceCodeSystemCodes(CodeSystemId, BuildCsvFile("code,display\r\n"));
+
+        AssertProblem(result, StatusCodes.Status404NotFound);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_NoFile_Returns400WithFileError()
+    {
+        var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, file: null);
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        Assert.Contains("file", Assert.IsType<ValidationProblemDetails>(problem).Errors.Keys);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_EmptyFile_Returns400WithFileError()
+    {
+        var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile(string.Empty));
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        Assert.Contains("file", Assert.IsType<ValidationProblemDetails>(problem).Errors.Keys);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_NonCsvExtension_Returns400WithFileError()
+    {
+        var result = await _controller.ReplaceValueSetCodes(
+            UploadValueSetId, BuildCsvFile("system,code,display\r\n", "codes.txt"));
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        Assert.Contains("file", Assert.IsType<ValidationProblemDetails>(problem).Errors.Keys);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_BlankId_Returns400WithIdError()
+    {
+        var result = await _controller.ReplaceValueSetCodes(" ", BuildCsvFile("system,code,display\r\n"));
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        Assert.Contains("id", Assert.IsType<ValidationProblemDetails>(problem).Errors.Keys);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_BlankIdAndBadFile_ReportsBothErrors()
+    {
+        var result = await _controller.ReplaceValueSetCodes(" ", file: null);
+
+        var problem = Assert.IsType<ValidationProblemDetails>(AssertProblem(result, StatusCodes.Status400BadRequest));
+        Assert.Contains("id", problem.Errors.Keys);
+        Assert.Contains("file", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_UnknownTarget_Returns404WithTypedTitle()
+    {
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Throws(new KeyNotFoundException("No ValueSet found in the cache with id 'x' and version 'latest'"));
+
+        var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\n"));
+
+        var problem = AssertProblem(result, StatusCodes.Status404NotFound);
+        Assert.Equal("ValueSet Not Found", problem.Title);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_WrongColumnCount_Returns400WithTheColumnMessage()
+    {
+        const string message = "ValueSet CSV must have 3 or 4 columns: system, code, display, and optionally status.";
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Throws(new InvalidOperationException(message));
+
+        var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("a,b\r\n1,2\r\n"));
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        // The message is a fixed literal describing the expected columns, so echoing it is safe.
+        Assert.Equal(message, problem.Detail);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_MalformedCsv_Returns400WithoutEchoingTheOffendingField()
+    {
+        const string secret = "PATIENT-SSN-123-45-6789";
+        using var csvReader = new CsvReader(new StringReader("a,b\r\n1,2\r\n"), CultureInfo.InvariantCulture);
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Throws(new CsvHelperException(
+                csvReader.Context, $"The conversion cannot be performed. Text: '{secret}'"));
+
+        var result = await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\nx,y,z\r\n"));
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest);
+        // CsvHelper embeds the offending field in its message; that text is caller-supplied.
+        Assert.DoesNotContain(secret, problem.Detail);
+    }
+
+    [Fact]
+    public async Task ReplaceValueSetCodes_Success_Returns202WithCounts()
+    {
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Returns(new CodeGroup
+            {
+                Type = CodeGroup.CodeGroupTypes.ValueSet,
+                Id = UploadValueSetId,
+                Version = "3.0.0",
+                Codes = new Dictionary<string, List<Code>>
+                {
+                    ["http://a"] = [new ValueSetCode { Value = "1", Display = "One", Status = CodeStatus.Inactive }],
+                    ["http://b"] = [new ValueSetCode { Value = "2", Display = "Two", Status = CodeStatus.Active }]
+                }
+            });
+
+        var result = await _controller.ReplaceValueSetCodes(
+            UploadValueSetId, BuildCsvFile("system,code,display,status\r\n"));
+
+        var accepted = Assert.IsType<AcceptedResult>(result.Result);
+        var body = Assert.IsType<ReplaceCodesResponse>(accepted.Value);
+        Assert.Equal("ValueSet", body.Type);
+        Assert.Equal(UploadValueSetId, body.Id);
+        Assert.Equal("3.0.0", body.Version);
+        Assert.Equal(2, body.CodeCount);
+        Assert.Equal(2, body.SystemCount);
+        Assert.Equal(1, body.InactiveCodeCount);
+        Assert.Equal("codes.csv", body.FileName);
+    }
+
+    [Fact]
+    public async Task ReplaceCodeSystemCodes_Success_PassesCodeSystemTypeAndCsvContent()
+    {
+        const string csv = "code,display\r\nZZZ,Injected\r\n";
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv))
+            .Returns(CodeSystemWithCodes(new CodeSystemCode { Value = "ZZZ", Display = "Injected", Status = CodeStatus.Active }));
+
+        var result = await _controller.ReplaceCodeSystemCodes(CodeSystemId, BuildCsvFile(csv));
+
+        Assert.IsType<AcceptedResult>(result.Result);
+        // The route determines the type, so a CSV can never be applied to the wrong kind of group.
+        _mockCacheService.Verify(
+            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemId, null, csv), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ReplaceValueSetCodes_BlankVersion_IsTreatedAsLatest(string? version)
+    {
+        _mockCacheService
+            .Setup(x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()))
+            .Returns(new CodeGroup { Type = CodeGroup.CodeGroupTypes.ValueSet, Id = UploadValueSetId });
+
+        await _controller.ReplaceValueSetCodes(UploadValueSetId, BuildCsvFile("system,code,display\r\n"), version);
+
+        _mockCacheService.Verify(
+            x => x.ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes.ValueSet, UploadValueSetId, null, It.IsAny<string>()),
+            Times.Once);
+    }
 
     #endregion
 }

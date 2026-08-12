@@ -1053,6 +1053,238 @@ http://test.system,123,Test Display,Active,Extra Value";
         Assert.Equal(expectedLatest, codeGroup.Version);
     }
 
+    #region ReplaceCodesFromCsv
+
+    // A loaded CodeSystem (3 codes) and ValueSet (2 codes across 1 system) to replace.
+    private TestableCodeGroupCacheService BuildServiceWithLoadedGroups(IMemoryCache memoryCache)
+    {
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" },
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", \"name\": \"TestCs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\", " +
+                          "\"identifier\": [ { \"system\": \"urn:ietf:rfc:3986\", \"value\": \"urn:oid:1.2.3\" } ] }",
+            ["cs.csv"] = "code,display,status\r\n123,One,Active\r\n456,Two,Active\r\n789,Three,Inactive\r\n",
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", \"name\": \"TestVs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"2.0\" }",
+            ["vs.csv"] = "system,code,display\r\nhttp://test.codesystem,123,One\r\nhttp://test.codesystem,456,Two\r\n"
+        };
+
+        return new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_ReplacesCodesRatherThanAppending()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        // Act - the loaded CodeSystem has 3 codes; the upload supplies 1
+        var replaced = service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, "code,display\r\nZZZ,Injected\r\n");
+
+        // Assert - Process*Csv appends without clearing, so a shared CodeGroup would yield 4
+        Assert.Equal(1, replaced.Codes.Values.Sum(c => c.Count));
+
+        var fromCache = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs");
+        Assert.NotNull(fromCache);
+        var codes = Assert.Single(fromCache.Codes).Value;
+        Assert.Equal("ZZZ", Assert.Single(codes).Value);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_PreservesResourceAndMetadata()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var before = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs")!;
+        var originalResource = before.Resource;
+
+        service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, "code,display\r\nZZZ,Injected\r\n");
+
+        var after = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs")!;
+
+        // The upload must never be able to alter what identifies the code group.
+        Assert.Same(originalResource, after.Resource);
+        Assert.Equal(before.Url, after.Url);
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(before.Name, after.Name);
+        Assert.Equal(before.Identifiers.Count, after.Identifiers.Count);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_DoesNotMutateThePreviouslyCachedInstance()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        // A reader that grabbed the code group before the replace must keep seeing its own snapshot;
+        // this is the property that makes the swap safe while requests are in flight.
+        var heldByReader = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs")!;
+        var codesBefore = heldByReader.Codes.Values.Sum(c => c.Count);
+
+        service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, "code,display\r\nZZZ,Injected\r\n");
+
+        Assert.Equal(codesBefore, heldByReader.Codes.Values.Sum(c => c.Count));
+        Assert.NotSame(heldByReader, service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs"));
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_ValueSetWithStatusColumn_LoadsMembershipStatus()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var replaced = service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.ValueSet, "test-vs", null,
+            "system,code,display,status\r\nhttp://test.codesystem,123,One,Inactive\r\n");
+
+        var code = Assert.Single(Assert.Single(replaced.Codes).Value);
+        var valueSetCode = Assert.IsType<ValueSetCode>(code);
+        Assert.Equal(CodeStatus.Inactive, valueSetCode.Status);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_ValueSetWithoutStatusColumn_LoadsPlainCode()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var replaced = service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.ValueSet, "test-vs", null,
+            "system,code,display\r\nhttp://test.codesystem,123,One\r\n");
+
+        // No membership status: status resolution falls back to the code system.
+        var code = Assert.Single(Assert.Single(replaced.Codes).Value);
+        Assert.IsNotType<ValueSetCode>(code);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_ValueSetSpanningSystems_GroupsBySystem()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var replaced = service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.ValueSet, "test-vs", null,
+            "system,code,display\r\nhttp://a,1,A one\r\nhttp://b,2,B two\r\n");
+
+        Assert.Equal(2, replaced.Codes.Count);
+        Assert.Equal(2, replaced.Codes.Values.Sum(c => c.Count));
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_HeaderOnly_CachesAnEmptyCodeGroup()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        // Emptying a value set is a legitimate test setup, not an error.
+        var replaced = service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.ValueSet, "test-vs", null, "system,code,display\r\n");
+
+        Assert.Equal(0, replaced.Codes.Values.Sum(c => c.Count));
+        var fromCache = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, "test-vs")!;
+        Assert.Equal(0, fromCache.Codes.Values.Sum(c => c.Count));
+    }
+
+    [Theory]
+    [InlineData("unknown-id", null)]
+    [InlineData("test-cs", "9.9")]
+    public async Task ReplaceCodesFromCsv_UnknownTarget_ThrowsKeyNotFound(string id, string? version)
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        Assert.Throws<KeyNotFoundException>(() => service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, id, version, "code,display\r\nZZZ,Injected\r\n"));
+    }
+
+    [Theory]
+    // A CodeSystem CSV accepts 2 or 3 columns; a ValueSet CSV accepts 3 or 4.
+    [InlineData(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", "a,b,c,d\r\n1,2,3,4\r\n")]
+    [InlineData(CodeGroup.CodeGroupTypes.ValueSet, "test-vs", "a,b\r\n1,2\r\n")]
+    public async Task ReplaceCodesFromCsv_WrongColumnCount_ThrowsAndLeavesCacheIntact(
+        CodeGroup.CodeGroupTypes type, string id, string csv)
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var before = service.GetCodeGroupById(type, id)!.Codes.Values.Sum(c => c.Count);
+
+        Assert.Throws<InvalidOperationException>(() => service.ReplaceCodesFromCsv(type, id, null, csv));
+
+        // Process*Csv calls SetCodeGroup last, so a failed parse never reaches the cache.
+        Assert.Equal(before, service.GetCodeGroupById(type, id)!.Codes.Values.Sum(c => c.Count));
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_UnrecognizedStatus_ReplacesEveryRowWithTheBadOneDefaulted()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        // This used to be the mid-enumeration failure case: CsvHelper's enum converter threw on the
+        // second row's status, aborting the replace and leaving the previous codes in place. The status
+        // column is now interpreted by the loader, so a value it does not recognize costs that one row
+        // its status instead of costing the whole upload, and the replace runs to completion. Atomicity
+        // on a genuine parse failure is still covered by
+        // ReplaceCodesFromCsv_WrongColumnCount_ThrowsAndLeavesCacheIntact.
+        service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null,
+            "code,display,status\r\nAAA,Good,Inactive\r\nBBB,Bad,NotAStatus\r\n");
+
+        var codes = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs")!
+            .Codes.Values.SelectMany(c => c).Cast<CodeSystemCode>().ToList();
+
+        Assert.Equal(2, codes.Count);
+        Assert.Equal(CodeStatus.Inactive, codes[0].Status);
+        Assert.Equal(CodeStatus.Active, codes[1].Status);
+    }
+
+    [Fact]
+    public async Task ReplaceCodesFromCsv_RepeatedReplaces_DoNotAccumulateCacheKeys()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        for (var i = 0; i < 3; i++)
+        {
+            service.ReplaceCodesFromCsv(
+                CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, $"code,display\r\nZ{i},Injected\r\n");
+        }
+
+        // CacheKey has no value equality, so the pre-fix ConcurrentBag.Contains guard never matched
+        // and each replace leaked a key that lengthens every subsequent lookup scan.
+        Assert.Single(service.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem));
+        Assert.NotNull(service.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem"));
+    }
+
+    #endregion
+
     /// <summary>
     /// Real <see cref="CodeGroupCacheService"/> with only the file-system seams overridden,
     /// so LoadCache and everything it calls run against the actual implementation.
