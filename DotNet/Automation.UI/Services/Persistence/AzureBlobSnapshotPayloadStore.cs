@@ -1,4 +1,5 @@
-﻿using Azure.Storage.Blobs;
+﻿using Azure;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Options;
 using System.Text;
@@ -10,21 +11,34 @@ public sealed class AzureBlobSnapshotPayloadStore : ISnapshotPayloadStore
     private readonly ImportedBundleBlobStorageSettings _settings;
     private readonly BlobContainerClient _container;
     private readonly HashSet<string> _externalizedDomains;
+    private readonly Func<string, CancellationToken, AsyncPageable<BlobItem>> _listBlobs;
+    private readonly Func<string, CancellationToken, Task> _deleteBlob;
 
     public AzureBlobSnapshotPayloadStore(IOptions<ImportedBundleBlobStorageSettings> settings)
+        : this(
+            settings.Value,
+            CreateContainer(settings.Value),
+            listBlobs: null,
+            deleteBlob: null)
     {
-        _settings = settings.Value;
+    }
 
-        if (string.IsNullOrWhiteSpace(_settings.ConnectionString))
-            throw new InvalidOperationException("InternalBlobStorage:ConnectionString is required for snapshot payload storage.");
-        if (string.IsNullOrWhiteSpace(_settings.BlobContainerName))
-            throw new InvalidOperationException("InternalBlobStorage:BlobContainerName is required for snapshot payload storage.");
-
-        _container = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
+    internal AzureBlobSnapshotPayloadStore(
+        ImportedBundleBlobStorageSettings settings,
+        BlobContainerClient container,
+        Func<string, CancellationToken, AsyncPageable<BlobItem>>? listBlobs,
+        Func<string, CancellationToken, Task>? deleteBlob)
+    {
+        _settings = settings;
+        _container = container;
         _externalizedDomains = (_settings.SnapshotPayloadExternalizedDomains ?? [])
             .Where(d => !string.IsNullOrWhiteSpace(d))
             .Select(d => d.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        _listBlobs = listBlobs ?? ((prefix, ct) => _container.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix, ct));
+        _deleteBlob = deleteBlob ?? ((blobName, ct) =>
+            _container.DeleteBlobIfExistsAsync(blobName, DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: ct));
     }
 
     public bool ShouldExternalize(string domain, int payloadUtf8Bytes)
@@ -97,10 +111,27 @@ public sealed class AzureBlobSnapshotPayloadStore : ISnapshotPayloadStore
     {
         var prefix = BuildRunPrefix(runId);
 
-        await foreach (var blob in _container.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix, ct))
+        try
         {
-            await _container.DeleteBlobIfExistsAsync(blob.Name, DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: ct);
+            await foreach (var blob in _listBlobs(prefix, ct))
+            {
+                await _deleteBlob(blob.Name, ct);
+            }
         }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Missing container is treated as an empty cleanup result.
+        }
+    }
+
+    private static BlobContainerClient CreateContainer(ImportedBundleBlobStorageSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ConnectionString))
+            throw new InvalidOperationException("InternalBlobStorage:ConnectionString is required for snapshot payload storage.");
+        if (string.IsNullOrWhiteSpace(settings.BlobContainerName))
+            throw new InvalidOperationException("InternalBlobStorage:BlobContainerName is required for snapshot payload storage.");
+
+        return new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
     }
 
     private string BuildBlobName(Guid runId, string domain)

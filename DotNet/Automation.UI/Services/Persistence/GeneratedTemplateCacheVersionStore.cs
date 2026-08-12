@@ -31,12 +31,19 @@ public sealed class GeneratedTemplateCacheVersionStore
 {
     private readonly IMongoCollection<GeneratedTemplateCacheVersionDocument> _versions;
     private const string ScenarioHashUniqueIndexName = "ux_generated_template_versions_scenario_hash";
+    private const string ScenarioKeyField = "ScenarioKey";
+    private const string TemplateSetHashField = "TemplateSetHash";
 
     public GeneratedTemplateCacheVersionStore(IMongoDatabase database)
     {
         _versions = database.GetCollection<GeneratedTemplateCacheVersionDocument>("automation_generated_template_versions");
 
-        if (HasIndexWithKeys(_versions, new BsonDocument { { "ScenarioKey", 1 }, { "TemplateSetHash", 1 } }))
+        var indexes = _versions.Indexes.List().ToList();
+        var indexInvariant = GetScenarioHashIndexInvariant(indexes);
+        if (indexInvariant == ScenarioHashIndexInvariant.Satisfied)
+            return;
+
+        if (indexInvariant == ScenarioHashIndexInvariant.NonUniqueKeyShapePresent)
             return;
 
         var uniqueScenarioHashIndex = new CreateIndexModel<GeneratedTemplateCacheVersionDocument>(
@@ -49,56 +56,85 @@ public sealed class GeneratedTemplateCacheVersionStore
         {
             _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
         }
-        catch (MongoCommandException ex)
-            when (ex.Message.Contains("already exists with different options", StringComparison.OrdinalIgnoreCase)
-               || ex.Message.Contains("Cannot create unique index when collection contains documents", StringComparison.OrdinalIgnoreCase)
-               || (ex.Code == 13 && ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase)))
+        catch
         {
-            // Deployed environments may already have an index with this name/options
-            // drift or contain pre-existing duplicate rows. Do not block app startup.
+            // Best-effort only: startup must not be blocked by index creation limitations
+            // in deployed environments (e.g., Cosmos DB collections with existing data).
         }
     }
 
-    private static bool HasIndexWithKeys(
-        IMongoCollection<GeneratedTemplateCacheVersionDocument> collection,
-        BsonDocument targetKeys)
+    private static ScenarioHashIndexInvariant GetScenarioHashIndexInvariant(IReadOnlyList<BsonDocument> indexes)
     {
-        var indexes = collection.Indexes.List().ToList();
-
         foreach (var index in indexes)
         {
             if (index.TryGetValue("key", out var keyValue)
                 && keyValue.IsBsonDocument
-                && KeysEqual(keyValue.AsBsonDocument, targetKeys))
+                && IsScenarioHashKeyShape(keyValue.AsBsonDocument))
             {
-                return true;
+                var unique = index.TryGetValue("unique", out var uniqueValue)
+                    && uniqueValue.IsBoolean
+                    && uniqueValue.AsBoolean;
+
+                return unique
+                    ? ScenarioHashIndexInvariant.Satisfied
+                    : ScenarioHashIndexInvariant.NonUniqueKeyShapePresent;
             }
+        }
+
+        return ScenarioHashIndexInvariant.Missing;
+    }
+
+    private static bool IsScenarioHashKeyShape(BsonDocument key)
+    {
+        if (key.ElementCount != 2)
+            return false;
+
+        var elements = key.Elements.ToList();
+
+        if (!string.Equals(elements[0].Name, ScenarioKeyField, StringComparison.Ordinal))
+            return false;
+        if (!string.Equals(elements[1].Name, TemplateSetHashField, StringComparison.Ordinal))
+            return false;
+
+        return IsAscendingDirection(elements[0].Value)
+            && IsAscendingDirection(elements[1].Value);
+    }
+
+    private static bool IsAscendingDirection(BsonValue value)
+    {
+        if (!TryGetIntegralDirection(value, out var direction))
+            return false;
+
+        return direction == 1;
+    }
+
+    private static bool TryGetIntegralDirection(BsonValue value, out int direction)
+    {
+        direction = 0;
+
+        if (value is BsonInt32 int32)
+        {
+            direction = int32.Value;
+            return true;
+        }
+
+        if (value is BsonInt64 int64)
+        {
+            if (int64.Value is < int.MinValue or > int.MaxValue)
+                return false;
+
+            direction = (int)int64.Value;
+            return true;
         }
 
         return false;
     }
 
-    private static bool KeysEqual(BsonDocument existing, BsonDocument target)
+    private enum ScenarioHashIndexInvariant
     {
-        if (existing.ElementCount != target.ElementCount)
-            return false;
-
-        var existingElements = existing.Elements.ToList();
-        var targetElements = target.Elements.ToList();
-
-        for (var i = 0; i < existingElements.Count; i++)
-        {
-            var left = existingElements[i];
-            var right = targetElements[i];
-
-            if (!string.Equals(left.Name, right.Name, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (left.Value.ToInt32() != right.Value.ToInt32())
-                return false;
-        }
-
-        return true;
+        Missing,
+        Satisfied,
+        NonUniqueKeyShapePresent
     }
 
     public async Task<GeneratedTemplateCacheVersionBinding?> BindRunAsync(

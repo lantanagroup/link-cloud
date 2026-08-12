@@ -1,4 +1,5 @@
 ﻿using MongoDB.Driver;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -23,6 +24,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private const int MaxLogChunkEstimatedBsonBytes = 12 * 1024 * 1024;
     private const int EstimatedBsonBytesPerLineOverhead = 64;
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
+    private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
 
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
@@ -263,12 +265,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
-        await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
+
+        // Only remove externalized payload blobs after Mongo cleanup succeeds so
+        // a DB failure cannot orphan pointer records that still reference payload data.
+        await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
@@ -392,7 +397,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (_snapshotPayloadStore.ShouldExternalize(domain, payloadUtf8Bytes))
         {
             newPointer = await _snapshotPayloadStore.StoreAsync(runId, domain, json, ct);
-            storedJson = JsonSerializer.Serialize(newPointer);
+            storedJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
+            {
+                [SnapshotPayloadPointerEnvelopeProperty] = newPointer
+            });
         }
 
         var update = Builders<DomainSnapshotDocument>.Update
@@ -430,7 +438,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
                 if (string.IsNullOrWhiteSpace(payloadJson))
                 {
-                    _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", runId, domain, pointer.BlobName);
+                    var sanitizedRunId = runId.ToString().SanitizeForLog();
+                    var sanitizedDomain = domain.SanitizeForLog();
+                    var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
+                    _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
                     return null;
                 }
             }
@@ -458,7 +469,17 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         try
         {
-            var pointer = JsonSerializer.Deserialize<SnapshotPayloadPointer>(payload);
+            using var doc = JsonDocument.Parse(payload);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+
+            if (!doc.RootElement.TryGetProperty(SnapshotPayloadPointerEnvelopeProperty, out var pointerElement)
+                || pointerElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var pointer = pointerElement.Deserialize<SnapshotPayloadPointer>();
             if (pointer == null)
                 return null;
 
