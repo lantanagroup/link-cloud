@@ -6,6 +6,7 @@ using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.Annotations;
@@ -294,6 +295,31 @@ public class ConfigController(
     #region Code upload (non-production)
 
     /// <summary>
+    /// The authorization policy the upload endpoints require. These replace the codes every downstream
+    /// validation is judged against, so they are the one part of this service that is not left open.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This raises the bar wherever authentication is actually configured, which is every deployed
+    /// environment: <c>Authentication:EnableAnonymousAccess</c> is false for Terminology in dev, qa, qa2 and
+    /// test, so the real <c>IsLinkAdmin</c> policy applies and an unauthenticated or non-admin caller is
+    /// refused.
+    /// </para>
+    /// <para>
+    /// It deliberately does <b>not</b> claim to hold when anonymous access is on.
+    /// <c>AddLinkBearerServiceAuthentication</c> returns before registering any authentication scheme in that
+    /// mode and defines every named policy as <c>RequireAssertion(context =&gt; true)</c>, so this passes for
+    /// anyone — as does every other endpoint in the service, which declares no policy at all. A bare
+    /// <c>[Authorize]</c> would not close that gap either: with no default challenge scheme registered it
+    /// throws rather than returning 401. Closing it properly means an explicit authenticated-user check,
+    /// which would make these endpoints permanently unusable under docker-compose, the environment they
+    /// exist to serve. The remaining protection there is <c>Terminology:EnableCodeUploadEndpoint</c>, which
+    /// ships false.
+    /// </para>
+    /// </remarks>
+    private const string CodeUploadPolicy = "IsLinkAdmin";
+
+    /// <summary>
     /// The largest CSV this endpoint will accept. Sized to comfortably exceed the terminology artifacts
     /// shipped in the data volume; it exists to bound the in-memory read, not to express a policy about
     /// terminology size. Raise it if a legitimate artifact ever exceeds it.
@@ -333,11 +359,14 @@ public class ConfigController(
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>202 with a summary of the codes now cached; 400 for an unusable CSV; 404 if the ValueSet is not cached or the endpoint is disabled.</returns>
     [HttpPut("value-sets/{id}/codes")]
+    [Authorize(CodeUploadPolicy)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestBytes)]
     [SwaggerOperation(Summary = "Replace a cached ValueSet's codes from an uploaded CSV (testing only).")]
     [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ReplaceCodesResponse))]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceValueSetCodes(
@@ -376,11 +405,14 @@ public class ConfigController(
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>202 with a summary of the codes now cached; 400 for an unusable CSV; 404 if the CodeSystem is not cached or the endpoint is disabled.</returns>
     [HttpPut("code-systems/{id}/codes")]
+    [Authorize(CodeUploadPolicy)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestBytes)]
     [SwaggerOperation(Summary = "Replace a cached CodeSystem's codes from an uploaded CSV (testing only).")]
     [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ReplaceCodesResponse))]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceCodeSystemCodes(

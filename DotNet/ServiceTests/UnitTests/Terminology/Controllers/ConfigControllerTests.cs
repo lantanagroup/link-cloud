@@ -6,6 +6,7 @@ using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Controllers;
 using LantanaGroup.Link.Terminology.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -557,6 +558,28 @@ public class ConfigControllerTests
         var objectResult = Assert.IsAssignableFrom<ObjectResult>(result.Result);
         Assert.Equal(expectedStatus, objectResult.StatusCode);
         return Assert.IsAssignableFrom<ProblemDetails>(objectResult.Value);
+    }
+
+    [Theory]
+    [InlineData(nameof(ConfigController.ReplaceValueSetCodes))]
+    [InlineData(nameof(ConfigController.ReplaceCodeSystemCodes))]
+    public void UploadEndpoints_RequireTheAdminPolicy(string actionName)
+    {
+        // Authorization is enforced by the framework, not by the controller, so every other test in this
+        // region - which calls the action directly - passes whether or not the attribute is there.
+        // Reflection is the only thing standing between a deliberate security decision and a later edit
+        // that quietly drops it, which is why this asserts the policy name and not merely that some
+        // AuthorizeAttribute exists: "IsLinkAdmin" is the real policy outside anonymous mode, whereas an
+        // attribute with no policy would fall back to the default one and throw where no challenge scheme
+        // is registered.
+        var attribute = typeof(ConfigController)
+            .GetMethod(actionName)!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>()
+            .SingleOrDefault();
+
+        Assert.NotNull(attribute);
+        Assert.Equal("IsLinkAdmin", attribute!.Policy);
     }
 
     [Fact]
