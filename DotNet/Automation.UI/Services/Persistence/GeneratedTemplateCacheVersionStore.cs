@@ -1,4 +1,5 @@
 ﻿using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,12 +35,70 @@ public sealed class GeneratedTemplateCacheVersionStore
     public GeneratedTemplateCacheVersionStore(IMongoDatabase database)
     {
         _versions = database.GetCollection<GeneratedTemplateCacheVersionDocument>("automation_generated_template_versions");
+
+        if (HasIndexWithKeys(_versions, new BsonDocument { { "ScenarioKey", 1 }, { "TemplateSetHash", 1 } }))
+            return;
+
         var uniqueScenarioHashIndex = new CreateIndexModel<GeneratedTemplateCacheVersionDocument>(
             Builders<GeneratedTemplateCacheVersionDocument>.IndexKeys
                 .Ascending(version => version.ScenarioKey)
                 .Ascending(version => version.TemplateSetHash),
             new CreateIndexOptions { Unique = true, Name = ScenarioHashUniqueIndexName });
-        _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
+
+        try
+        {
+            _versions.Indexes.CreateOne(uniqueScenarioHashIndex);
+        }
+        catch (MongoCommandException ex)
+            when (ex.Message.Contains("already exists with different options", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("Cannot create unique index when collection contains documents", StringComparison.OrdinalIgnoreCase)
+               || (ex.Code == 13 && ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase)))
+        {
+            // Deployed environments may already have an index with this name/options
+            // drift or contain pre-existing duplicate rows. Do not block app startup.
+        }
+    }
+
+    private static bool HasIndexWithKeys(
+        IMongoCollection<GeneratedTemplateCacheVersionDocument> collection,
+        BsonDocument targetKeys)
+    {
+        var indexes = collection.Indexes.List().ToList();
+
+        foreach (var index in indexes)
+        {
+            if (index.TryGetValue("key", out var keyValue)
+                && keyValue.IsBsonDocument
+                && KeysEqual(keyValue.AsBsonDocument, targetKeys))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool KeysEqual(BsonDocument existing, BsonDocument target)
+    {
+        if (existing.ElementCount != target.ElementCount)
+            return false;
+
+        var existingElements = existing.Elements.ToList();
+        var targetElements = target.Elements.ToList();
+
+        for (var i = 0; i < existingElements.Count; i++)
+        {
+            var left = existingElements[i];
+            var right = targetElements[i];
+
+            if (!string.Equals(left.Name, right.Name, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (left.Value.ToInt32() != right.Value.ToInt32())
+                return false;
+        }
+
+        return true;
     }
 
     public async Task<GeneratedTemplateCacheVersionBinding?> BindRunAsync(

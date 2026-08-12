@@ -32,6 +32,8 @@ public static class FhirGenerationPipeline
 {
     private const int MaxEntriesPerBundle = 500;
     private const int DefaultMaxConcurrentPatients = 4;
+    private const int VerbosePatientLogHeadCount = 5;
+    private const int VerbosePatientLogInterval = 250;
     private const string TemplateRunTag = "template-run";
     private static readonly Lazy<string> GeneratorDependencyFingerprint = new(ComputeGeneratorDependencyFingerprint);
 
@@ -363,7 +365,8 @@ public static class FhirGenerationPipeline
             {
                 var templateBundles = bundles.Select(b => ReplaceRunTag(b.Json, ids.RunTag, TemplateRunTag)).ToList();
                 await generatedTemplateCache.StoreAsync(templateCacheKey, new GeneratedPatientTemplate(TemplateRunTag, templateBundles));
-                output.WriteLine($"  [cache] Miss for {patientId}; stored template key={templateCacheKey}.");
+                if (ShouldEmitDetailedPatientLog(patientIndex))
+                    output.WriteLine($"  [cache] Miss for {patientId}; stored template key={templateCacheKey}.");
             }
         }
         else
@@ -377,7 +380,8 @@ public static class FhirGenerationPipeline
                 .ToList();
 
             entries = ParseBundleEntriesFromJson(materialized);
-            output.WriteLine($"  [cache] Hit for {patientId}; reused template key={templateCacheKey}.");
+            if (ShouldEmitDetailedPatientLog(patientIndex))
+                output.WriteLine($"  [cache] Hit for {patientId}; reused template key={templateCacheKey}.");
         }
 
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
@@ -433,8 +437,11 @@ public static class FhirGenerationPipeline
             return $"{shortName}={eligible}";
         }));
 
-        output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{measureEligibilityLabel}] | scenario={scenario.PrimaryDxDisplay} | " +
-                         $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
+        if (ShouldEmitDetailedPatientLog(patientIndex))
+        {
+            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{measureEligibilityLabel}] | scenario={scenario.PrimaryDxDisplay} | " +
+                             $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
+        }
 
         // Record patient in manifest builder
         manifestBuilder.AddPatient(patientId, effectiveProfile);
@@ -466,7 +473,7 @@ public static class FhirGenerationPipeline
         entries.Clear();
 
         var progress = $"[{patientId}] ";
-        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, progress);
+        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, progress, logSuccessfulPosts: false);
 
         var bundleCount = bundles.Count;
 
@@ -620,7 +627,7 @@ public static class FhirGenerationPipeline
         {
             var bundles = ChunkEntries(entries, patientId, 0);
             entries.Clear();
-            var ok = await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, $"[imported:{patientId}] ");
+            var ok = await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, $"[imported:{patientId}] ", logSuccessfulPosts: false);
             if (!ok)
                 throw new InvalidOperationException($"Failed to upload imported bundle for patient '{patientId}'.");
             bundleCount = bundles.Count;
@@ -1074,5 +1081,14 @@ public static class FhirGenerationPipeline
         }
 
         return result;
+    }
+
+    private static bool ShouldEmitDetailedPatientLog(int patientIndex)
+    {
+        if (patientIndex < VerbosePatientLogHeadCount)
+            return true;
+
+        var ordinal = patientIndex + 1;
+        return ordinal % VerbosePatientLogInterval == 0;
     }
 }
