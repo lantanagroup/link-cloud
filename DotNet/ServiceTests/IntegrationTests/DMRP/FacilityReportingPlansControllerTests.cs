@@ -70,7 +70,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var mapping = new MeasureMapping
         {
             Measure = $"MEASURE-{Guid.NewGuid():N}",
-            Dqm = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
             Frequency = Frequency.Monthly
         };
 
