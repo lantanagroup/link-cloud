@@ -183,19 +183,22 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task CreateAsync_PeriodAlreadyRecordedForTheFacilityAndMapping_IsRejected()
+        public async Task CreateAsync_DoesNotPreCheckForADuplicatePeriod()
         {
+            // Validation no longer queries for an existing row before saving: a duplicate period is
+            // reported only when the unique index rejects the save (see TranslateSaveFailureAsync).
+            // A plan repository that would report a duplicate if asked must never be asked here.
             _mockRepository
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
             var plan = ValidPlan();
 
-            var ex = await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(plan));
-            Assert.Equal(
-                $"A reporting plan already exists for facility {plan.FacilityId}, measure mapping " +
-                $"{plan.MeasureMappingId} and period {plan.ReportingMonth}/{plan.ReportingYear}.",
-                ex.Message);
+            await _manager.CreateAsync(plan);
+
+            _mockRepository.Verify(
+                r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()),
+                Times.Never);
         }
 
         [Fact]
@@ -239,10 +242,11 @@ namespace UnitTests.DMRP
 
             await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(ValidPlan()));
 
-            // Once for the pre-check only. The failure names the index, so there is no second lookup.
+            // The failure names the index, so it never falls back to the query - and there is no
+            // pre-check to begin with.
             _mockRepository.Verify(
                 r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()),
-                Times.Once);
+                Times.Never);
         }
 
         [Fact]
