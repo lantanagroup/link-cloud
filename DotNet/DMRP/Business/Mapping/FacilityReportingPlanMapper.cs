@@ -14,8 +14,19 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             ReportingMonth = entity.ReportingMonth,
             ReportingYear = entity.ReportingYear,
             IsReporting = entity.IsReporting,
-            CreateDate = entity.CreateDate,
-            ModifyDate = entity.ModifyDate
+
+            // The columns are datetime2 with no offset, so a value that round-tripped through
+            // EF Core comes back DateTimeKind.Unspecified, while a value set in memory just
+            // before SaveChangesAsync (UpdateBaseEntityInterceptor) is still DateTimeKind.Utc.
+            // System.Text.Json only appends "Z" for Kind.Utc, so left unqualified, Create
+            // (no round trip) rendered a "Z" suffix while Get/Update (fetched from the DB
+            // first) did not - the same field serialized two different ways depending on which
+            // operation produced it. The values are always UTC in practice, so it's safe to
+            // pin the Kind rather than convert it.
+            CreateDate = DateTime.SpecifyKind(entity.CreateDate, DateTimeKind.Utc),
+            ModifyDate = entity.ModifyDate is null
+                ? null
+                : DateTime.SpecifyKind(entity.ModifyDate.Value, DateTimeKind.Utc)
         };
 
         public static FacilityReportingPlan ToEntity(FacilityReportingPlanRequest request) => new()
