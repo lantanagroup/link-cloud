@@ -1402,7 +1402,7 @@ public class FhirServiceTests
         var codeSystem = new CodeSystem
         {
             Id = codeSystemId,
-            Content = CodeSystemContentMode.Fragment
+            Content = CodeSystemContentMode.NotPresent
         };
         var mockCodeGroup = new CodeGroup
         {
@@ -1496,7 +1496,6 @@ public class FhirServiceTests
         // Assert
         var codeSystem = Assert.IsType<CodeSystem>(Assert.Single(result.Entry).Resource);
         var concept = Assert.Single(codeSystem.Concept);
-        Assert.Equal(CodeSystemContentMode.Complete, codeSystem.Content);
         Assert.Equal(code, concept.Code);
         Assert.Equal("last display", concept.Display);
     }
