@@ -183,7 +183,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             throw new KeyNotFoundException($"Code system not found with ID {id}");
         }
 
-        return codeGroup.Resource as CodeSystem;
+        var codeSystem = codeGroup.Resource as CodeSystem;
+        if(codeSystem != null && codeGroup.Codes.Values.Any(c => c.Count > 0))
+            codeSystem.Content = CodeSystemContentMode.Complete;
+
+        return codeSystem;
     }
 
     public Bundle GetCodeSystems(string? url, SummaryType? summary)
@@ -212,6 +216,8 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                 }
 
                 CodeSystem clone = (CodeSystem)codeGroup.Resource.DeepCopy();
+                if (codeGroup.Codes.Values.Any(c => c.Count > 0))
+                    clone.Content = CodeSystemContentMode.Complete;
 
                 if (summary != SummaryType.True)
                 {

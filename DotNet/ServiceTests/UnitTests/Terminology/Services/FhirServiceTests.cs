@@ -1395,6 +1395,69 @@ public class FhirServiceTests
     #region GetCodeSystems Tests
 
     [Fact]
+    public void GetCodeSystemById_WithCachedCodes_SetsContentToComplete()
+    {
+        // Arrange
+        var codeSystemId = "test-code-system";
+        var codeSystem = new CodeSystem
+        {
+            Id = codeSystemId,
+            Content = CodeSystemContentMode.Fragment
+        };
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Resource = codeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { "http://test.system", new List<Code> { new() { Value = "test-code", Display = "Test Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.GetCodeSystemById(codeSystemId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(CodeSystemContentMode.Complete, result.Content);
+    }
+
+    [Fact]
+    public void GetCodeSystemById_WithoutCachedCodes_PreservesContentMode()
+    {
+        // Arrange
+        var codeSystemId = "test-empty-code-system";
+        var codeSystem = new CodeSystem
+        {
+            Id = codeSystemId,
+            Content = CodeSystemContentMode.NotPresent
+        };
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Resource = codeSystem,
+            Codes = new Dictionary<string, List<Code>>()
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.GetCodeSystemById(codeSystemId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(CodeSystemContentMode.NotPresent, result.Content);
+    }
+
+    [Fact]
     public void GetCodeSystems_WithDuplicateCode_EmitsSingleConceptWithLastDisplay()
     {
         // Arrange
@@ -1433,6 +1496,7 @@ public class FhirServiceTests
         // Assert
         var codeSystem = Assert.IsType<CodeSystem>(Assert.Single(result.Entry).Resource);
         var concept = Assert.Single(codeSystem.Concept);
+        Assert.Equal(CodeSystemContentMode.Complete, codeSystem.Content);
         Assert.Equal(code, concept.Code);
         Assert.Equal("last display", concept.Display);
     }
