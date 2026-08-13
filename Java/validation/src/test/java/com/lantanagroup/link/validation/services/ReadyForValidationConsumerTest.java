@@ -156,6 +156,13 @@ public class ReadyForValidationConsumerTest {
         return category;
     }
 
+    private Category categoryWithSubmit(boolean submit) {
+        Category category = new Category();
+        category.setId(submit ? "submitted-cat" : "non-submitted-cat");
+        category.setSubmit(submit);
+        return category;
+    }
+
     // -------------------------------------------------------------------------
     // Bundle retrieval: Blob Storage
     // -------------------------------------------------------------------------
@@ -265,14 +272,39 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_savesAllResultsToRepository() throws Exception {
-        Result result = resultWithCategories(Collections.emptyList());
+    void process_savesOnlyResultsWithSubmitEnabledCategories() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(submittedResult, nonSubmittedResult, uncategorizedResult));
+
+        consumer.process(buildRecord(null));
+
+        verify(resultRepository).saveAll(List.of(submittedResult));
+    }
+
+    @Test
+    void process_multiCategoryResultWithAnySubmitEnabledCategory_savesResult() throws Exception {
+        Result result = resultWithCategories(List.of(categoryWithSubmit(false), categoryWithSubmit(true)));
         stubRestRetrieval();
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
         verify(resultRepository).saveAll(List.of(result));
+    }
+
+    @Test
+    void process_noSubmitEnabledCategories_doesNotSaveResults() throws Exception {
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(nonSubmittedResult, uncategorizedResult));
+
+        consumer.process(buildRecord(null));
+
+        verify(resultRepository, never()).saveAll(anyList());
     }
 
     @Test

@@ -204,7 +204,13 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             categorizationService.categorize(results);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
-        resultRepository.saveAll(results);
+        List<Result> submittedResults = results.stream()
+                .filter(result -> result.getCategories() != null
+                        && result.getCategories().stream().anyMatch(Category::isSubmit))
+                .toList();
+        if (!submittedResults.isEmpty()) {
+            resultRepository.saveAll(submittedResults);
+        }
         return results;
     }
 
