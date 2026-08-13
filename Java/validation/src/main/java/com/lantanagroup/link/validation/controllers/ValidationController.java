@@ -98,7 +98,7 @@ public class ValidationController {
 
     @Operation(summary = "Validates a FHIR resource")
     @PostMapping("/$validate")
-    public ResponseEntity<ApiResponse<List<?>>> validate(
+    public List<?> validate(
             @RequestParam(defaultValue = "false") boolean categorize,
             @RequestParam(defaultValue = "false") boolean summarize,
             @RequestBody String json) {
@@ -116,14 +116,13 @@ public class ValidationController {
 
         List<Result> results = validationService.validate(resource);
 
-        List<?> data;
         if (categorize) {
             categorizationService.categorize(results);
-            data = getCategorizeResponse(summarize, results);
+
+            return getCategorizeResponse(summarize, results);
         } else {
-            data = summarize ? summarize(results, result -> Stream.of(result.getMessage())) : results;
+            return summarize ? summarize(results, result -> Stream.of(result.getMessage())) : results;
         }
-        return ResponseEntity.ok(ApiResponse.ok("Validation completed", data));
     }
 
     @Operation(summary = "Categorizes validation results using latest rules")
