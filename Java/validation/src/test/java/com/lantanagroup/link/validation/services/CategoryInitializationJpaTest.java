@@ -189,11 +189,16 @@ class CategoryInitializationJpaTest {
     void reimportUpdatesFieldsOnAnAlreadyPersistedCategory() {
         String id = "unknown_code_system";
         CategorySnapshot original = snapshot(id, "Original title", "Original guidance", CategorySeverity.WARNING);
+        original.setSubmit(false);
         categorizationService.saveCategorySnapshot(original);
         testEntityManager.flush();
         testEntityManager.clear();
 
+        Category initiallyPersisted = categoryRepository.findById(id).orElseThrow();
+        assertFalse(initiallyPersisted.isSubmit());
+
         CategorySnapshot revised = snapshot(id, "Revised title", "Revised guidance", CategorySeverity.ERROR);
+        revised.setSubmit(true);
         categorizationService.saveCategorySnapshot(revised);
         testEntityManager.flush();
         testEntityManager.clear();
@@ -203,6 +208,7 @@ class CategoryInitializationJpaTest {
         assertEquals("Revised guidance", persisted.getGuidance());
         assertEquals(CategorySeverity.ERROR, persisted.getSeverity());
         assertTrue(persisted.isAcceptable());
+        assertTrue(persisted.isSubmit());
         assertEquals(2, persisted.getRules().size(), "each import should append a rule");
     }
 
