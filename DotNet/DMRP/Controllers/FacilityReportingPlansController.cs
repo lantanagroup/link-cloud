@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Get a paged list of facility reporting plans.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilityReportingPlans")]
         public Task<IActionResult> GetFacilityReportingPlans(string? sortBy, SortOrder? sortOrder,
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// period and reporting state.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("search", Name = "SearchFacilityReportingPlans")]
         public async Task<IActionResult> SearchFacilityReportingPlans([FromQuery] FacilityReportingPlanSearchFilters filters,
@@ -81,18 +81,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
             var periodError = ValidatePeriodFilters(filters.Month, filters.Year);
             if (periodError is not null)
             {
-                return BadRequest(periodError);
+                return BadRequestProblem(periodError);
             }
 
             if (sortBy is not null && !SortableColumns.Contains(sortBy))
             {
-                return BadRequest($"Cannot sort by '{sortBy}'.");
+                return BadRequestProblem($"Cannot sort by '{sortBy}'.");
             }
 
             var pagingError = ValidatePaging(pageSize, pageNumber);
             if (pagingError is not null)
             {
-                return BadRequest(pagingError);
+                return BadRequestProblem(pagingError);
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Facility Reporting Plans");
@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// reporting state.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityReportingPlanModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}")]
         public async Task<IActionResult> GetFacilityReportingPlansForFacility(string facilityId, int? month, int? year,
@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             var periodError = ValidatePeriodFilters(month, year);
             if (periodError is not null)
             {
-                return BadRequest(periodError);
+                return BadRequestProblem(periodError);
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Gets a facility reporting plan by Id.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetFacilityReportingPlan(string id, CancellationToken cancellationToken)
@@ -145,7 +145,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (model == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility reporting plan with Id: {id} not found.");
             }
 
             return Ok(model);
@@ -155,8 +155,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Creates a facility reporting plan.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanRequest request, CancellationToken cancellationToken)
@@ -169,11 +169,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (DuplicateReportingPlanException ex)
             {
-                return Conflict(ex.Message);
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (ReportingPlanValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -190,9 +190,9 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Updates a facility reporting plan.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFacilityReportingPlan(string id, FacilityReportingPlanUpdateRequest request, CancellationToken cancellationToken)
@@ -203,12 +203,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (string.IsNullOrWhiteSpace(requestId))
             {
-                return BadRequest("Id is required in the request body.");
+                return BadRequestProblem("Id is required in the request body.");
             }
 
             if (requestId != id)
             {
-                return BadRequest("Id in the URL must match the Id in the request body.");
+                return BadRequestProblem("Id in the URL must match the Id in the request body.");
             }
 
             try
@@ -217,15 +217,15 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundProblem(ex.Message);
             }
             catch (DuplicateReportingPlanException ex)
             {
-                return Conflict(ex.Message);
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (ReportingPlanValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -265,7 +265,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Deletes a facility reporting plan.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFacilityReportingPlan(string id, CancellationToken cancellationToken)
@@ -278,7 +278,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -293,7 +293,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Deletes every reporting plan belonging to a facility.
         /// </summary>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("facilities/{facilityId}")]
         public async Task<IActionResult> DeleteFacilityReportingPlansForFacility(string facilityId, CancellationToken cancellationToken)
@@ -302,7 +302,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (facilityId is null)
             {
-                return BadRequest("FacilityId is required.");
+                return BadRequestProblem("FacilityId is required.");
             }
 
             try
@@ -356,6 +356,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             return null;
         }
+
+        private ObjectResult BadRequestProblem(string detail) =>
+            Problem(detail, statusCode: StatusCodes.Status400BadRequest, title: "Bad Request");
+
+        private ObjectResult NotFoundProblem(string detail) =>
+            Problem(detail, statusCode: StatusCodes.Status404NotFound, title: "Not Found");
 
         private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 

@@ -158,7 +158,18 @@ namespace Tenant
             {
                 options.CustomizeProblemDetails = ctx =>
                 {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    var statusCode = ctx.ProblemDetails.Status ?? ctx.HttpContext.Response.StatusCode;
+
+                    // A 500 may carry a raw exception message the caller should not see. Every
+                    // other status is framework- or controller-authored and already safe to show,
+                    // so only fall back to the generic text when nothing more specific was set
+                    // (matches the pattern Terminology and MockDmrpApi already use).
+                    if (statusCode == StatusCodes.Status500InternalServerError
+                        || string.IsNullOrWhiteSpace(ctx.ProblemDetails.Detail))
+                    {
+                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    }
+
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
                         string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
