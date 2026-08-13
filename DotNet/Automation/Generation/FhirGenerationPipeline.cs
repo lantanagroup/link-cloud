@@ -402,6 +402,7 @@ public static class FhirGenerationPipeline
         // measure's MeasureReport does not contain the patient's resources, so its SDE
         // semantics do not contribute to the intersection of exclusions that determines
         // whether a resource reaches ABS.
+        HashSet<string>? cqlFilteredKeys = null;
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
         var effectiveProfile = profile;
 
@@ -419,7 +420,7 @@ public static class FhirGenerationPipeline
             var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
             if (qualifyingMeasures.Count > 0)
             {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
                 manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
             }
         }
@@ -464,7 +465,8 @@ public static class FhirGenerationPipeline
                 acquiredKeys,
                 patientSimEntries,
                 sharedSimEntries,
-                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
+                cqlFilteredKeys);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
@@ -562,6 +564,7 @@ public static class FhirGenerationPipeline
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
         // 3. CQL filter simulation + period-aware eligibility prediction
+        HashSet<string>? cqlFilteredKeys = null;
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
         var effectiveProfile = profile;
         if (cqlInput != null)
@@ -578,7 +581,7 @@ public static class FhirGenerationPipeline
             var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
             if (qualifyingMeasures.Count > 0)
             {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
                 manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
             }
         }
@@ -617,7 +620,8 @@ public static class FhirGenerationPipeline
                 acquiredKeys,
                 patientSimEntries,
                 sharedSimEntries,
-                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
+                cqlFilteredKeys);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
         }
 

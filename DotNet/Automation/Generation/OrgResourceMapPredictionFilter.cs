@@ -1,5 +1,7 @@
-﻿using System.Text.Json;
-using System.Text.RegularExpressions;
+﻿using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.Model;
+using Hl7.FhirPath;
+using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
 
@@ -19,7 +21,8 @@ public static class OrgResourceMapPredictionFilter
         HashSet<string> acquiredKeys,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> patientResourceEntries,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries,
-        IReadOnlyList<string>? organizationLocationConditionFhirPaths)
+        IReadOnlyList<string>? organizationLocationConditionFhirPaths,
+        IReadOnlySet<string>? cqlFilteredKeys = null)
     {
         if (acquiredKeys.Count == 0
             || organizationLocationConditionFhirPaths == null
@@ -115,12 +118,13 @@ public static class OrgResourceMapPredictionFilter
                 filtered.Add(key);
         }
 
-        return PruneUnreferencedReferenceResources(filtered, entriesByKey);
+        return PruneUnreferencedReferenceResources(filtered, entriesByKey, cqlFilteredKeys);
     }
 
     private static HashSet<string> PruneUnreferencedReferenceResources(
         HashSet<string> keptKeys,
-        Dictionary<string, ResourceEntry> entriesByKey)
+        Dictionary<string, ResourceEntry> entriesByKey,
+        IReadOnlySet<string>? cqlFilteredKeys)
     {
         if (keptKeys.Count == 0)
             return keptKeys;
@@ -129,6 +133,7 @@ public static class OrgResourceMapPredictionFilter
         // prediction if still referenced by kept resources after org-scope filtering.
         var pruneTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "Location",
             "Medication",
             "Specimen",
             "Device"
@@ -142,6 +147,9 @@ public static class OrgResourceMapPredictionFilter
             var referencedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var key in keptKeys)
             {
+                if (cqlFilteredKeys?.Contains(key) == true)
+                    continue;
+
                 if (!entriesByKey.TryGetValue(key, out var entry))
                     continue;
 
@@ -196,86 +204,46 @@ public static class OrgResourceMapPredictionFilter
         if (string.IsNullOrWhiteSpace(fhirPath))
             return false;
 
-        var path = fhirPath.Trim();
-        if (path.StartsWith("Location.", StringComparison.OrdinalIgnoreCase))
-            path = path["Location.".Length..];
-
-        var system = ExtractQuotedValue(path, "system");
-        var value = ExtractQuotedValue(path, "value");
-        var code = ExtractQuotedValue(path, "code");
-
-        if (path.Contains("identifier", StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(system)
-            && locationResource.TryGetProperty("identifier", out var identifiers)
-            && identifiers.ValueKind == JsonValueKind.Array)
+        try
         {
-            foreach (var identifier in identifiers.EnumerateArray())
-            {
-                if (!identifier.TryGetProperty("system", out var sysProp) || sysProp.ValueKind != JsonValueKind.String)
-                    continue;
+            var path = fhirPath.Trim();
+            if (path.StartsWith("Location.", StringComparison.OrdinalIgnoreCase))
+                path = path["Location.".Length..];
 
-                var identifierSystem = sysProp.GetString();
-                if (!string.Equals(identifierSystem, system, StringComparison.OrdinalIgnoreCase))
-                    continue;
+            var location = JsonSerializer.Deserialize<Location>(
+                locationResource.GetRawText(),
+                FhirSerializerOptions.ForFhirWithoutValidation());
 
-                if (string.IsNullOrWhiteSpace(value))
-                    return true;
+            if (location is null)
+                return false;
 
-                if (identifier.TryGetProperty("value", out var valueProp)
-                    && valueProp.ValueKind == JsonValueKind.String
-                    && string.Equals(valueProp.GetString(), value, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
+            var element = location.ToTypedElement();
+            var compiled = new FhirPathCompiler().Compile(path);
+            var results = compiled(element, new EvaluationContext()).ToList();
+
+            if (results.Count == 0)
+                return false;
+
+            if (results.Count == 1 && results[0].Value is bool isMatch)
+                return isMatch;
+
+            return true;
         }
-
-        if (path.Contains("type.coding", StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(system)
-            && locationResource.TryGetProperty("type", out var types)
-            && types.ValueKind == JsonValueKind.Array)
+        catch
         {
-            foreach (var type in types.EnumerateArray())
-            {
-                if (!type.TryGetProperty("coding", out var codingArray) || codingArray.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                foreach (var coding in codingArray.EnumerateArray())
-                {
-                    if (!coding.TryGetProperty("system", out var sysProp) || sysProp.ValueKind != JsonValueKind.String)
-                        continue;
-
-                    if (!string.Equals(sysProp.GetString(), system, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (string.IsNullOrWhiteSpace(code))
-                        return true;
-
-                    if (coding.TryGetProperty("code", out var codeProp)
-                        && codeProp.ValueKind == JsonValueKind.String
-                        && string.Equals(codeProp.GetString(), code, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-            }
+            return false;
         }
-
-        return false;
-    }
-
-    private static string? ExtractQuotedValue(string source, string key)
-    {
-        var match = Regex.Match(source, $@"\b{Regex.Escape(key)}\s*=\s*'([^']+)'", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value : null;
     }
 
     private static bool TryGetReferencedResourceIds(JsonElement resource, string resourceType, out List<string> ids)
     {
         ids = EnumerateReferences(resource)
-            .Where(reference => reference.StartsWith(resourceType + "/", StringComparison.OrdinalIgnoreCase))
-            .Select(reference => reference[(resourceType.Length + 1)..])
-            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(reference => TryParseReference(reference, out var type, out var id)
+                ? (Type: type, Id: id)
+                : (Type: string.Empty, Id: string.Empty))
+            .Where(parsed => string.Equals(parsed.Type, resourceType, StringComparison.OrdinalIgnoreCase)
+                             && !string.IsNullOrWhiteSpace(parsed.Id))
+            .Select(parsed => parsed.Id)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
