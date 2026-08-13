@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Builds the single pre-qualification {@link OperationOutcome} written to the patient NDJSON: one issue
- * per <em>unacceptable</em> category (a category with {@code acceptable=false}) that has at least one
+ * per <em>submitted</em> category (a category with {@code submit=true}) that has at least one
  * finding. See LEGLINK-425.
  */
 @Component
@@ -55,10 +55,10 @@ public class PreQualOperationOutcomeBuilder {
      * @param results          the patient's categorized validation results
      * @param measureReport    the patient's MeasureReport in the submission bundle (may be null)
      * @param writeExpressions when false, {@code expression[]} is omitted from every issue
-     * @return the OperationOutcome, or {@link Optional#empty()} when no unacceptable-category findings exist
+         * @return the OperationOutcome, or {@link Optional#empty()} when no submitted-category findings exist
      */
     public Optional<OperationOutcome> build(List<Result> results, MeasureReportRef measureReport, boolean writeExpressions) {
-        // Group findings by unacceptable category (acceptable == false); a Result may map to several
+                // Group findings by submitted category (submit == true); a Result may map to several
         // categories. Keyed by category id, not by the Category entity: Category defines no
         // equals/hashCode, so two instances of the same logical category (loaded in different
         // persistence contexts, say) would otherwise land in separate groups and emit a duplicate issue
@@ -71,7 +71,7 @@ public class PreQualOperationOutcomeBuilder {
                 continue;
             }
             for (Category category : categories) {
-                if (!category.isAcceptable()) {
+                if (category.isSubmit()) {
                     byCategoryId.computeIfAbsent(category.getId(), id -> new ArrayList<>()).add(result);
                 }
             }
