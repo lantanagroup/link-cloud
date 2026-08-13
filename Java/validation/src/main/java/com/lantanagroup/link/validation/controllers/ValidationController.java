@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.records.ApiResponse;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.PreQualService;
 import com.lantanagroup.link.validation.services.RubricExecutionService;
@@ -97,7 +98,7 @@ public class ValidationController {
 
     @Operation(summary = "Validates a FHIR resource")
     @PostMapping("/$validate")
-    public List<?> validate(
+    public ResponseEntity<ApiResponse<List<?>>> validate(
             @RequestParam(defaultValue = "false") boolean categorize,
             @RequestParam(defaultValue = "false") boolean summarize,
             @RequestBody String json) {
@@ -115,13 +116,14 @@ public class ValidationController {
 
         List<Result> results = validationService.validate(resource);
 
+        List<?> data;
         if (categorize) {
             categorizationService.categorize(results);
-
-            return getCategorizeResponse(summarize, results);
+            data = getCategorizeResponse(summarize, results);
         } else {
-            return summarize ? summarize(results, result -> Stream.of(result.getMessage())) : results;
+            data = summarize ? summarize(results, result -> Stream.of(result.getMessage())) : results;
         }
+        return ResponseEntity.ok(ApiResponse.ok("Validation completed", data));
     }
 
     @Operation(summary = "Categorizes validation results using latest rules")
@@ -220,19 +222,21 @@ public class ValidationController {
 
     @Operation(summary = "Evaluate a rubric synchronously against a FHIR payload (v2)")
     @PostMapping("/v2/rubrics/{rubricId}/$evaluate")
-    public ValidationResultEnvelope evaluate(
+    public ResponseEntity<ApiResponse<ValidationResultEnvelope>> evaluate(
             @PathVariable String rubricId,
             @RequestParam(name = "version", required = false) String version,
             @Valid @RequestBody EvaluateRequestDto request) {
-        return rubricExecutionService.evaluate(rubricId, version, request, true);
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, version, request, true);
+        return ResponseEntity.ok(ApiResponse.ok("Evaluation completed", result));
     }
 
     @Operation(summary = "Dry-run a rubric: no result is persisted, but the outcome is recorded on the version (v2)")
     @PostMapping("/v2/rubrics/{rubricId}/versions/{semver}/$dry-run")
-    public ValidationResultEnvelope dryRun(
+    public ResponseEntity<ApiResponse<ValidationResultEnvelope>> dryRun(
             @PathVariable String rubricId,
             @PathVariable String semver,
             @Valid @RequestBody EvaluateRequestDto request) {
-        return rubricExecutionService.evaluate(rubricId, semver, request, false);
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, semver, request, false);
+        return ResponseEntity.ok(ApiResponse.ok("Dry-run completed", result));
     }
 }
