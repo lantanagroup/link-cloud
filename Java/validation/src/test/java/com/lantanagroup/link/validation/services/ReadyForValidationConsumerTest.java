@@ -513,7 +513,7 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOn_unacceptableFindings_appendsOperationOutcomeToSameBlob() throws Exception {
+    void process_flagOn_submittedFindings_appendsOperationOutcomeToSameBlob() throws Exception {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubBlobDownload();
 
@@ -522,7 +522,7 @@ public class ReadyForValidationConsumerTest {
         when(jsonParser.encodeResourceToString(any()))
                 .thenReturn("{\"resourceType\":\"OperationOutcome\"}");
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -532,10 +532,10 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOff_unacceptableFindings_doesNotAppend() throws Exception {
+    void process_flagOff_submittedFindings_doesNotAppend() throws Exception {
         stubBlobDownload(); // flag defaults to false
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
@@ -544,11 +544,11 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOn_noUnacceptableFindings_doesNotAppend() throws Exception {
+    void process_flagOn_noSubmittedFindings_doesNotAppend() throws Exception {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubBlobDownload();
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(false)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
@@ -571,7 +571,7 @@ public class ReadyForValidationConsumerTest {
 
         stubBlobDownload();
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -596,7 +596,7 @@ public class ReadyForValidationConsumerTest {
         when(fhirContext.newJsonParser()).thenReturn(jsonParser);
         when(jsonParser.encodeResourceToString(any())).thenReturn("{\"resourceType\":\"OperationOutcome\"}");
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -610,7 +610,7 @@ public class ReadyForValidationConsumerTest {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubRestRetrieval(); // no blob service -> bundle comes via REST, append is skipped
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumerWithoutBlobStorage.process(buildRecord(PAYLOAD_URI));
@@ -626,7 +626,7 @@ public class ReadyForValidationConsumerTest {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubRestRetrieval(); // no payload URI -> bundle comes via REST
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
