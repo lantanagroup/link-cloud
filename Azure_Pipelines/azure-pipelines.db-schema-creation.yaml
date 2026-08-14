@@ -34,6 +34,9 @@ parameters:
     - name: data
       artifact: data-db
       file: dataDb.sql
+    - name: mock-dmrp
+      artifact: MockDmrpApi-db
+      file: MockDmrpApi.sql
     - name: normalization
       artifact: normalization-db
       file: normalizationDb.sql
@@ -101,7 +104,7 @@ stages:
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
             # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $dotnetServices = @("Account", "Audit", "Census", "MockDmrpApi", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
             $javaServices = @("validation" )
             $dataAcquisition = @("DataAcquisition" )
 
@@ -255,6 +258,29 @@ stages:
          ArtifactName: 'data-db'
          publishLocation: 'container'
         displayName: Publish Data Acquisition SQL Script  
+  ###
+  # Mock-DMRP
+  - job: Mock-DMRP
+    displayName: "Generate Mock-DMRP Schema Script"
+    steps:
+      - script: |
+          cd DotNet/MockDmrpApi
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/MockDmrpApi
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c MockDmrpApiDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/MockDmrpApiDb.sql
+        displayName: Generate MockDmrpApi SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/MockDmrpApiDb.sql'
+         ArtifactName: 'MockDmrpApi-db'
+         publishLocation: 'container'
+        displayName: Publish MockDmrpApi SQL Script  
   ###
   # Normalization
   - job: Normalization
