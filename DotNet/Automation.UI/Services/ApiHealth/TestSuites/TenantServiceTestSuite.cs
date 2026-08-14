@@ -89,7 +89,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
             results.Add(await CallRawGetAsync(
                 StepNames.InfoGet200,
                 baseUrl,
-                "/api/Tenant/info",
+                "/api/facility/info",
                 ct));
 
             results.Add(await CallRawGetAsync(

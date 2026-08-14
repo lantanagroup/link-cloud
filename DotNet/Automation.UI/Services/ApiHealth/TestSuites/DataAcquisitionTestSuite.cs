@@ -94,7 +94,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await CallRawGetAsync(
                 StepNames.InfoGet200,
                 baseUrl,
-                "/api/DataAcquisition/info",
+                "/api/data/info",
                 ct));
 
             results.Add(await CallRawGetAsync(

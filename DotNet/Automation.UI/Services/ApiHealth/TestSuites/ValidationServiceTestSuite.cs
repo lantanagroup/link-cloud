@@ -84,7 +84,7 @@ public sealed class ValidationServiceTestSuite : ServiceTestSuiteBase
             results.Add(await CallRawGetAsync(
                 StepNames.InfoGet200,
                 baseUrl,
-                "/api/Validation/info",
+                "/api/validation/info",
                 ct));
 
             results.Add(await CallRawGetAsync(

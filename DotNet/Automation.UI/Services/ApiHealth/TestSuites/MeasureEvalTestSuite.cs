@@ -89,7 +89,7 @@ public sealed class MeasureEvalTestSuite : ServiceTestSuiteBase
             results.Add(await CallRawGetAsync(
                 StepNames.InfoGet200,
                 baseUrl,
-                "/api/MeasureEval/info",
+                "/api/measureeval/info",
                 ct));
 
             results.Add(await CallRawGetAsync(

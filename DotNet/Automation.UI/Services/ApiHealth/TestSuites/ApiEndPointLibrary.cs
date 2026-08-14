@@ -149,13 +149,13 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/DataAcquisition/info"),
+        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data/info"),
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildMeasureEvalMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [MeasureEvalSteps.InfoGet200] = new EndpointMeta("Returns MeasureEval service information.", "GET /api/MeasureEval/info"),
+        [MeasureEvalSteps.InfoGet200] = new EndpointMeta("Returns MeasureEval service information.", "GET /api/measureeval/info"),
         [MeasureEvalSteps.RootHealthGet200] = new EndpointMeta("Returns MeasureEval service health status.", "GET /health")
     };
 
@@ -187,13 +187,13 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildTenantMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [TenantSteps.InfoGet200] = new EndpointMeta("Returns Tenant service information.", "GET /api/Tenant/info"),
+        [TenantSteps.InfoGet200] = new EndpointMeta("Returns Tenant service information.", "GET /api/facility/info"),
         [TenantSteps.RootHealthGet200] = new EndpointMeta("Returns Tenant service health status.", "GET /health")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildValidationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [ValidationSteps.InfoGet200] = new EndpointMeta("Returns Validation service information.", "GET /api/Validation/info"),
+        [ValidationSteps.InfoGet200] = new EndpointMeta("Returns Validation service information.", "GET /api/validation/info"),
         [ValidationSteps.RootHealthGet200] = new EndpointMeta("Returns Validation service health status.", "GET /health")
     };
 
