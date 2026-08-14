@@ -83,14 +83,14 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         results.Add(await CallRawGetAsync(
             StepNames.InfoGet200,
             baseUrl,
-            "/info",
+            "/api/info",
             ct));
 
         // --- /health ---
         results.Add(await CallRawGetAsync(
             StepNames.RootHealthGet200,
             baseUrl,
-            "/health",
+            "/api/monitor/health",
             ct));
 
         var adminBffClient = _serviceProvider.GetRequiredService<IAdminBffIntegrationClient>();
