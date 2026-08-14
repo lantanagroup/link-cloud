@@ -134,7 +134,6 @@ public static class ApiEndPointLibrary
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [AdminBffSteps.InfoGet200] = new EndpointMeta("Returns Admin BFF service information.", "GET /api/info"),
-        [AdminBffSteps.RootHealthGet200] = new EndpointMeta("Returns Admin BFF root health status.", "GET /api/monitor/health"),
         [AdminBffSteps.HealthGet200] = new EndpointMeta("Returns Admin BFF monitor health status.", "GET /api/monitor/health")
     };
 
@@ -236,7 +235,6 @@ public static class ApiEndPointLibrary
     public static class AdminBffSteps
     {
         public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string HealthGet200 = "Health GET → 200";
         public const string FacilityDelete200 = "Facility DELETE → 200";
         public const string FacilityDelete404 = "Facility DELETE → 404";

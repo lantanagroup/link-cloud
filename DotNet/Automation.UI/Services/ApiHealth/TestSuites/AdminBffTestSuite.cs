@@ -58,7 +58,6 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             foreach (var endpointName in new[]
             {
                 StepNames.InfoGet200,
-                StepNames.RootHealthGet200,
                 StepNames.HealthGet200
             })
             {
@@ -84,13 +83,6 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             StepNames.InfoGet200,
             baseUrl,
             "/api/info",
-            ct));
-
-        // --- /health ---
-        results.Add(await CallRawGetAsync(
-            StepNames.RootHealthGet200,
-            baseUrl,
-            "/api/monitor/health",
             ct));
 
         var adminBffClient = _serviceProvider.GetRequiredService<IAdminBffIntegrationClient>();
