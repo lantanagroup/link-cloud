@@ -54,7 +54,6 @@ parameters:
       file: tenantDb.sql
     - name: validation
       artifact: validation-db
-      file: V20241101__Initial_schema.sql
 
 #####################
 
@@ -407,6 +406,7 @@ stages:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
        Contents: 'V*.sql'
+
     - task: PublishBuildArtifacts@1
       inputs:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
@@ -428,9 +428,13 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_TEST
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.name }}_TEST
+        displayName: Update ${{ db.name }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
@@ -445,6 +449,86 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
+      - job: Update_validation_TEST
+        displayName: Update validation
+
+        steps:
+        - download: current
+          artifact: validation-db
+
+        - task: PowerShell@2
+          displayName: Combine Validation SQL Scripts
+          inputs:
+            targetType: inline
+            script: |
+
+              $path = "$(Pipeline.Workspace)/validation-db"
+              $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+              # Find all Validation migration scripts
+              $files = Get-ChildItem `
+                -Path $path `
+                -Filter "V*.sql" `
+                -File |
+                Sort-Object Name
+
+              Write-Host ""
+              Write-Host "Validation SQL files found:"
+              Write-Host ""
+
+              foreach ($file in $files) 
+              {
+                  Write-Host "  $($file.Name)"
+              }
+
+              Write-Host ""
+              Write-Host "Creating combined SQL file: $outputFile"
+
+              # Start with a clean file
+              New-Item `
+                -ItemType File `
+                -Path $outputFile `
+                -Force | Out-Null
+
+              foreach ($file in $files) 
+              {
+
+                Write-Host "Adding $($file.Name)"
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+                
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- Migration: $($file.Name)"
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Get-Content $file.FullName |
+                  Add-Content -Path $outputFile
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+              }
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply validation DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-test-botw-validation'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
+
 ############################################################################################
 # SQL Script Apply QA
 ############################################################################################
@@ -458,9 +542,13 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_QA
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.name }}_QA
+        displayName: Update ${{ db.name }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
@@ -475,6 +563,86 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
+      - job: Update_validation_QA
+        displayName: Update validation
+
+        steps:
+        - download: current
+          artifact: validation-db
+
+        - task: PowerShell@2
+          displayName: Combine Validation SQL Scripts
+          inputs:
+            targetType: inline
+            script: |
+
+              $path = "$(Pipeline.Workspace)/validation-db"
+              $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+              # Find all Validation migration scripts
+              $files = Get-ChildItem `
+                -Path $path `
+                -Filter "V*.sql" `
+                -File |
+                Sort-Object Name
+
+              Write-Host ""
+              Write-Host "Validation SQL files found:"
+              Write-Host ""
+
+              foreach ($file in $files) 
+              {
+                  Write-Host "  $($file.Name)"
+              }
+
+              Write-Host ""
+              Write-Host "Creating combined SQL file: $outputFile"
+
+              # Start with a clean file
+              New-Item `
+                -ItemType File `
+                -Path $outputFile `
+                -Force | Out-Null
+
+              foreach ($file in $files) 
+              {
+
+                Write-Host "Adding $($file.Name)"
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+                
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- Migration: $($file.Name)"
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Get-Content $file.FullName |
+                  Add-Content -Path $outputFile
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+              }
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply validation DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa-botw-validation'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
+
 ############################################################################################
 # SQL Script Apply QA2
 ############################################################################################
@@ -488,9 +656,13 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_QA
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.name }}_QA2
+        displayName: Update ${{ db.name }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
@@ -504,3 +676,83 @@ stages:
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+      - job: Update_validation_QA2
+        displayName: Update validation
+
+        steps:
+        - download: current
+          artifact: validation-db
+
+        - task: PowerShell@2
+          displayName: Combine Validation SQL Scripts
+          inputs:
+            targetType: inline
+            script: |
+
+              $path = "$(Pipeline.Workspace)/validation-db"
+              $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+              # Find all Validation migration scripts
+              $files = Get-ChildItem `
+                -Path $path `
+                -Filter "V*.sql" `
+                -File |
+                Sort-Object Name
+
+              Write-Host ""
+              Write-Host "Validation SQL files found:"
+              Write-Host ""
+
+              foreach ($file in $files) 
+              {
+                  Write-Host "  $($file.Name)"
+              }
+
+              Write-Host ""
+              Write-Host "Creating combined SQL file: $outputFile"
+
+              # Start with a clean file
+              New-Item `
+                -ItemType File `
+                -Path $outputFile `
+                -Force | Out-Null
+
+              foreach ($file in $files) 
+              {
+
+                Write-Host "Adding $($file.Name)"
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+                
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- Migration: $($file.Name)"
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value "-- ====================================================="
+
+                Get-Content $file.FullName |
+                  Add-Content -Path $outputFile
+
+                Add-Content `
+                  -Path $outputFile `
+                  -Value ""
+              }
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply validation DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa2-botw-validation'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
