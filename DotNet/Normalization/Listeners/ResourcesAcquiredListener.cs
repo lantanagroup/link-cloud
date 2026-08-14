@@ -44,6 +44,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
+    private readonly IResourceCachePurger _resourceCachePurger;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -61,7 +62,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyLocationOperationService copyLocationOperationService,
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        IResourceCachePurger resourceCachePurger)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -88,6 +90,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
+        _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -113,25 +116,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 {
                     try
                     {
-                        await ProcessMessageAsync(result, consumeCancellationToken);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
-                    }
-                    catch (TransientException ex)
-                    {
-                        _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
-                    }
-                    catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
-
-                        _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
+                        await ConsumeMessageAsync(result, consumeCancellationToken);
                     }
                     finally
                     {
@@ -179,6 +164,47 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
                 continue;
             }
+        }
+    }
+
+    /// <summary>
+    /// Processes a single consumed message and routes any failure to the dead letter or retry topic.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the consume loop (which owns only the offset commit) so that the failure routing —
+    /// in particular which failures release the resource cache — is directly testable.
+    /// </remarks>
+    public async Task ConsumeMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
+    {
+        try
+        {
+            await ProcessMessageAsync(result, consumeCancellationToken);
+        }
+        catch (DeadLetterException ex)
+        {
+            _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
+
+            // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
+            // so release its cached resources. The retry paths below must NOT do this — a redelivered
+            // message still needs its cache.
+            await _resourceCachePurger.PurgeAsync(
+                result.Message.Value,
+                $"{nameof(KafkaTopic.ResourcesAcquired)} dead-lettered: {ex.Message}",
+                consumeCancellationToken);
+        }
+        catch (TransientException ex)
+        {
+            _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
+        }
+        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
+
+            _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
         }
     }
 
