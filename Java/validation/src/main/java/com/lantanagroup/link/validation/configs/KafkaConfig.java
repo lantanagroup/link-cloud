@@ -98,7 +98,11 @@ public class KafkaConfig {
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
-                ReadyForValidation.Key.class, getJsonSerializer(objectMapper, ReadyForValidation.Key.class)
+                ReadyForValidation.Key.class, getJsonSerializer(objectMapper, ReadyForValidation.Key.class),
+                // A record whose key fails to deserialize carries raw bytes, and those bytes are what the
+                // dead-letter publisher must write. Without this delegate the publication throws and the
+                // container redelivers the record forever, blocking the partition.
+                byte[].class, new ByteArraySerializer()
         );
         return new DelegatingByTypeSerializer(serializers);
     }
@@ -108,7 +112,12 @@ public class KafkaConfig {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ValidationComplete.class, getJsonSerializer(objectMapper, ValidationComplete.class),
-                ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class)
+                ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class),
+                // A record that fails deserialization reaches the dead-letter publisher as the raw byte[]
+                // that could not be parsed — there is no bound type to serialize. Without this delegate the
+                // publication throws, DefaultErrorHandler cannot recover, and the container redelivers the
+                // record forever, blocking the partition and stranding every message behind it.
+                byte[].class, new ByteArraySerializer()
         );
         return new DelegatingByTypeSerializer(serializers);
     }
@@ -216,6 +225,14 @@ public class KafkaConfig {
                 .notRetryOn(DeserializationException.class)
                 .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
+                // Keep the DLT in the destination chain — it is the routing target for container-thread
+                // poison (see notRetryOn above), so removing it with doNotConfigureDlt() would leave a
+                // malformed record with no destination and drop it instead of preserving it.
+                // Only suppress its *listener*: nothing consumes -Error (there is no @DltHandler), so the
+                // container it would otherwise start just re-reads each dead letter, fails again on the
+                // same bytes, and commits the offset — which both doubles the error logging for poison
+                // and advances the group past records that dead-letter replay will need to re-read.
+                .autoStartDltHandler(false)
                 .create(template);
     }
 

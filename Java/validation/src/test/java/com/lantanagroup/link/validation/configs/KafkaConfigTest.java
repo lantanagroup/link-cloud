@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.configs;
 import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.UnclassifiedServerFailureException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
@@ -13,6 +14,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.serialization.Serializer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -24,12 +26,14 @@ import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.support.GenericMessage;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -216,5 +220,41 @@ class KafkaConfigTest {
         stampAttempts(record, 1);
         assertEquals(Topics.READY_FOR_VALIDATION_RETRY,
                 routedTopic(retryConfig(3, false), record, new RuntimeException("still failing")));
+    }
+
+    // ---- Raw-byte serialization. A record that fails deserialization reaches the dead-letter publisher
+    //      with its ORIGINAL byte[] payload rather than a bound type — there is nothing else to publish,
+    //      the bytes are precisely what could not be parsed. Without a byte[] delegate the publication
+    //      throws SerializationException, DefaultErrorHandler cannot recover the record, and the container
+    //      redelivers it forever: the partition is blocked and every message behind it is stranded.
+
+    @SuppressWarnings("unchecked")
+    private static Serializer<Object> valueSerializer() {
+        return (Serializer<Object>) new KafkaConfig().valueSerializer(new ObjectMapper());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Serializer<Object> keySerializer() {
+        return (Serializer<Object>) new KafkaConfig().keySerializer(new ObjectMapper());
+    }
+
+    @Test
+    void valueSerializer_handlesRawBytes_soDeserializationFailuresCanBeDeadLettered() {
+        byte[] unparseable = "{\"bundleId\":".getBytes(StandardCharsets.UTF_8);
+
+        byte[] serialized = valueSerializer().serialize(Topics.READY_FOR_VALIDATION_ERROR, unparseable);
+
+        assertArrayEquals(unparseable, serialized,
+                "raw payload must pass through unchanged so the dead letter preserves the original bytes");
+    }
+
+    @Test
+    void keySerializer_handlesRawBytes_soDeserializationFailuresCanBeDeadLettered() {
+        byte[] unparseable = "{\"facilityId\":".getBytes(StandardCharsets.UTF_8);
+
+        byte[] serialized = keySerializer().serialize(Topics.READY_FOR_VALIDATION_ERROR, unparseable);
+
+        assertArrayEquals(unparseable, serialized,
+                "raw key must pass through unchanged so a record with an unparseable key can be dead-lettered");
     }
 }

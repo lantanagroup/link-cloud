@@ -255,6 +255,14 @@ public class KafkaConfig {
                 .notRetryOn(DeserializationException.class)
                 .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
+                // Keep the DLT in the destination chain — it is the routing target for container-thread
+                // poison (see notRetryOn above), so removing it with doNotConfigureDlt() would leave a
+                // malformed record with no destination and drop it instead of preserving it.
+                // Only suppress its *listener*: nothing consumes -Error (there is no @DltHandler), so the
+                // container it would otherwise start just re-reads each dead letter, fails again on the
+                // same bytes, and commits the offset — which both doubles the error logging for poison
+                // and advances the group past records that dead-letter replay will need to re-read.
+                .autoStartDltHandler(false)
                 .create(template);
     }
 

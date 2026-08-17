@@ -37,16 +37,30 @@ public final class RetryTopicRecovererFactory {
             KafkaRetryConfig config,
             Set<Class<? extends Throwable>> nonRetryable) {
 
+        // The single routing decision. Both the destination resolver below and the recoverer's log line
+        // are derived from this, so a record can never be dead-lettered while the log reports a retry.
+        // Route straight to the error topic when retries are disabled, the message is poison (malformed
+        // content / deserialization can never succeed), or attempts are exhausted.
+        BiFunction<ConsumerRecord<?, ?>, Exception, RetryTopicRecoverer.Decision> decide =
+                (record, exception) -> {
+                    if (config.isDisableRetryConsumer()) {
+                        return RetryTopicRecoverer.Decision.DLT_DISABLED;
+                    }
+                    if (isNonRetryable(exception, nonRetryable)) {
+                        return RetryTopicRecoverer.Decision.DLT_POISON;
+                    }
+                    int attempt = RetryTopicRecoverer.currentAttempts(record.headers());
+                    if (attempt >= config.effectiveMaxAttempts()) {
+                        return RetryTopicRecoverer.Decision.DLT_EXHAUSTED;
+                    }
+                    return RetryTopicRecoverer.Decision.RETRY;
+                };
+
         BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> resolver =
                 (record, exception) -> {
-                    int attempt = RetryTopicRecoverer.currentAttempts(record.headers());
-                    // Route straight to the error topic when retries are disabled, the message is poison
-                    // (malformed content / deserialization can never succeed), or attempts are exhausted.
-                    String target = (config.isDisableRetryConsumer()
-                            || isNonRetryable(exception, nonRetryable)
-                            || attempt >= config.effectiveMaxAttempts())
-                            ? errorTopic
-                            : retryTopic;
+                    String target = decide.apply(record, exception) == RetryTopicRecoverer.Decision.RETRY
+                            ? retryTopic
+                            : errorTopic;
                     return new TopicPartition(target, record.partition());
                 };
 
@@ -55,7 +69,8 @@ public final class RetryTopicRecovererFactory {
         return new RetryTopicRecoverer(
                 config.effectiveMaxAttempts(),
                 config::backoffMsForAttempt,
-                delegate);
+                delegate,
+                decide);
     }
 
     /**
