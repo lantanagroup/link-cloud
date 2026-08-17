@@ -23,36 +23,47 @@ parameters:
   type: object
   default:
     - name: account
+      alias: account
       artifact: account-db
       file: accountDb.sql
     - name: audit
+      alias: audit
       artifact: audit-db
       file: auditDb.sql
     - name: census
+      alias: census
       artifact: census-db
       file: censusDb.sql
     - name: data
+      alias: data
       artifact: data-db
       file: dataDb.sql
     - name: mock-dmrp
+      alias: mock-dmrp
       artifact: MockDmrpApi-db
       file: MockDmrpApi.sql
     - name: normalization
+      alias: normalization
       artifact: normalization-db
       file: normalizationDb.sql
     - name: querydispatch
+      alias: querydispatch
       artifact: querydispatch-db
       file: querydispatchDb.sql
     - name: report
+      alias: report
       artifact: report-db
       file: reportDb.sql
     - name: submission
+      alias: submission
       artifact: submission-db
       file: submissionDb.sql
     - name: tenant
+      alias: tenant
       artifact: tenant-db
       file: tenantDb.sql
     - name: validation
+      alias: validation
       artifact: validation-db
 
 #####################
@@ -431,15 +442,15 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.name }}_TEST
-        displayName: Update ${{ db.name }}
+      - job: Update_${{ db.alias }}_TEST
+        displayName: Update ${{ db.alias }}
 
         steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
@@ -545,15 +556,15 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.name }}_QA
-        displayName: Update ${{ db.name }}
+      - job: Update_${{ db.alias }}_QA
+        displayName: Update ${{ db.alias }}
 
         steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
@@ -659,15 +670,15 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.name }}_QA2
-        displayName: Update ${{ db.name }}
+      - job: Update_${{ db.alias }}_QA2
+        displayName: Update ${{ db.aliase }}
 
         steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
