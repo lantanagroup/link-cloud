@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -129,6 +130,34 @@ class RubricCacheServiceTest {
         assertThat(second).isEqualTo(first);
         verify(versionRepository, times(1)).findByRubricIdAndSemver("piqi.core", "1.0.0");
         verify(checkRepository, times(1)).findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(VERSION_ID);
+    }
+
+    @Test
+    @DisplayName("leading-zero and canonical semver share one cache entry and one canonical DB lookup")
+    void getVersion_normalizesKeyAndLookup() {
+        stubDb(); // stubs findByRubricIdAndSemver("piqi.core", "1.0.0")
+
+        RubricVersionSnapshot viaLeadingZero = cacheService.getVersion("piqi.core", "01.0.0");
+        RubricVersionSnapshot viaCanonical = cacheService.getVersion("piqi.core", "1.0.0");
+
+        assertThat(viaLeadingZero).isNotNull();
+        assertThat(viaCanonical).isEqualTo(viaLeadingZero);
+        // one DB hit total: the canonical lookup, whose result serves both cache keys;
+        // the raw "01.0.0" must never reach the repository
+        verify(versionRepository, times(1)).findByRubricIdAndSemver("piqi.core", "1.0.0");
+        verify(versionRepository, never()).findByRubricIdAndSemver("piqi.core", "01.0.0");
+    }
+
+    @Test
+    @DisplayName("evictVersion normalizes its key, so evicting '01.0.0' clears the entry cached as '1.0.0'")
+    void evictVersion_normalizesKey() {
+        stubDb();
+        cacheService.getVersion("piqi.core", "1.0.0"); // cached under piqi.core:1.0.0
+
+        cacheService.evictVersion("piqi.core", "01.0.0"); // non-canonical arg must still clear it
+        cacheService.getVersion("piqi.core", "1.0.0");    // cache miss -> a second DB hit
+
+        verify(versionRepository, times(2)).findByRubricIdAndSemver("piqi.core", "1.0.0");
     }
 
     @Test

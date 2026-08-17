@@ -58,6 +58,24 @@ public record Semver(long major, long minor, long patch, String preRelease) impl
         }
     }
 
+    // canonical form with leading zeros stripped, e.g. "01.02.3" -> "1.2.3" — used so
+    // storage/lookup treat numerically-equal segments as the same version
+    public String toCanonicalString() {
+        return major + "." + minor + "." + patch + (preRelease != null ? "-" + preRelease : "");
+    }
+
+    // canonical form if the value parses, otherwise the value unchanged. This is the single
+    // normalization entry point every semver-keyed storage/lookup goes through, so "01.2.3" and
+    // "1.2.3" resolve to one row; an unparseable value is passed through so it still 404s/400s
+    // exactly as it did before normalization instead of failing here.
+    public static String normalize(String value) {
+        try {
+            return parse(value).toCanonicalString();
+        } catch (IllegalArgumentException e) {
+            return value;
+        }
+    }
+
     @Override
     public int compareTo(Semver o) {
         int c = Long.compare(major, o.major);

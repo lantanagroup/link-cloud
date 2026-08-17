@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.controllers;
 
 import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
@@ -74,8 +75,10 @@ public class RubricController {
         this.maxPayloadBytes = maxPayloadBytes;
         this.strictJsonMapper = objectMapper.copy()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        this.strictJsonMapper.getFactory().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
         this.strictYamlMapper = new YAMLMapper();
         this.strictYamlMapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        this.strictYamlMapper.getFactory().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
     @Operation(summary = "List rubrics (paged), each with its versions. Optional status filter: only rubrics "
@@ -155,9 +158,11 @@ public class RubricController {
         }
         RubricVersion version = registry.registerVersion(payload, actor(principal));
         RubricVersionSummaryDto dto = RubricVersionSummaryDto.from(version, objectMapper);
+        // build the Location from the persisted version's (canonical) semver, not the raw payload,
+        // so the header and body agree even when the input carried leading zeros
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{semver}")
-                .buildAndExpand(payload.getSemver())
+                .buildAndExpand(version.getSemver())
                 .toUri();
         return ResponseEntity.created(location)
                 .body(ApiResponse.created("Rubric version registered", dto));

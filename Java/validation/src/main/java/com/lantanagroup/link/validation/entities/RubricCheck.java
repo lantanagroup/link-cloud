@@ -58,7 +58,7 @@ public class RubricCheck {
     @Setter(AccessLevel.NONE)
     private RubricVersion rubricVersion;
 
-    @Column(name = "check_local_id", nullable = false, length = 64)
+    @Column(name = "check_local_id", nullable = false, length = 128)
     private String checkLocalId;
 
     @Enumerated(EnumType.STRING)

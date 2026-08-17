@@ -508,6 +508,42 @@ class RubricRegistryServiceTest {
         verify(versionRepository, never()).findByRubricIdIn(any());
         verify(versionRepository, never()).findByRubricIdInAndStatus(any(), any());
     }
+
+    @Test
+    @DisplayName("register canonicalizes a leading-zero semver before the pre-check and before storing")
+    void register_normalizesSemver() {
+        // the pre-check and the stored row must both use the canonical "1.2.0", never the raw "01.2.0"
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.2.0")).thenReturn(Optional.empty());
+        when(rubricRepository.findById("piqi.core")).thenReturn(Optional.empty());
+        when(rubricRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(versionRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RubricVersionPayloadDto payload = RubricVersionPayloadDto.builder()
+                .id("piqi.core")
+                .semver("01.2.0")
+                .title("PIQI Core")
+                .checks(List.of(CheckDto.builder()
+                        .id("c1").type(CheckType.FHIRPATH).dimension(PiqiDimension.CONFORMANCE)
+                        .ordinal(1).enabled(true).build()))
+                .build();
+
+        RubricVersion result = service().registerVersion(payload, "qa");
+
+        assertThat(result.getSemver()).isEqualTo("1.2.0");
+        verify(versionRepository).findByRubricIdAndSemver("piqi.core", "1.2.0");
+    }
+
+    @Test
+    @DisplayName("getVersion canonicalizes a leading-zero semver before the repository lookup")
+    void getVersion_normalizesSemver() {
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.2.0"))
+                .thenReturn(Optional.of(versionOf("piqi.core", "1.2.0", RubricVersionStatus.PUBLISHED)));
+
+        RubricVersion result = service().getVersion("piqi.core", "01.2.0");
+
+        assertThat(result.getSemver()).isEqualTo("1.2.0");
+        verify(versionRepository).findByRubricIdAndSemver("piqi.core", "1.2.0");
+    }
 }
 
 

@@ -23,9 +23,9 @@ import lombok.Setter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CheckDto {
 
-    // mirrors rubric_check.check_local_id varchar(64)
+    // mirrors rubric_check.check_local_id varchar(128)
     @NotBlank
-    @Size(max = 64)
+    @Size(max = 128)
     private String id;
 
     @NotNull

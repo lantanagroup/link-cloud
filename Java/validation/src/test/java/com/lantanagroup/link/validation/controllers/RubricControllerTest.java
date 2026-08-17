@@ -147,6 +147,22 @@ class RubricControllerTest {
         }
 
         @Test
+        @DisplayName("leading-zero semver -> 201 with canonical Location and body, not the raw input")
+        void register_leadingZeroSemverCanonicalized() throws Exception {
+            // service returns the persisted (canonical) version; the controller must echo that in
+            // both the Location header and the body, never the raw "01.2.0" from the request
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.2.0", RubricVersionStatus.DRAFT));
+
+            mockMvc.perform(post(BASE + "/piqi.core/versions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(validPayload("piqi.core", "01.2.0")))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string("Location", containsString("/piqi.core/versions/1.2.0")))
+                    .andExpect(jsonPath("$.data.semver").value("1.2.0"));
+        }
+
+        @Test
         @DisplayName("blank id -> 400 (bean validation)")
         void register_blankId() throws Exception {
             expectStatus(post(BASE + "/piqi.core/versions")
@@ -412,6 +428,31 @@ class RubricControllerTest {
             expectStatus(post(BASE + "/piqi.core/versions")
                     .contentType("application/yaml")
                     .content("checks: [ {id: c1, type: ["), 400);
+        }
+
+        @Test
+        @DisplayName("duplicate JSON key -> 400 (strict duplicate detection, not silent last-value-wins)")
+        void register_duplicateJsonKey() throws Exception {
+            // stub success so a 201 here would prove the duplicate slipped through as last-value-wins
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validPayload("piqi.core", "1.0.0")
+                    .replace("\"owner\": \"qa\",", "\"owner\": \"qa\",\n  \"owner\": \"other\",");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("duplicate YAML key -> 400 (strict duplicate detection)")
+        void register_duplicateYamlKey() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validYamlPayload("piqi.core", "1.0.0")
+                    .replace("owner: qa", "owner: qa\nowner: other");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType("application/yaml")
+                    .content(body), 400);
         }
     }
 

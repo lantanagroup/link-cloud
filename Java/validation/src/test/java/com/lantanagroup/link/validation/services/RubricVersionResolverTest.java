@@ -176,4 +176,17 @@ class RubricVersionResolverTest {
         assertThatThrownBy(() -> resolver.resolve("piqi.core", null, true))
                 .isInstanceOf(RubricVersionNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("an explicit leading-zero semver is canonicalized before the cache lookup")
+    void resolvesNormalizedSemver() {
+        when(cacheService.getVersion("piqi.core", "1.2.0"))
+                .thenReturn(snapshot("1.2.0", RubricVersionStatus.PUBLISHED));
+
+        RubricVersionResolver.ResolvedRubric resolved = resolver.resolve("piqi.core", "01.2.0", true);
+
+        assertThat(resolved.version().getSemver()).isEqualTo("1.2.0");
+        // the raw "01.2.0" must never reach the cache — only its canonical form
+        verify(cacheService).getVersion("piqi.core", "1.2.0");
+    }
 }

@@ -35,9 +35,14 @@ public class RubricCacheService {
 
     // null = not found, and nulls are never cached, so a version registered right after a
     // miss shows up immediately. The 404-vs-409 decisions stay in the resolver.
-    @Cacheable(value = VERSION_CACHE, key = "#rubricId + ':' + #semver", unless = "#result == null")
+    // Semver.normalize in the key AND the lookup so "01.2.0" and "1.2.0" resolve to one cache entry
+    // and one row no matter which caller reached here — the cache can't be split by a caller that
+    // forgot to canonicalize the semver first.
+    @Cacheable(value = VERSION_CACHE,
+            key = "#rubricId + ':' + T(com.lantanagroup.link.validation.models.Semver).normalize(#semver)",
+            unless = "#result == null")
     public RubricVersionSnapshot getVersion(String rubricId, String semver) {
-        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
+        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, Semver.normalize(semver))
                 .map(v -> RubricVersionSnapshot.from(v,
                         rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(
                                 v.getRubricVersionId())))
@@ -65,8 +70,11 @@ public class RubricCacheService {
     // transactionAware() manager: the decorator's deferred evict runs outside the cache
     // error handler, so a redis outage would 500 a retire whose commit already went through.
     public void evictVersion(String rubricId, String semver) {
+        // normalize to match getVersion's cache key, so an evict for "01.2.0" still clears the
+        // entry cached under the canonical "1.2.0" regardless of what the caller passed
+        String key = rubricId + ":" + Semver.normalize(semver);
         afterCommitOrNow(() -> {
-            safeEvict(VERSION_CACHE, rubricId + ":" + semver);
+            safeEvict(VERSION_CACHE, key);
             safeEvict(LATEST_SEMVER_CACHE, rubricId);
         });
     }
