@@ -10,6 +10,7 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.services.ReportClient;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -151,7 +152,7 @@ public class BlobStorageService {
                             .map(candidate -> candidate.getResourceType().name())
                             .collect(Collectors.joining(", "));
                     logger.warn("Contained reference '#{}' is ambiguous between {} resources ({}); leaving reference unresolved",
-                            idPart, candidates.size(), candidateTypes);
+                            LogUtils.sanitize(idPart), candidates.size(), LogUtils.sanitize(candidateTypes));
                     continue;
                 }
                 resource = candidates.isEmpty() ? null : candidates.get(0);
