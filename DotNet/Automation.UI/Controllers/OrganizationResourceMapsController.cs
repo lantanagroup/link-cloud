@@ -2,7 +2,6 @@
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
-using System.Runtime.InteropServices;
 
 namespace Automation.UI.Controllers;
 
