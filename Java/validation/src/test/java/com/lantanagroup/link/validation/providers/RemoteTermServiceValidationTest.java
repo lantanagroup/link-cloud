@@ -3,14 +3,20 @@ package com.lantanagroup.link.validation.providers;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.IValidationSupport.CodeValidationResult;
 import ca.uhn.fhir.context.support.IValidationSupport.IssueSeverity;
+import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.gclient.ICriterion;
 import ca.uhn.fhir.rest.gclient.IOperation;
 import ca.uhn.fhir.rest.gclient.IOperationUnnamed;
 import ca.uhn.fhir.rest.gclient.IOperationUntyped;
 import ca.uhn.fhir.rest.gclient.IOperationUntypedWithInputAndPartialOutput;
+import ca.uhn.fhir.rest.gclient.IQuery;
+import ca.uhn.fhir.rest.gclient.IUntypedQuery;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import com.lantanagroup.link.shared.utils.LogUtils;
+import org.hl7.fhir.instance.model.api.IBaseBundle;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -64,6 +70,34 @@ class RemoteTermServiceValidationTest {
             when(withInput.execute()).thenReturn(executeResult);
         }
         return operation;
+    }
+
+    /**
+     * Stubs the fluent {@code client.search().forResource(..).where(..).summaryMode(..).returnBundle(..).execute()}
+     * chain so that {@code execute()} returns the supplied bundle. Returns the query mock so callers can capture
+     * the summary mode requested.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private IQuery stubSearchChain(RemoteTermServiceValidation subject, IBaseBundle executeResult) {
+        IGenericClient client = mock(IGenericClient.class);
+        IUntypedQuery untypedQuery = mock(IUntypedQuery.class);
+        IQuery query = mock(IQuery.class);
+
+        doReturn(client).when(subject).provideClient();
+        when(client.search()).thenReturn(untypedQuery);
+        when(untypedQuery.forResource(anyString())).thenReturn(query);
+        when(query.where(any(ICriterion.class))).thenReturn(query);
+        when(query.summaryMode(any(SummaryEnum.class))).thenReturn(query);
+        when(query.returnBundle(any(Class.class))).thenReturn(query);
+        when(query.execute()).thenReturn(executeResult);
+        return query;
+    }
+
+    private Bundle searchsetContaining(Resource resource) {
+        Bundle bundle = new Bundle();
+        bundle.setType(Bundle.BundleType.SEARCHSET);
+        bundle.addEntry().setResource(resource);
+        return bundle;
     }
 
     private Parameters validateCodeResponse(boolean result, String paramName, String paramValue) {
@@ -296,6 +330,56 @@ class RemoteTermServiceValidationTest {
                 result.getMessage());
         // The inline path targets the ValueSet resource, not CodeSystem.
         verify(operation).onType("ValueSet");
+    }
+
+    // ---------- fetchValueSet summary mode ----------
+    // fetchValueSet(String) is the public IValidationSupport hook HAPI calls to resolve a bound ValueSet.
+    // Requesting _summary=false makes the Link terminology service enumerate every code of the value set
+    // into ValueSet.expansion.contains, which is the client-side trigger for terminology-service memory
+    // exhaustion -- and the expansion is never read (validateCodeInValueSet uses only the canonical URL).
+    // These tests pin the summary mode so it cannot be silently changed back.
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void fetchValueSet_requestsSummaryModeTrue() {
+        RemoteTermServiceValidation subject = newSpy();
+        ValueSet valueSet = new ValueSet();
+        valueSet.setUrl(VALUE_SET_URL);
+        IQuery query = stubSearchChain(subject, searchsetContaining(valueSet));
+
+        IBaseResource result = subject.fetchValueSet(VALUE_SET_URL);
+
+        ArgumentCaptor<SummaryEnum> summaryMode = ArgumentCaptor.forClass(SummaryEnum.class);
+        verify(query).summaryMode(summaryMode.capture());
+        assertEquals(SummaryEnum.TRUE, summaryMode.getValue(),
+                "fetchValueSet must not request _summary=false: that makes the terminology service "
+                        + "enumerate the full expansion for a resource whose expansion is never read.");
+        assertSame(valueSet, result);
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void fetchValueSet_noMatch_returnsNull() {
+        RemoteTermServiceValidation subject = newSpy();
+        Bundle empty = new Bundle();
+        empty.setType(Bundle.BundleType.SEARCHSET);
+        IQuery query = stubSearchChain(subject, empty);
+
+        assertNull(subject.fetchValueSet(VALUE_SET_URL));
+        verify(query).summaryMode(SummaryEnum.TRUE);
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void invokeIsValueSetSupported_requestsSummaryModeTrue() {
+        // The existence check has always used _summary=true; fetchValueSet(String) now matches it.
+        RemoteTermServiceValidation subject = newSpy();
+        ValueSet valueSet = new ValueSet();
+        valueSet.setUrl(VALUE_SET_URL);
+        IQuery query = stubSearchChain(subject, searchsetContaining(valueSet));
+
+        assertTrue(subject.invokeIsValueSetSupported(VALUE_SET_URL));
+        verify(query).summaryMode(SummaryEnum.TRUE);
     }
 
     // ---------- isCodeSystemSupported / isValueSetSupported delegation to cache ----------
