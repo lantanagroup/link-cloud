@@ -198,9 +198,9 @@ class RubricYamlNegativeScenariosTest {
     }
 
     @Test
-    @DisplayName("check id over 64 chars rejected")
+    @DisplayName("check id over 128 chars rejected")
     void checkIdTooLong() {
-        String yaml = VALID_YAML.replace("- id: name-exists", "- id: " + "c".repeat(65));
+        String yaml = VALID_YAML.replace("- id: name-exists", "- id: " + "c".repeat(129));
         assertThat(beanViolations(yaml)).anyMatch(v -> v.contains(".id:"));
     }
 

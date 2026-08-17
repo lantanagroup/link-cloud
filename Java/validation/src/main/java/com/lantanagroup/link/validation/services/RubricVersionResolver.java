@@ -6,6 +6,7 @@ import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
 import com.lantanagroup.link.validation.models.RubricVersionSnapshot;
+import com.lantanagroup.link.validation.models.Semver;
 import com.lantanagroup.link.validation.providers.RubricCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,9 @@ public class RubricVersionResolver {
 
     public ResolvedRubric resolve(String rubricId, String semver, boolean publishedOnly) {
         if (semver != null && !semver.isBlank()) {
+            // "01.2.0" and "1.2.0" are the same registered version — canonicalize here too so the
+            // 404/409 messages below echo the canonical form (the cache normalizes the key itself)
+            semver = Semver.normalize(semver);
             RubricVersionSnapshot snapshot = cacheService.getVersion(rubricId, semver);
             if (snapshot == null) {
                 throw new RubricVersionNotFoundException(rubricId, semver);

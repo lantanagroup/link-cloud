@@ -52,7 +52,7 @@ begin
     (
         check_id          uniqueidentifier not null,
         rubric_version_id uniqueidentifier not null,
-        check_local_id    varchar(64)      not null,
+        check_local_id    varchar(128)     not null,
         type              varchar(32)      not null check (type in
                                                            ('FHIR_CONFORMANCE', 'TERMINOLOGY', 'FHIRPATH', 'VALUESET',
                                                             'PLAUSIBILITY', 'COMPLETENESS', 'CURRENCY', 'CUSTOM')),

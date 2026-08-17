@@ -62,6 +62,8 @@ public class RubricRegistryService {
     @Transactional
     public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor) {
         definitionValidator.validate(payload);
+        // "01.2.3" and "1.2.3" are the same version — normalize before it's ever looked up or stored
+        payload.setSemver(Semver.normalize(payload.getSemver()));
 
         String definitionJson = writeJson(payload);
         String checksum = sha256(definitionJson);
@@ -158,17 +160,18 @@ public class RubricRegistryService {
 
     @Transactional
     public RubricVersion publish(String rubricId, String semver, String publishedBy) {
-        RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
-                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
+        final String normalizedSemver = Semver.normalize(semver);
+        RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
         if (v.getStatus() != RubricVersionStatus.DRAFT) {
-            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "publish");
+            throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "publish");
         }
         if (dryRunConfig.isRequiredForPublish()) {
             boolean acceptable = v.getDryRunCompletedAt() != null
                     && (v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE
                         || v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
             if (!acceptable) {
-                throw new RubricDryRunRequiredException(rubricId, semver, v.getDryRunStatus());
+                throw new RubricDryRunRequiredException(rubricId, normalizedSemver, v.getDryRunStatus());
             }
         }
         // the status check above can go stale before we write, so flip it with a guarded update
@@ -178,48 +181,49 @@ public class RubricRegistryService {
                 v.getRubricVersionId(), RubricVersionStatus.DRAFT, RubricVersionStatus.PUBLISHED, publishedAt, publishedBy);
         if (updated == 0) {
             // someone else transitioned it first — re-read so the 409 reports the real status
-            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
-                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
-            throw new RubricLifecycleException(rubricId, semver, current.getStatus(), "publish");
+            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+            throw new RubricLifecycleException(rubricId, normalizedSemver, current.getStatus(), "publish");
         }
         // the update cleared the persistence context; patch the fields on the entity we return
         v.setStatus(RubricVersionStatus.PUBLISHED);
         v.setPublishedAt(publishedAt);
         v.setPublishedBy(publishedBy);
         // drop the stale DRAFT snapshot and the latest pointer — this may be the new latest
-        rubricCacheService.evictVersion(rubricId, semver);
-        recordEvent(rubricId, semver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
+        rubricCacheService.evictVersion(rubricId, normalizedSemver);
+        recordEvent(rubricId, normalizedSemver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
         logger.info("Published rubric {} v{} by {}",
-                LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(publishedBy));
+                LogUtils.sanitize(rubricId), LogUtils.sanitize(normalizedSemver), LogUtils.sanitize(publishedBy));
         return v;
     }
 
     @Transactional
     public RubricVersion retire(String rubricId, String semver, String retiredBy) {
-        RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
-                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
+        final String normalizedSemver = Semver.normalize(semver);
+        RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
         // drafts can be retired directly (abandoned without ever publishing), only
         // re-retiring is blocked so retiredAt/retiredBy and the audit trail stay intact
         if (v.getStatus() == RubricVersionStatus.RETIRED) {
-            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
+            throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "retire");
         }
         // guarded update like publish — if it was retired between our read and here we get 0 rows
         OffsetDateTime retiredAt = OffsetDateTime.now();
         int updated = rubricVersionRepository.retireIfNotRetired(
                 v.getRubricVersionId(), RubricVersionStatus.RETIRED, retiredAt, retiredBy);
         if (updated == 0) {
-            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
-                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
-            throw new RubricLifecycleException(rubricId, semver, current.getStatus(), "retire");
+            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+            throw new RubricLifecycleException(rubricId, normalizedSemver, current.getStatus(), "retire");
         }
         v.setStatus(RubricVersionStatus.RETIRED);
         v.setRetiredAt(retiredAt);
         v.setRetiredBy(retiredBy);
         // drop the cached entry and the latest pointer so nothing keeps evaluating this version
-        rubricCacheService.evictVersion(rubricId, semver);
-        recordEvent(rubricId, semver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
+        rubricCacheService.evictVersion(rubricId, normalizedSemver);
+        recordEvent(rubricId, normalizedSemver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
         logger.info("Retired rubric {} v{} by {}",
-                LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(retiredBy));
+                LogUtils.sanitize(rubricId), LogUtils.sanitize(normalizedSemver), LogUtils.sanitize(retiredBy));
         return v;
     }
 
@@ -269,12 +273,13 @@ public class RubricRegistryService {
     }
 
     public RubricVersion getVersion(String rubricId, String semver) {
-        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
-                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
+        final String normalizedSemver = Semver.normalize(semver);
+        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
     }
 
     public Optional<RubricVersion> findVersion(String rubricId, String semver) {
-        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver);
+        return rubricVersionRepository.findByRubricIdAndSemver(rubricId, Semver.normalize(semver));
     }
 
     public List<RubricCheck> getChecks(UUID rubricVersionId) {
