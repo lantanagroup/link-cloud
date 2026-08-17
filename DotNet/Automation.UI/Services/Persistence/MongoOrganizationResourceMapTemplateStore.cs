@@ -73,7 +73,6 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
     {
         Id = model.Id,
         Name = model.Name.Trim(),
-        NormalizedName = NormalizeName(model.Name),
         Description = model.Description,
         IsSystem = model.IsSystem,
         IsDefault = model.IsDefault,
@@ -85,7 +84,6 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
     {
         Id = doc.Id,
         Name = doc.Name,
-        NormalizedName = doc.NormalizedName,
         Description = doc.Description,
         IsSystem = doc.IsSystem,
         IsDefault = doc.IsDefault,
@@ -99,10 +97,5 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
         if (string.IsNullOrWhiteSpace(json)) return default;
         try { return JsonSerializer.Deserialize<T>(json, JsonOpts); }
         catch { return default; }
-    }
-
-    private static string NormalizeName(string name)
-    {
-        return name.Trim().ToUpperInvariant();
     }
 }

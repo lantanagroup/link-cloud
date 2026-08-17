@@ -4,7 +4,6 @@ public class OrganizationResourceMapTemplate
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
-    public string NormalizedName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool IsSystem { get; set; }
     public bool IsDefault { get; set; }

@@ -47,8 +47,6 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
                 $"Template name cannot exceed {MaxNameLength} characters.");
         }
 
-        model.NormalizedName = NormalizeName(model.Name);
-
         var templates = await store.GetAllAsync(ct);
 
         if (HasDuplicateName(templates, model.Name, model.Id))
@@ -125,7 +123,6 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         {
             Id = Guid.NewGuid(),
             Name = cloneName,
-            NormalizedName = NormalizeName(cloneName),
             Description = source.Description,
             Conditions = source.Conditions.Select(c => new OrganizationResourceMapCondition
             {
@@ -170,11 +167,9 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
     string name,
     Guid? excludeId = null)
     {
-        var normalizedName = NormalizeName(name);
-
         return templates.Any(t =>
             (!excludeId.HasValue || t.Id != excludeId.Value) &&
-            NormalizeName(t.Name) == normalizedName);
+            string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildCloneName(
@@ -193,10 +188,5 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
             baseName = baseName[..maxBaseLength];
 
         return baseName + suffix;
-    }
-
-    private static string NormalizeName(string name)
-    {
-        return name.Trim().ToUpperInvariant();
     }
 }
