@@ -71,13 +71,12 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
     public void accept(ConsumerRecord<?, ?> record, Exception exception) {
         Headers headers = record.headers();
 
+        // attempts is history: it records how many times the record ran, so it is stamped
+        // unconditionally and survives onto a dead letter.
         int attempt = currentAttempts(headers) + 1;
         headers.remove(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS);
         headers.add(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS, ByteBuffer.allocate(4).putInt(attempt).array());
 
-        long newBackoff = System.currentTimeMillis() + backoffMsForAttempt.applyAsLong(attempt);
-        headers.remove(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP);
-        headers.add(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP, BigInteger.valueOf(newBackoff).toByteArray());
         if (headers.lastHeader(RetryTopicHeaders.DEFAULT_HEADER_ORIGINAL_TIMESTAMP) == null) {
             headers.add(RetryTopicHeaders.DEFAULT_HEADER_ORIGINAL_TIMESTAMP, BigInteger.valueOf(record.timestamp()).toByteArray());
         }
@@ -85,7 +84,19 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
         // Exception headers are stamped by the DeadLetterPublishingRecoverer delegate on publish.
         // Evaluated here, after the attempts header is stamped, so this sees the same count the
         // delegate's destination resolver will read a moment later.
-        switch (decide.apply(record, exception)) {
+        Decision decision = decide.apply(record, exception);
+
+        // The backoff timestamp is a due-time the -Retry listener waits on, so it is a promise that the
+        // record will be delivered again. Stamp it only when that is true. A dead letter is never
+        // redelivered, so a due-time on it describes a retry that was never scheduled — clear the one a
+        // previous hop left rather than carrying it onto the DLT.
+        headers.remove(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP);
+        if (decision == Decision.RETRY) {
+            long dueAt = System.currentTimeMillis() + backoffMsForAttempt.applyAsLong(attempt);
+            headers.add(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP, BigInteger.valueOf(dueAt).toByteArray());
+        }
+
+        switch (decision) {
             case RETRY -> logger.info("Retry attempt {}/{} for topic [{}].",
                     attempt, maxAttempts, record.topic());
             case DLT_EXHAUSTED -> logger.warn("Max retry attempts ({}) reached for topic [{}]. Routing to DLT.",
