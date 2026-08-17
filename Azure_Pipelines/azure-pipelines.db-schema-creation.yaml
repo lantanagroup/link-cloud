@@ -39,7 +39,7 @@ parameters:
       artifact: data-db
       file: dataDb.sql
     - name: mock-dmrp
-      alias: mock-dmrp
+      alias: mockdmrp
       artifact: MockDmrpApi-db
       file: MockDmrpApi.sql
     - name: normalization
