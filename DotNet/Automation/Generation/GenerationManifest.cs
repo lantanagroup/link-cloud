@@ -284,7 +284,7 @@ public sealed class GenerationManifest
 
         HashSet<string>? sourceKeys = null;
 
-        if (SimulatedAcquiredResourceKeysByPatient.TryGetValue(patientId, out var simulated) && simulated.Count > 0)
+        if (SimulatedAcquiredResourceKeysByPatient.TryGetValue(patientId, out var simulated))
             sourceKeys = simulated;
         else if (ResourceKeysByPatient.TryGetValue(patientId, out var generated) && generated.Count > 0)
             sourceKeys = generated;

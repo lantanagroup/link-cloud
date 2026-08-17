@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
             ArgumentNullException.ThrowIfNull(newFacilityReportingPlan);
 
-            await ValidateAsync(newFacilityReportingPlan, null, cancellationToken);
+            await ValidateAsync(newFacilityReportingPlan, cancellationToken);
 
             try
             {
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 throw new KeyNotFoundException($"Facility reporting plan with Id: {id} not found");
             }
 
-            await ValidateAsync(facilityReportingPlan, id, cancellationToken);
+            await ValidateAsync(facilityReportingPlan, cancellationToken);
 
             existing.FacilityId = facilityReportingPlan.FacilityId;
             existing.MeasureMappingId = facilityReportingPlan.MeasureMappingId;
@@ -165,11 +165,11 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         }
 
         /// <summary>
-        /// Rejects a reporting plan that cannot be stored. <paramref name="currentId"/> is the row
-        /// being updated, which is excluded from the duplicate check so that saving a row over itself
-        /// is not treated as a collision.
+        /// Rejects a reporting plan that cannot be stored. Does not check for a duplicate period:
+        /// that is left to the unique index, and reported by <see cref="TranslateSaveFailureAsync"/>
+        /// when the save fails.
         /// </summary>
-        private async Task ValidateAsync(FacilityReportingPlan plan, string? currentId, CancellationToken cancellationToken)
+        private async Task ValidateAsync(FacilityReportingPlan plan, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(plan.FacilityId))
             {
@@ -211,12 +211,6 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             if (!facilityExists)
             {
                 throw new ReportingPlanValidationException($"Facility with Id: {plan.FacilityId} not found.");
-            }
-
-            if (await IsDuplicateAsync(plan, currentId, cancellationToken))
-            {
-                throw new DuplicateReportingPlanException(plan.FacilityId, plan.MeasureMappingId,
-                    plan.ReportingMonth, plan.ReportingYear);
             }
         }
 

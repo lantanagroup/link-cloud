@@ -261,9 +261,26 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return conceptDesignation;
     }
 
+    /**
+     * Summary mode used when HAPI asks us to resolve a bound ValueSet.
+     * <p>
+     * Deliberately {@link SummaryEnum#TRUE}: {@code _summary=false} is the condition that makes the Link
+     * terminology service enumerate every code of the value set into {@code ValueSet.expansion.contains}
+     * (see {@code Terminology/Services/FhirService.cs}), which for large value sets is the client-side
+     * trigger for terminology-service memory exhaustion. The expansion is not read by this class -- when
+     * the resolved ValueSet carries a canonical URL, {@link #validateCodeInValueSet} uses only that URL and
+     * routes validation through {@code $validate-code}. The Link terminology service's summary handling is
+     * bespoke rather than element-filtering: at {@code _summary=true} it still returns the stored ValueSet
+     * with its {@code compose} intact, so downstream chain members (e.g. HAPI's in-memory terminology
+     * support) can still expand it in-process.
+     * <p>
+     * Change this only with before/after comparison of validation results -- see
+     * {@code RemoteTermServiceValidationTest#fetchValueSet_requestsSummaryModeTrue}.
+     */
+    static final SummaryEnum FETCH_VALUE_SET_SUMMARY_MODE = SummaryEnum.TRUE;
+
     public IBaseResource fetchValueSet(String theValueSetUrl) {
-        SummaryEnum summaryParam = SummaryEnum.FALSE;
-        return this.fetchValueSet(theValueSetUrl, summaryParam);
+        return this.fetchValueSet(theValueSetUrl, FETCH_VALUE_SET_SUMMARY_MODE);
     }
 
     @Nullable
