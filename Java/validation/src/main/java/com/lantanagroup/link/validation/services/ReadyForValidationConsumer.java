@@ -3,6 +3,9 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
@@ -14,6 +17,10 @@ import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.exceptions.PayloadParseException;
+import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.SubjectDto;
+import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
@@ -25,6 +32,7 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
@@ -45,6 +53,11 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
     private final BlobStorageService blobStorageService;
     private final PreQualificationConfig preQualificationConfig;
     private final PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
+    private final RubricExecutionService rubricExecutionService;
+    private final LegacyResultMapper legacyResultMapper;
+    private final ObjectMapper objectMapper;
+    private final boolean bridgeEnabled;
+    private final String rubricId;
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -57,6 +70,12 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             Optional<BlobStorageService> blobStorageService,
             PreQualificationConfig preQualificationConfig,
             PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder,
+            RubricExecutionService rubricExecutionService,
+            LegacyResultMapper legacyResultMapper,
+            ObjectMapper objectMapper,
+            @Value("${vaas.bridge.enabled:false}") boolean bridgeEnabled,
+            // ADR-0003 M1: the MeasureReport submission path always evaluates this rubric; see "Rubric selection".
+            @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
             ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
@@ -69,6 +88,11 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         this.blobStorageService = blobStorageService.orElse(null);
         this.preQualificationConfig = preQualificationConfig;
         this.preQualOperationOutcomeBuilder = preQualOperationOutcomeBuilder;
+        this.rubricExecutionService = rubricExecutionService;
+        this.legacyResultMapper = legacyResultMapper;
+        this.objectMapper = objectMapper;
+        this.bridgeEnabled = bridgeEnabled;
+        this.rubricId = rubricId;
     }
 
     @Override
@@ -87,7 +111,9 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
-        List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        List<Result> results = bridgeEnabled
+                ? evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle)
+                : validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
     }
@@ -206,6 +232,47 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         }
         resultRepository.saveAll(results);
         return results;
+    }
+
+    /**
+     * ADR-0003 step 2 bridge: evaluates the rubric engine in-process (synchronous call, same as the
+     * $evaluate REST endpoint) and maps its envelope back into the legacy {@link Result} shape so the
+     * rest of {@code process()} — pre-qual, ValidationComplete — is unaware of which engine ran.
+     */
+    private List<Result> evaluateViaRubricEngine(
+            String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
+        List<Result> results;
+        Attributes attributes;
+
+        try (Timer timer = Timer.start()) {
+            EvaluateRequestDto request = EvaluateRequestDto.builder()
+                    .subject(SubjectDto.builder()
+                            .facilityId(facilityId)
+                            .patientId(patientId)
+                            .reportId(reportId)
+                            .build())
+                    .payload(bundleToJsonNode(bundle))
+                    .build();
+            ValidationResultEnvelope envelope = rubricExecutionService.evaluate(rubricId, null, request, true);
+            results = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
+            _logger.debug("Rubric evaluation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
+
+            attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
+            validationMetrics.addToValidationCounter(attributes);
+            validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
+        }
+
+        resultRepository.saveAll(results);
+        return results;
+    }
+
+    private JsonNode bundleToJsonNode(Bundle bundle) {
+        try {
+            String json = fhirContext.newJsonParser().encodeResourceToString(bundle);
+            return objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            throw new PayloadParseException("Failed to convert bundle to JSON for rubric evaluation", e);
+        }
     }
 
     private Attributes buildMetricAttributes(Bundle bundle, List<Result> results, String correlationId, String facilityId, String patientId, String reportId) {
