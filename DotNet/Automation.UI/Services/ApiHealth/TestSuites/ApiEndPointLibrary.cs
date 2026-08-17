@@ -13,8 +13,10 @@ public static class ApiEndPointLibrary
     {
         var services = new[]
         {
+            ServiceNames.Account,
             ServiceNames.AdminBff,
             ServiceNames.AdminBffAuth,
+            ServiceNames.Audit,
             ServiceNames.Census,
             ServiceNames.DataAcquisition,
             ServiceNames.MeasureEval,
@@ -23,6 +25,7 @@ public static class ApiEndPointLibrary
             ServiceNames.Report,
             ServiceNames.Submission,
             ServiceNames.Tenant,
+            ServiceNames.Terminology,
             ServiceNames.Validation
         };
 
@@ -68,8 +71,10 @@ public static class ApiEndPointLibrary
     private static IReadOnlyList<ApiEndpointDefinition> BuildServiceEndpoints(string serviceName) =>
         serviceName switch
         {
+            ServiceNames.Account => BuildFromStepConstants(ServiceNames.Account, typeof(AccountSteps), BuildAccountMetadata()),
             ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps)),
             ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
+            ServiceNames.Audit => BuildFromStepConstants(ServiceNames.Audit, typeof(AuditSteps), BuildAuditMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
             ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps)),
             ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps)),
@@ -78,6 +83,7 @@ public static class ApiEndPointLibrary
             ServiceNames.Report => BuildFromStepConstants(ServiceNames.Report, typeof(ReportSteps), BuildReportMetadata()),
             ServiceNames.Submission => BuildFromStepConstants(ServiceNames.Submission, typeof(SubmissionSteps)),
             ServiceNames.Tenant => BuildFromStepConstants(ServiceNames.Tenant, typeof(TenantSteps)),
+            ServiceNames.Terminology => BuildFromStepConstants(ServiceNames.Terminology, typeof(TerminologySteps), BuildTerminologyMetadata()),
             ServiceNames.Validation => BuildFromStepConstants(ServiceNames.Validation, typeof(ValidationSteps)),
             _ => []
         };
@@ -130,6 +136,20 @@ public static class ApiEndPointLibrary
         [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildTerminologyMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [TerminologySteps.InfoGet200] = new EndpointMeta("Returns Terminology service information.", "GET /api/Terminology/info"),
+        [TerminologySteps.RootHealthGet200] = new EndpointMeta("Returns Terminology service health status.", "GET /health")
+    };
+
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAccountMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AccountSteps.InfoGet200] = new EndpointMeta("Returns Account service information.", "GET /api/Account/info"),
+        [AccountSteps.RootHealthGet200] = new EndpointMeta("Returns Account service health status.", "GET /health")
+    };
+
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffAuthMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [AdminBffAuthSteps.ValidBearerGet200] = new EndpointMeta("Valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
@@ -141,6 +161,13 @@ public static class ApiEndPointLibrary
         [AdminBffAuthSteps.MissingAuthHeaderGet401] = new EndpointMeta("Missing Authorization header GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
         [AdminBffAuthSteps.InvalidAuthSchemeGet401] = new EndpointMeta("Invalid auth scheme (Basic) GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
         [AdminBffAuthSteps.CrossApiTokenReuseGet401] = new EndpointMeta("Cross-API token reuse GET \u2192 401", "GET /aggregate/reports/summaries (auth)")
+    };
+
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAuditMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AuditSteps.InfoGet200] = new EndpointMeta("Returns Audit service information.", "GET /api/Audit/info"),
+        [AuditSteps.RootHealthGet200] =new EndpointMeta("Returns Audit service health status.", "GET /health")
     };
 
     private sealed record EndpointMeta(string? Description, string? Group, string? SkipReason = null);
@@ -166,8 +193,10 @@ public static class ApiEndPointLibrary
 
     public static class ServiceNames
     {
+        public const string Account = "Account";
         public const string AdminBff = "AdminBff";
         public const string AdminBffAuth = "AdminBffAuth";
+        public const string Audit = "Audit";
         public const string Census = "Census";
         public const string DataAcquisition = "DataAcquisition";
         public const string MeasureEval = "MeasureEval";
@@ -176,6 +205,7 @@ public static class ApiEndPointLibrary
         public const string Report = "Report";
         public const string Submission = "Submission";
         public const string Tenant = "Tenant";
+        public const string Terminology = "Terminology";
         public const string Validation = "Validation";
     }
 
@@ -195,6 +225,12 @@ public static class ApiEndPointLibrary
         public const string ReportRestorePatch404 = "Report Restore PATCH → 404";
     }
 
+    public static class AccountSteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
+    }
+
     public static class AdminBffAuthSteps
     {
         public const string ValidBearerGet200 = "Valid credentials/token → access granted";
@@ -206,6 +242,12 @@ public static class ApiEndPointLibrary
         public const string MissingAuthHeaderGet401 = "Missing auth header → 401";
         public const string InvalidAuthSchemeGet401 = "Invalid auth scheme (Basic) → 401";
         public const string CrossApiTokenReuseGet401 = "Cross-API token reuse → 401";
+    }
+
+    public static class AuditSteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
     public static class CensusSteps
@@ -440,6 +482,12 @@ public static class ApiEndPointLibrary
         public const string Regenerate400NoReportId = "RegenerateReport → 400 (no report id)";
         public const string Regenerate404NonExistentFacility = "RegenerateReport → 404 (non-existent facility)";
         public const string Regenerate404NonExistentReport = "RegenerateReport → 404 (non-existent report)";
+    }
+
+    public static class TerminologySteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
     public static class MeasureEvalSteps
