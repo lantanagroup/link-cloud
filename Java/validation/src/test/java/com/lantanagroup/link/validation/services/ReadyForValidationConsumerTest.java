@@ -10,6 +10,8 @@ import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
@@ -58,13 +60,19 @@ public class ReadyForValidationConsumerTest {
     @Mock private ValidationMetrics validationMetrics;
     @Mock private BlobStorageService blobStorageService;
     @Mock private ConsumerRecordRecoverer recoverer;
+    @Mock private RubricExecutionService rubricExecutionService;
+    @Mock private LegacyResultMapper legacyResultMapper;
+
+    private static final String RUBRIC_ID = "measure-report-submission-v1";
 
     private ReadyForValidationConsumer consumer;
     private ReadyForValidationConsumer consumerWithoutBlobStorage;
+    private ReadyForValidationConsumer consumerWithBridgeEnabled;
 
     // Real instances (no deps); the flag defaults to false so the append path is off by default.
     private PreQualificationConfig preQualificationConfig;
     private PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
+    private ObjectMapper objectMapper;
 
     private Bundle bundle;
 
@@ -73,6 +81,7 @@ public class ReadyForValidationConsumerTest {
     void setUp() throws Exception {
         preQualificationConfig = new PreQualificationConfig();
         preQualOperationOutcomeBuilder = new PreQualOperationOutcomeBuilder();
+        objectMapper = new ObjectMapper();
 
         consumer = new ReadyForValidationConsumer(
                 fhirContext,
@@ -85,6 +94,11 @@ public class ReadyForValidationConsumerTest {
                 Optional.of(blobStorageService),
                 preQualificationConfig,
                 preQualOperationOutcomeBuilder,
+                rubricExecutionService,
+                legacyResultMapper,
+                objectMapper,
+                false,
+                RUBRIC_ID,
                 recoverer);
 
         consumerWithoutBlobStorage = new ReadyForValidationConsumer(
@@ -98,6 +112,29 @@ public class ReadyForValidationConsumerTest {
                 Optional.empty(),
                 preQualificationConfig,
                 preQualOperationOutcomeBuilder,
+                rubricExecutionService,
+                legacyResultMapper,
+                objectMapper,
+                false,
+                RUBRIC_ID,
+                recoverer);
+
+        consumerWithBridgeEnabled = new ReadyForValidationConsumer(
+                fhirContext,
+                reportClient,
+                validationService,
+                categorizationService,
+                resultRepository,
+                validationCompleteTemplate,
+                validationMetrics,
+                Optional.of(blobStorageService),
+                preQualificationConfig,
+                preQualOperationOutcomeBuilder,
+                rubricExecutionService,
+                legacyResultMapper,
+                objectMapper,
+                true,
+                RUBRIC_ID,
                 recoverer);
 
         bundle = new Bundle();
@@ -287,7 +324,8 @@ public class ReadyForValidationConsumerTest {
         ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
                 fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
                 validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
-                preQualificationConfig, preQualOperationOutcomeBuilder, recoverer);
+                preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
+                legacyResultMapper, objectMapper, false, RUBRIC_ID, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -601,5 +639,90 @@ public class ReadyForValidationConsumerTest {
         consumer.process(buildRecord(null));
 
         verify(blobStorageService, never()).appendResource(anyString(), anyString());
+    }
+
+    // -------------------------------------------------------------------------
+    // Rubric bridge (ADR-0003 step 2)
+    // -------------------------------------------------------------------------
+
+    /** Stubs fhirContext so the bundle can be re-encoded to JSON for the rubric-evaluate request. */
+    private void stubBundleJsonEncoding() {
+        IParser jsonParser = mock(IParser.class);
+        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
+        when(jsonParser.encodeResourceToString(bundle)).thenReturn("{\"resourceType\":\"Bundle\"}");
+    }
+
+    @Test
+    void process_bridgeEnabled_callsRubricEngineInsteadOfLegacyValidation() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(Collections.emptyList());
+
+        consumerWithBridgeEnabled.process(buildRecord(null));
+
+        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true));
+        verify(validationService, never()).validate(any());
+        verify(categorizationService, never()).categorize(any());
+    }
+
+    @Test
+    void process_bridgeEnabled_requestCarriesSubjectIdentifiers() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        ArgumentCaptor<EvaluateRequestDto> captor = ArgumentCaptor.forClass(EvaluateRequestDto.class);
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), eq(true)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(Collections.emptyList());
+
+        consumerWithBridgeEnabled.process(buildRecord(null));
+
+        assertEquals(FACILITY_ID, captor.getValue().getSubject().getFacilityId());
+        assertEquals(PATIENT_ID, captor.getValue().getSubject().getPatientId());
+        assertEquals(REPORT_ID, captor.getValue().getSubject().getReportId());
+    }
+
+    @Test
+    void process_bridgeEnabled_savesMappedResultsToRepository() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(List.of(mapped));
+
+        consumerWithBridgeEnabled.process(buildRecord(null));
+
+        verify(resultRepository).saveAll(List.of(mapped));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_bridgeEnabled_producesValidationCompleteFromMappedResults() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        Result mapped = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(List.of(mapped));
+
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(captor.capture())).thenReturn(future);
+        when(future.get()).thenReturn(null);
+
+        consumerWithBridgeEnabled.process(buildRecord(null));
+
+        assertFalse(captor.getValue().value().isValid());
     }
 }

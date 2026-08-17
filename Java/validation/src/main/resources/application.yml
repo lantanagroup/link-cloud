@@ -155,6 +155,9 @@ vaas:
     max-pool-size: 8
     queue-capacity: 0
     keep-alive-seconds: 60
+  bridge:
+    enabled: true
+    rubric-id: measure-report-submission-v1
 
 validation:
   # Behavioural knobs for rubric (v2) category override and scoring, bound to ValidationPolicyConfig.
