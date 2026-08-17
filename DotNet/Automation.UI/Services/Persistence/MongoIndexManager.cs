@@ -47,9 +47,21 @@ public sealed class MongoIndexManager
 
     private void EnsureOrganizationResourceMapTemplateIndexes()
     {
-        var collection = _database.GetCollection<BsonDocument>("automation_org_resource_map_templates");
-        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
-        CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
+        var collection = _database.GetCollection<BsonDocument>(
+            "automation_org_resource_map_templates");
+
+        // Retain Name index because GetAllAsync sorts by display Name.
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Name", 1 } },
+            unique: false,
+            "idx_name_asc");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "IsDefault", 1 } },
+            unique: false,
+            "idx_isDefault");
     }
 
     // --- automation_runs ---
