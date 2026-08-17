@@ -259,8 +259,8 @@ stages:
         displayName: Publish Data Acquisition SQL Script  
   ###
   # Mock-DMRP
-  - job: Mock-DMRP
-    displayName: "Generate Mock-DMRP Schema Script"
+  - job: Mock_DMRP
+    displayName: "Generate Mock_DMRP Schema Script"
     steps:
       - script: |
           cd DotNet/MockDmrpApi
