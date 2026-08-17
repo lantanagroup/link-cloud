@@ -41,7 +41,7 @@ parameters:
     - name: mock-dmrp
       alias: mockdmrp
       artifact: MockDmrpApi-db
-      file: MockDmrpApi.sql
+      file: MockDmrpApiDb.sql
     - name: normalization
       alias: normalization
       artifact: normalization-db
