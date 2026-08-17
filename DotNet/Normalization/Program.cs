@@ -100,9 +100,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IResourceCachePurger, ResourceCachePurger>();
 
-    // Registered after the open generic above so that it wins for this closed type: when RetryListener
-    // exhausts the retry count for a ResourcesAcquired message, the dead letter also releases the
-    // resource cache. See ResourcesAcquiredRetryDeadLetterHandler.
+    // A closed-type registration takes precedence over the open generic above regardless of the order
+    // the two appear in, so this wins for IDeadLetterExceptionHandler<RetryListener, string, string>:
+    // when RetryListener exhausts the retry count for a ResourcesAcquired message, the dead letter also
+    // releases the resource cache. See ResourcesAcquiredRetryDeadLetterHandler.
     builder.Services.AddSingleton<IDeadLetterExceptionHandler<RetryListener, string, string>, ResourcesAcquiredRetryDeadLetterHandler>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

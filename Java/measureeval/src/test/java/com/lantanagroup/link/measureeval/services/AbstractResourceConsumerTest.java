@@ -354,6 +354,9 @@ class AbstractResourceConsumerTest {
         ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         consumerWithAbs.process(record);
 
+        // The ABS branch of the cleanup switch must actually run, not merely leave Redis alone:
+        // without this the assertion below still passes if the ABS cleanup call is removed entirely.
+        verify(absResourceService).cleanup(cacheKey);
         verify(redisResourceService, never()).cleanup(anyString());
     }
 
@@ -400,6 +403,28 @@ class AbstractResourceConsumerTest {
         RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
 
         assertEquals("evaluation failed", ex.getMessage());
+        verify(redisResourceService).cleanup(cacheKey);
+    }
+
+    @Test
+    void process_metricsThrowsAfterValidation_stillCleansUpCache() {
+        // The cleanup guard needs both correlationId and cacheType. Anything that throws between the
+        // two assignments - metrics, logging - must not leave a valid cache entry stranded, since
+        // nothing else will ever come back for it.
+        String facilityId = "facility-1";
+        String patientId = "patient-1";
+        String cacheKey = "cache-key-metrics-fail";
+
+        ResourcesNormalized value = buildRedisValue(cacheKey);
+
+        doThrow(new RuntimeException("metrics failed"))
+                .when(measureEvalMetrics).IncrementRecordsReceivedCounter(any());
+
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
+
+        assertEquals("metrics failed", ex.getMessage());
         verify(redisResourceService).cleanup(cacheKey);
     }
 

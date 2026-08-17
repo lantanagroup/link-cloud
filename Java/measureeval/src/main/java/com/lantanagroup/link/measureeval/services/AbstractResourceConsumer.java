@@ -13,6 +13,7 @@ import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
@@ -118,6 +119,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getCacheType() == null) {
                 throw new ValidationException("Cache Type is null.");
             }
+            // Captured here, next to its validation, rather than after the metrics/logging below: the
+            // finally-block cleanup is guarded on both correlationId and cacheType, so anything that
+            // throws between the two assignments would silently strand a valid cache entry.
+            cacheType = value.getCacheType();
             correlationId = value.getCacheKey();
             if (correlationId == null || correlationId.isEmpty()) {
                 throw new ValidationException("Cache Key is null or empty.");
@@ -138,8 +143,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                     value.getCacheType(),
                     value.getQueryType(),
                     value.getScheduledReports() != null ? value.getScheduledReports().size() : 0);
-
-            cacheType = value.getCacheType();
 
             if (perf) taskStopWatch.start("readResources");
             long readStart = perf ? System.nanoTime() : 0;
@@ -244,10 +247,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                             }
                         }
                     }
-                    logger.debug("Cache cleanup complete for correlationId={}, cacheType={}", correlationId, cacheType);
+                    logger.debug("Cache cleanup complete for correlationId={}, cacheType={}",
+                            LogUtils.sanitize(correlationId), LogUtils.sanitize(cacheType));
                 } catch (Exception e) {
                     // Never mask the exception that brought us here, if any.
-                    logger.error("Cache cleanup failed for correlationId={}, cacheType={}", correlationId, cacheType, e);
+                    logger.error("Cache cleanup failed for correlationId={}, cacheType={}",
+                            LogUtils.sanitize(correlationId), LogUtils.sanitize(cacheType), e);
                 } finally {
                     if (perf) taskStopWatch.stop();
                 }

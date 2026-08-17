@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Error;
@@ -75,7 +76,7 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
             _logger.LogError(ex,
                 "Could not deserialize a retry-exhausted message from {Topic} to determine its resource cache keys. " +
                 "Any cached resources for it will be released by the cache expiration policy instead.",
-                consumeResult.Topic);
+                consumeResult.Topic.SanitizeForLog());
             return;
         }
 
