@@ -91,9 +91,10 @@ separate container-thread handler is required.
       POISON SET is parameterized (no FHIR/HAPI types in shared).
 
   KafkaRetryConfig                     (shared/config)
-      Retry policy: consumer-retry-duration, disable-retry-consumer,
-      maxAttempts/retry-backoff-ms; helpers isArrayDrivenBackoff,
-      effectiveMaxAttempts, backoffMsForAttempt.
+      Retry policy: consumer-retry-duration, disable-retry-consumer. Helpers
+      effectiveMaxAttempts (size + 1) and backoffMsForAttempt (index clamped at
+      both ends). These two properties are the whole surface - there is no flat
+      maxAttempts/retry-backoff-ms fallback (see 8.7).
 
   RetryTopicConfiguration beans        (measureeval KafkaConfig)
       Provision Spring's backoff-aware -Retry listener;
@@ -189,8 +190,16 @@ Guarded by:
       kept as a cheap policy-agreement guard.
   6.  Configuration mirrors .NET ConsumerSettings - consumer-retry-duration
       (ISO-8601 array) and disable-retry-consumer, for cross-service consistency.
-  7.  Derive attempt count from the array - N delays => N retries, then -Error;
-      flat maxAttempts/retry-backoff-ms only as fallback.
+  7.  Derive attempt count from the array - N delays => N retries, then -Error.
+      An earlier draft also honoured flat maxAttempts/retry-backoff-ms as a
+      fallback; that was dropped so the array is the single source of truth and
+      depth/timing cannot be set two ways that disagree. NOTE: those two keys
+      are still present in all four App Configuration stores
+      (/spring/kafka/retry/maxAttempts = 5, retry-backoff-ms = 3000, label
+      MeasureEval) where they are now inert - nothing binds them. Editing them
+      to tune retries has no effect. They should be removed from the stores, and
+      consumer-retry-duration / disable-retry-consumer provisioned in their place
+      if an environment needs to differ from the application.yml schedule.
   8.  Pin spring-kafka + add the delay test - close the silent-break risk from the
       header coupling.
   9.  Layer reusable mechanism into shared; parameterize the poison set - so
