@@ -1,4 +1,6 @@
-﻿namespace Automation.UI.Models;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Automation.UI.Models;
 
 public class OrganizationResourceMapTemplate
 {

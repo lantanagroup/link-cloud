@@ -2,13 +2,12 @@
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using System.Runtime.InteropServices;
 
 namespace Automation.UI.Controllers;
 
 public class OrganizationResourceMapsController(IOrganizationResourceMapTemplateStore store) : Controller
 {
-    private const int MaxNameLength = 120;
-
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -41,12 +40,6 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
 
         model.Name = model.Name.Trim();
 
-        if (model.Name.Length > MaxNameLength)
-        {
-            return BadRequest(
-                $"Template name cannot exceed {MaxNameLength} characters.");
-        }
-
         var templates = await store.GetAllAsync(ct);
 
         if (HasDuplicateName(templates, model.Name, model.Id))
@@ -66,17 +59,7 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
-        try
-        {
-            await store.UpsertAsync(model, ct);
-        }
-        catch (MongoWriteException ex)
-            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
-        {
-            return Conflict(
-                $"An Organization Resource Map named '{model.Name}' already exists.");
-        }
-
+        await store.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
     }
 
@@ -134,16 +117,7 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        try
-        {
-            await store.UpsertAsync(clone, ct);
-        }
-        catch (MongoWriteException ex)
-            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
-        {
-            return Conflict(
-                $"An Organization Resource Map named '{clone.Name}' already exists.");
-        }
+        await store.UpsertAsync(clone, ct);
 
         return CreatedAtAction(nameof(GetJson), new { id = clone.Id }, new { id = clone.Id });
     }
@@ -180,12 +154,7 @@ public class OrganizationResourceMapsController(IOrganizationResourceMapTemplate
             ? $" (Copy {copyNumber.Value})"
             : " (Copy)";
 
-        var maxBaseLength = MaxNameLength - suffix.Length;
-
         var baseName = sourceName.Trim();
-
-        if (baseName.Length > maxBaseLength)
-            baseName = baseName[..maxBaseLength];
 
         return baseName + suffix;
     }
