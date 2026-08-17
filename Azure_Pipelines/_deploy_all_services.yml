@@ -15,6 +15,7 @@ parameters:
       - dev-scale
       - scale-test
       - scale-qa
+      - scale-qa2
 
 variables:
 - group: link-cloud-variables
@@ -33,6 +34,8 @@ variables:
     value:  'test'
   ${{ if eq(parameters.environment, 'scale-qa') }}:
     value:  'qa'
+  ${{ if eq(parameters.environment, 'scale-qa2') }}:
+    value:  'qa2'
 
 jobs:
 
@@ -165,6 +168,14 @@ jobs:
         repoName: validation
         containerName: validation
         healthUrl: https://$(env)-validation.nhsnlink.org/health
+      # Stand-in for the CDC DMRP API, deployed to the lower environments only. Health
+      # answers even when the mock is disabled by configuration, so this check passes for a
+      # deliberately dormant deployment rather than reporting it as an outage.
+      mock-dmrp:
+        serviceName: mock-dmrp
+        repoName: mock-dmrp
+        containerName: mock-dmrp
+        healthUrl: https://$(env)-mock-dmrp.nhsnlink.org/health
 
   steps:
     - task: KubeloginInstaller@0

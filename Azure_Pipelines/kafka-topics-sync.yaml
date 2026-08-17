@@ -16,6 +16,7 @@ parameters:
     - DEV
     - TEST
     - QA
+    - QA2
 
 variables:
 - group: kafka_topics # variable group `kafka_topics`
@@ -35,6 +36,8 @@ variables:
     value:  '$(test-rest-url)'
   ${{ if eq(parameters.environment, 'QA') }}:
     value:  '$(qa-rest-url)'
+  ${{ if eq(parameters.environment, 'QA2') }}:
+    value:  '$(qa2-rest-url)'
 
 stages:
 - stage: Sync_Kafka_Topics_${{ parameters.environment }}

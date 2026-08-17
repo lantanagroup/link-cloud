@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             _cache = cache;
         }
 
-        public void StartConsumer(string groupId, List<string> topics, string reportTrackingId,
+        public async Task StartConsumer(string groupId, List<string> topics, string reportTrackingId,
             IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
             // get the cache
@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             string retrievedListJson;
                             try
                             {
-                                retrievedListJson = _cache.Get<string>(cacheKey);
+                                retrievedListJson = await _cache.GetAsync<string>(cacheKey, cancellationToken);
                             }
                             catch (Exception ex)
                             {
@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
 
                             // Save updated list to Redis
-                            _cache.Set(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30));
+                            await _cache.SetAsync(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30), cancellationToken: cancellationToken);
                         }
                     }
                 }

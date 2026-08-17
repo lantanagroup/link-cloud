@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Builds the single pre-qualification {@link OperationOutcome} written to the patient NDJSON: one issue
- * per <em>unacceptable</em> category (a category with {@code acceptable=false}) that has at least one
+ * per <em>submitted</em> category (a category with {@code submit=true}) that has at least one
  * finding. See LEGLINK-425.
  */
 @Component
@@ -55,10 +55,10 @@ public class PreQualOperationOutcomeBuilder {
      * @param results          the patient's categorized validation results
      * @param measureReport    the patient's MeasureReport in the submission bundle (may be null)
      * @param writeExpressions when false, {@code expression[]} is omitted from every issue
-     * @return the OperationOutcome, or {@link Optional#empty()} when no unacceptable-category findings exist
+         * @return the OperationOutcome, or {@link Optional#empty()} when no submitted-category findings exist
      */
     public Optional<OperationOutcome> build(List<Result> results, MeasureReportRef measureReport, boolean writeExpressions) {
-        // Group findings by unacceptable category (acceptable == false); a Result may map to several
+                // Group findings by submitted category (submit == true); a Result may map to several
         // categories. Keyed by category id, not by the Category entity: Category defines no
         // equals/hashCode, so two instances of the same logical category (loaded in different
         // persistence contexts, say) would otherwise land in separate groups and emit a duplicate issue
@@ -71,7 +71,7 @@ public class PreQualOperationOutcomeBuilder {
                 continue;
             }
             for (Category category : categories) {
-                if (!category.isAcceptable()) {
+                if (category.isSubmit()) {
                     byCategoryId.computeIfAbsent(category.getId(), id -> new ArrayList<>()).add(result);
                 }
             }
@@ -96,11 +96,14 @@ public class PreQualOperationOutcomeBuilder {
             issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(categoryId)));
 
             if (writeExpressions) {
-                if (measureReport != null) {
+                // The id is checked as well as the ref: a MeasureReport carrying no id yields a non-null
+                // ref with a null id, and formatting that produces where(id = 'null') — valid FHIRPath
+                // that silently resolves to nothing. Omitting the locator is the honest outcome.
+                if (measureReport != null && measureReport.id() != null) {
                     issue.addExpression(
                             String.format(MEASURE_REPORT_LOCATOR, measureReport.index(), measureReport.id()));
                 } else {
-                    _logger.warn("No MeasureReport in the bundle; omitting the MeasureReport locator expression");
+                    _logger.warn("No identifiable MeasureReport in the bundle; omitting the MeasureReport locator expression");
                 }
                 categoryResults.forEach(r -> issue.addExpression(r.getExpression()));
             }

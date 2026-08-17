@@ -17,6 +17,7 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class MutableRunState(
     Guid runId,
+    Guid? scenarioId,
     AutomationScenarioKind scenario,
     ResolvedRunOptions options,
     string? runNameOverride,
@@ -24,6 +25,7 @@ internal sealed class MutableRunState(
 {
     public object Sync { get; } = new();
     public Guid RunId { get; } = runId;
+    public Guid? ScenarioId { get; } = scenarioId;
     public AutomationScenarioKind Scenario { get; } = scenario;
     public ResolvedRunOptions Options { get; } = options;
     public string? RunNameOverride { get; } = runNameOverride;
@@ -40,4 +42,8 @@ internal sealed class MutableRunState(
     public bool CancelRequested { get; set; }
     public Task? ExecutionTask { get; set; }
     public FhirDataLoader? FhirDataLoader { get; set; }
+    public Guid? GeneratedTemplateCacheVersionId { get; set; }
+    public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    public string? GeneratedTemplateCacheScenarioKey { get; set; }
+    public string? GeneratedTemplateSetHash { get; set; }
 }

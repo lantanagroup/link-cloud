@@ -120,6 +120,7 @@ secret-management:
 authentication:
   anonymous: false
   authority: 'https://localhost:7004'
+  signing-key: ''
 
 internal-blob-storage:
   connection-string: ''

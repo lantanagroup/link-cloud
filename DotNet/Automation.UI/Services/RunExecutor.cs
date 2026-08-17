@@ -1,6 +1,8 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
-using Automation.UI.Models;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -43,12 +45,21 @@ internal sealed class RunExecutor
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
     private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
+    private readonly ImportedBundleExecutionResolver _importedBundleResolver;
+    private readonly IGeneratedPatientTemplateCache _generatedTemplateCache;
+    private readonly GeneratedTemplateCacheVersionStore _generatedTemplateVersionStore;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly string _includePatientAggregatorOrganizationResourceSource;
     private readonly ReportAbsManifestValidator.OperationOutcomeExpectationSettings _operationOutcomeExpectations;
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
+
+    internal sealed record GenerationPipelineRequest(
+        IReadOnlyList<ProfiledMeasureType> SelectedMeasures,
+        IReadOnlyList<PatientProfile> Profiles,
+        IReadOnlyList<ImportedPatientInput>? ImportedPatients,
+        IGeneratedPatientTemplateCache? GeneratedTemplateCache);
 
     public RunExecutor(
         AutomationConfig automationConfig,
@@ -58,6 +69,9 @@ internal sealed class RunExecutor
         QueryPlanTemplateResolver queryPlanResolver,
         NormalizationSuiteResolver normalizationSuiteResolver,
         OrganizationResourceMapTemplateResolver organizationResourceMapResolver,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         IConfiguration configuration,
         ILogger logger)
     {
@@ -68,6 +82,9 @@ internal sealed class RunExecutor
         _queryPlanResolver = queryPlanResolver;
         _normalizationSuiteResolver = normalizationSuiteResolver;
         _organizationResourceMapResolver = organizationResourceMapResolver;
+        _importedBundleResolver = importedBundleResolver;
+        _generatedTemplateCache = generatedTemplateCache;
+        _generatedTemplateVersionStore = generatedTemplateVersionStore;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _includePatientAggregatorOrganizationResource = includeOrg.Value;
@@ -245,6 +262,12 @@ internal sealed class RunExecutor
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
 
+            var acquisitionSimulation = CreateAcquisitionSimulationConfig(
+                effectiveQueryPlan,
+                scenarioConfig.StartDate,
+                scenarioConfig.EndDate,
+                organizationResourceMapTemplate);
+
             var locationQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
                 .Count(q => string.Equals(q.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
             var expectLocationResources = locationQueryCount > 0;
@@ -274,7 +297,9 @@ internal sealed class RunExecutor
                 var importedPatients = new List<ImportedPatientInput>(
                     state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
                 importedPatients.AddRange(state.Options.ImportedPatientIds);
-                importedPatients.AddRange(state.Options.ImportedPatientBundles);
+                importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
+                    state.Options.ImportedPatientBundles,
+                    state.RunCancellation.Token));
 
                 // Pre-load imported patient FHIR data so the pipeline can reuse it without
                 // re-fetching, and surface — but do NOT enforce — whether each imported
@@ -312,38 +337,47 @@ internal sealed class RunExecutor
                 // Use the streaming pipeline: generate ? upload ? dispose per patient.
                 // The pipeline builds the manifest incrementally and runs acquisition
                 // simulation per-patient, so no serialized FHIR JSON is retained.
+                var generationRequest = BuildProfileGenerationRequest(
+                    selectedMeasures,
+                    profiles,
+                    importedPatients,
+                    _generatedTemplateCache);
+
                 var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
                     fhirDataLoader,
-                    selectedMeasures,
-                    profiles,
+                    generationRequest.SelectedMeasures,
+                    generationRequest.Profiles,
                     state.Options.ResourcesPerPatient,
                     state.Options.Seed,
                     generationConfig,
                     generationRequirementsPlan,
-                    acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
-                    {
-                        QueryPlan = effectiveQueryPlan,
-                        ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate,
-                        OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
-                            ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
-                            .OrderBy(c => c.Priority)
-                            .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
-                            .ToList(),
-                        // Keep simulation strict for date-filtered resources. Encounter-anchored
-                        // out-of-range override can over-predict scheduled ABS content for
-                        // Observation/DiagnosticReport/Procedure, causing false expected-key
-                        // assertions (e.g. Observation-001 / DxRpt-042 class mismatches).
-                        // We still allow encounter anchoring when a resource has no recognized
-                        // date shape (handled inside the simulator), but not when its recognized
-                        // date is outside the reporting window.
-                        AllowEncounterAnchoredDateOverrideForOutOfRange = false
-                    },
-                    importedPatients: importedPatients.Count > 0 ? importedPatients : null);
+                    acquisitionSimulation: acquisitionSimulation,
+                    importedPatients: generationRequest.ImportedPatients,
+                    generatedTemplateCache: generationRequest.GeneratedTemplateCache,
+                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
 
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
+
+                var cacheBinding = await _generatedTemplateVersionStore.BindRunAsync(
+                    state.RunId,
+                    state.ScenarioId,
+                    state.RunNameOverride,
+                    pipelineResult.GeneratedTemplateKeys,
+                    state.RunCancellation.Token);
+                if (cacheBinding != null)
+                {
+                    lock (state.Sync)
+                    {
+                        state.GeneratedTemplateCacheVersionId = cacheBinding.VersionId;
+                        state.GeneratedTemplateCacheVersionNumber = cacheBinding.VersionNumber;
+                        state.GeneratedTemplateCacheScenarioKey = cacheBinding.ScenarioKey;
+                        state.GeneratedTemplateSetHash = cacheBinding.TemplateSetHash;
+                    }
+
+                    output.WriteLine($"[cache-version] Bound run to {cacheBinding.ScenarioKey} v{cacheBinding.VersionNumber} ({cacheBinding.VersionId}).");
+                }
 
                 // Manifest carries explicit patient/profile pairs. Build the initial expected
                 // submitted set from those pairs; scheduled runs are recomputed later after
@@ -356,15 +390,29 @@ internal sealed class RunExecutor
             }
             else
             {
-                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
+                var generationRequest = BuildNonProfileGenerationRequest(
+                    state.Options.SelectedMeasures,
+                    state.Options.PatientCount,
+                    state.Options.ResourcesPerPatient,
+                    state.Options.Seed);
+
+                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+                    output,
+                    fhirDataLoader,
+                    generationRequest.SelectedMeasures,
+                    generationRequest.Profiles,
+                    state.Options.ResourcesPerPatient,
+                    state.Options.Seed,
                     generationConfig,
-                    generationRequirementsPlan);
+                    generationRequirementsPlan,
+                    acquisitionSimulation: acquisitionSimulation,
+                    importedPatients: generationRequest.ImportedPatients,
+                    generatedTemplateCache: generationRequest.GeneratedTemplateCache,
+                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
 
-                patientIds = genPatientIds;
+                patientIds = pipelineResult.PatientIds;
+                generationManifest = pipelineResult.Manifest;
                 expectedSubmittedPatientIds = patientIds.ToList();
-
-                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
@@ -895,6 +943,70 @@ internal sealed class RunExecutor
         return expected;
     }
 
+    internal static FhirGenerationPipeline.AcquisitionSimulationConfig CreateAcquisitionSimulationConfig(
+        QueryPlanInput effectiveQueryPlan,
+        string clinicalPeriodStart,
+        string clinicalPeriodEnd,
+        OrganizationResourceMapTemplate? organizationResourceMapTemplate)
+    {
+        return new FhirGenerationPipeline.AcquisitionSimulationConfig
+        {
+            QueryPlan = effectiveQueryPlan,
+            ClinicalPeriodStart = clinicalPeriodStart,
+            ClinicalPeriodEnd = clinicalPeriodEnd,
+            OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
+                ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                .OrderBy(c => c.Priority)
+                .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
+                .ToList(),
+            // Keep simulation strict for date-filtered resources. Encounter-anchored
+            // out-of-range override can over-predict scheduled ABS content for
+            // Observation/DiagnosticReport/Procedure, causing false expected-key
+            // assertions (e.g. Observation-001 / DxRpt-042 class mismatches).
+            // We still allow encounter anchoring when a resource has no recognized
+            // date shape (handled inside the simulator), but not when its recognized
+            // date is outside the reporting window.
+            AllowEncounterAnchoredDateOverrideForOutOfRange = false
+        };
+    }
+
+    internal static GenerationPipelineRequest BuildProfileGenerationRequest(
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        IReadOnlyList<PatientProfile> profiles,
+        IReadOnlyList<ImportedPatientInput> importedPatients,
+        IGeneratedPatientTemplateCache generatedTemplateCache)
+    {
+        return new GenerationPipelineRequest(
+            SelectedMeasures: selectedMeasures,
+            Profiles: profiles,
+            ImportedPatients: importedPatients.Count > 0 ? importedPatients : null,
+            GeneratedTemplateCache: generatedTemplateCache);
+    }
+
+    internal static GenerationPipelineRequest BuildNonProfileGenerationRequest(
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        int patientCount,
+        int resourcesPerPatient,
+        int seed)
+    {
+        var syntheticCohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(
+                selectedMeasures,
+                patientCount: patientCount,
+                resourcesMin: resourcesPerPatient,
+                resourcesMax: resourcesPerPatient)
+        };
+
+        var syntheticProfiles = PatientCohortDefinition.ExpandProfiles(syntheticCohorts, seed);
+
+        return new GenerationPipelineRequest(
+            SelectedMeasures: selectedMeasures,
+            Profiles: syntheticProfiles,
+            ImportedPatients: null,
+            GeneratedTemplateCache: null);
+    }
+
     private static IReadOnlyList<PatientProfile> AlignProfilesToPatientIds(
         IReadOnlyList<string> patientIds,
         IReadOnlyList<string> manifestPatientIds,
@@ -1355,15 +1467,6 @@ internal sealed class RunExecutor
                 .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-        static List<NormalizationOperationApiModel> BuildKeyedOperationPool(
-            List<NormalizationOperationApiModel> operations,
-            string name,
-            string operationType)
-            => operations
-                .Where(op => string.Equals(op.Name ?? string.Empty, name, StringComparison.Ordinal)
-                             && string.Equals(op.OperationType ?? string.Empty, operationType, StringComparison.Ordinal))
-                .ToList();
-
         static bool TryTakeMatchingOperation(
             List<NormalizationOperationApiModel> candidates,
             string[] plannedResourceTypes,
@@ -1451,8 +1554,8 @@ internal sealed class RunExecutor
 
             var apiOp = new CreateNormalizationOperationDetailsApiModel
             {
-                OperationType = opDef.OperationType,
-                Name = opDef.Name,
+                OperationType = opDef.OperationType ?? string.Empty,
+                Name = opDef.Name ?? string.Empty,
                 Description = opDef.Description ?? string.Empty,
                 SourceFhirPath = opDef.SourceFhirPath ?? string.Empty,
                 TargetFhirPath = opDef.TargetFhirPath ?? string.Empty
@@ -1497,7 +1600,7 @@ internal sealed class RunExecutor
                 FacilityId = facilityId,
                 Operation = apiOp,
                 Description = opDef.Description ?? string.Empty,
-                VendorIds = []
+                VendorVersionIds = []
             }, cancellationToken);
 
             if (!createResp.IsSuccessStatusCode)

@@ -2,11 +2,8 @@
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
-using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
@@ -456,6 +453,99 @@ public class FhirServiceTests
         var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
 
         // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_ValueSetCodeInactive_OverridesActiveCodeSystem_ReturnsInactiveIssue()
+    {
+        // Arrange - the member carries its own inactive membership status (a 4-column value set file).
+        // Even though the CodeSystem marks the code Active, the value set membership status wins.
+        var valueSetId = "test-vs-member-inactive";
+        var code = "member-inactive-code";
+        var system = "http://test.system";
+        var display = "Member Inactive Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new ValueSetCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+        // CodeSystem says Active; it must NOT be consulted because the membership status is authoritative.
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert - membership status makes it inactive despite the active CodeSystem.
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_ValueSetCodeActive_OverridesInactiveCodeSystem_ReturnsNoIssue()
+    {
+        // Arrange - the member carries its own active membership status; the CodeSystem is not consulted,
+        // so an inactive CodeSystem status does not make an active value set member inactive.
+        var valueSetId = "test-vs-member-active";
+        var code = "member-active-code";
+        var system = "http://test.system";
+        var display = "Member Active Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new ValueSetCode { Value = code, Display = display, Status = CodeStatus.Active } } }
+            }
+        };
+        // CodeSystem says Inactive; it must NOT be consulted because the membership status is authoritative.
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert - active membership status means no inactive issue, despite the inactive CodeSystem.
         Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
         Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
     }
@@ -1081,6 +1171,140 @@ public class FhirServiceTests
         Assert.True(resultParameter.Value);
     }
 
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodeAndSystem_ReturnsNameVersionDisplay()
+    {
+        // Arrange
+        var codeSystemId = "lookup-cs-id";
+        var codeSystemUrl = "http://lookup.system";
+        var codeSystemVersion = "2.0.0";
+        var code = "lookup-code";
+        var display = "Lookup Display";
+        var name = "LookupCodeSystem";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = codeSystemUrl,
+            Name = name,
+            Version = codeSystemVersion,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, codeSystemVersion))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.LookupCodeInCodeSystem(null, null, codeSystemUrl, code, codeSystemVersion, null);
+
+        // Assert
+        Assert.Equal(name, result.GetSingleValue<FhirString>("name")?.Value);
+        Assert.Equal(codeSystemVersion, result.GetSingleValue<FhirString>("version")?.Value);
+        Assert.Equal(display, result.GetSingleValue<FhirString>("display")?.Value);
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodingParameter_ReturnsNameVersionDisplay()
+    {
+        // Arrange
+        var codeSystemId = "lookup-cs-id";
+        var codeSystemUrl = "http://lookup.system";
+        var codeSystemVersion = "3.1.4";
+        var code = "lookup-code";
+        var display = "Lookup Display";
+        var name = "LookupCodeSystem";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = codeSystemUrl,
+            Name = name,
+            Version = codeSystemVersion,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, codeSystemVersion))
+            .Returns(mockCodeGroup);
+
+        var parameters = new Parameters();
+        parameters.Add("version", new FhirString(codeSystemVersion));
+        parameters.Add("coding", new Coding(codeSystemUrl, code, null));
+
+        // Act
+        var result = _service.LookupCodeInCodeSystem(null, null, null, null, null, parameters);
+
+        // Assert
+        Assert.Equal(name, result.GetSingleValue<FhirString>("name")?.Value);
+        Assert.Equal(codeSystemVersion, result.GetSingleValue<FhirString>("version")?.Value);
+        Assert.Equal(display, result.GetSingleValue<FhirString>("display")?.Value);
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithVersionNoMatch_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var codeSystemUrl = "http://lookup.system";
+        var requestedVersion = "9.9.9";
+        var fallbackCodeGroup = new CodeGroup
+        {
+            Id = "lookup-cs-id",
+            Url = codeSystemUrl,
+            Name = "LookupCodeSystem",
+            Version = "1.0.0",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { codeSystemUrl, new List<Code> { new() { Value = "lookup-code", Display = "Lookup Display" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemUrl, requestedVersion))
+            .Returns(fallbackCodeGroup);
+
+        // Act / Assert
+        Assert.Throws<KeyNotFoundException>(() =>
+            _service.LookupCodeInCodeSystem(null, null, codeSystemUrl, "lookup-code", requestedVersion, null));
+    }
+
+    [Fact]
+    public void LookupCodeInCodeSystem_WithCodeSystemAndCoding_ThrowsArgumentException()
+    {
+        // Arrange
+        var parameters = new Parameters();
+        parameters.Add("coding", new Coding("http://lookup.system", "lookup-code", null));
+
+        // Act / Assert
+        Assert.Throws<ArgumentException>(() =>
+            _service.LookupCodeInCodeSystem(null, null, "http://lookup.system", "lookup-code", null, parameters));
+    }
+
+    [Fact]
+    public void GetMetaData_CodeSystemOperations_IncludesLookupOperation()
+    {
+        // Act
+        var result = _service.GetMetaData();
+
+        // Assert
+        var codeSystemResource = result.Rest
+            .SelectMany(rest => rest.Resource)
+            .First(resource => resource.Type == "CodeSystem");
+
+        Assert.Contains(codeSystemResource.Operation, operation =>
+            operation.Name == "lookup" &&
+            operation.Definition == "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup");
+    }
+
     #endregion
 
     #region ExpandValueSet Tests
@@ -1171,6 +1395,69 @@ public class FhirServiceTests
     #region GetCodeSystems Tests
 
     [Fact]
+    public void GetCodeSystemById_WithCachedCodes_SetsContentToComplete()
+    {
+        // Arrange
+        var codeSystemId = "test-code-system";
+        var codeSystem = new CodeSystem
+        {
+            Id = codeSystemId,
+            Content = CodeSystemContentMode.NotPresent
+        };
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Resource = codeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { "http://test.system", new List<Code> { new() { Value = "test-code", Display = "Test Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.GetCodeSystemById(codeSystemId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(CodeSystemContentMode.Complete, result.Content);
+    }
+
+    [Fact]
+    public void GetCodeSystemById_WithoutCachedCodes_PreservesContentMode()
+    {
+        // Arrange
+        var codeSystemId = "test-empty-code-system";
+        var codeSystem = new CodeSystem
+        {
+            Id = codeSystemId,
+            Content = CodeSystemContentMode.NotPresent
+        };
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Resource = codeSystem,
+            Codes = new Dictionary<string, List<Code>>()
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.GetCodeSystemById(codeSystemId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(CodeSystemContentMode.NotPresent, result.Content);
+    }
+
+    [Fact]
     public void GetCodeSystems_WithDuplicateCode_EmitsSingleConceptWithLastDisplay()
     {
         // Arrange
@@ -1211,6 +1498,269 @@ public class FhirServiceTests
         var concept = Assert.Single(codeSystem.Concept);
         Assert.Equal(code, concept.Code);
         Assert.Equal("last display", concept.Display);
+    }
+
+    #endregion
+
+    #region ValueSet $validate-code request handling (LEGLINK-886 / LEGLINK-887)
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeNotInAnySystem_ReturnsMessage()
+    {
+        // Arrange
+        var valueSetId = "test-vs-no-system";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = "valid-code", Display = "Valid Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act (no system supplied -> the across-systems path, which previously omitted the message)
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, "missing-code", null, null);
+
+        // Assert
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        var messageParameter = result.GetSingleValue<FhirString>("message");
+
+        Assert.NotNull(resultParameter);
+        Assert.False(resultParameter.Value);
+        Assert.Equal("Code not found in ValueSet", messageParameter?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeNotInAnySystem_MatchesSingleSystemMessage()
+    {
+        // Arrange
+        var valueSetId = "test-vs-message-parity";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = "valid-code", Display = "Valid Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var withoutSystem = _service.ValidateCodeInValueSet(null, valueSetId, null, "missing-code", null, null);
+        var withSystem = _service.ValidateCodeInValueSet(null, valueSetId, system, "missing-code", null, null);
+
+        // Assert - supplying the system must not change the shape of the answer
+        Assert.Equal(
+            withSystem.GetSingleValue<FhirString>("message")?.Value,
+            withoutSystem.GetSingleValue<FhirString>("message")?.Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ValidateCodeInValueSet_WithNoValueSetIdentifier_ThrowsArgumentException(string? url)
+    {
+        // Act / Assert - a request that names no value set is malformed, so it must surface as a 400
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(url, null, null, "any-code", null, null));
+
+        Assert.Equal("No id or url parameter specified", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithQueryCodeAndParametersSystem_UsesParametersSystem()
+    {
+        // Arrange
+        var valueSetId = "test-vs-mixed-inputs";
+        var code = "test-code";
+        var matchingSystem = "http://test.system/b";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { "http://test.system/a", new List<Code> { new() { Value = code, Display = "Wrong System" } } },
+                { matchingSystem, new List<Code> { new() { Value = code, Display = "Right System" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(matchingSystem));
+
+        // Act - code arrives as a query parameter, system only in the body
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, code, "Right System", parameters);
+
+        // Assert - without the body system the code resolves against the first system and the display fails
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    #endregion
+
+    #region Blank system handling (LEGLINK-888)
+
+    private const string BlankSystemValueSetId = "test-vs-blank-system";
+    private const string BlankSystemCode = "test-code";
+    private const string BlankSystemSystem = "http://test.system";
+
+    /// <summary>
+    /// A single-system value set containing <see cref="BlankSystemCode"/>, so a request that reaches the
+    /// validator resolves successfully. Anything that still fails did so on the system, not the lookup.
+    /// </summary>
+    private void ArrangeBlankSystemValueSet()
+    {
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, BlankSystemValueSetId, It.IsAny<string>()))
+            .Returns(new CodeGroup
+            {
+                Id = BlankSystemValueSetId,
+                Type = CodeGroup.CodeGroupTypes.ValueSet,
+                Codes = new Dictionary<string, List<Code>>
+                {
+                    { BlankSystemSystem, new List<Code> { new() { Value = BlankSystemCode, Display = "Test Code" } } }
+                }
+            });
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void ValidateCodeInValueSet_WithBlankQuerySystem_ThrowsArgumentException(string system)
+    {
+        // Arrange
+        ArrangeBlankSystemValueSet();
+
+        // Act / Assert - FHIR primitives require at least one non-whitespace character, so each of these
+        // is malformed input rather than a request to search every system
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, system, BlankSystemCode, null, null));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemParameterInBody_ThrowsArgumentException()
+    {
+        // Arrange
+        ArrangeBlankSystemValueSet();
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(string.Empty));
+        parameters.Add("code", new FhirString(BlankSystemCode));
+
+        // Act / Assert
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, null, null, null, parameters));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankQuerySystemAndValidBodySystem_ThrowsArgumentException()
+    {
+        // Arrange - the body carries a usable system, so only up-front validation catches the blank:
+        // the merge treats an empty string as "not supplied" and would overwrite it before any check
+        ArrangeBlankSystemValueSet();
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(BlankSystemSystem));
+
+        // Act / Assert
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(
+                null, BlankSystemValueSetId, string.Empty, BlankSystemCode, null, parameters));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemInLaterCodeableConceptCoding_ThrowsArgumentException()
+    {
+        // Arrange - the first coding matches, so a check performed at the point of use would return
+        // result=true and never reach the malformed second coding
+        ArrangeBlankSystemValueSet();
+
+        var codeableConcept = new CodeableConcept();
+        codeableConcept.Coding.Add(new Coding(BlankSystemSystem, BlankSystemCode));
+        codeableConcept.Coding.Add(new Coding { Code = "other-code", System = string.Empty });
+
+        var parameters = new Parameters();
+        parameters.Add("codeableConcept", codeableConcept);
+
+        // Act / Assert - validation is up front, so the verdict does not depend on match order
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, null, null, null, parameters));
+
+        Assert.Equal("The 'codeableConcept.coding.system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithPaddedSystem_StillMatchesThatSystem()
+    {
+        // Arrange - the code system lookup is an exact dictionary match, so an untrimmed value would
+        // report "Code system not found" for a system that is right there in the value set.
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, $"  {BlankSystemSystem}  ", BlankSystemCode, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("undefined")]
+    [InlineData("NULL")]
+    [InlineData("  null  ")]
+    [InlineData("\tundefined\t")]
+    public void ValidateCodeInValueSet_WithPlaceholderSystem_SearchesAllSystems(string system)
+    {
+        // Arrange - a client that interpolated an unset variable into the request rather than omitting it
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, system, BlankSystemCode, null, null);
+
+        // Assert - treated as absent, so the code is found; looking "null" up as a system URL would miss
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithAbsentSystem_StillSearchesAllSystems()
+    {
+        // Arrange - the behaviour a blank system used to borrow, which must survive the fix
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, null, BlankSystemCode, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
     }
 
     #endregion

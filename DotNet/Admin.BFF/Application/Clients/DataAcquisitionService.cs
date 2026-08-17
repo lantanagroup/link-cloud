@@ -58,37 +58,37 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> RestoreLogsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}/restore");
-            await SetAuthHeaderAsync(user, request);
+                await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> RestoreLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}/restore");
-            await SetAuthHeaderAsync(user, request);
+            await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}");
-            await SetAuthHeaderAsync(user, request);
+            await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteLogsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}");
-            await SetAuthHeaderAsync(user, request);
+            await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
-        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request)
+        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (_authenticationSchemaConfig.Value.EnableAnonymousAccess) return;
             using var scope = _scopeFactory.CreateScope();
             var createLinkBearerToken = scope.ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-            var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+            var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 

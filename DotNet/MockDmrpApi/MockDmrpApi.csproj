@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<RootNamespace>LantanaGroup.Link.MockDmrpApi</RootNamespace>
+		<Version>0.1.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Content Include="..\.dockerignore">
+			<Link>.dockerignore</Link>
+		</Content>
+		<Content Include="Properties\launchSettings.json" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Shared\Shared.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+		<PackageReference Include="Serilog" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Enrichers.Span" />
+		<PackageReference Include="Serilog.Exceptions" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" />
+		<PackageReference Include="Swashbuckle.AspNetCore" />
+		<PackageReference Include="NSwag.MSBuild">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Remove="Properties\launchSettings.json" />
+	</ItemGroup>
+
+	<!--
+		Contract-first code generation.
+
+		Contracts/dmrp-openapi.yaml is the source of truth for this service's API.
+		NSwag regenerates the abstract controller base and the DTOs into obj/ on
+		every build where the spec (or nswag.json) is newer than the generated
+		file. The generated file is deliberately NOT committed: keeping it in obj/
+		makes it impossible for the C# and the spec to drift apart, and keeps a
+		spec change reviewable as a spec diff rather than thousands of lines of
+		generated churn.
+
+		Replacing the spec and rebuilding therefore surfaces every contract
+		difference as a compile error in Presentation/Controllers/.
+
+		Escape hatch: dotnet build /p:RunNSwagCodeGen=false  (skips codegen when
+		the generated file already exists).
+	-->
+	<!--
+		BaseIntermediateOutputPath (obj\) is used rather than IntermediateOutputPath
+		(obj\Debug\net8.0\) because the latter is not defined until targets that are
+		imported after the project body, so it evaluates to empty here.
+	-->
+	<PropertyGroup>
+		<DmrpSpecFile>$(MSBuildProjectDirectory)\Contracts\dmrp-openapi.yaml</DmrpSpecFile>
+		<DmrpNSwagConfig>$(MSBuildProjectDirectory)\nswag.json</DmrpNSwagConfig>
+		<DmrpGeneratedDir>$(BaseIntermediateOutputPath)NSwag</DmrpGeneratedDir>
+		<DmrpGeneratedFile>$(DmrpGeneratedDir)\DmrpApi.Generated.cs</DmrpGeneratedFile>
+		<RunNSwagCodeGen Condition="'$(RunNSwagCodeGen)' == ''">true</RunNSwagCodeGen>
+	</PropertyGroup>
+
+	<Target Name="GenerateDmrpContract"
+			BeforeTargets="BeforeCompile;CoreCompile"
+			Condition="'$(RunNSwagCodeGen)' == 'true'"
+			Inputs="$(DmrpSpecFile);$(DmrpNSwagConfig)"
+			Outputs="$(DmrpGeneratedFile)">
+		<MakeDir Directories="$(DmrpGeneratedDir)" />
+		<Message Importance="high" Text="MockDmrpApi: generating API contract from $(DmrpSpecFile)" />
+		<!-- $(NSwagExe_Net80) already expands to: dotnet "<path>\dotnet-nswag.dll". Do not quote it. -->
+		<Exec Command="$(NSwagExe_Net80) run nswag.json /variables:OutputPath=$(DmrpGeneratedFile)"
+			  WorkingDirectory="$(MSBuildProjectDirectory)" />
+	</Target>
+
+	<Target Name="IncludeDmrpContract"
+			BeforeTargets="BeforeCompile;CoreCompile"
+			DependsOnTargets="GenerateDmrpContract">
+		<ItemGroup>
+			<Compile Include="$(DmrpGeneratedFile)" Condition="Exists('$(DmrpGeneratedFile)')" />
+		</ItemGroup>
+	</Target>
+
+</Project>

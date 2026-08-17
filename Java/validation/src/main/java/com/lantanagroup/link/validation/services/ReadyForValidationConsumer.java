@@ -103,9 +103,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     }
 
     /**
-     * When enabled, builds the pre-qualification OperationOutcome for the patient's unacceptable-category
+        * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
      * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
-     * there is no blob storage or payload URI (e.g. local/dev), or when there are no unacceptable findings.
+        * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
      */
     private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
         if (!preQualificationConfig.isWritePreQualOperationOutcome()) {
@@ -214,7 +214,13 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             categorizationService.categorize(results);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
-        resultRepository.saveAll(results);
+        List<Result> submittedResults = results.stream()
+                .filter(result -> result.getCategories() != null
+                        && result.getCategories().stream().anyMatch(Category::isSubmit))
+                .toList();
+        if (!submittedResults.isEmpty()) {
+            resultRepository.saveAll(submittedResults);
+        }
         return results;
     }
 
