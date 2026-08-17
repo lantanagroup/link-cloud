@@ -40,7 +40,7 @@ parameters:
       file: dataDb.sql
     - name: mock-dmrp
       alias: mockdmrp
-      artifact: MockDmrpApi-db
+      artifact: MockDmrpApiDb.sql
       file: MockDmrpApiDb.sql
     - name: normalization
       alias: normalization
