@@ -29,19 +29,12 @@ public class AdminBffTestSuiteTests
 
         var results = await suite.ExecuteAsync();
 
-        results.Should().HaveCount(2);
-
-        results.Should().OnlyContain(result =>
-            !result.Passed &&
-            result.ErrorMessage == "ServiceRegistry:AdminBffServiceUrl is not configured." &&
-            result.RequestBody.Contains("Admin BFF service URL is missing") &&
-            result.ResponseBody.Contains("Admin BFF service URL is missing"));
-
-        results.Select(r => r.EndpointName).Should().BeEquivalentTo(
-        [
-            ApiEndPointLibrary.AdminBffSteps.InfoGet200,
-            ApiEndPointLibrary.AdminBffSteps.HealthGet200
-        ]);
+        results.Should().ContainSingle();
+        var result = results.Single();
+        result.Passed.Should().BeFalse();
+        result.ErrorMessage.Should().Be("ServiceRegistry:AdminBffServiceUrl is not configured.");
+        result.RequestBody.Should().Contain("ServiceRegistry:AdminBffServiceUrl is missing");
+        result.ResponseBody.Should().Contain("ServiceRegistry:AdminBffServiceUrl is missing");
 
         serviceProvider.Verify(sp => sp.GetService(typeof(LantanaGroup.Link.Sdk.Clients.IAdminBffIntegrationClient)), Times.Never);
     }
