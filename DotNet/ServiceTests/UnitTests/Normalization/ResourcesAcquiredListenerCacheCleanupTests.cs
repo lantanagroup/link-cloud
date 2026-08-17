@@ -44,8 +44,10 @@ public class ResourcesAcquiredListenerCacheCleanupTests
 
         deadLetterHandler.Verify(
             item => item.HandleException(result, It.IsAny<DeadLetterException>(), FacilityId), Times.Once);
+        // The immediate dead-letter path provably fails before ResourcesNormalized is produced
+        // (DeadLetterException is raised only by validation), so the full purge is safe here.
         purger.Verify(
-            item => item.PurgeAsync(result.Message.Value, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            item => item.PurgeAsync(result.Message.Value, It.IsAny<string>(), ResourceCachePurgeScope.All, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

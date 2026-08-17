@@ -40,9 +40,10 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
         };
 
         ResourcesAcquiredValue? purged = null;
+        ResourceCachePurgeScope? scope = null;
         purger
-            .Setup(item => item.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<ResourcesAcquiredValue?, string, CancellationToken>((v, _, _) => purged = v)
+            .Setup(item => item.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), It.IsAny<string>(), It.IsAny<ResourceCachePurgeScope>(), It.IsAny<CancellationToken>()))
+            .Callback<ResourcesAcquiredValue?, string, ResourceCachePurgeScope, CancellationToken>((v, _, s, _) => { purged = v; scope = s; })
             .Returns(Task.CompletedTask);
 
         handler.ProduceDeadLetter(BuildRetryConsumeResult(JsonSerializer.Serialize(value)), "Retry count exceeded");
@@ -50,6 +51,10 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
         Assert.NotNull(purged);
         Assert.Equal(value.CacheKeys, purged!.CacheKeys);
         Assert.Equal(ResourceCacheType.ABS, purged.CacheType);
+
+        // Retry exhaustion cannot prove an earlier attempt did not already publish
+        // ResourcesNormalized, so it must never remove {correlationId}.
+        Assert.Equal(ResourceCachePurgeScope.AcquisitionKeysOnly, scope);
 
         // The dead letter is still produced: the durable record of the failure comes first.
         producer.Verify(
