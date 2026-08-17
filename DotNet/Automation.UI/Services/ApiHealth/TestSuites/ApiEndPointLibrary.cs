@@ -72,19 +72,20 @@ public static class ApiEndPointLibrary
         serviceName switch
         {
             ServiceNames.Account => BuildFromStepConstants(ServiceNames.Account, typeof(AccountSteps), BuildAccountMetadata()),
-            ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps),BuildAdminBffMetadata()),
+            ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps)),
             ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
             ServiceNames.Audit => BuildFromStepConstants(ServiceNames.Audit, typeof(AuditSteps), BuildAuditMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
-            ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps), BuildDataAcquisitionMetadata()),
-            ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps), BuildMeasureEvalMetadata()),
-            ServiceNames.Normalization => BuildFromStepConstants(ServiceNames.Normalization, typeof(NormalizationSteps), BuildNormalizationMetadata()),
-            ServiceNames.QueryDispatch => BuildFromStepConstants(ServiceNames.QueryDispatch, typeof(QueryDispatchSteps), BuildQueryDispatchMetadata()),
+            ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps)),
+            ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps)),
+            ServiceNames.Normalization => BuildFromStepConstants(ServiceNames.Normalization, typeof(NormalizationSteps)),
+            ServiceNames.QueryDispatch => BuildFromStepConstants(ServiceNames.QueryDispatch, typeof(QueryDispatchSteps)),
             ServiceNames.Report => BuildFromStepConstants(ServiceNames.Report, typeof(ReportSteps), BuildReportMetadata()),
             ServiceNames.Terminology => BuildFromStepConstants(ServiceNames.Terminology, typeof(TerminologySteps), BuildTerminologyMetadata()),
-            ServiceNames.Submission => BuildFromStepConstants(ServiceNames.Submission, typeof(SubmissionSteps), BuildSubmissionMetadata()),
-            ServiceNames.Tenant => BuildFromStepConstants(ServiceNames.Tenant, typeof(TenantSteps), BuildTenantMetadata()),
-            ServiceNames.Validation => BuildFromStepConstants(ServiceNames.Validation, typeof(ValidationSteps), BuildValidationMetadata()),
+            ServiceNames.Submission => BuildFromStepConstants(ServiceNames.Submission, typeof(SubmissionSteps)),
+            ServiceNames.Tenant => BuildFromStepConstants(ServiceNames.Tenant, typeof(TenantSteps)),
+            ServiceNames.Validation => BuildFromStepConstants(ServiceNames.Validation, typeof(ValidationSteps)),
+
             _ => []
         };
 
@@ -137,6 +138,12 @@ public static class ApiEndPointLibrary
     {
         [AccountSteps.InfoGet200] = new EndpointMeta("Returns Account service information.", "GET /api/Account/info"),
         [AccountSteps.RootHealthGet200] = new EndpointMeta("Returns Account service health status.", "GET /health")
+
+    };
+
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildReportMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffAuthMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -162,68 +169,16 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [AdminBffSteps.InfoGet200] = new EndpointMeta("Returns Admin BFF service information.", "GET /api/info"),
         [AdminBffSteps.HealthGet200] = new EndpointMeta("Returns Admin BFF monitor health status.", "GET /api/monitor/health")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildCensusMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [CensusSteps.InfoGet200] = new EndpointMeta("Returns Census service information.", "GET /api/Census/info"),
-        [CensusSteps.RootHealthGet200] = new EndpointMeta("Returns Census service health status.", "GET /health"),
         [CensusSteps.AdmittedGet200] = new EndpointMeta(CensusSteps.AdmittedGet200, "/api/census/{facilityId}/history/admitted", "Admitted census rows are produced by downstream ingestion workflows and cannot be deterministically created through Census HTTP endpoints in a self-contained health run."),
         [CensusSteps.PatientEventsGet200] = new EndpointMeta(CensusSteps.PatientEventsGet200, "/api/census/patient-events", "Patient events are created by Kafka listeners, not HTTP APIs, so a deterministic 200 fixture cannot be self-seeded in this suite."),
         [CensusSteps.PatientEventDelete202] = new EndpointMeta(CensusSteps.PatientEventDelete202, "/api/census/patient-events/{id}", "Patient events are written exclusively by the Kafka PatientListsAcquiredListener. No HTTP endpoint exists to create them, so the 202 path cannot be exercised in a self-contained health test.")
     };
 
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data/info"),
-        [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildMeasureEvalMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [MeasureEvalSteps.InfoGet200] = new EndpointMeta("Returns MeasureEval service information.", "GET /api/measureeval/info"),
-        [MeasureEvalSteps.RootHealthGet200] = new EndpointMeta("Returns MeasureEval service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildNormalizationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [NormalizationSteps.InfoGet200] = new EndpointMeta("Returns Normalization service information.", "GET /api/Normalization/info"),
-        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [QueryDispatchSteps.InfoGet200] = new EndpointMeta("Returns QueryDispatch service information.", "GET /api/QueryDispatch/info"),
-        [QueryDispatchSteps.RootHealthGet200] = new EndpointMeta("Returns QueryDispatch service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildReportMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [ReportSteps.InfoGet200] = new EndpointMeta("Returns Report service information.", "GET /api/Report/info"),
-        [ReportSteps.RootHealthGet200] = new EndpointMeta("Returns Report service health status.", "GET /health"),
-        [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildSubmissionMetadata() =>
-    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [SubmissionSteps.InfoGet200] = new EndpointMeta("Returns Submission service information.", "GET /api/Submission/info"),
-        [SubmissionSteps.RootHealthGet200] = new EndpointMeta("Returns Submission service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildTenantMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [TenantSteps.InfoGet200] = new EndpointMeta("Returns Tenant service information.", "GET /api/facility/info"),
-        [TenantSteps.RootHealthGet200] = new EndpointMeta("Returns Tenant service health status.", "GET /health")
-    };
-
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildValidationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
-    {
-        [ValidationSteps.InfoGet200] = new EndpointMeta("Returns Validation service information.", "GET /api/validation/info"),
-        [ValidationSteps.RootHealthGet200] = new EndpointMeta("Returns Validation service health status.", "GET /health")
-    };
 
     private sealed record EndpointMeta(string? Description, string? Group, string? SkipReason = null);
 
@@ -266,7 +221,6 @@ public static class ApiEndPointLibrary
 
     public static class AdminBffSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
         public const string HealthGet200 = "Health GET → 200";
         public const string FacilityDelete200 = "Facility DELETE → 200";
         public const string FacilityDelete404 = "Facility DELETE → 404";
@@ -308,8 +262,6 @@ public static class ApiEndPointLibrary
 
     public static class CensusSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ConfigPost201 = "Config POST → 201";
         public const string ConfigPost400EmptyScheduledTrigger = "Config POST → 400 (empty ScheduledTrigger)";
         public const string ConfigPost400EmptyFacilityId = "Config POST → 400 (empty FacilityId)";
@@ -347,8 +299,6 @@ public static class ApiEndPointLibrary
 
     public static class DataAcquisitionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string FhirConfigPost201 = "FhirConfig POST → 201";
         public const string FhirConfigPost409 = "FhirConfig POST → 409";
         public const string FhirConfigGet200 = "FhirConfig GET → 200";
@@ -411,8 +361,6 @@ public static class ApiEndPointLibrary
 
     public static class NormalizationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post201 = "POST → 201";
         public const string Post400InvalidOperationType = "POST → 400 (invalid operation type)";
         public const string Post400EmptyResourceTypes = "POST → 400 (empty resourceTypes)";
@@ -433,8 +381,6 @@ public static class ApiEndPointLibrary
 
     public static class QueryDispatchSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post400NullModel = "POST → 400 (empty model)";
         public const string Post400EmptyFacilityId = "POST → 400 (empty facilityId)";
         public const string Post400InvalidDuration = "POST → 400 (invalid duration)";
@@ -453,8 +399,6 @@ public static class ApiEndPointLibrary
 
     public static class ReportSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetSchedule200HasData = "Get Schedule → 200 (has data)";
         public const string GetSchedule404 = "Get Schedule → 404";
         public const string GetSchedule400BadGuid = "Get Schedule → 400 (bad guid)";
@@ -512,8 +456,6 @@ public static class ApiEndPointLibrary
 
     public static class TenantSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Create201 = "Create → 201";
         public const string Create400Duplicate = "Create → 400 (duplicate)";
         public const string Create400NoName = "Create → 400 (no name)";
@@ -560,8 +502,6 @@ public static class ApiEndPointLibrary
 
     public static class MeasureEvalSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetAll200 = "GET ALL → 200";
         public const string Get200 = "GET → 200";
         public const string Get404 = "GET → 404";
@@ -571,8 +511,6 @@ public static class ApiEndPointLibrary
 
     public static class SubmissionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Get200 = "GET → 200";
         public const string Get400BadReportId = "GET → 400 (bad reportId)";
         public const string Get404NotFound = "GET → 404 (not found)";
@@ -582,8 +520,6 @@ public static class ApiEndPointLibrary
 
     public static class ValidationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
-        public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ArtifactsGet200 = "Artifacts GET → 200";
         public const string CategoriesGet200 = "Categories GET → 200";
         public const string ArtifactPut200Or201 = "Artifact PUT → 200/201";
