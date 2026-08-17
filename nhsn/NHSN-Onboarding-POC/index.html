@@ -734,7 +734,7 @@
     <!-- ============ WELCOME (Start -> Login -> JWT -> Enrollment check) ============ -->
     <section class="panel" id="panel-welcome">
       <div class="card">
-        <h1>NHSNLink Facilities</h1>
+        <h1>NHSNLink UI Test Facilities</h1>
         <p class="subtitle">Log into the NHSN App and select the NHSNLink component to begin. This POC simulates that login step and captures a mock JWT for the session.</p>
 
         <div class="section-title">Existing Facilities</div>
@@ -855,8 +855,8 @@
     <!-- ============ ONBOARDING UPLOAD ============ -->
     <section class="panel" id="panel-fhir-upload" hidden>
       <div class="card">
-        <h1>Onboarding Upload</h1>
-        <p class="subtitle">NHSNLink requires technical configurations to establish connections with your reporting facility and mapping information to ensure local system codes map to NHSN's reporting requirements. This can all be done by continuing to fill out the web form. Additionally, an instruction package is available to download and provide to teams within your facility to complete. You can upload the complete or partially complete spreadsheet here to automatically populate the form.</p>
+        <h1>Manual Upload Option</h1>
+        <p class="subtitle">If you are not able to  complete the onboarding form online, download the form, complete it with your facility’s technical team, and upload it here. You can upload a partially completed form and return later to finish the process.</p>
 
         <div id="importSheetSection">
           <div class="btn-row" style="margin-top:0;">
@@ -885,7 +885,7 @@
     <section class="panel" id="panel-fhir" hidden>
       <div class="card">
         <h1>FHIR Server Information</h1>
-        <p class="subtitle">NHSNLink uses the <a href="https://hl7.org/fhir/R4/summary.html">FHIR (Fast Healthcare Interoperability Resources)</a> standard to communicate with facility health systems for patient reporting. Below are the configuration settings needed for NHSNLink to establish connectivity to your facility's FHIR server.</p>
+        <p class="subtitle">NHSNLink uses the <a href="https://hl7.org/fhir/R4/summary.html">FHIR</a> standard to connect with your facility’s health information system. Please provide the technical information needed to securely connect your EHR FHIR API's to NHSNLink.</p>
 
         <div class="form-group">
           <label for="fhirBaseUrl">FHIR Server Base URL
@@ -1012,8 +1012,10 @@
     <section class="panel" id="panel-census" hidden>
       <div class="census-outer-layout" id="censusOuterLayout">
         <div class="card">
-          <h1>Census Configuration</h1>
-          <p class="subtitle">Census refers to the patient cohort from which the Initial Population (IP) of enrolled NHSN measures are identified. How NHSNLink will acquire census information depends on the EHR vendor implementations. Below will guide you on the configuration steps needed for NHSNLink to acquire and maintain a patient census.</p>
+            <h1>Patients of Interest (POI) Configuration</h1>
+            <p class="subtitle">Patients of Interest (POI) are the patients included for NHSN ACH dQM surveillance and measure evaluation. POI includes patients receiving care in inpatient, emergency department, observation, and short-stay settings during the surveillance measurement period.</p>
+
+            <p class="subtitle">NHSNLink must identify the POI before retrieving the FHIR resources needed for measure evaluation. How the POI is identified depends on your EHR and configuration. The following steps will guide you through configuring how NHSNLink identifies your facility’s POI.</p>
 
             <div class="form-group" id="censusAdtQuestionWrap">
               <label>Will your facility be using an HL7 V2 ADT (<a href="https://v2.hl7.org/conformance/HL7v2_Conformance_Methodology_R1_O1_Ballot_Revised_D9_-_September_2019_Introduction.html">Link Here</a>) feed for NHSNLink census management?<span class="backend-support-slot" data-support-key="censusAdtQuestion"></span></label>
@@ -1033,9 +1035,7 @@
             <div id="censusVendorFieldsWrap" hidden>
               <div id="censusFieldsEpic" hidden>
                 <H2>Epic Patient Lists</H2>
-                  <p class="subtitle">NHSNLink uses the Epic FHIR List API to retrieve patient IDs from system patient lists, so that
-                  admitted and recently admitted patient lists can be queried daily. This provides a historical,
-                  complete list of FHIR Patient IDs needed for scheduled reporting. The Epic List API has a limit of 1500 patients returned with any one query, so building six separate system lists is recommended to keep daily queries well under the 1500 limit threshold and to avoid missing patients with short admissions.</p>
+                  <p class="subtitle">For Epic facilities using automated POI acquisition, NHSNLink uses configured Epic system patient lists to identify currently admitted and recently discharged patients. The Epic List API has a limit of 1500 patients returned with any one query, so building six separate system lists is recommended to keep daily queries well under the 1500 limit threshold and to avoid missing patients with short admissions.</p>
                   <div class="instructions-box">
                   <p>If Epic FHIR List Id's have not been created by your facility for census management, the following instructions can be downloaded for your technical team to generate them.</p><br/>
                   <a class="download-link" href="/Epic_Census_Instructions.pdf" target="_blank" rel="noopener">
@@ -1169,8 +1169,8 @@
     <!-- ============ LOCATION ORGANIZATION RESOLUTION ============ -->
     <section class="panel" id="panel-location-org" hidden>
       <div class="card">
-        <h1>Location Organization Resolution</h1>
-        <p class="subtitle">Often reporting facilities within a health system will share a common FHIR endpoint with other facilities in the network. Due to query limitations from EHR (Electronic Health Record) systems, there's a risk that NHSNLink may retrieve patient related FHIR resources that don't belong to the reporting facility. To address this, configuration on specific FHIR Location values must be provided to ensure that any patient Encounters that are evaluated for NHSN measures are within the reporting facility. <b>No configuration is needed unless your facility's FHIR data is shared with other facilities in your health system.</b></p>
+        <h1>Organization Identification</h1>
+        <p class="subtitle">If your health system uses multiple FHIR endpoints, NHSNLink needs to determine which facility in the health system each patient encounter belongs to. Use the form below to help identify your specific facility in the FHIR data. No additional configuration is needed if your facility’s FHIR data is not shared with other facilities in your health system.</p>
 
         <div class="form-group" id="locOrgMethodWrap">
           <label>Resolution Method<span class="backend-support-slot" data-support-key="locOrgMethod"></span></label>
@@ -2070,10 +2070,10 @@
       { id: 'enrollment', label: 'Welcome', panel: 'panel-enrollment' }
     ];
     steps.push({ id: 'facility-info', label: 'Facility Information', panel: 'panel-facility-info' });
-    steps.push({ id: 'fhir-upload', label: 'Onboarding Upload', panel: 'panel-fhir-upload' });
+    steps.push({ id: 'fhir-upload', label: 'Manual Upload', panel: 'panel-fhir-upload' });
     steps.push({ id: 'fhir', label: 'FHIR Server Information', panel: 'panel-fhir' });
-    steps.push({ id: 'census', label: 'Census Configuration', panel: 'panel-census' });
-    steps.push({ id: 'location-org', label: 'Location Org Resolution', panel: 'panel-location-org' });
+    steps.push({ id: 'census', label: 'Patients of Interest Configuration', panel: 'panel-census' });
+    steps.push({ id: 'location-org', label: 'Organization Identification', panel: 'panel-location-org' });
     steps.push({ id: 'hsloc', label: 'HSLOC Location Mapping', panel: 'panel-hsloc' });
     steps.push({ id: 'encounter', label: 'Encounter Mapping', panel: 'panel-encounter' });
     steps.push({ id: 'report', label: 'Generate Report', panel: 'panel-report' });
@@ -2107,25 +2107,25 @@
     { key: 'maxPullTime', page: 'FHIR Server Information', label: 'Max Acquisition Pull Time' },
     { key: 'lagDuration', page: 'FHIR Server Information', label: 'Patient Resource Acquisition Lag Duration' },
 
-    { key: 'censusAdtQuestion', page: 'Census Configuration', label: 'HL7 V2 ADT Feed Question' },
-    { key: 'censusEAdmitLt24', page: 'Census Configuration', label: 'Epic List: Admit - Within 24 Hours' },
-    { key: 'censusEAdmit24to48', page: 'Census Configuration', label: 'Epic List: Admit - Between 24 and 48 Hours' },
-    { key: 'censusEAdmitGt48', page: 'Census Configuration', label: 'Epic List: Admit - Over 48 Hours' },
-    { key: 'censusEDischargeLt24', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Within 24 Hours' },
-    { key: 'censusEDischarge24to48', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Between 24 and 48 Hours' },
-    { key: 'censusEDischargeGt48', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Over 48 Hours' },
-    { key: 'censusCHost', page: 'Census Configuration', label: 'SFTP Host URL' },
-    { key: 'censusCPort', page: 'Census Configuration', label: 'SFTP Host URL Port' },
-    { key: 'censusCRemoteDir', page: 'Census Configuration', label: 'Remote Directory' },
-    { key: 'censusCRemove', page: 'Census Configuration', label: 'Remove Files After Processing' },
-    { key: 'censusFreq', page: 'Census Configuration', label: 'Census Acquisition Frequency' },
-    { key: 'censusAccuracyAckCheckbox', page: 'Census Configuration', label: 'Census Results Accuracy Acknowledgment' },
+    { key: 'censusAdtQuestion', page: 'Patients of Interest (POI) Configuration', label: 'HL7 V2 ADT Feed Question' },
+    { key: 'censusEAdmitLt24', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Admit - Within 24 Hours' },
+    { key: 'censusEAdmit24to48', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Admit - Between 24 and 48 Hours' },
+    { key: 'censusEAdmitGt48', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Admit - Over 48 Hours' },
+    { key: 'censusEDischargeLt24', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Discharge - Lookback Within 24 Hours' },
+    { key: 'censusEDischarge24to48', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Discharge - Lookback Between 24 and 48 Hours' },
+    { key: 'censusEDischargeGt48', page: 'Patients of Interest (POI) Configuration', label: 'Epic List: Discharge - Lookback Over 48 Hours' },
+    { key: 'censusCHost', page: 'Patients of Interest (POI) Configuration', label: 'SFTP Host URL' },
+    { key: 'censusCPort', page: 'Patients of Interest (POI) Configuration', label: 'SFTP Host URL Port' },
+    { key: 'censusCRemoteDir', page: 'Patients of Interest (POI) Configuration', label: 'Remote Directory' },
+    { key: 'censusCRemove', page: 'Patients of Interest (POI) Configuration', label: 'Remove Files After Processing' },
+    { key: 'censusFreq', page: 'Patients of Interest (POI) Configuration', label: 'Census Acquisition Frequency' },
+    { key: 'censusAccuracyAckCheckbox', page: 'Patients of Interest (POI) Configuration', label: 'Census Results Accuracy Acknowledgment' },
 
-    { key: 'locOrgMethod', page: 'Location Organization Resolution', label: 'Resolution Method' },
-    { key: 'locTypeList', page: 'Location Organization Resolution', label: 'Location Type Code / Location Alias' },
-    { key: 'managingOrgList', page: 'Location Organization Resolution', label: 'Managing Organizations' },
-    { key: 'locIdentifierList', page: 'Location Organization Resolution', label: 'Location Identifier System / Location Identifier Code' },
-    { key: 'customFhirPath', page: 'Location Organization Resolution', label: 'Custom FHIR Path' },
+    { key: 'locOrgMethod', page: 'Organization Identification', label: 'Resolution Method' },
+    { key: 'locTypeList', page: 'Organization Identification', label: 'Location Type Code / Location Alias' },
+    { key: 'managingOrgList', page: 'Organization Identification', label: 'Managing Organizations' },
+    { key: 'locIdentifierList', page: 'Organization Identification', label: 'Location Identifier System / Location Identifier Code' },
+    { key: 'customFhirPath', page: 'Organization Identification', label: 'Custom FHIR Path' },
 
     { key: 'hslocMappingList', page: 'HSLOC Location Mapping', label: 'HSLOC Code Mappings' },
 
@@ -2432,12 +2432,12 @@
     }
     if (vendor === 'Epic') {
       censusFields.push(
-        { key: 'admitLt24', label: 'Admit - Admission within 24 Hours', description: '' },
-        { key: 'admit24to48', label: 'Admit - Admission between 24 and 48 hours', description: '' },
-        { key: 'admitGt48', label: 'Admit - Admission over 48 hours', description: '' },
-        { key: 'dischargeLt24', label: 'Discharge - Recent discharge within past 24 hours', description: '' },
-        { key: 'discharge24to48', label: 'Discharge - Recent discharge between 24 and 48 hours', description: '' },
-        { key: 'dischargeGt48', label: 'Discharge - Recent discharge over 48 hours', description: '' }
+        { key: 'admitLt24', label: 'Admit - Within 24 Hours', description: '' },
+        { key: 'admit24to48', label: 'Admit - Between 24 and 48 hours', description: '' },
+        { key: 'admitGt48', label: 'Admit - Over 48 hours', description: '' },
+        { key: 'dischargeLt24', label: 'Discharge - Where lookback of admission is within past 24 hours', description: '' },
+        { key: 'discharge24to48', label: 'Discharge - Where lookback of admission is between 24 and 48 hours', description: '' },
+        { key: 'dischargeGt48', label: 'Discharge - Where lookback of admission is over 48 hours', description: '' }
       );
     } else if (vendor === 'Cerner') {
       censusFields.push(
@@ -2457,13 +2457,13 @@
 
     var sections = [
       { title: 'FHIR Server Information', fields: fhirFields },
-      { title: 'Census Configuration', fields: censusFields },
-      { title: 'Location Organization Resolution', fields: locationOrgFields }
+      { title: 'Patients of Interest (POI) Configuration', fields: censusFields },
+      { title: 'Organization Identification', fields: locationOrgFields }
     ];
 
     if (vendor === 'Epic') {
       sections.push({
-        title: 'Location Organization Resolution — Location Identifiers',
+        title: 'Organization Identification — Location Identifiers',
         rows: {
           headers: ['Location Identifier System', 'Location Identifier Code'],
           data: (f.locationOrg.locationIdentifierPairs || []).map(function (p) { return [p.system || '', p.code || '']; })
@@ -2471,14 +2471,14 @@
       });
     } else if (vendor === 'Cerner') {
       sections.push({
-        title: 'Location Organization Resolution — Location Types',
+        title: 'Organization Identification — Location Types',
         rows: {
           headers: ['Location Type Code', 'Location Alias'],
           data: (f.locationOrg.locationTypePairs || []).map(function (p) { return [p.code || '', p.alias || '']; })
         }
       });
       sections.push({
-        title: 'Location Organization Resolution — Managing Organizations',
+        title: 'Organization Identification — Managing Organizations',
         rows: {
           headers: ['Managing Organization'],
           data: (f.locationOrg.managingOrgs || []).map(function (p) { return [p.value || '']; })
@@ -2798,10 +2798,10 @@
     }
     var rows = [];
     var r = 1;
-    rows.push('<row r="' + r + '">' + cell('A' + r, 'NHSN Link - FHIR Server & Census Import Sheet', STYLE_SECTION_HEADER) + '</row>'); r++;
+    rows.push('<row r="' + r + '">' + cell('A' + r, 'NHSN Link - FHIR Server & Patients of Interest Import Sheet', STYLE_SECTION_HEADER) + '</row>'); r++;
     rows.push('<row r="' + r + '">' + cell('A' + r, 'Facility: ' + f.facilityName + ' (' + f.facilityId + ')') + '</row>'); r++;
     rows.push('<row r="' + r + '">' + cell('A' + r, 'Vendor: ' + f.vendor) + '</row>'); r++;
-    rows.push('<row r="' + r + '">' + cell('A' + r, 'Instructions: fill in the Value column for each field below, save this file, then upload it on the FHIR Server Information Upload page in NHSN Link.') + '</row>'); r++;
+    rows.push('<row r="' + r + '">' + cell('A' + r, 'Instructions: fill in the Value column for each field below, save this file, then upload it on the Manual Upload page in NHSN Link.') + '</row>'); r++;
     r++;
 
     var COLS = ['A', 'B', 'C', 'D'];
