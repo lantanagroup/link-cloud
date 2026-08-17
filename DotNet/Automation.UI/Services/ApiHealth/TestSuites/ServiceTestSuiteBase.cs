@@ -260,36 +260,6 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
     };
 
     /// <summary>
-    /// Creates the standard service metadata endpoints required by API Health.
-    /// </summary>
-    protected IReadOnlyList<ApiEndpointDefinition> StandardHealthEndpointDefinitions(
-        string apiServiceName) =>
-    [
-        new ApiEndpointDefinition
-    {
-        ServiceName = ServiceName,
-        EndpointName = "Service Info → 200",
-        Description = "Returns service information.",
-        GroupName = $"GET /api/{apiServiceName}/info",
-        RelativePath = $"/api/{apiServiceName}/info",
-        HttpMethod = "GET",
-        ExpectedStatusCode = 200,
-        IsTestSuiteStep = true
-    },
-    new ApiEndpointDefinition
-    {
-        ServiceName = ServiceName,
-        EndpointName = "Health → 200",
-        Description = "Returns service health status.",
-        GroupName = "GET /health",
-        RelativePath = "/health",
-        HttpMethod = "GET",
-        ExpectedStatusCode = 200,
-        IsTestSuiteStep = true
-    }
-    ];
-
-    /// <summary>
     /// Executes an action ignoring any errors (used for cleanup).
     /// </summary>
     protected static async Task TryCleanupAsync(Func<Task> action)
