@@ -283,7 +283,7 @@ stages:
       - script: |
           cd DotNet/MockDmrpApi
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c MockDmrpApiDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/MockDmrpApiDb.sql
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportingPlanDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/MockDmrpApiDb.sql
         displayName: Generate MockDmrpApi SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
