@@ -4,6 +4,7 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DMRP
 {
@@ -35,7 +37,32 @@ namespace UnitTests.DMRP
 
             builder.Configuration.AddInMemoryCollection(settings);
 
+            // Stands in for what the real host registers before it adds the module.
+            builder.Services.AddScoped<IFacilityOperations, HostFacilityOperations>();
+
             return builder;
+        }
+
+        /// <summary>
+        /// Stands in for the host's implementation. Only its type matters here: the tests check which
+        /// implementation the container hands out, never what it does.
+        /// </summary>
+        private sealed class HostFacilityOperations : IFacilityOperations
+        {
+            public Task CreateAsync(FacilityModel facility, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+
+            public Task UpdateAsync(FacilityModel existingFacility, FacilityModel updatedFacility,
+                CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+            public Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+
+            public Task SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+
+            public Task RestoreAsync(FacilityModel facility, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
         }
 
         [Fact]
@@ -44,7 +71,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
 
             Assert.True(registered);
             Assert.Contains(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -61,7 +88,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
 
             // The module must not stand up a context of its own; it repositories over the host's.
             var repository = Assert.Single(builder.Services,
@@ -77,7 +104,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
 
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             Assert.Contains(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
@@ -111,7 +138,7 @@ namespace UnitTests.DMRP
 
             builder.Services.AddSingleton(hostLookup);
 
-            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
             Assert.Same(hostLookup, registration.ImplementationInstance);
@@ -122,9 +149,54 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
 
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
+        }
+
+        [Fact]
+        public void AddDmrpModule_puts_its_facility_operations_in_front_of_the_hosts()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            using var provider = BuildProviderWithModuleDependencies(builder);
+            using var scope = provider.CreateScope();
+
+            var resolved = scope.ServiceProvider.GetRequiredService<IFacilityOperations>();
+
+            Assert.IsType<DmrpFacilityOperations>(resolved);
+
+            // The host's implementation has to remain resolvable, because the module delegates to it.
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<HostFacilityOperations>());
+        }
+
+        [Fact]
+        public void AddDmrpModule_leaves_the_hosts_facility_operations_alone_when_disabled()
+        {
+            var builder = CreateBuilder(enabled: false);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityOperations));
+
+            Assert.Equal(typeof(HostFacilityOperations), registration.ImplementationType);
+        }
+
+        /// <summary>
+        /// The module's facility operations take dependencies it registers over the host's database
+        /// context. The tests here only resolve them, so the context and the repositories they need are
+        /// faked rather than stood up.
+        /// </summary>
+        private static ServiceProvider BuildProviderWithModuleDependencies(WebApplicationBuilder builder)
+        {
+            builder.Services.AddLogging();
+            builder.Services.AddScoped(_ => Mock.Of<IEntityRepository<MeasureMapping>>());
+            builder.Services.AddScoped(_ => Mock.Of<IEntityRepository<FacilityReportingPlan>>());
+            builder.Services.AddScoped(_ => Mock.Of<IFacilityExistence>());
+
+            return builder.Services.BuildServiceProvider();
         }
 
         [Theory]
@@ -135,7 +207,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
 
             Assert.False(registered);
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -161,7 +233,7 @@ namespace UnitTests.DMRP
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             mvcBuilder.AddApplicationPart(dmrpAssembly);
 
-            var registered = builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
 
             Assert.False(registered);
             Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);

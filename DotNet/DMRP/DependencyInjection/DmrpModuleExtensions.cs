@@ -1,10 +1,12 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LantanaGroup.Link.DMRP.DependencyInjection
 {
@@ -23,9 +25,16 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
         /// The host's database context. It must expose the DMRP entities, which lets the module persist
         /// through the host's context instead of opening a connection of its own.
         /// </typeparam>
+        /// <typeparam name="THostFacilityOperations">
+        /// The host's own facility operations. The module puts its behavior in front of these rather
+        /// than replacing them, so the host stays the single place facilities are validated, persisted
+        /// and scheduled.
+        /// </typeparam>
         /// <returns>True when the module was registered, otherwise false.</returns>
-        public static bool AddDmrpModule<TDbContext>(this WebApplicationBuilder builder, IMvcBuilder mvcBuilder)
+        public static bool AddDmrpModule<TDbContext, THostFacilityOperations>(this WebApplicationBuilder builder,
+            IMvcBuilder mvcBuilder)
             where TDbContext : DbContext
+            where THostFacilityOperations : class, IFacilityOperations
         {
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(mvcBuilder);
@@ -59,6 +68,22 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             builder.Services.AddScoped<IMeasureMappingQueries, MeasureMappingQueries>();
             builder.Services.AddScoped<IFacilityReportingPlanManager, FacilityReportingPlanManager>();
             builder.Services.AddScoped<IFacilityReportingPlanQueries, FacilityReportingPlanQueries>();
+
+            // Reporting plans come from what the module has already recorded. When the DMRP API client
+            // lands, an implementation that refreshes those rows from the API replaces this one and
+            // nothing downstream changes.
+            builder.Services.AddScoped<IReportingPlanSource, DbBackedReportingPlanSource>();
+
+            builder.Services.TryAddSingleton(TimeProvider.System);
+
+            // The host's endpoints resolve IFacilityOperations, so taking over that registration is what
+            // puts the module's behavior in front of the host's without moving a route. The host's own
+            // implementation stays resolvable by its own type, which is what the module delegates to.
+            builder.Services.RemoveAll<IFacilityOperations>();
+            builder.Services.TryAddScoped<THostFacilityOperations>();
+            builder.Services.AddScoped<IFacilityOperations>(sp =>
+                ActivatorUtilities.CreateInstance<DmrpFacilityOperations>(sp,
+                    sp.GetRequiredService<THostFacilityOperations>()));
 
             return true;
         }
