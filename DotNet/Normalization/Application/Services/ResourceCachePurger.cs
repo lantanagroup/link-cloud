@@ -5,30 +5,6 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 namespace LantanaGroup.Link.Normalization.Application.Services;
 
 /// <summary>
-/// Which cache keys a terminal-failure purge is allowed to remove. The scope encodes what the
-/// caller can prove about whether <c>ResourcesNormalized</c> was already published for the message.
-/// </summary>
-public enum ResourceCachePurgeScope
-{
-    /// <summary>
-    /// Remove the per-resource-type acquisition keys and the <c>{correlationId}</c> key. Only valid
-    /// where the failure provably occurred before <c>ResourcesNormalized</c> was produced (the
-    /// immediate dead-letter path: validation raises before the processing loop), so nothing
-    /// downstream can be holding the correlation key.
-    /// </summary>
-    All,
-
-    /// <summary>
-    /// Remove only the per-resource-type acquisition keys. For paths that cannot rule out a prior
-    /// publish — retry exhaustion follows attempts that may have produced <c>ResourcesNormalized</c>
-    /// and then failed on the trailing cache delete — where Measure Eval may already be holding
-    /// <c>{correlationId}</c> for its SUPPLEMENTAL pass. The correlation key is left to the cache
-    /// expiration policy.
-    /// </summary>
-    AcquisitionKeysOnly
-}
-
-/// <summary>
 /// Releases the resource cache entries belonging to a <c>ResourcesAcquired</c> message after a
 /// terminal (non-retryable) normalization failure.
 /// </summary>
@@ -37,15 +13,18 @@ public enum ResourceCachePurgeScope
 /// needs its cached resources when it is redelivered, so purging on a transient failure would
 /// guarantee the retry fails too.
 /// <para>
-/// The success path deletes only the per-resource-type acquisition keys and leaves
-/// <c>{correlationId}</c> in place for Measure Eval to read. Whether a terminal failure may also
-/// remove the correlation key depends on what the caller can prove — see
-/// <see cref="ResourceCachePurgeScope"/>.
+/// Only the per-resource-type acquisition keys (<c>{correlationId}:{ResourceType}</c>) are ever
+/// deleted — they are Normalization's input, consumed by this message alone. The
+/// <c>{correlationId}</c> key is Normalization's output and belongs to its reader: Measure Eval
+/// deletes it after evaluation, and the cache expiration policy reclaims it if no reader ever
+/// comes (e.g. the failure occurred before <c>ResourcesNormalized</c> was published). Normalization
+/// never deletes it, on any path — it cannot know whether an earlier attempt already published, or
+/// whether the key still holds kept INITIAL-phase data a SUPPLEMENTAL evaluation needs.
 /// </para>
 /// </remarks>
 public interface IResourceCachePurger
 {
-    Task PurgeAsync(ResourcesAcquiredValue? value, string reason, ResourceCachePurgeScope scope, CancellationToken cancellationToken = default);
+    Task PurgeAsync(ResourcesAcquiredValue? value, string reason, CancellationToken cancellationToken = default);
 }
 
 /// <inheritdoc cref="IResourceCachePurger"/>
@@ -60,7 +39,7 @@ public class ResourceCachePurger : IResourceCachePurger
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task PurgeAsync(ResourcesAcquiredValue? value, string reason, ResourceCachePurgeScope scope, CancellationToken cancellationToken = default)
+    public async Task PurgeAsync(ResourcesAcquiredValue? value, string reason, CancellationToken cancellationToken = default)
     {
         var cacheKeys = value?.CacheKeys?.Where(k => !string.IsNullOrWhiteSpace(k)).ToList();
 
@@ -73,31 +52,18 @@ public class ResourceCachePurger : IResourceCachePurger
             return;
         }
 
-        // Acquisition keys are "{correlationId}:{ResourceType}". The correlation key itself is only
-        // removed when the caller can prove ResourcesNormalized was never published for this message
-        // (scope All); otherwise Measure Eval may still be reading it, and it is left to expire.
-        var keysToDelete = new List<string>(cacheKeys);
-        if (scope == ResourceCachePurgeScope.All)
-        {
-            keysToDelete.AddRange(cacheKeys
-                .Select(ExtractCorrelationId)
-                .Where(correlationId => !string.IsNullOrWhiteSpace(correlationId))
-                .Distinct()
-                .Where(correlationId => !keysToDelete.Contains(correlationId)));
-        }
-
         try
         {
             await _resourceCache
                 .GetImplementation(value!.CacheType)
-                .DeleteAsync(keysToDelete, cancellationToken);
+                .DeleteAsync(cacheKeys, cancellationToken);
 
             _logger.LogInformation(
                 "Purged {KeyCount} resource cache entries after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
-                keysToDelete.Count,
+                cacheKeys.Count,
                 reason.SanitizeForLog(),
                 value.CacheType,
-                string.Join(", ", keysToDelete).SanitizeForLog());
+                string.Join(", ", cacheKeys).SanitizeForLog());
         }
         catch (Exception ex)
         {
@@ -107,14 +73,7 @@ public class ResourceCachePurger : IResourceCachePurger
                 "Failed to purge resource cache after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
                 reason.SanitizeForLog(),
                 value!.CacheType,
-                string.Join(", ", keysToDelete).SanitizeForLog());
+                string.Join(", ", cacheKeys).SanitizeForLog());
         }
-    }
-
-    /// <remarks>Mirrors <c>HybridResourceCache.ExtractCorrelationId</c>.</remarks>
-    private static string ExtractCorrelationId(string cacheKey)
-    {
-        var idx = cacheKey.IndexOf(':');
-        return idx > 0 ? cacheKey[..idx] : cacheKey;
     }
 }

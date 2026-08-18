@@ -185,18 +185,12 @@ public class ResourcesAcquiredListener : BackgroundService
             _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
 
             // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
-            // so release its cached resources. The retry paths below must NOT do this — a redelivered
-            // message still needs its cache.
-            //
-            // Scope.All is safe here ONLY because DeadLetterException is raised exclusively by
-            // ValidateResourcesAcquiredEvent, before the processing loop — so ResourcesNormalized was
-            // provably never produced and nothing downstream can be holding {correlationId}. If a
-            // DeadLetterException is ever thrown after the produce, this must become
-            // AcquisitionKeysOnly.
+            // so release its acquisition keys. The retry paths below must NOT do this — a redelivered
+            // message still needs its cache. The {correlationId} key is never deleted here: Measure
+            // Eval owns its deletion, and the cache expiration policy reclaims it if unread.
             await _resourceCachePurger.PurgeAsync(
                 result.Message.Value,
                 $"{nameof(KafkaTopic.ResourcesAcquired)} dead-lettered: {ex.Message}",
-                ResourceCachePurgeScope.All,
                 consumeCancellationToken);
         }
         catch (TransientException ex)

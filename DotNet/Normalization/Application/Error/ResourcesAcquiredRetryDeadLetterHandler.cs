@@ -80,16 +80,10 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
             return;
         }
 
-        // Retry exhaustion cannot rule out that an earlier attempt already produced
-        // ResourcesNormalized and then failed on the trailing cache delete — the produce precedes
-        // the delete on the success path — in which case Measure Eval is holding {correlationId}
-        // for its SUPPLEMENTAL pass. Deleting it would make that pass read an empty cache and emit
-        // a silent false not-reportable report, so only the acquisition keys are released here.
-        //
         // RetryListener runs its consume callback on a background thread with no synchronization
         // context, so blocking here cannot deadlock. PurgeAsync does not throw.
         _resourceCachePurger
-            .PurgeAsync(value, $"retry count exhausted: {exceptionMessage}", ResourceCachePurgeScope.AcquisitionKeysOnly)
+            .PurgeAsync(value, $"retry count exhausted: {exceptionMessage}")
             .GetAwaiter()
             .GetResult();
     }
