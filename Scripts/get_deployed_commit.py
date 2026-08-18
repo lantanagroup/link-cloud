@@ -123,12 +123,13 @@ def main():
         except Exception as e:
             print(f"Warning: Could not resolve full commit hash: {e}", file=sys.stderr)
 
-    # A short hash here breaks the downstream fetch in list-deploy-changes.py, which fails
-    # silently and yields an empty summary. Say so rather than letting it pass unnoticed.
+    # A short hash breaks the downstream fetch in list-deploy-changes.py: 'git fetch origin
+    # <ref>' is rejected for anything but a full SHA, and that failure is swallowed, so the
+    # summary comes out empty with nothing in the log to explain it. Stop here instead of
+    # publishing a FromCommit that cannot be used.
     if len(commit) < 40:
-        print(f"Warning: '{commit}' is not a full commit hash. "
-              f"'git fetch origin {commit}' will fail and the deployment summary may be empty.",
-              file=sys.stderr)
+        fail(f"'{commit}' is not a full commit hash and could not be resolved to one. "
+             f"'git fetch origin {commit}' would fail and the deployment summary would be empty.")
 
     print(f"FromCommit: {commit}")
 
