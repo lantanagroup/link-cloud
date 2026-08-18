@@ -1,26 +1,26 @@
-import {Component, OnInit} from '@angular/core';
-import {CommonModule, Location} from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule, Location } from '@angular/common';
 
-import {ActivatedRoute, Router, RouterLink, RouterLinkActive} from "@angular/router";
-import {FacilityViewService} from '../facility-view.service';
-import {IMeasureReportSummary} from '../report-view.interface';
-import {MatToolbarModule} from '@angular/material/toolbar';
-import {MatIconModule} from '@angular/material/icon';
-import {MatTabsModule} from '@angular/material/tabs';
-import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
-import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
-import {MatDialog, MatDialogConfig, MatDialogModule} from '@angular/material/dialog';
-import {ViewMeasureReportComponent} from '../view-measure-report/view-measure-report.component';
-import {FormsModule} from '@angular/forms';
-import {MatButtonModule} from '@angular/material/button';
-import {MatTooltipModule} from '@angular/material/tooltip';
-import {MatTableDataSource, MatTableModule} from '@angular/material/table';
-import {MatSortModule, Sort} from '@angular/material/sort';
-import {MatSelectModule} from '@angular/material/select';
-import {MatFormFieldModule} from '@angular/material/form-field';
-import {MatInputModule} from '@angular/material/input';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from "@angular/router";
+import { FacilityViewService } from '../facility-view.service';
+import { IMeasureReportSummary } from '../report-view.interface';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTabsModule } from '@angular/material/tabs';
+import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
+import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-report.component';
+import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatSortModule, Sort } from '@angular/material/sort';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
-import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faArrowLeft,
   faFileArrowDown,
@@ -33,16 +33,17 @@ import {
   faSortUp,
   faXmark
 } from '@fortawesome/free-solid-svg-icons';
-import {LoadingService} from 'src/app/services/loading.service';
-import {DonutChartComponent} from 'src/app/components/core/donut-chart/donut-chart.component';
-import {ViewReportTableCommandComponent} from './table-command/view-report-table-command.component';
-import {AcquisitionLogService} from '../../acquisition-log/acquisition-log.service';
+import { LoadingService } from 'src/app/services/loading.service';
+import { ChartColorService } from 'src/app/services/chart-color.service';
+import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
+import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
+import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
 import {
   IDataAcquisitionLogStatistics
 } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
-import {ReportAnalysisComponent} from './report-analysis/report-analysis.component';
-import {IReportSchedule} from '../../../../interfaces/report/report-schedule.interface';
-import {ReportService} from '../../../../services/gateway/report/report.service';
+import { ReportAnalysisComponent } from './report-analysis/report-analysis.component';
+import { IReportSchedule } from '../../../../interfaces/report/report-schedule.interface';
+import { ReportService } from '../../../../services/gateway/report/report.service';
 import {
   IReportEntry,
   IReportEntrySummary,
@@ -99,8 +100,29 @@ export class ViewReportComponent implements OnInit {
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
   measureIpCountsData: Record<string, number> = {};
+  // Stable colors per report type, persisted across refreshes via ChartColorService.
+  measureIpColors: Record<string, string> = {};
   reportStatusData: Record<string, number> = {};
   submissionStatusData: Record<string, number> = {};
+
+  // Fixed donut-chart colors keyed by the labels produced by
+  // getReportingStatusText / getSubmissionStatusText. Labels not listed
+  // fall back to the chart's default palette.
+  reportStatusColors: Record<string, string> = {
+    'Patient Identified': '#1f77b4', // blue - in pipeline
+    'Pending Validation': '#ff9800', // amber - in progress
+    'Passed Validation': '#2ca02c',  // green - good
+    'Failed Validation': '#d62728',  // red - bad
+    'Not Reportable': '#9e9e9e',     // grey - neutral
+  };
+  submissionStatusColors: Record<string, string> = {
+    'Pending Validation': '#ff9800', // amber - in progress
+    'Submitting': '#1f77b4',         // blue - in progress
+    'Submitted': '#2ca02c',          // green - good
+    'Failed Submission': '#d62728',  // red - bad
+    'Not Eligible': '#9e9e9e',       // grey - neutral
+    'Pending': '#bdbdbd',            // light grey - neutral
+  };
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -142,7 +164,8 @@ export class ViewReportComponent implements OnInit {
     private facilityViewService: FacilityViewService,
     private acquisitionLogService: AcquisitionLogService,
     private loadingService: LoadingService,
-    private reportService: ReportService) { }
+    private reportService: ReportService,
+    private chartColorService: ChartColorService) { }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
@@ -235,18 +258,35 @@ export class ViewReportComponent implements OnInit {
         next: (data) => {
           this.reportEntrySummary = data;
           this.measureIpCountsData = data.reportTypeCounts;
-          this.reportStatusData = Object.entries(data.reportingStatusCounts).reduce((acc, [statusKey, count]) => {
-            const statusValue = this.toReportingStatus(statusKey);
-            const label = statusValue !== null ? this.getReportingStatusText(statusValue) : statusKey;
-            acc[label] = count;
-            return acc;
-          }, {} as Record<string, number>);
-          this.submissionStatusData = Object.entries(data.submissionStatusCounts).reduce((acc, [statusKey, count]) => {
-            const statusValue = this.toSubmissionStatus(statusKey);
-            const label = statusValue !== null ? this.getSubmissionStatusText(statusValue) : statusKey;
-            acc[label] = count;
-            return acc;
-          }, {} as Record<string, number>);
+          this.measureIpColors = this.chartColorService.getColorMap(
+            'measure-report-type',
+            Object.keys(data.reportTypeCounts)
+          );
+          this.reportStatusData = Object.fromEntries(
+            Object.entries(data.reportingStatusCounts)
+              .map(([statusKey, count]) => {
+                const statusValue = this.toReportingStatus(statusKey);
+                const label = statusValue !== null
+                  ? this.getReportingStatusText(statusValue)
+                  : statusKey;
+
+                return [label, count] as const;
+              })
+              .sort(([labelA], [labelB]) => labelA.localeCompare(labelB))
+          ) as Record<string, number>;
+
+          this.submissionStatusData = Object.fromEntries(
+            Object.entries(data.submissionStatusCounts)
+              .map(([statusKey, count]) => {
+                const statusValue = this.toSubmissionStatus(statusKey);
+                const label = statusValue !== null
+                  ? this.getSubmissionStatusText(statusValue)
+                  : statusKey;
+
+                return [label, count] as const;
+              })
+              .sort(([labelA], [labelB]) => labelA.localeCompare(labelB))
+          ) as Record<string, number>;
         },
         error: (error) => {
           console.error('Error loading report entry summary:', error);

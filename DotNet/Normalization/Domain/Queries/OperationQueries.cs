@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 OperationId = id,
                 FacilityId = facilityId,
                 IncludeDisabled = true
-            })).Records.Single();
+            })).Records.FirstOrDefault();
         }
 
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)

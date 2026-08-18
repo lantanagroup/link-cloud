@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -132,13 +132,22 @@ public class KafkaErrorMonitor : IAsyncDisposable
                 GroupId = $"e2e-diag-{Guid.NewGuid():N}",
                 AutoOffsetReset = AutoOffsetReset.Latest,
                 EnableAutoCommit = true,
-                SecurityProtocol = SecurityProtocol.SaslPlaintext,
-                SaslMechanism = SaslMechanism.Plain,
-                SaslUsername = _kafkaUser,
-                SaslPassword = _kafkaPassword,
                 SessionTimeoutMs = 10000,
                 SocketTimeoutMs = 5000,
             };
+
+            // Only enable SASL when credentials are actually configured. The Link services
+            // gate SASL behind KafkaConnection.SaslProtocolEnabled (default false) and the
+            // local/dev/docker brokers use PLAINTEXT. Forcing SaslPlaintext/Plain here with
+            // empty credentials makes librdkafka throw "sasl.username and sasl.password must
+            // be set", which silently disabled dead-letter monitoring for the whole run.
+            if (!string.IsNullOrWhiteSpace(_kafkaUser) && !string.IsNullOrWhiteSpace(_kafkaPassword))
+            {
+                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                config.SaslMechanism = SaslMechanism.Plain;
+                config.SaslUsername = _kafkaUser;
+                config.SaslPassword = _kafkaPassword;
+            }
 
             _consumer = new ConsumerBuilder<string, string>(config)
                 .SetErrorHandler((_, e) =>

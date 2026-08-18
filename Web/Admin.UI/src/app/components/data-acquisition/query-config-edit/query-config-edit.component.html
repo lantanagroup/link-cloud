@@ -19,23 +19,26 @@
     </mat-form-field>
   </div>
 
-  @if (queryForm.get('queryConfigType')?.value === 'Reference') {
-    <div class="form-row">
-      <mat-form-field appearance="outline">
-        <mat-label>Operation Type</mat-label>
-        <mat-select formControlName="operationType">
-          @for (op of operationTypes; track op.value) {
+  <div class="form-row">
+    <mat-form-field appearance="outline">
+      <mat-label>Operation Type</mat-label>
+      <mat-select formControlName="operationType">
+        @for (op of operationTypes; track op.value) {
+          <!-- Parameter query types do not allow read operations, so hide that option unless query config type is Reference -->
+          @if (op.label !== 'Read' || queryForm.get('queryConfigType')?.value === 'Reference') {
             <mat-option [value]="op.value">{{op.label}}</mat-option>
           }
-        </mat-select>
-      </mat-form-field>
+        }
+      </mat-select>
+    </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Paged</mat-label>
-        <input matInput type="number" formControlName="paged">
-      </mat-form-field>
-    </div>
+  @if (queryForm.get('queryConfigType')?.value === 'Reference') {
+    <mat-form-field appearance="outline">
+      <mat-label>Paged</mat-label>
+      <input matInput type="number" formControlName="paged">
+    </mat-form-field>
   }
+  </div>
 
   @if (queryForm.get('queryConfigType')?.value === 'Parameter') {
     <div class="parameters-section">
@@ -47,6 +50,10 @@
           </button>
         }
       </div>
+
+      @if (parameters.hasError('minLengthArray') && parameters.touched) {
+        <div class="parameters-error">At least one parameter is required for a Parameter query.</div>
+      }
 
       <div formArrayName="parameters">
         @for (param of parameters.controls; track $index) {

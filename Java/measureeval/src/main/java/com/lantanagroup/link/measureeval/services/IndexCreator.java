@@ -28,9 +28,7 @@ public class IndexCreator {
                 .on("correlationId", Sort.Direction.ASC));
         ensureIndex(Resource.class, new Index()
                 .on("facilityId", Sort.Direction.ASC)
-                .on("correlationId", Sort.Direction.ASC)
-                .on("resourceType", Sort.Direction.ASC)
-                .on("resourceId", Sort.Direction.ASC));
+                .on("correlationId", Sort.Direction.ASC));
     }
 
     private <T> void ensureIndex(Class<T> entityClass, Index index) {

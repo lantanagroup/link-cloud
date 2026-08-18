@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -18,7 +18,7 @@ public class DataAcquisitionLog
     public string FacilityId { get; set; }
 
     [Required]
-    public AcquisitionPriority Priority { get; set; } = AcquisitionPriority.Normal;
+    public AcquisitionPriority? Priority { get; set; } = AcquisitionPriority.Normal;
 
     public string? PatientId { get; set; }
 

@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Helpers;
+﻿using LantanaGroup.Automation.Helpers;
 using System.Globalization;
 using System.Text.Json;
 
@@ -42,10 +42,19 @@ public static class QueryPlanAcquisitionSimulator
         QueryPlanInput queryPlan,
         string? clinicalPeriodStart = null,
         string? clinicalPeriodEnd = null,
-        IAutomationOutput? output = null)
+        IAutomationOutput? output = null,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange = true)
     {
         var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
         var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+
+        // DataAcquisition variable substitution normalizes PeriodStart/PeriodEnd to day bounds
+        // (00:00:00Z / 23:59:59Z) before applying ge/le formatting. Mirror that behavior so
+        // simulator date filtering matches runtime acquisition semantics.
+        if (hasStart)
+            start = new DateTimeOffset(start.UtcDateTime.Date, TimeSpan.Zero);
+        if (hasEnd)
+            end = new DateTimeOffset(end.UtcDateTime.Date.AddDays(1).AddSeconds(-1), TimeSpan.Zero);
 
         // Track resource keys we've already emitted a "no recognized date" warning for, so
         // a single missing-date resource doesn't spam the log once per date-parameter iteration.
@@ -97,7 +106,15 @@ public static class QueryPlanAcquisitionSimulator
 
                 foreach (var resource in candidates)
                 {
-                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType, warnedKeys, output))
+                    if (!MatchesParameterQuery(
+                            resource,
+                            query,
+                            hasStart ? start : null,
+                            hasEnd ? end : null,
+                            acquiredByType,
+                            warnedKeys,
+                            output,
+                            allowEncounterAnchoredDateOverrideForOutOfRange))
                         continue;
 
                     acquired.Add(resource.Key);
@@ -134,7 +151,8 @@ public static class QueryPlanAcquisitionSimulator
         DateTimeOffset? periodEnd,
         Dictionary<string, HashSet<string>> acquiredByType,
         HashSet<string> warnedKeys,
-        IAutomationOutput? output)
+        IAutomationOutput? output,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange)
     {
         foreach (var p in query.Parameters)
         {
@@ -151,14 +169,20 @@ public static class QueryPlanAcquisitionSimulator
                 }
             }
 
-            if (string.Equals(p.ParameterType, "Literal", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(p.Name, "category", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(p.ParameterType, "Literal", StringComparison.OrdinalIgnoreCase))
             {
-                if (!MatchesLiteralCategory(resource.Resource, p.Literal))
+                // Skip FHIR pagination/control parameters — they are not filters.
+                if (string.Equals(p.Name, "_count", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_sort", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_include", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_revinclude", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!MatchesLiteralFilter(resource.Resource, p.Name, p.Literal))
                     return false;
             }
 
-            if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+            if (IsTemporalSearchParam(p.Name)
                 && string.Equals(p.ParameterType, "Variable", StringComparison.OrdinalIgnoreCase))
             {
                 var isGe = p.Format?.StartsWith("ge", StringComparison.OrdinalIgnoreCase) == true;
@@ -171,14 +195,71 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
+                // FHIR Observation/DiagnosticReport `date` matching may consider either
+                // effective[x] or issued, while our generic extractor returns only one range.
+                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var matchedAny = false;
+                    var recognizedAny = false;
+
+                    if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
+                    }
+
+                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
+                    }
+
+                    if (!recognizedAny)
+                    {
+                        if (HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                            continue;
+
+                        if (output != null && warnedKeys.Add(resource.Key))
+                        {
+                            output.WriteLine(
+                                $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
+                                $"'{resource.ResourceType}' Parameter query '{p.Name}' filter; excluding from " +
+                                "predicted-acquired set (fail-closed). Extend TryGetResourceDateRangeForParam to model this shape.");
+                        }
+                        return false;
+                    }
+
+                    if (!matchedAny)
+                    {
+                        if (allowEncounterAnchoredDateOverrideForOutOfRange
+                            && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                        {
+                            continue;
+                        }
+
+                        return false;
+                    }
+
+                    continue;
+                }
+
                 // Only one bound is being checked per parameter. We need both ends of the
                 // resource's date range so we can compute correct FHIR overlap semantics:
                 //   ge{S}:  resource.End   >= S   (resource extends into [S, +inf))
                 //   le{E}:  resource.Start <= E   (resource extends into (-inf, E])
                 // For instant types (e.g. authoredOn) start == end.
-                if (!TryGetResourceDateRange(resource.ResourceType, resource.Resource,
+                if (!TryGetResourceDateRangeForParam(p.Name, resource.ResourceType, resource.Resource,
                         out var resourceStart, out var resourceEnd))
                 {
+                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     // Fail closed: the query has a date filter and we don't recognize the
                     // resource's date shape, so we can't honestly say it falls in-period.
                     // Drop it and warn once per resource key so unfamiliar shapes surface.
@@ -186,21 +267,66 @@ public static class QueryPlanAcquisitionSimulator
                     {
                         output.WriteLine(
                             $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
-                            $"'{resource.ResourceType}' Parameter query 'date' filter; excluding from " +
-                            "predicted-acquired set (fail-closed). Extend TryGetResourceDateRange to model this shape.");
+                            $"'{resource.ResourceType}' Parameter query '{p.Name}' filter; excluding from " +
+                            "predicted-acquired set (fail-closed). Extend TryGetResourceDateRangeForParam to model this shape.");
                     }
                     return false;
                 }
 
                 if (isGe && resourceEnd < bound.Value)
+                {
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
 
                 if (isLe && resourceStart > bound.Value)
+                {
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
             }
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Some DA query paths are encounter-anchored and can include resources linked to an
+    /// already-acquired encounter. The simulator always uses this as a fallback when a
+    /// resource doesn't expose a recognizable date field, and can optionally apply it to
+    /// out-of-range recognized-date cases when enabled by the caller.
+    ///
+    /// This override is restricted to date-filtered Observation/DiagnosticReport/Procedure
+    /// resources and only when their Encounter reference resolves to an acquired Encounter id.
+    /// </summary>
+    private static bool HasEncounterAnchoredDateOverride(
+        GeneratedResource resource,
+        Dictionary<string, HashSet<string>> acquiredByType)
+    {
+        if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        if (!acquiredByType.TryGetValue("Encounter", out var encounterIds) || encounterIds.Count == 0)
+            return false;
+
+        return TryGetReferencedResourceId(resource.Resource, "Encounter", out var encounterId)
+               && encounterIds.Contains(encounterId);
     }
 
     private static HashSet<string> CollectReferencedIds(
@@ -283,7 +409,12 @@ public static class QueryPlanAcquisitionSimulator
         return false;
     }
 
-    private static bool MatchesLiteralCategory(JsonElement resource, string? literal)
+    /// <summary>
+    /// Generic literal filter. Handles:
+    /// - CodeableConcept arrays (e.g. <c>category</c>) — matches if any coding.code is in the accepted set.
+    /// - Simple code/string fields (e.g. <c>intent</c>, <c>status</c>) — matches if the field value is in the accepted set.
+    /// </summary>
+    private static bool MatchesLiteralFilter(JsonElement resource, string paramName, string? literal)
     {
         if (string.IsNullOrWhiteSpace(literal))
             return true;
@@ -291,26 +422,111 @@ public static class QueryPlanAcquisitionSimulator
         var accepted = literal.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (!resource.TryGetProperty("category", out var categories) || categories.ValueKind != JsonValueKind.Array)
+        if (!resource.TryGetProperty(paramName, out var fieldValue))
             return false;
 
-        foreach (var category in categories.EnumerateArray())
+        // Case 1: Simple string/code field (e.g. intent, status)
+        if (fieldValue.ValueKind == JsonValueKind.String)
         {
-            if (!category.TryGetProperty("coding", out var codingArray) || codingArray.ValueKind != JsonValueKind.Array)
-                continue;
+            var value = fieldValue.GetString();
+            return !string.IsNullOrWhiteSpace(value) && accepted.Contains(value);
+        }
 
-            foreach (var coding in codingArray.EnumerateArray())
+        // Case 2: CodeableConcept array (e.g. category)
+        if (fieldValue.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in fieldValue.EnumerateArray())
             {
-                if (!coding.TryGetProperty("code", out var codeProp) || codeProp.ValueKind != JsonValueKind.String)
-                    continue;
-
-                var code = codeProp.GetString();
-                if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
-                    return true;
+                if (item.TryGetProperty("coding", out var codingArray) && codingArray.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var coding in codingArray.EnumerateArray())
+                    {
+                        if (coding.TryGetProperty("code", out var codeProp)
+                            && codeProp.ValueKind == JsonValueKind.String)
+                        {
+                            var code = codeProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
+                                return true;
+                        }
+                    }
+                }
             }
+            return false;
+        }
+
+        // Case 3: Single CodeableConcept object (e.g. code)
+        if (fieldValue.ValueKind == JsonValueKind.Object
+            && fieldValue.TryGetProperty("coding", out var singleCodingArray)
+            && singleCodingArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var coding in singleCodingArray.EnumerateArray())
+            {
+                if (coding.TryGetProperty("code", out var codeProp)
+                    && codeProp.ValueKind == JsonValueKind.String)
+                {
+                    var code = codeProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
+                        return true;
+                }
+            }
+            return false;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Determines whether a FHIR search parameter name is a temporal (date-like) filter.
+    /// Recognized names: <c>date</c>, <c>authoredon</c>, <c>authored</c>, <c>issued</c>,
+    /// <c>effective</c>, <c>onset-date</c>, <c>recorded-date</c>.
+    /// </summary>
+    private static bool IsTemporalSearchParam(string paramName)
+        => string.Equals(paramName, "date", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "authoredon", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolves the resource's date range for a given FHIR search parameter name.
+    /// Named search parameters like <c>authoredon</c> map to specific fields regardless of
+    /// what <c>TryGetResourceDateRange</c> would pick for the generic <c>date</c> param.
+    /// </summary>
+    private static bool TryGetResourceDateRangeForParam(string paramName, string resourceType,
+        JsonElement resource, out DateTimeOffset start, out DateTimeOffset end)
+    {
+        // Named search parameters that map to specific fields.
+        if (string.Equals(paramName, "authoredon", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "authoredOn", out start, out end);
+        }
+
+        if (string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "issued", out start, out end);
+        }
+
+        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetEffective(resource, out start, out end);
+        }
+
+        if (string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "onsetDateTime", out start, out end)
+                   || TryGetPeriod(resource, "onsetPeriod", out start, out end);
+        }
+
+        if (string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "recordedDate", out start, out end);
+        }
+
+        // Generic "date" → resource-type-aware resolution.
+        return TryGetResourceDateRange(resourceType, resource, out start, out end);
     }
 
     /// <summary>

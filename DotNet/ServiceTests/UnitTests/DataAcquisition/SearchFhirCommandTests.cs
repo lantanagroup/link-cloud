@@ -1,3 +1,5 @@
+﻿using System.Net;
+using System.Text;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -11,8 +13,6 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using System.Net;
-using System.Text;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -35,8 +35,9 @@ public class SearchFhirCommandTests
             IDistributedSemaphoreProvider semaphoreProvider,
             IOptions<DistributedLockSettings> lockSettings,
             IAuthenticationRetrievalService authService,
+            IOptionsMonitor<TelemetrySettings> telemetrySettings,
             HttpMessageHandler stubHandler)
-            : base(logger, new HttpClient(), metrics, semaphoreProvider, lockSettings, authService)
+            : base(logger, new HttpClient(), metrics, semaphoreProvider, lockSettings, authService, telemetrySettings)
         {
             _stubHandler = stubHandler;
         }
@@ -47,12 +48,16 @@ public class SearchFhirCommandTests
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _queue = new();
+        private readonly List<HttpRequestMessage> _captured = new();
+
+        public IReadOnlyList<HttpRequestMessage> CapturedRequests => _captured;
 
         public void Enqueue(HttpResponseMessage response) => _queue.Enqueue(response);
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            _captured.Add(request);
             if (_queue.TryDequeue(out var response))
                 return Task.FromResult(response);
             throw new InvalidOperationException("StubHttpMessageHandler: no more queued responses.");
@@ -141,6 +146,7 @@ public class SearchFhirCommandTests
             facilityId: "test-facility",
             patientId: "test-patient",
             correlationId: "test-correlation",
+            reportTrackingId: "test-report",
             queryPhase: QueryPhase.Initial,
             queryType: FhirQueryType.Search);
 
@@ -184,14 +190,22 @@ public class SearchFhirCommandTests
         StubHttpMessageHandler stub,
         Mock<IDistributedSemaphoreProvider> semaphoreProvider,
         Mock<IDataAcquisitionServiceMetrics> metrics,
-        Mock<IAuthenticationRetrievalService> auth) =>
-        new(
+        Mock<IAuthenticationRetrievalService> auth)
+    {
+        var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        telemetrySettings
+            .Setup(x => x.CurrentValue)
+            .Returns(new TelemetrySettings());
+
+        return new TestableSearchFhirCommand(
             new Mock<ILogger<SearchFhirCommand>>().Object,
             metrics.Object,
             semaphoreProvider.Object,
             Options.Create(new DistributedLockSettings()),
             auth.Object,
+            telemetrySettings.Object,
             stub);
+    }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -314,5 +328,28 @@ public class SearchFhirCommandTests
 
         Assert.Equal(2, results.Count);
         Assert.Equal(new[] { "acquired", "released", "acquired", "released" }, trace);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_QueryTypeSearchPost_SendsHttpPostRequest()
+    {
+        // SearchFhirCommand picks SearchUsingPostAsync vs SearchAsync purely on
+        // request.queryType. SearchUsingPostAsync issues POST [base]/[type]/_search;
+        // SearchAsync issues GET. Asserting the outgoing HTTP method proves the
+        // SearchPost branch ran. IsReference is a FhirApiService concern and
+        // never reaches this command, so it is not part of this assertion.
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var sut = BuildSut(stub, semProvider, SetupMetricsMock(), SetupNoAuthMock());
+
+        var request = CreateRequest() with { queryType = FhirQueryType.SearchPost };
+
+        await foreach (var _ in sut.ExecuteAsync(request)) { }
+
+        var captured = Assert.Single(stub.CapturedRequests);
+        Assert.Equal(HttpMethod.Post, captured.Method);
+        Assert.EndsWith("_search", captured.RequestUri!.AbsolutePath);
     }
 }

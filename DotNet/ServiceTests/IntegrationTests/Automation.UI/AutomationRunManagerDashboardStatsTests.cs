@@ -1,4 +1,4 @@
-using Automation.UI.Services.Persistence;
+﻿using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Models;
 using Task = System.Threading.Tasks.Task;

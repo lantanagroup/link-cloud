@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 
@@ -36,6 +36,7 @@ public static class ScenarioConfigBuilder
             EndDate = options.ReportPeriodEnd.HasValue
                 ? options.ReportPeriodEnd.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 : "2023-12-31T23:59:59Z",
+            NhsnOrganizationId = options.NhsnOrganizationId,
             PatientIds = [],
             CleanupServiceData = options.CleanupServiceData,
             CleanupFhirData = options.CleanupFhirData,

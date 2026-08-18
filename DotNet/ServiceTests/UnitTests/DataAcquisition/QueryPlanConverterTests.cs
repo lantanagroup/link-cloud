@@ -175,13 +175,14 @@ public class QueryPlanConverterTests
         var config = new ParameterQueryConfig
         {
             ResourceType = "Encounter",
-            Parameters = new List<IParameter>()
+            Parameters = new List<IParameter>(),
+            OperationType = OperationType.Search
         };
 
         string json = JsonSerializer.Serialize<IQueryConfig>(config, _options);
 
         var expected = """
-        {"QueryConfigType":"Parameter","ResourceType":"Encounter","Parameters":[]}
+        {"QueryConfigType":"Parameter","ResourceType":"Encounter","OperationType":"Search","Parameters":[]}
         """.Replace("\r\n", "").Replace("\n", "");
 
         Assert.Equal(expected, json);

@@ -17,6 +17,10 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
                 options.ConfigurationOptions = new ConfigurationOptions
                 {
                     EndPoints = { redisCacheOptions.ConnectionString },
+                    // See DistributedLockSettings: SE.Redis with a hostname endpoint and
+                    // AddressFamily.Unspecified fails to connect over docker bridge networks
+                    // (Standalone DidNotRespond, ConnectTimeout). ResolveDns forces an IPEndPoint.
+                    ResolveDns = true,
                 };
 
                 if (!string.IsNullOrEmpty(redisCacheOptions.InstanceName))

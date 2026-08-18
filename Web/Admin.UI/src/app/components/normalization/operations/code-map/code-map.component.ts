@@ -40,6 +40,10 @@ import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {MatDialog} from "@angular/material/dialog";
+import {DeleteConfirmationDialogComponent} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {AlertDialogComponent} from "../../../core/alert-dialog/alert-dialog.component";
+import Papa from 'papaparse';
 
 @Component({
   selector: 'app-code-map',
@@ -110,7 +114,8 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private operationService: OperationService
+    private operationService: OperationService,
+    private dialog: MatDialog
   ) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
@@ -495,6 +500,171 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
 
+
+  async pasteFromExcel(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const parsed = this.parseTsv(text);
+    if (parsed === null || parsed.formatError) {
+      this.clearClipboard();
+      this.showTsvFormatError();
+      return;
+    }
+    if (parsed.rows.length === 0) {
+      this.showPasteError('All rows were skipped because they are invalid.');
+      return;
+    }
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
+  }
+
+  async pasteFromCsv(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const parsed = this.parseCsv(text);
+    if (parsed === null || parsed.formatError) {
+      this.clearClipboard();
+      this.showCsvFormatError();
+      return;
+    }
+    if (parsed.rows.length === 0) {
+      this.showPasteError('All rows were skipped because they are invalid.');
+      return;
+    }
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
+  }
+
+  private showTsvFormatError(): void {
+    const exampleLine = 'source code \\t target code \\t optional display';
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected tab-separated values (TSV) format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste from Excel Error', true);
+  }
+
+  private showCsvFormatError(): void {
+    const exampleLine = '"source code","target code","optional display"';
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected comma-separated values (CSV) format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste from CSV Error', true);
+  }
+
+  private async readClipboard(): Promise<string | null> {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        this.showPasteError('Clipboard is empty.');
+        return null;
+      }
+      return text;
+    } catch {
+      this.showPasteError('Unable to read clipboard. Please ensure clipboard access is allowed by your browser.');
+      return null;
+    }
+  }
+
+  private parseTsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number; formatError: boolean } | null {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
+    for (const line of lines) {
+      const cols = line.split('\t');
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
+        skipped++;
+        continue;
+      }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : '';
+      rows.push({source, target, display});
+    }
+    return { rows, skipped, formatError: false };
+  }
+
+  private parseCsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number; formatError: boolean } | null {
+    const result = Papa.parse<string[]>(text, {
+      header: false,
+      skipEmptyLines: true,
+    });
+
+    if (result.data.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
+    for (const cols of result.data) {
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
+        skipped++;
+        continue;
+      }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : ''
+      rows.push({source, target, display});
+    }
+    return { rows, skipped, formatError: false };
+  }
+
+  private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[], skipped: number = 0): void {
+    let message = `${rows.length} code map(s) will be added.`;
+    if (skipped > 0) {
+      message += ` ${skipped} invalid row(s) were skipped.`;
+    }
+    message += ' Continue?';
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      data: {
+        title: 'Paste Code Maps',
+        message,
+        confirmButtonText: 'Add',
+        icon: 'playlist_add',
+        iconColor: 'primary'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        const codeMaps = this.codeMapsAt(codeSystemIndex);
+        for (let k = codeMaps.length - 1; k >= 0; k--) {
+          const cm = codeMaps.at(k) as FormGroup;
+          if (!cm.get('key')?.value && !cm.get('value.code')?.value) {
+            codeMaps.removeAt(k);
+          }
+        }
+        for (const row of rows) {
+          codeMaps.push(this.fb.group({
+            key: [row.source, Validators.required],
+            value: this.fb.group({
+              code: [row.target, Validators.required],
+              display: [row.display || row.target, Validators.required],
+            }),
+          }));
+        }
+        this.clearClipboard();
+      }
+    });
+  }
+
+  private clearClipboard(): void {
+    navigator.clipboard.writeText('').catch(() => {});
+  }
+
+  private showPasteError(message: string, title: string = 'Paste Error', isHtml: boolean = false): void {
+    this.dialog.open(AlertDialogComponent, {
+      data: {
+        title,
+        message,
+        isHtml,
+        icon: 'error',
+        iconColor: 'warn'
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();

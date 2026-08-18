@@ -14,6 +14,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private const string HealthUp = "UP";
+        private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
 
         public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
         {
@@ -26,14 +27,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(HealthCheckTimeout);
+
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
+            HttpResponseMessage response = await _client.GetAsync($"health", timeoutCts.Token);
 
             return response;
         }
 
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(HealthCheckTimeout);
             // HTTP GET
 
             var report = new LinkServiceHealthReport
@@ -43,7 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
             try
             {
-                var response = await _client.GetAsync($"health", cancellationToken);
+                var response = await _client.GetAsync($"health", timeoutCts.Token);
 
                 var content = await response.Content.ReadAsStringAsync();
 
@@ -78,7 +84,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
-                        report.Entries[ToPascalCase(component.Key)] = new LinkServiceHealthReportEntry
+                        // MeasureEval's ResourceCacheHealthIndicator reports the combined Redis + ABS
+                        // resource-cache status under the "resourceCache" component; map it to the
+                        // "Cache" entry the UI's Cache column expects.
+                        var key = component.Key.Equals("resourceCache", StringComparison.OrdinalIgnoreCase)
+                            ? "Cache"
+                            : ToPascalCase(component.Key);
+
+                        report.Entries[key] = new LinkServiceHealthReportEntry
                         {
                             Status = componentStatus,
                             Duration = TimeSpan.Zero

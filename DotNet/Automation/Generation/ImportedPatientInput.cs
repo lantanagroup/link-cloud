@@ -31,6 +31,13 @@ public sealed class ImportedPatientInput
     /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the original file name (display only).</summary>
     public string? FileName { get; set; }
 
+    /// <summary>
+    /// For <see cref="ImportedPatientSource.Bundle"/>: identifier of an uploaded bundle
+    /// stored in Automation.UI persistence. When set, saves can reference the uploaded
+    /// payload without reposting <see cref="BundleJson"/>.
+    /// </summary>
+    public Guid? UploadedBundleId { get; set; }
+
     /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON.</summary>
     public string? BundleJson { get; set; }
 

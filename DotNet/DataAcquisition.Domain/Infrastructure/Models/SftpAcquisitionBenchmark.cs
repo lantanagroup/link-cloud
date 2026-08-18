@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 /// <summary>
 /// Benchmark data collected during SFTP file acquisition and processing.

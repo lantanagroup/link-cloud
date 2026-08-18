@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
@@ -9,8 +9,11 @@ namespace Automation.UI.Controllers;
 
 public class RunsController(
     IAutomationRunManager runManager,
+    ISnapshotStore snapshotStore,
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
+    INormalizationStore normalizationStore,
+    IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
@@ -35,18 +38,28 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Active runs are surfaced by status, not by what page the user is on,
-        // so they always come from a default-sorted first page slice. Otherwise
-        // a user paged deep into history would lose the Active Runs card.
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
+        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -98,11 +111,22 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         return Json(new
@@ -126,6 +150,19 @@ public class RunsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Start(StartScenarioRequest request, CancellationToken cancellationToken)
     {
+        if (request.Scenario == AutomationScenarioKind.Custom && request.ScenarioId is Guid scenarioId)
+        {
+            var scenario = await scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+            if (scenario == null)
+            {
+                TempData["RunStartError"] = "Unable to start test: selected scenario was not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+            return RedirectToAction(nameof(Index));
+        }
+
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values
@@ -326,7 +363,7 @@ public class RunsController(
                 normalizedSearchTerm,
                 cancellationToken);
 
-            if ((result?.Records?.Count ?? 0) == 0)
+            if ((result?.Body?.Records?.Count ?? 0) == 0)
             {
                 result = await dataAcqClient.SearchAcquisitionLogsAsync(
                     string.Empty,
@@ -339,7 +376,7 @@ public class RunsController(
                     cancellationToken);
             }
 
-            var records = (result?.Records ?? [])
+            var records = (result?.Body?.Records ?? [])
                 .Select(r => new
                 {
                     r.Id,
@@ -360,10 +397,10 @@ public class RunsController(
 
             var metadata = new
             {
-                TotalCount = result?.Metadata?.TotalCount ?? 0,
-                PageNumber = result?.Metadata?.PageNumber ?? pageNumber,
-                PageSize = result?.Metadata?.PageSize ?? pageSize,
-                TotalPages = result?.Metadata?.TotalPages ?? 0
+                TotalCount = result?.Body?.Metadata?.TotalCount ?? 0,
+                PageNumber = result?.Body?.Metadata?.PageNumber ?? pageNumber,
+                PageSize = result?.Body?.Metadata?.PageSize ?? pageSize,
+                TotalPages = result?.Body?.Metadata?.TotalPages ?? 0
             };
 
             return Json(new { records, metadata });
@@ -408,7 +445,7 @@ public class RunsController(
                 while (true)
                 {
                     var refPage = await dataAcqClient.GetReferenceResourcesForLogAsync(logId, refPageSize, pageNum, cancellationToken);
-                    var refRecords = refPage?.Records ?? [];
+                    var refRecords = refPage?.Body?.Records ?? [];
                     if (refRecords.Count == 0)
                         break;
 
@@ -430,7 +467,7 @@ public class RunsController(
             // Build the human-readable "Resource?param=value&..." form per FhirQuery.
             // Mirrors the FhirQueryModel.Query getter so the UI shows what was actually
             // sent to the FHIR server.
-            var queries = (detailed.FhirQuery ?? [])
+            var queries = (detailed.Body?.FhirQuery ?? [])
                 .Select(q =>
                 {
                     var firstResource = q.ResourceTypes?.FirstOrDefault();
@@ -448,40 +485,40 @@ public class RunsController(
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToList();
 
-            var queryType = (detailed.FhirQuery ?? [])
+            var queryType = (detailed.Body?.FhirQuery ?? [])
                 .Select(q => q.QueryType.ToString())
                 .FirstOrDefault();
 
             return Json(new
             {
-                detailed.Id,
-                detailed.PatientId,
-                Status = detailed.Status?.ToString(),
-                QueryPhase = detailed.QueryPhase?.ToString(),
-                IsReferenceLog = detailed.IsReferenceLog
-                                 || string.Equals(detailed.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
-                                 || detailed.ReferenceResourceCount > 0,
-                ReferenceResourceCount = detailed.ReferenceResourceCount,
-                detailed.ReportTrackingId,
-                detailed.CorrelationId,
-                detailed.TraceId,
-                detailed.FhirVersion,
-                detailed.Priority,
-                detailed.RetryAttempts,
+                detailed.Body?.Id,
+                detailed.Body?.PatientId,
+                Status = detailed.Body?.Status?.ToString(),
+                QueryPhase = detailed.Body?.QueryPhase?.ToString(),
+                IsReferenceLog = detailed.Body?.IsReferenceLog == true
+                                 || string.Equals(detailed.Body?.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
+                                 || (detailed.Body?.ReferenceResourceCount ?? 0) > 0,
+                ReferenceResourceCount = detailed.Body?.ReferenceResourceCount ?? 0,
+                detailed.Body?.ReportTrackingId,
+                detailed.Body?.CorrelationId,
+                detailed.Body?.TraceId,
+                detailed.Body?.FhirVersion,
+                detailed.Body?.Priority,
+                detailed.Body?.RetryAttempts,
                 QueryType = queryType,
                 Queries = queries,
-                detailed.CompletionDate,
-                detailed.CompletionTimeMilliseconds,
-                ResourceTypes = (detailed.ResourceTypes ?? [])
-                    .Concat(detailed.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
+                detailed.Body?.CompletionDate,
+                CompletionTimeMilliseconds = detailed.Body?.CompletionTimeMilliseconds,
+                ResourceTypes = (detailed.Body?.ResourceTypes ?? [])
+                    .Concat((detailed.Body?.FhirQuery ?? []).SelectMany(q => q.ResourceTypes ?? []))
                     .Concat(referenceResourceIds
                         .Select(r => r.Contains('/') ? r.Split('/')[0] : r)
                         .Where(rt => !string.IsNullOrWhiteSpace(rt)))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
-                ResourceAcquiredIds = detailed.ResourceAcquiredIds?.ToList() ?? new List<string>(),
+                ResourceAcquiredIds = detailed.Body?.ResourceAcquiredIds?.ToList() ?? new List<string>(),
                 ReferenceResourceIds = referenceResourceIds,
-                Notes = detailed.Notes?.ToList() ?? new List<string>()
+                Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
             });
         }
         catch (Exception ex)

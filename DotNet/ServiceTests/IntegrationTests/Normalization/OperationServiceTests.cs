@@ -17,10 +17,11 @@ namespace IntegrationTests.Normalization
 {
     [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class OperationServiceTests
+    public class OperationServiceTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly NormalizationIntegrationTestFixture _fixture;
+        private readonly IServiceScope _scope;
         private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
@@ -28,20 +29,29 @@ namespace IntegrationTests.Normalization
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
+        private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
 
         public OperationServiceTests(NormalizationIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;
 
-            _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
-            _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
-            _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            _copyOperationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
-            _codeMapOperationService = _fixture.ServiceProvider.GetRequiredService<CodeMapOperationService>();
-            _conditionalTransformService = _fixture.ServiceProvider.GetRequiredService<ConditionalTransformOperationService>();
-            _copyLocationOperationService = _fixture.ServiceProvider.GetRequiredService<CopyLocationOperationService>();
+            // Resolve scoped services from a per-test scope rather than the root provider, so the
+            // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
+            _scope = fixture.ServiceProvider.CreateScope();
+            var sp = _scope.ServiceProvider;
+
+            _database = sp.GetRequiredService<IDatabase>();
+            _operationManager = sp.GetRequiredService<IOperationManager>();
+            _operationQueries = sp.GetRequiredService<IOperationQueries>();
+            _copyOperationService = sp.GetRequiredService<CopyPropertyOperationService>();
+            _codeMapOperationService = sp.GetRequiredService<CodeMapOperationService>();
+            _conditionalTransformService = sp.GetRequiredService<ConditionalTransformOperationService>();
+            _copyLocationOperationService = sp.GetRequiredService<CopyLocationOperationService>();
+            _removeExtensionsOperationService = sp.GetRequiredService<RemoveExtensionsOperationService>();
         }
+
+        public void Dispose() => _scope.Dispose();
 
         [Fact]
         public async Task Integration_CopyPropertyOperation_Location_Identifier_To_Type_Create_TargetElement()
@@ -2466,6 +2476,178 @@ namespace IntegrationTests.Normalization
             _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
 
             Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
+        }
+
+        [Fact]
+        public async Task Integration_RemoveExtensionsOperation_Patient_RemovesListedExtensions_LeavesOthersIntact()
+        {
+            var urlToRemove1 = "http://example.com/fhir/extension/vendor-tag";
+            var urlToRemove2 = "http://example.com/fhir/extension/internal-flag";
+            var urlToKeep = "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName";
+
+            var operation = new RemoveExtensionsOperation
+            {
+                Name = "Remove Vendor Extensions",
+                Description = "Integration Test Remove Extensions Operation",
+                ExtensionUrls = [urlToRemove1, urlToRemove2]
+            };
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.RemoveExtensions.ToString(),
+                FacilityId = "TestFacilityId",
+                Description = "Integration Test Remove Extensions Operation",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+            Assert.NotNull(taskResult.ObjectResult);
+
+            var result = (OperationModel)taskResult.ObjectResult;
+
+            Assert.NotNull(result);
+            Assert.True(result.Id != default);
+
+            var fetched = await _operationQueries.Get(result.Id, result.FacilityId);
+
+            Assert.NotNull(fetched);
+            Assert.True(fetched.Id != default);
+
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "PatientWithExtensions.txt");
+            string text = File.ReadAllText(resourcePath);
+            var patient = parser.Parse<Patient>(text);
+
+            Assert.Equal(3, patient.Extension.Count);
+
+            Assert.NotNull(fetched.OperationJson);
+            var removeOperation = JsonSerializer.Deserialize<RemoveExtensionsOperation>(fetched.OperationJson);
+
+            Assert.NotNull(removeOperation);
+            Assert.NotEmpty(removeOperation.ExtensionUrls);
+
+            var operationResult = await _removeExtensionsOperationService.ProcessOperationAsync(removeOperation, patient);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedPatient = (Patient)operationResult.Resource;
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedPatient));
+
+            Assert.Single(modifiedPatient.Extension);
+            Assert.Equal(urlToKeep, modifiedPatient.Extension[0].Url);
+            Assert.DoesNotContain(modifiedPatient.Extension, e => e.Url == urlToRemove1);
+            Assert.DoesNotContain(modifiedPatient.Extension, e => e.Url == urlToRemove2);
+        }
+
+        [Fact]
+        public async Task Integration_RemoveExtensionsOperation_Validation_RejectsEmptyUrlList()
+        {
+            var operation = new RemoveExtensionsOperation
+            {
+                Name = "Remove Extensions - Empty List",
+                Description = "Should fail validation",
+                ExtensionUrls = []
+            };
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.RemoveExtensions.ToString(),
+                FacilityId = "TestFacilityId",
+                Description = "Integration Test Remove Extensions Validation",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.False(taskResult.IsSuccess);
+            Assert.NotNull(taskResult.ErrorMessage);
+            Assert.Contains("ExtensionUrls", taskResult.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Integration_RemoveExtensionsOperation_Validation_AcceptsValidAbsoluteUrls()
+        {
+            var operation = new RemoveExtensionsOperation
+            {
+                Name = "Remove Extensions - Valid URLs",
+                Description = "Should pass validation",
+                ExtensionUrls =
+                [
+                    "http://example.com/fhir/extension/test",
+                    "https://hl7.org/fhir/StructureDefinition/ext",
+                    "urn:oid:2.16.840.1.113883.4.3"
+                ]
+            };
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.RemoveExtensions.ToString(),
+                FacilityId = "TestFacilityId",
+                Description = "Integration Test Remove Extensions Validation - Valid URLs",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Integration_RemoveExtensionsOperation_Validation_RejectsRelativeUrl()
+        {
+            var operation = new RemoveExtensionsOperation
+            {
+                Name = "Remove Extensions - Relative URL",
+                Description = "Should fail validation",
+                ExtensionUrls = ["relative/path"]
+            };
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.RemoveExtensions.ToString(),
+                FacilityId = "TestFacilityId",
+                Description = "Integration Test Remove Extensions Validation - Relative URL",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.False(taskResult.IsSuccess);
+            Assert.NotNull(taskResult.ErrorMessage);
+            Assert.Contains("absolute", taskResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task Integration_RemoveExtensionsOperation_Validation_RejectsMalformedUrl()
+        {
+            var operation = new RemoveExtensionsOperation
+            {
+                Name = "Remove Extensions - Malformed URL",
+                Description = "Should fail validation",
+                ExtensionUrls = ["not-a-url"]
+            };
+
+            var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+            {
+                OperationJson = JsonSerializer.Serialize(operation),
+                OperationType = OperationType.RemoveExtensions.ToString(),
+                FacilityId = "TestFacilityId",
+                Description = "Integration Test Remove Extensions Validation - Malformed URL",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.False(taskResult.IsSuccess);
+            Assert.NotNull(taskResult.ErrorMessage);
+            Assert.Contains("absolute", taskResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.Net.Http.Headers;
@@ -19,21 +20,26 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
 public class EpicAuth : IAuth
 {
+    private const string PemSuffix = "-pem";
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
     private readonly ICacheService _cacheService;
     private readonly ISecretManager _secretManager;
+    private readonly IOptions<DataSourceAuthSettings> _dataSourceAuthSettings;
     public EpicAuth(
         HttpClient httpClient,
         ILogger<EpicAuth> logger,
         ICacheService cacheService,
-        ISecretManager secretManager
+        ISecretManager secretManager,
+        IOptions<DataSourceAuthSettings> dataSourceAuthSettings
         )
     {
         _httpClient = httpClient;
         _logger = logger;
         _cacheService = cacheService;
         _secretManager = secretManager;
+        _dataSourceAuthSettings = dataSourceAuthSettings;
     }
 
     /// <summary>
@@ -49,7 +55,7 @@ public class EpicAuth : IAuth
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
 
-        string jwt = await GetJwt(authSettings);
+        var jwt = await GetJwt(facilityId, authSettings);
 
         try
         {
@@ -87,9 +93,13 @@ public class EpicAuth : IAuth
         return sanitizedInput;
     }
 
-    private async Task<string> GetJwt(AuthenticationConfigurationModel authSettings)
+    private async Task<string> GetJwt(string facilityId, AuthenticationConfigurationModel authSettings)
     {
-        var key = authSettings.Key.Replace("\\r\\n\\t", "\r\n\t");
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("A facilityId must be provided for Epic authentication.");
+
+        var resolvedPem = await ResolvePem(facilityId, authSettings);
+        var key = resolvedPem.Replace("\\r\\n\\t", "\r\n\t");
 
         var handler = new JsonWebTokenHandler();
         var now = DateTime.UtcNow;
@@ -132,5 +142,28 @@ public class EpicAuth : IAuth
 
         string token = handler.CreateToken(descriptor);
         return token;
+    }
+
+    private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings)
+    {
+        var keySource = _dataSourceAuthSettings.Value.KeySource;
+
+        if (keySource == PemKeySource.Database)
+        {
+            if (string.IsNullOrWhiteSpace(authSettings.Key))
+                throw new InvalidOperationException(
+                    $"No PEM found on the authentication configuration for facility '{facilityId}' (KeySource=Database).");
+
+            return authSettings.Key;
+        }
+
+        var pemName = $"{facilityId}{PemSuffix}";
+        var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
+
+        if (string.IsNullOrWhiteSpace(resolvedPem))
+            throw new InvalidOperationException(
+                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
+
+        return resolvedPem;
     }
 }

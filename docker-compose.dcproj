@@ -103,6 +103,8 @@
     <Content Include="Azure_Pipelines\_deploy_all_services.yml" />
     <Content Include="Azure_Pipelines\_summarize_delta.yaml" />
     <Content Include="Dockerfile.aspnet8-run" />
-    <Content Include="Dockerfile.hapi" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tests\AutomationUI.Pipeline\" />
   </ItemGroup>
 </Project>

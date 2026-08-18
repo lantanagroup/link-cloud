@@ -1,4 +1,4 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Hanlders;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Handlers;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;

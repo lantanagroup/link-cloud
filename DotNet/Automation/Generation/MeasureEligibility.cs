@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Controls whether a generated patient should qualify for the measure's Initial Population.

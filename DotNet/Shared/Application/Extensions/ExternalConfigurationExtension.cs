@@ -1,5 +1,6 @@
 ﻿using Azure.Identity;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -34,6 +35,9 @@ public static class ExternalConfigurationExtension
                 case "AzureAppConfiguration":
                     builder.Configuration.AddAzureAppConfiguration(options =>
                     {
+                        const string patientTagsKey = "Telemetry:PatientTags";
+                        const string includeOrgResourceKey = "PatientAggregator:IncludeOrganizationResource";
+
                         string? connectionString =
                             builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.AzureAppConfiguration);
 
@@ -58,6 +62,15 @@ public static class ExternalConfigurationExtension
                                 // Load configuration values for service name and environment
                                 .Select("*",
                                     serviceName + ":" + builder.Environment);
+
+                            options.ConfigureRefresh(refresh =>
+                            {
+                                refresh.Register(patientTagsKey, refreshAll: true);
+                                refresh.Register(includeOrgResourceKey, refreshAll: true);
+                            });
+
+                            builder.Services.AddSingleton(options.GetRefresher());
+                            builder.Services.AddHostedService<AzureAppConfigurationRefreshService>();
 
                             options.ConfigureKeyVault(kv => { kv.SetCredential(new DefaultAzureCredential()); });
                         }

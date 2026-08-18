@@ -11,5 +11,6 @@ public class TailCompletionResult
     public string FacilityId { get; set; } = string.Empty;
     public string CorrelationId { get; set; } = string.Empty;
     public string? TraceParentId { get; set; }
-    public ResourceAcquired ResourceAcquired { get; set; } = null!;
+    public string PatientId { get; set; } = string.Empty;
+    public ResourcesAcquired ResourcesAcquired { get; set; } = new ResourcesAcquired();
 }

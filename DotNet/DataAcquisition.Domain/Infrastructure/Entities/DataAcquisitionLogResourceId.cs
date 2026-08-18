@@ -10,7 +10,7 @@ public class DataAcquisitionLogResourceId
     public long Id { get; set; }
 
     [Required]
-    public long DataAcquisitionLogId { get; set; }
+    public long? DataAcquisitionLogId { get; set; }
 
     [ForeignKey(nameof(DataAcquisitionLogId))]
     public virtual DataAcquisitionLog DataAcquisitionLog { get; set; } = null!;

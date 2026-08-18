@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -31,7 +31,7 @@ public partial class ReferenceResources
     public DateTime? ModifyDate { get; set; }
 
     [Required]
-    public QueryPhase QueryPhase { get; set; }
+    public QueryPhase? QueryPhase { get; set; } = 0;
 
     public virtual ICollection<DataAcquisitionLog> DataAcquisitionLogs { get; set; } = new List<DataAcquisitionLog>();
 }

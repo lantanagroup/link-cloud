@@ -6,6 +6,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Normalization/Normalization.csproj", "DotNet/Normalization/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Normalization/Normalization.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Normalization"

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -30,7 +30,7 @@ public class ReferenceResourcesModel
             ReferenceResource = entity.ReferenceResource,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate,
-            QueryPhase = entity.QueryPhase
+            QueryPhase = entity.QueryPhase.GetValueOrDefault()
         };
     }
 }

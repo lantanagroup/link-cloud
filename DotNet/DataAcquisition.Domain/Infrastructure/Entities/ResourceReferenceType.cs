@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -16,7 +16,7 @@ public partial class ResourceReferenceType
     public string FacilityId { get; set; }
 
     [Required]
-    public QueryPhase QueryPhase { get; set; }
+    public QueryPhase? QueryPhase { get; set; } = 0;
 
     public string ResourceType { get; set; }
 

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 public sealed class PreparedReferenceLogExecutionModel
 {

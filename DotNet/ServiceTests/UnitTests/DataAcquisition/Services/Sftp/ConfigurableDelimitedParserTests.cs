@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using Microsoft.Extensions.Logging;

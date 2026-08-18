@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         [Required, DataMember]
         public List<string> ResourceTypes { get; set; } = new List<string>();
         [Required, DataMember]
-        public required IOperation Operation { get; set; }
+        public IOperation Operation { get; set; }
         [DataMember]
         public string? FacilityId { get; set; } = null;
         [DataMember(IsRequired = false)]
@@ -25,7 +25,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
             FacilityId = facilityId;
             VendorIds = vendorIds;
 
-            if (this.Operation.OperationType == OperationType.CopyLocation)
+            if ((this.Operation.OperationType == OperationType.CopyLocation ||
+                this.Operation.OperationType == OperationType.CopyLocationAliasToTypeIteratively) &&
+                !this.ResourceTypes.Contains(ResourceType.Location.ToString()))
             {
                 this.ResourceTypes.Add(ResourceType.Location.ToString());
             }

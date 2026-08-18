@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -219,7 +219,6 @@ public class AcquisitionProcessingJob : IJob
 
                 _logger.BeginScope("Processing {count} processable requests for facility {facilityId}", requests.Count, facilityId);
 
-                var logIds = requests.Select(r => r.Id).ToList();
                 var failedLogs = requests.Where(r => r.Status == RequestStatus.Failed).ToList();
 
                 var maxRetryAttempts = config.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
@@ -229,16 +228,28 @@ public class AcquisitionProcessingJob : IJob
                     .Select(r => r.Id)
                     .ToList();
 
-                var retryableLogIds = logIds.Except(maxRetriesReachedIds).ToList();
+                var retryableFailedLogIds = failedLogs
+                    .Where(r => !maxRetriesReachedIds.Contains(r.Id))
+                    .Select(r => r.Id)
+                    .ToList();
+                var pendingLogIds = requests
+                    .Where(r => r.Status == RequestStatus.Pending)
+                    .Select(r => r.Id)
+                    .ToList();
 
                 if (maxRetriesReachedIds.Any())
                 {
                     await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, false, cancellationToken);
                 }
 
-                if (retryableLogIds.Any())
+                if (pendingLogIds.Any())
                 {
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, true, cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(pendingLogIds, RequestStatus.Ready, false, cancellationToken);
+                }
+
+                if (retryableFailedLogIds.Any())
+                {
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableFailedLogIds, RequestStatus.Ready, true, cancellationToken);
                 }
 
                 foreach (var request in requests)

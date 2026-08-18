@@ -28,6 +28,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var initTelemetryOptions = new TelemetryServiceOptions();
             options.Invoke(initTelemetryOptions);
 
+            services.Configure<TelemetrySettings>(configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry));
+
             var telemetryConfig = configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry).Get<TelemetrySettings>();
 
             if (telemetryConfig is not null && telemetryConfig.EnableTelemetry)

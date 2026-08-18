@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using FluentAssertions;
 using LantanaGroup.Automation.Generation;
@@ -17,7 +17,8 @@ public class ScenarioConfigBuilderTests
         bool cleanupFhirData = true,
         int polling = 3,
         int maxPolling = 0,
-        int loki = 30)
+        int loki = 30,
+        string nhsnOrganizationId = "10756")
     {
         return new ResolvedRunOptions(
             PatientCount: 1,
@@ -34,6 +35,7 @@ public class ScenarioConfigBuilderTests
         {
             ReportPeriodStart = start,
             ReportPeriodEnd = end,
+            NhsnOrganizationId = nhsnOrganizationId,
         };
     }
 
@@ -119,13 +121,14 @@ public class ScenarioConfigBuilderTests
     {
         var config = ScenarioConfigBuilder.Build(
             AutomationScenarioKind.Custom,
-            OptionsWith(cleanupServiceData: true, cleanupFhirData: false, polling: 7, maxPolling: 15, loki: 90));
+            OptionsWith(cleanupServiceData: true, cleanupFhirData: false, polling: 7, maxPolling: 15, loki: 90, nhsnOrganizationId: "22001"));
 
         config.CleanupServiceData.Should().BeTrue();
         config.CleanupFhirData.Should().BeFalse();
         config.PollingIntervalSeconds.Should().Be(7);
         config.MaxPollingDurationMinutes.Should().Be(15);
         config.LokiScrapeWindowMinutes.Should().Be(90);
+        config.NhsnOrganizationId.Should().Be("22001");
         config.PatientIds.Should().BeEmpty();
     }
 }

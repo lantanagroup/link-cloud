@@ -1,4 +1,4 @@
-using Hl7.Fhir.Rest;
+﻿using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using System.Net;
 

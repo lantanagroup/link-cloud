@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Controllers;
+﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Report.Models
+﻿namespace LantanaGroup.Link.Report.Models
 {
     public class ReportEntrySummary
     {

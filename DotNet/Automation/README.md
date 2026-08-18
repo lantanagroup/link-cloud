@@ -11,7 +11,7 @@ This README is the comprehensive reference for the project. It is aimed at three
   and why it exists.
 - **QA** -- sections 3 and 4 explain how generation is configured and what determinism
   guarantees are in place.
-- **Developers** -- sections 5 through 9 walk through every extensible surface and the
+- **Developers** -- sections 5 through 10 walk through every extensible surface and the
   mathematical model that drives predictions.
 
 ---
@@ -38,15 +38,17 @@ clients, and presentation on top.
 Although orchestration happens in host projects, `Automation` is designed around this lifecycle:
 
 1. **Input selection** -- choose patient count, cohorts, profiles, measures, seed.
-2. **Deterministic generation** -- produce clinically coherent FHIR resources and transaction
+2. **Generation requirements planning** -- optional host-supplied requirements can shape
+   generated data so specific downstream behaviors are exercised.
+3. **Deterministic generation** -- produce clinically coherent FHIR resources and transaction
    bundles.
-3. **Streaming upload** -- upload each patient's data as it is generated (no full dataset in
+4. **Streaming upload** -- upload each patient's data as it is generated (no full dataset in
    memory).
-4. **Manifest construction** -- build concrete generated resource-key and resource-count maps
+5. **Manifest construction** -- build concrete generated resource-key and resource-count maps
    incrementally.
-5. **Acquisition + CQL reachability modeling** -- determine which generated resources are
+6. **Acquisition + CQL reachability modeling** -- determine which generated resources are
    expected to be acquired and to appear in final artifacts.
-6. **Validation support** -- expose stable contracts and derived expectations that validators can
+7. **Validation support** -- expose stable contracts and derived expectations that validators can
    compare against actual pipeline output.
 
 This design avoids brittle static baselines and favors deterministic, input-derived
@@ -61,7 +63,8 @@ Automation (no Link dependencies)
 +-- Generation/          FHIR R4 bundle generation, prediction model, streaming pipeline,
 |                        imported-patient ingestion + classification, IP-window resolver,
 |                        CQL filter simulator + per-resource-type filter profiles,
-|                        deterministic acquisition simulator
+|                        deterministic acquisition simulator,
+|                        optional generation requirements planning
 +-- Helpers/             output abstractions, retry, monitoring, diagnostics
 +-- Configuration/       base config classes for host extension
 +-- ExtractCqlTypes/     tiny utility app for extracting CQL retrieve types from measure bundles
@@ -125,6 +128,10 @@ logic in a streaming pipeline that:
    simulated through the same acquisition + CQL paths as generated patients. Imported
    patient IDs are appended to `MarkPreExistingPatient` when sourced by ID, so cleanup
    skips expunging them.
+
+Inpatient-pattern shaping is applied in this pipeline for both scheduled and non-scheduled
+workflows whenever the profile carries `ScheduledInpatientPattern` and a clinical period is
+provided. This keeps generation and prediction aligned with scenario-authored timing intent.
 
 The pipeline accepts an optional `runId` parameter; when omitted a fresh short GUID is
 generated so concurrent invocations remain isolated. Provide a stable `runId` only when
@@ -206,6 +213,41 @@ patient graph that downstream processes traverse deterministically. Examples:
 Central code tables covering SNOMED, ICD-10, RxNorm, LOINC, and CVX selections for
 demographics, practitioners, scenario definitions, observations, medications, procedures,
 service requests, and related artifacts.
+
+### 4.9 Generation requirements plans (`GenerationRequirementsPlan`)
+
+`Automation` supports optional host-supplied generation shaping through
+`GenerationRequirementsPlan` (`Generation/GenerationRequirementsPlan.cs`).
+
+This contract is intentionally platform-agnostic: it does not encode product-specific
+pipeline concepts. Instead, it expresses generic statements of
+"generated data must include characteristics X for resource types Y." A host can derive
+those requirements from any external configuration model.
+
+Core model:
+
+- `GenerationRequirementsPlan`
+  - `PlanName`
+  - `List<GenerationRequirement> Requirements`
+- `GenerationRequirement`
+  - `Name`
+  - `RequirementType` (for example `RemoveExtensions`, `CopyProperty`, `CodeMap`,
+    `ConditionalTransform`, `CopyLocation`)
+  - `List<string> ResourceTypes`
+  - optional type-specific fields (`SourceFhirPath`, `CodeMapFhirPath`,
+    `ExtensionUrls`, `Conditions`, `CodeSystemMaps`)
+
+Both generation entry points accept this plan:
+
+- `FhirGenerationPipeline.GenerateAndUploadAsync(..., GenerationRequirementsPlan? generationRequirementsPlan = null, ...)`
+- `FhirBundleGenerator.Generate(..., GenerationRequirementsPlan? generationRequirementsPlan = null, ...)`
+
+Plan application is centralized in `ScenarioResourceGeneration` so bulk and streaming paths
+cannot drift. The generation layer applies best-effort shaping to ensure target trigger
+conditions are present in produced resources while preserving deterministic behavior.
+
+This allows hosts to evolve downstream test intent without hardcoding those assumptions in
+the core generator.
 
 ---
 
@@ -323,18 +365,37 @@ before saving the scenario.
 Compact cohort inputs defining a group of patients:
 
 - `PatientCount` -- how many patients to generate.
+- `CohortQualification` -- explicit cohort intent (`Qualifying` / `NonQualifying`) used by
+  prediction gating, independent of per-measure map drift.
 - `MeasureEligibilities` -- per-measure `Qualifying` / `NonQualifying` map.
+- `ScheduledInpatientPattern` -- encounter admit/discharge timing relative to the report
+  period.
 - `EligibleClinicalScenarioIds` -- which clinical scenarios to draw from (empty = all).
 - `ResourcesPerPatientMin` / `ResourcesPerPatientMax` -- resource count range.
+
+`ScheduledInpatientPattern` values:
+
+- `AdmittedBeforePeriodRemainsInpatientAfterPeriod`
+- `AdmittedBeforePeriodDischargedDuringPeriod`
+- `AdmittedDuringPeriodRemainsInpatientAfterPeriod`
+- `AdmittedDuringPeriodDischargedDuringPeriod`
+- `AdmittedAndDischargedBeforePeriod`
+- `AdmittedAndDischargedAfterPeriod`
 
 ### 7.2 `PatientProfile`
 
 Expanded per-patient configuration produced by `PatientCohortDefinition.ExpandProfiles()`:
 
 - Per-measure eligibility map.
+- `CohortQualification` propagated from the source cohort.
+- `ScheduledInpatientPattern` propagated from the source cohort.
 - Seed offset for deterministic generation.
 - Clinical scenario assignment (round-robin from eligible scenarios).
 - Resource count (randomized within the cohort's min/max range).
+
+`PatientProfile` exposes prediction helpers that combine measure eligibility with cohort-level
+intent and pattern inclusion semantics, so hosts can compute expected submitted/ABS sets
+without re-implementing rule logic.
 
 ### 7.3 Expansion flow
 
@@ -348,6 +409,25 @@ PatientCohortDefinition[]
 
 When `EligibleClinicalScenarioIds` is empty, expansion falls back to all clinical scenarios
 from `FhirGenerationCodes.ClinicalScenarios`.
+
+### 7.4 Inpatient pattern semantics in generation/prediction
+
+`ScheduledInpatientPattern` influences two independent but coordinated behaviors:
+
+1. **Encounter window derivation** -- controls admit/discharge placement relative to the
+   report period (`before`, `during`, `after`).
+2. **Prediction inclusion semantics** -- each pattern maps to `ExpectedInReport` via
+   `ScheduledInpatientPatternExtensions.GetCensusBehavior()`.
+
+Prediction helpers (`PatientProfile.IsExpectedInReportByCohortAndPattern()` and
+`IsExpectedToBeSubmitted(...)`) combine:
+
+- per-measure eligibility,
+- `CohortQualification`,
+- pattern `ExpectedInReport`.
+
+This prevents expected-output inflation for cohorts intentionally configured as
+non-reportable by timing or cohort qualification.
 
 ---
 
@@ -375,6 +455,9 @@ Two construction modes:
 - CQL-referenced resource types (from `CqlResourceTypeExtractor`).
 - `SimulatedAcquiredResourceKeysByPatient` -- deterministic key-level acquisition replay.
 - `CqlFilteredResourceKeysByPatient` -- per-resource SDE exclusions.
+- Resource-level CQL context attributes used by the simulator, including reference/subject
+  relationships for resources such as `Specimen` where a resource can be acquired by a
+  reference query but still not be reachable from the measure's patient-context CQL retrieve.
 - `ExpectedOperationOutcomeCountByPatient` -- post-hoc hook populated by
   `ReportAbsManifestValidator` from `ReportEntry.ReportingStatus`.
 - `PreExistingPatientIds` -- patients that were already on the FHIR server before the run
@@ -389,6 +472,8 @@ For each patient the predicted set of resources is computed in layers:
 base        = simulated-acquired keys (fallback: generated keys) filtered by
               IsExpectedInAbs(resourceType)
 base        = base minus CqlFilteredResourceKeysByPatient[patientId]
+base        = empty when patient is excluded by cohort qualification/pattern inclusion
+              semantics
 base        = base plus Patient/{patientId}   when the patient qualifies for any measure
               (MeasureEval's CQL engine loads Patient implicitly)
 
@@ -424,6 +509,14 @@ absent from ABS when every applicable measure for its resource type excludes it.
 Profiles for other resource types do not participate in that intersection -- an
 Observation profile has no opinion about whether a Condition belongs in ABS.
 
+The simulator also models patient-context CQL retrieval. A DataAcquisition reference query
+can acquire a resource because some other acquired resource references it, but the measure
+CQL still evaluates `[ResourceType]` in the current patient context. Profiles therefore may
+check patient ownership/reference fields before predicting inclusion. The most important
+case today is `Specimen`: `Specimen.subject` must resolve to the evaluated patient before
+monthly ACH or Hypoglycemic specimen rules can include it, and ACH Daily additionally
+requires an included respiratory-pathogen observation to reference the specimen.
+
 For multi-measure runs with per-patient eligibility, `FhirGenerationPipeline` passes only
 each patient's **qualifying** measures into `ComputeFilteredKeys`, because a measure the
 patient does not qualify for does not contribute contained resources to ABS and therefore
@@ -436,9 +529,14 @@ Most SDE `where` clauses have the shape
 resolves the patient's IP windows once per call by walking every encounter in the input
 and keeping those whose `class.code` qualifies them for any selected measure:
 
-- ACH Monthly + ACH Daily -- `class` in {`IMP`, `EMER`, `AMB`} (inpatient, ED,
-  observation / short-stay).
-- Hypoglycemic -- `class` in {`IMP`} only.
+- ACH Monthly + ACH Daily -- `class` in the NHSN inpatient set
+  {`IMP`, `ACUTE`, `NONAC`, `SS`} plus direct emergency / observation codes
+  {`EMER`, `OBSENC`}.
+- Hypoglycemic -- `class` in the NHSN inpatient set {`IMP`, `ACUTE`, `NONAC`, `SS`}.
+
+Known resolver gaps are documented in `EncounterIpClassification`: encounter type-based
+qualification, encounter-location-based qualification, and the full Hypoglycemic
+antidiabetic-medication requirement are approximated rather than fully CQL-evaluated.
 
 The resulting `IpWindow` set is then passed to every applicable filter profile via
 `PatientCqlInput.IpWindows`. The `IpWindowExtensions` helpers (`AnyOverlaps`,
@@ -467,7 +565,10 @@ by an SDE `define` in the supported measures:
 | `HypoMedicationAdministrationFilterProfile` | `MedicationAdministration` | Hypoglycemic | `effective` overlaps any IP. |
 | `AchHypoCoverageFilterProfile` | `Coverage` | ACH + Hypoglycemic | `period` overlaps any IP (open ends supported). |
 | `AchHypoServiceRequestFilterProfile` | `ServiceRequest` | ACH + Hypoglycemic | `authoredOn` falls inside any IP. |
-| `AchEncounterFilterProfile` | `Encounter` | ACH Monthly + Daily | Encounter must itself overlap an IP window (matches the SDE `Encounter overlaps IP.period` retrieve). |
+| `AchEncounterFilterProfile` | `Encounter` | ACH Monthly + Daily + Hypoglycemic | Encounter must itself overlap an IP window (IP encounters trivially overlap themselves; ACH SDE also pulls in non-IP encounters that overlap IP). |
+| `AchMonthlySpecimenFilterProfile` | `Specimen` | ACH Monthly | `Specimen.subject` resolves to the evaluated patient AND `collection.collected` overlaps any IP. This mirrors patient-context `[Specimen]` plus the monthly SDE `overlaps IP.period` predicate. |
+| `AchDailySpecimenFilterProfile` | `Specimen` | ACH Daily | `Specimen.subject` resolves to the evaluated patient AND the specimen is referenced by a final/registered/preliminary/partial laboratory observation whose LOINC is in the respiratory pathogen (COVID-19, influenza, RSV) value sets used by the daily measure. Daily does **not** include every collected-in-period specimen. |
+| `HypoglycemicSpecimenFilterProfile` | `Specimen` | Hypoglycemic | `Specimen.subject` resolves to the evaluated patient AND `collection.collected` is fully during any IP. |
 
 All profiles are extracted from real generated FHIR content via
 `CqlFilterInputExtractor` -- the simulator never replays seeds. Adding a new family is a
@@ -482,7 +583,8 @@ matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
   acquire for each patient. The single-patient entrypoint
   `SimulateAcquiredKeysForPatient` accepts the patient's pre-parsed entries plus the
   shared infrastructure entries, the query plan, and an optional clinical period
-  (`clinicalPeriodStart` / `clinicalPeriodEnd`):
+  (`clinicalPeriodStart` / `clinicalPeriodEnd`), plus an optional
+  `allowEncounterAnchoredDateOverrideForOutOfRange` mode switch:
   - When the query plan declares a `date=ge...` or `date=le...` parameter, the simulator
     extracts the candidate resource's date range (instant fields collapse to start == end)
     and applies FHIR overlap semantics: `ge S` requires `resource.End >= S`, `le E`
@@ -492,6 +594,10 @@ matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
     set and a one-time-per-resource warning is emitted via the optional `IAutomationOutput`
     sink. This keeps prediction honest for unfamiliar imported FHIR shapes; extending
     `TryGetResourceDateRange` is the way to model new shapes.
+  - **Encounter-anchored out-of-range override (optional)** -- callers can opt-in to keep
+    encounter-linked Observation/DiagnosticReport/Procedure resources when strict date-bound
+    matching would otherwise exclude them. Hosts typically enable this for scheduled/regenerate
+    workflows and keep strict mode for non-scheduled runs.
 - `CqlResourceTypeExtractor` -- extracts CQL-retrieved resource types from measure bundles.
   Reachability roots include both population criteria expressions and `supplementalData`
   criteria expressions (SDE roots).
@@ -506,6 +612,9 @@ matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
   - MedicationAdministrations (`MedicationAdministrationContext`).
   - Coverages (`CoverageContext`).
   - ServiceRequests (`ServiceRequestContext`).
+  - Specimens (`SpecimenContext`, including `subject` and `collection.collected`).
+  Observation extraction also captures `status` and `specimen` references for measure rules
+  that include related specimens through qualifying observations.
   Legacy single-encounter shape is preserved (`EncounterId` / `EncounterStart` /
   `EncounterEnd` pick the first encounter with a populated `Period`) so existing callers
   and tests continue to compile and behave the same.
@@ -566,6 +675,9 @@ infrastructure coupling.
 - Uses `Hl7.Fhir.R4` for FHIR model types and `System.Text.Json` for serialization.
 - `FhirGenerationPipeline` is the recommended entry point for any non-trivial dataset;
   `FhirBundleGenerator.Generate()` is suitable only for small/test datasets.
+- `GenerationRequirementsPlan` is optional and consumer-supplied. When present, it shapes
+  generated resources to include required characteristics using platform-agnostic
+  requirement semantics.
 - `UploadBundlesSequentiallyAsync` aborts on first failure to preserve resource dependency
   ordering guarantees.
 - Pipeline-derived resources (`Patient`, `MeasureReport`, `OperationOutcome`) are predicted

@@ -4,6 +4,7 @@ using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Collections;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
@@ -18,12 +19,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default)
         {
             var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
 
             if (result.SuccessCode == OperationStatus.Success) {
-                _logger.LogDebug("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+                _logger.LogDebug("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
             }
 
             return result;
@@ -46,7 +47,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 : OperationServiceHelper.GetValueReflectively(resource, sourceFhirPath);
 
             if (sourceValue == null)
-                return OperationResult.Failure($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.", resource);
+                return OperationResult.NoAction($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.", resource);
 
             if (sourceValue is string or int or bool or decimal or DateTime ||
                 sourceValue is IList valueList && valueList.Cast<object>().All(v => v is string or int or bool or decimal or DateTime))
@@ -128,7 +129,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Failed to validate complex type compatibility for FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath, scopedNode.Name);
+                Logger.LogError(ex, "Failed to validate complex type compatibility for FHIRPath '{TargetFhirPath}' for resource type {ResourceType}.", targetFhirPath.SanitizeForLog(), scopedNode.Name.SanitizeForLog());
                 return OperationServiceHelper.SetValueResult.Failure($"Failed to validate complex type compatibility for FHIRPath '{targetFhirPath}': {ex.Message}");
             }
         }

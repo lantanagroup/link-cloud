@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
@@ -26,7 +26,7 @@ public partial class FhirQuery
     public List<string> QueryParameters { get; set; } = new List<string>();
 
     [Required]
-    public FhirQueryType QueryType { get; set; }
+    public FhirQueryType? QueryType { get; set; } = 0;
 
     public string? MeasureId { get; set; }
     public TimeFrame? CensusTimeFrame { get; set; } = null;

@@ -14,9 +14,8 @@ This README is aimed at three audiences:
 
 - **Product owners / project managers** -- sections 1-4 describe what the UI does and how
   users interact with it.
-- **QA** -- sections 5-7 describe the dashboard, run inspection, and the strict
-  prediction-vs-actual report surface.
-- **Developers** -- sections 8-12 describe the code structure, persistence model, and
+- **QA** -- sections 5-7 and 15 describe run workflows and API Health execution/coverage.
+- **Developers** -- sections 8-15 describe the code structure, persistence model, and
   extension points.
 
 ---
@@ -29,13 +28,19 @@ pipeline tests. It provides:
 1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
 2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
-3. **Scenario execution** -- start, cancel, and delete runs.
-4. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
-5. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
-6. **Persistent run history** -- MongoDB-backed state across restarts.
-7. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
-8. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
+3. **Organization Resource Map management** -- define reusable org-location matching templates
+   (FHIRPath conditions) used to scope reporting to organization-relevant encounters/resources.
+4. **Normalization suite management** -- define reusable normalization operations,
+   sequences, and suites; select suites per scenario.
+5. **Scenario execution** -- start, cancel, and delete runs.
+6. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
+7. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
+8. **Persistent run history** -- MongoDB-backed state across restarts.
+9. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
+10. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
+11. **API Health automated testing** -- service-oriented endpoint/status-path verification with
+   seeded test data, streaming progress, and run history.
 
 ---
 
@@ -47,6 +52,10 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- RunsController          dashboard, run lifecycle, snapshot/log APIs
 |   +-- ScenariosController     inline CRUD for scenario templates
 |   +-- QueryPlansController    inline CRUD for query plan templates
+|   +-- OrganizationResourceMapsController inline CRUD for org resource map templates
+|   +-- NormalizationsController inline CRUD for normalization operations/sequences/suites
+|   +-- ApiHealthController     API Health dashboard + SSE run streaming
+|   +-- Api/AutomationRunsApiController  external start/status API
 |   +-- HomeController          landing redirect
 +-- Views/
 |   +-- Runs/Index.cshtml       dashboard: KPIs, run history, quick-launch
@@ -54,15 +63,24 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- Runs/Manifest.cshtml    Generation-Manifest deep dive (generated / predicted / actual)
 |   +-- Scenarios/Index.cshtml  scenario list (uses shared editor modal)
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
+|   +-- OrganizationResourceMaps/Index.cshtml organization resource map template management
+|   +-- Normalizations/Index.cshtml normalization operations/sequences/suites management
+|   +-- ApiHealth/Index.cshtml  API test matrix, run controls, SSE/live updates
 |   +-- Shared/_ScenarioEditorModal.cshtml   reusable scenario editor (markup + JS)
 +-- Models/
 |   +-- RunDashboardViewModel, RunDashboardStats, TestScenarioDefinition, --
 +-- Services/
 |   +-- AutomationRunManager    run lifecycle orchestration
+|   +-- ApiEndpointRegistry     API Health endpoint catalog
+|   +-- ApiHealthTestExecutor   per-endpoint execution abstraction
+|   +-- ApiHealthExecutionRunManager  long-running API Health service/all runs
+|   +-- ApiHealthSeedOrchestrator     seed run lifecycle + context propagation
 |   +-- RunSnapshotOrchestrator background pollers per active run
 |   +-- StoreBackedServicePoller polls pipeline domains and writes snapshots
 |   +-- RunHub                  SignalR hub for run logs + dashboard updates
 |   +-- ScenarioSeedService     seeds system scenarios at startup
+|   +-- NormalizationSuiteSeedService seeds system normalization operations/sequences/suites
+|   +-- NormalizationSuiteResolver resolves selected suite at run time
 +-- Services/Persistence/
     +-- MongoSnapshotStore      run summaries, logs, per-domain snapshots
     +-- MongoScenarioStore      saved scenario templates
@@ -164,9 +182,66 @@ acquisition. Follows the same inline editing pattern as Scenarios.
 System query plans cannot be modified or deleted. The default query plan is used for new
 scenarios unless overridden.
 
-### 3.4 `HomeController`
+### 3.4 `NormalizationsController`
+
+Manages reusable normalization definitions used by scenarios:
+
+- **Operations** (`NormalizationOperationDefinition`) -- unit operations (for example
+  `RemoveExtensions`, `CopyProperty`, `CodeMap`, `ConditionalTransform`, `CopyLocation`).
+- **Sequences** (`NormalizationSequenceDefinition`) -- ordered operation references.
+- **Suites** (`NormalizationSuiteDefinition`) -- bundles of sequences and/or standalone
+  operations, with optional default marker.
+
+All edits are inline JSON POSTs with antiforgery and system-item protection semantics
+(system items can be cloned, not modified/deleted).
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | Normalization management page (operations / sequences / suites tabs). |
+| `GetOperationJson` / `GetSequenceJson` / `GetSuiteJson` | GET | Fetch one definition by id. |
+| `SaveOperation` / `SaveSequence` / `SaveSuite` | POST | Create or update non-system definitions. |
+| `CloneOperation` / `CloneSequence` / `CloneSuite` | POST | Deep copy selected definition. |
+| `DeleteOperation` / `DeleteSequence` / `DeleteSuite` | POST | Delete non-system definitions. |
+| `SetDefaultSuite` | POST | Mark one suite as default. |
+
+### 3.5 `OrganizationResourceMapsController`
+
+Manages reusable Organization Resource Map templates used to configure Data Acquisition
+org-location matching conditions per run.
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | Template list/editor page. |
+| `GetJson` | GET | Return a single org resource map template as JSON. |
+| `SaveInline` | POST | Create or update a custom org resource map template. |
+| `CloneInline` | POST | Clone an existing template. |
+| `DeleteInline` | POST | Delete a non-system template. |
+| `SetDefaultInline` | POST | Mark a template as the default for new scenarios. |
+
+Templates store one or more FHIRPath conditions (evaluated against `Location`) and are
+applied with "any match" semantics.
+
+### 3.6 `HomeController`
 
 Redirects to `Runs/Index`.
+
+### 3.7 `ApiHealthController`
+
+Primary API Health UI surface. Provides dashboard rendering, run launch, SSE streaming,
+active-run resume, and history APIs.
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | API Health matrix page (grouped by service, latest status per endpoint). |
+| `RunEndpoint` | POST | Run one endpoint test (seeded as required by suite contract). |
+| `RunServiceStream` | GET | Start service-scoped API Health run; stream events via SSE. |
+| `RunAllStream` | GET | Start run-all API Health run; stream events via SSE. |
+| `RunStream` | GET | Attach to an existing API Health run id and stream events. |
+| `ActiveRun` | GET | Returns currently active API Health run metadata for resume-on-refresh UX. |
+| `History` | GET | Paged endpoint history from `api_health_runs` persistence. |
+
+Execution events are streamed as `text/event-stream` (`phase`, `result`, `done`) and the
+client updates row status/badges in real time.
 
 ---
 
@@ -214,11 +289,37 @@ The Scenarios page reloads on this event; the Runs page appends the saved scenar
 quick-launch dropdown, selects it, and fires the dropdown's `change` event so the Run button
 becomes ready immediately.
 
+### API Health view model
+
+`Views/ApiHealth/Index.cshtml` is a service-grouped test matrix (not modal CRUD). It provides:
+
+- **Run All** and **Run Service** controls.
+- Real-time phase/result rendering through SSE.
+- Seed-run status card (run link, live status, elapsed timer).
+- Endpoint-level history modal backed by persisted API Health results.
+- Run-start reset behavior (service-only or all rows) so each execution starts from pending state.
+
 ### Antiforgery
 
 All POST endpoints use `[ValidateAntiForgeryToken]`. The token is rendered via
 `@Html.AntiForgeryToken()` inside the modal and sent as a `RequestVerificationToken` request
 header.
+
+Antiforgery tokens are protected by ASP.NET Core Data Protection. `Automation.UI` persists the
+Data Protection key ring to MongoDB so redeploying the UI does not invalidate current browser
+tokens solely because the container restarted. Keys are stored in the configured Mongo database in
+`DataProtection:KeyCollectionName` (default: `automation_data_protection_keys`).
+
+By default, the Data Protection application name is environment-scoped:
+
+```text
+Link.Automation.UI:{ASPNETCORE_ENVIRONMENT}
+```
+
+This allows environments such as Dev and Test to use the same Mongo collection without sharing a
+decryptable antiforgery/cookie payload boundary. Override `DataProtection:ApplicationName` only if
+the value needs to be pinned to a deployment-specific name; it must remain stable across redeploys
+and across all replicas of the same environment.
 
 ---
 
@@ -235,8 +336,10 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `Seed` | Deterministic generation seed. |
 | `PatientCount` | Computed from cohorts plus imported patients (read-only on the editor). |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
-| `PatientCohorts` | List of cohort definitions (count, eligibility, clinical profiles, resource range). |
+| `PatientCohorts` | List of cohort definitions (count, `CohortQualification`, per-measure eligibility, clinical profiles, resource range, inpatient pattern). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
+| `OrganizationResourceMapTemplateId` | Optional override for org-location matching template (null = default template). |
+| `NormalizationSuiteId` | Optional override for the normalization suite (null = system default suite). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |
 | `CleanupFhirData` | Expunge FHIR server data after completion. |
 | `ReportPeriodStart` / `ReportPeriodEnd` | Optional reporting period (UTC). When null, the system defaults (`2023-01-01T00:00:00Z` / `2023-12-31T23:59:59Z`) are used. The runtime uses these to bound generated encounter windows and to drive the report's clinical period; the editor auto-suggests a value that encompasses any imported-patient encounter dates. |
@@ -276,6 +379,12 @@ each imported patient the editor calls `ScenariosController.ClassifyImported` to
 When an imported encounter falls outside the configured Report Period, the editor shows
 a warning so the user knows to expect non-qualification. The save proceeds either way.
 
+> **Important for Custom / Uploaded patients:** imported data is used as-authored. To get
+> expected org-scoped acquisition and ABS outcomes, the selected Organization Resource Map
+> must be compatible with the actual `Location` / `Encounter.location` shape in that data
+> (for example matching the identifier systems/codes present on referenced locations).
+> A broad/default map that fits generated synthetic data may not fit uploaded bundles.
+
 ### System scenarios
 
 `ScenarioSeedService` seeds a set of canonical system scenarios at startup. Each one mirrors a
@@ -294,6 +403,24 @@ UI scenario and the backend test produces equivalent FHIR input:
 
 These scenarios match `Tests/BackendE2ETests` entry by entry (see that project's README).
 
+### Normalization suites and generation requirements plans
+
+`Automation.UI` stores and manages normalization suites as Link-facing configuration, but it
+does **not** hardcode suite behavior into the core generator. At run time:
+
+1. The selected suite id (`NormalizationSuiteId`) is resolved to concrete operations via
+   `NormalizationSuiteResolver`.
+2. `RunExecutor` maps that resolved suite into a platform-agnostic
+   `GenerationRequirementsPlan` (from the `Automation` project).
+3. The generation plan is passed into both generation paths
+   (`FhirGenerationPipeline` and `FhirBundleGenerator`) so generated data includes required
+   trigger characteristics.
+4. The original suite is still applied to Link Normalization service configuration for
+   execution-time normalization.
+
+This separation keeps `Automation` platform-agnostic while allowing `Automation.UI` to
+author and enforce Link-specific normalization intent.
+
 ### Cohort model
 
 Each cohort defines a group of patients sharing:
@@ -311,6 +438,73 @@ The editor enforces measure eligibility constraints in the UI:
   the generation layer).
 - The Hypoglycemic measure requires ACH Monthly to also be qualifying (dependency
   enforcement).
+
+### Inpatient Pattern (UI-driven encounter timing)
+
+Each cohort includes a `ScheduledInpatientPattern` that defines encounter timing relative to
+the report period. This is authored in the shared scenario editor modal and persisted with
+the cohort JSON.
+
+Supported values:
+
+- `AdmittedBeforePeriodRemainsInpatientAfterPeriod`
+- `AdmittedBeforePeriodDischargedDuringPeriod`
+- `AdmittedDuringPeriodRemainsInpatientAfterPeriod`
+- `AdmittedDuringPeriodDischargedDuringPeriod`
+- `AdmittedAndDischargedBeforePeriod`
+- `AdmittedAndDischargedAfterPeriod`
+
+The dropdown uses compact labels for readability and tooltip hints for the full wording.
+
+#### Cohort Outcome + Pattern compatibility
+
+The editor now treats cohort intent as explicit via `CohortQualification`:
+
+- `Qualifying`
+- `NonQualifying`
+
+Pattern options are filtered by that choice:
+
+- **Qualifying** cohorts can choose only patterns whose census behavior is
+  `ExpectedInReport=true`.
+- **Non-Qualifying** cohorts can choose only patterns whose census behavior is
+  `ExpectedInReport=false`.
+
+This prevents invalid UI combinations that previously caused prediction drift.
+
+#### Measure checkbox rules by Cohort Outcome
+
+The cohort measure-eligibility editor enforces hard constraints:
+
+- **Qualifying cohort**
+  - If one selected measure exists in the scenario, it cannot be unchecked.
+  - If multiple measures exist, at least one must remain checked.
+- **Non-Qualifying cohort**
+  - No measure checkboxes can be selected.
+
+These rules run on row add, measure toggle, cohort-outcome toggle, and global measure-list
+changes.
+
+#### Runtime impact
+
+The UI host passes inpatient pattern + cohort qualification through run resolution so the
+downstream generation/prediction model can align expectations with authored scenario intent:
+
+- Pattern shapes encounter timing for both scheduled and non-scheduled runs.
+- Scheduled/regenerate runs additionally use pattern-derived live census orchestration.
+- Expected submitted/ABS sets are gated by measure eligibility **and**
+  (`CohortQualification` + pattern inclusion semantics), reducing false validator failures.
+
+#### Backward compatibility
+
+Legacy scenarios (saved before these fields were first-class) are normalized on load/save:
+
+- missing pattern defaults to
+  `AdmittedBeforePeriodRemainsInpatientAfterPeriod`.
+- missing `CohortQualification` is inferred from per-measure eligibility where possible.
+
+This keeps existing saved scenarios runnable while adopting the new model.
+
 ---
 
 ## 6. Dashboard and real-time updates
@@ -336,6 +530,25 @@ The editor enforces measure eligibility constraints in the UI:
 `AutomationRunManager` broadcasts to both groups on every status transition, enabling live log
 streaming on the run details page and real-time dashboard KPI updates without polling.
 
+### 6.3 API Health streaming model
+
+API Health uses **SSE** (not SignalR) for long-running test execution streams:
+
+- `ApiHealthExecutionRunManager` owns in-memory active run state and ordered event buffers.
+- `ApiHealthController.StreamRunAsync` emits `phase`, `result`, and terminal `done` events.
+- Browser-side code supports reconnect/resume by requesting `ActiveRun` then attaching with
+  `RunStream?runId=...`.
+- Seed orchestration is surfaced in-phase, including linked seed run metadata when available.
+
+Why SSE here:
+
+- API Health execution is a one-way server→browser event feed (`phase`/`result`/`done`) with no
+  client-to-server hub messaging requirements.
+- `EventSource` keeps the transport model small and explicit for this workflow (single long-lived
+  HTTP response per stream).
+- Existing run-log telemetry remains on SignalR (`RunHub`) where group subscription semantics are
+  needed; API Health keeps a separate, purpose-fit stream model to avoid unnecessary hub coupling.
+
 ---
 
 ## 7. End-to-end run workflow
@@ -359,6 +572,12 @@ streaming on the run details page and real-time dashboard KPI updates without po
      (generated cohort first, imported patients appended).
    - `GenerationManifest` is built incrementally during generation; ID-imported patients
      are recorded via `MarkPreExistingPatient` so cleanup skips them.
+    - The resolved normalization suite is translated into a platform-agnostic
+      `GenerationRequirementsPlan` and supplied to generation so produced resources include
+      the required trigger characteristics.
+   - When an Organization Resource Map template is selected, its conditions are applied to:
+     - Data Acquisition org-location configuration for the run facility, and
+     - generation/prediction modeling so expected ABS counts are org-scope aware.
    - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
    - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
@@ -397,6 +616,8 @@ with:
 - Acquired resource types from the effective query plan.
 - Parameter-query resource types.
 - Simulated acquired keys per patient (`QueryPlanAcquisitionSimulator`).
+- Organization Resource Map post-filtering over simulated acquired keys
+  (`OrgResourceMapPredictionFilter`).
 - CQL-referenced resource types (`CqlResourceTypeExtractor`).
 - Per-resource CQL exclusions (`CqlFilterSimulator`, measure-family profiles, intersection
   semantics across the patient's qualifying measures).
@@ -406,7 +627,28 @@ strict prediction-vs-actual comparison. The Report service's `ReportEntry.Report
 rows feed the `OperationOutcome` count prediction (one OO per patient with
 `FailedValidation`).
 
-See `DotNet/Automation/README.md` section 7 for the full prediction formula.
+The CQL simulator is resource-aware, not just type-aware. In addition to checking that a
+resource type is acquired and referenced by CQL, it applies known SDE `where` predicates per
+resource. For example, `Specimen` prediction now models measure-specific behavior:
+
+- ACH Monthly predicts only specimens whose `subject` is the evaluated patient and whose
+  `collection.collected` overlaps an initial-population encounter.
+- ACH Daily predicts only patient-owned specimens referenced by qualifying respiratory
+  pathogen laboratory observations (COVID-19, influenza, RSV); it does not assume every
+  acquired specimen appears in ABS.
+- Hypoglycemic predicts only patient-owned specimens whose collection interval is fully
+  during an initial-population encounter.
+
+This matters on the `Runs/Manifest` page: a `Specimen` can be shown as generated and even
+DataAcquisition-acquired through a reference query, but still be filtered from the predicted
+ABS set when patient-context CQL retrieval or measure-specific SDE predicates do not include
+it.
+
+Likewise, when Organization Resource Map conditions are active, resources tied only to
+non-org encounters are intentionally excluded from the predicted ABS set, even if they are
+otherwise query-plan-acquired and CQL-referenced.
+
+See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
 ### Generation Manifest page
 
@@ -456,6 +698,17 @@ Per-run poller with one cadence for all key domains:
 Each domain write is independent and fault-isolated. Failures are logged to run logs without
 taking down the whole poll cycle.
 
+### API Health services
+
+- `ApiEndpointRegistry` discovers/normalizes endpoint definitions from all registered suites.
+- `ApiHealthTestExecutor` executes endpoint/suite tests and persists results.
+- `ApiHealthExecutionRunManager` coordinates service/all runs, emits ordered execution events,
+  and handles run state transitions.
+- `ApiHealthSeedOrchestrator` launches/monitors seed scenario runs, exposes seed context to
+  suites, and performs teardown cleanup.
+- `IApiHealthSeedContextAccessor` carries per-run seed payloads (facility/report ids and seed
+  run metadata) across suite execution.
+
 ### `ISnapshotStore` + Mongo stores
 
 Persistence abstraction used by both execution and UI reads:
@@ -479,6 +732,10 @@ Collections:
 - `automation_logs` -- full run logs.
 - `automation_scenarios` -- user and system scenario templates.
 - `automation_query_plan_templates` -- query plan templates.
+- `automation_normalization_operations` -- normalization operation definitions.
+- `automation_normalization_sequences` -- normalization sequence definitions.
+- `automation_normalization_suites` -- normalization suite definitions.
+- `api_health_runs` -- API Health endpoint execution history.
 
 ### Document conventions
 
@@ -587,8 +844,47 @@ Port mapping: host `5256` -- container `5257`.
 - Imported patients (by ID and by uploaded bundle) are first-class scenario inputs.
   Bundles are validated server-side on save; ID-only patients are pre-fetched at run
   start so the run's reporting period can widen to enclose their encounter dates.
+- Organization Resource Maps are first-class scenario inputs and directly affect both
+  acquisition behavior and ABS prediction math. For uploaded/custom patients, choose a map
+  that specifically matches the locations and encounter references present in the imported
+  dataset.
 - The Report Period (`ReportPeriodStart` / `ReportPeriodEnd`) is exposed in the editor
   and on the dashboard quick-launch row. When omitted, the system default for the chosen
   report method is used.
 - Data-Acquisition log search is server-side. The Run Details DA-logs panel debounces
   the search input and re-issues a paged request with `searchTerm` on every change.
+
+---
+
+## 15. API Health automated testing workflow
+
+API Health is a dedicated automation workflow for service API validation in `Automation.UI`.
+
+### What it does
+
+- Executes endpoint/status-path checks across registered service suites.
+- Supports service-scoped and run-all execution.
+- Persists endpoint history and latest status for dashboard hydration.
+- Streams execution progress/results live to the browser.
+
+### Seeded execution model
+
+- Suites declare seed requirements via `GetSeedRequirements()`.
+- When required, API Health launches `ApiHealthScenario` through `IAutomationRunManager`.
+- The resulting seed payload (e.g., facility/report ids) is attached to execution context.
+- Seed teardown runs after suite execution, preserving test reliability during run and
+  performing cleanup at the appropriate lifecycle stage.
+
+### Result model
+
+Each endpoint result tracks:
+
+- expected vs actual status code,
+- pass/fail/skip semantics,
+- duration,
+- request metadata,
+- response snippet/error context,
+- execution timestamp.
+
+Skipped steps are explicit (with reason) for paths that are intentionally non-deterministic or
+cannot be self-seeded through API-only orchestration.

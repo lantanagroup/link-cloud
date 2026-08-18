@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 
 namespace UnitTests.Automation;
 
@@ -484,5 +484,135 @@ public class CqlFilterSimulatorTests
             InputWithMedicationRequests(mr));
 
         Assert.Contains("MedicationRequest/MR-multi-out", excluded);
+    }
+
+    // ---------- Specimen profiles ----------
+
+    private static CqlFilterSimulator.SpecimenContext Specimen(
+        string id,
+        DateTime collectionStart,
+        DateTime? collectionEnd = null,
+        string patientId = "P1")
+        => new(id, collectionStart, collectionEnd ?? collectionStart)
+        {
+            SubjectReference = $"Patient/{patientId}"
+        };
+
+    private static CqlFilterSimulator.ObservationContext LabObservationWithSpecimen(
+        string id,
+        string loinc,
+        string specimenId)
+        => new(
+            ResourceId: id,
+            LoincCode: loinc,
+            CategoryCodes: new[] { "laboratory" },
+            EffectiveStart: EncStart.AddHours(1),
+            EffectiveEnd: EncStart.AddHours(2))
+        {
+            Status = "final",
+            SpecimenReference = $"Specimen/{specimenId}"
+        };
+
+    private static CqlFilterSimulator.PatientCqlInput InputWithSpecimens(
+        CqlFilterSimulator.SpecimenContext[] specimens,
+        params CqlFilterSimulator.ObservationContext[] observations)
+        => new(
+            PatientId: "P1",
+            EncounterId: "E1",
+            EncounterStart: EncStart,
+            EncounterEnd: EncEnd,
+            Conditions: Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Observations: observations)
+        { Specimens = specimens };
+
+    [Fact]
+    public void AchMonthly_Specimen_CollectedDuringEncounter_IsKept()
+    {
+        var specimen = Specimen("S-monthly-in", EncStart.AddHours(1));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            InputWithSpecimens(new[] { specimen }));
+
+        Assert.DoesNotContain("Specimen/S-monthly-in", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_Specimen_CollectedOutsideEncounter_IsExcluded()
+    {
+        var specimen = Specimen("S-monthly-out", EncEnd.AddDays(2));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            InputWithSpecimens(new[] { specimen }));
+
+        Assert.Contains("Specimen/S-monthly-out", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_Specimen_WithDifferentSubject_IsExcludedEvenWhenCollectedDuringEncounter()
+    {
+        var specimen = Specimen("S-monthly-other-patient", EncStart.AddHours(1), patientId: "OtherPatient");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            InputWithSpecimens(new[] { specimen }));
+
+        Assert.Contains("Specimen/S-monthly-other-patient", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_Specimen_ReferencedOnlyByNonRespiratoryObservation_IsExcluded()
+    {
+        var specimen = Specimen("S-daily-non-rps", EncStart.AddHours(1));
+        var sodium = LabObservationWithSpecimen("O-sodium", "2951-2", specimen.ResourceId);
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation },
+            InputWithSpecimens(new[] { specimen }, sodium));
+
+        Assert.Contains("Specimen/S-daily-non-rps", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_Specimen_ReferencedByRespiratoryPathogenObservation_IsKept()
+    {
+        var specimen = Specimen("S-daily-rps", EncStart.AddHours(1));
+        var covid = LabObservationWithSpecimen("O-covid", "94500-6", specimen.ResourceId);
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation },
+            InputWithSpecimens(new[] { specimen }, covid));
+
+        Assert.DoesNotContain("Specimen/S-daily-rps", excluded);
+    }
+
+    [Fact]
+    public void Hypoglycemic_Specimen_CollectedOutsideEncounter_IsExcluded()
+    {
+        var specimen = Specimen("S-hypo-out", EncEnd.AddDays(2));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation },
+            InputWithSpecimens(new[] { specimen }));
+
+        Assert.Contains("Specimen/S-hypo-out", excluded);
+    }
+
+    [Fact]
+    public void MixedMeasures_SpecimenKeptWhenAnyApplicableMeasureKeepsIt()
+    {
+        var specimen = Specimen("S-mixed", EncStart.AddHours(1));
+        var sodium = LabObservationWithSpecimen("O-sodium", "2951-2", specimen.ResourceId);
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[]
+            {
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+                ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
+            },
+            InputWithSpecimens(new[] { specimen }, sodium));
+
+        Assert.DoesNotContain("Specimen/S-mixed", excluded);
     }
 }

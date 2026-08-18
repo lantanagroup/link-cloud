@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -101,6 +101,26 @@ public sealed class GenerationManifest
     /// </summary>
     public IDictionary<string, int> ExpectedOperationOutcomeCountByPatient { get; set; }
         = new Dictionary<string, int>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// When true, predict one additional <c>Organization</c> resource per submitted patient
+    /// artifact in ABS to account for Report's <c>PatientAggregator:IncludeOrganizationResource</c>
+    /// behavior.
+    ///
+    /// This is count-level only: the organization ID is assigned by downstream services and
+    /// is not represented in key-level expectations.
+    /// </summary>
+    public bool IncludePatientAggregatorOrganizationResource { get; set; }
+
+    /// <summary>
+    /// Optional explicit ABS scope: when populated, only these patients are expected
+    /// to produce patient-{id}.ndjson artifacts.
+    ///
+    /// This is used by scheduled workflows where a patient's profile may be
+    /// measure-qualifying in isolation, but report orchestration/terminal state resolves
+    /// a smaller submitted subset.
+    /// </summary>
+    public IReadOnlySet<string>? ExpectedAbsPatientIdsOverride { get; set; }
 
     /// <summary>
     /// Every resource key (<c>ResourceType/ResourceId</c>) from the generated FHIR bundles,
@@ -247,6 +267,12 @@ public sealed class GenerationManifest
     {
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        if (ExpectedAbsPatientIdsOverride is { Count: > 0 }
+            && !ExpectedAbsPatientIdsOverride.Contains(patientId))
+        {
+            return filtered;
+        }
+
         // Non-qualifying patients are never submitted by measure-eval, so PatientAggregator
         // never emits a patient-{id}.ndjson artifact for them and nothing about them
         // appears in ABS — even though their resources were uploaded to the FHIR server
@@ -294,6 +320,9 @@ public sealed class GenerationManifest
     /// </summary>
     private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts)
     {
+        if (!ShouldExpectAbsForPatient(patientId))
+            return;
+
         var qualifyingMeasureCount = CountQualifyingMeasuresForPatient(patientId);
         if (qualifyingMeasureCount > 0)
         {
@@ -307,6 +336,13 @@ public sealed class GenerationManifest
         {
             counts["OperationOutcome"] = ooCount;
         }
+
+        if (IncludePatientAggregatorOrganizationResource)
+        {
+            counts["Organization"] = counts.TryGetValue("Organization", out var orgCount)
+                ? orgCount + 1
+                : 1;
+        }
     }
 
     private int CountQualifyingMeasuresForPatient(string patientId)
@@ -314,6 +350,8 @@ public sealed class GenerationManifest
         var idx = PatientIds.ToList().IndexOf(patientId);
         if (idx < 0 || idx >= Profiles.Count) return 0;
         var profile = Profiles[idx];
+        if (!profile.IsExpectedInReportByCohortAndPattern())
+            return 0;
         return SelectedMeasures.Count(m => profile.QualifiesFor(m));
     }
 
@@ -321,7 +359,13 @@ public sealed class GenerationManifest
     {
         var idx = PatientIds.ToList().IndexOf(patientId);
         if (idx < 0 || idx >= Profiles.Count) return false;
-        return Profiles[idx].QualifiesForAny(SelectedMeasures);
+        return Profiles[idx].IsExpectedToBeSubmitted(SelectedMeasures);
+    }
+
+    private bool ShouldExpectAbsForPatient(string patientId)
+    {
+        return ExpectedAbsPatientIdsOverride is not { Count: > 0 }
+               || ExpectedAbsPatientIdsOverride.Contains(patientId);
     }
 
     /// <summary>
@@ -348,9 +392,10 @@ public sealed class GenerationManifest
     public int QualifyingPatientCount(string measureId)
     {
         var idx = IndexOfMeasure(measureId);
-        if (idx < 0 || idx >= SelectedMeasures.Count) return Profiles.Count; // fallback: assume all qualify
+        if (idx < 0 || idx >= SelectedMeasures.Count)
+            return Profiles.Count(p => p.IsExpectedInReportByCohortAndPattern());
         var measureType = SelectedMeasures[idx];
-        return Profiles.Count(p => p.QualifiesFor(measureType));
+        return Profiles.Count(p => p.IsExpectedInReportByCohortAndPattern() && p.QualifiesFor(measureType));
     }
 
     private static string GetResourceTypeFromKey(string key)
@@ -374,7 +419,7 @@ public sealed class GenerationManifest
         var result = new List<string>();
         for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
         {
-            if (Profiles[i].QualifiesForAny(SelectedMeasures))
+            if (Profiles[i].IsExpectedToBeSubmitted(SelectedMeasures))
                 result.Add(PatientIds[i]);
         }
         return result;
@@ -414,6 +459,7 @@ public sealed class GenerationManifest
     public GenerationManifestSnapshot ToSnapshot()
     {
         var eligibility = new Dictionary<string, List<string>>();
+        var inpatientPatterns = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
         {
             var qualifying = new List<string>();
@@ -423,6 +469,10 @@ public sealed class GenerationManifest
                     qualifying.Add(measure.ToString());
             }
             eligibility[PatientIds[i]] = qualifying;
+
+            var pattern = Profiles[i].ScheduledInpatientPattern
+                ?? ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+            inpatientPatterns[PatientIds[i]] = pattern.ToString();
         }
 
         // Build predicted ABS counts per patient (generated ? acquired ? CQL-referenced)
@@ -458,6 +508,7 @@ public sealed class GenerationManifest
                 .Where(kv => !string.IsNullOrEmpty(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => new Dictionary<string, int>(kv.Value)),
             PatientEligibility = eligibility,
+            PatientInpatientPatterns = inpatientPatterns,
             ExpectedAbsCountsByPatient = expectedAbsByPatient,
             ExpectedAbsTotalCountsByType = expectedAbsTotals
         };

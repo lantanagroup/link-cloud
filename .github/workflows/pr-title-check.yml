@@ -30,8 +30,8 @@ jobs:
           } else {
             core.setFailed('Cannot determine PR title for validation.')
           }
-          const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^LEGLINK-\d+:\s)|(^TECH_DEBT:\s)|(^DOCS:\s)|(^SNYK:\s)|(^Dops-)|(^Bump\s)/g
-          const prTitleMismatchError = 'Invalid PR title "' + prTitle + '"! Must begin with LNK-nnnn:<space> or LEGLINK-nnnn:<space> or TECH_DEBT:<space> or DOCS:<space> or SNYK:<space> or Dops- or Bump<space>, e.g. LNK-1234: My PR title, or TECH_DEBT or DOCS or SNYK or Dops- or Bump: My PR title or DOCS: My PR title or [Snyk] My PR title'
+          const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^LEGLINK-\d+:\s)|(^LEGPROG-\d+:\s)|(^TECH_DEBT:\s)|(^DOCS:\s)|(^SNYK:\s)|(^Dops-)|(^Bump\s)/g
+          const prTitleMismatchError = 'Invalid PR title "' + prTitle + '"! Must begin with LNK-nnnn:<space> or LEGLINK-nnnn:<space> or LEGPROG-nnnn:<space> or TECH_DEBT:<space> or DOCS:<space> or SNYK:<space> or Dops- or Bump<space>, e.g. LNK-1234: My PR title, or TECH_DEBT or DOCS or SNYK or Dops- or Bump: My PR title or DOCS: My PR title or [Snyk] My PR title'
           if (!prTitleExpectedPattern.test(prTitle)) {
             // Fail the workflow
             console.log(prTitleMismatchError)

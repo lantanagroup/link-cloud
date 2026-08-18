@@ -90,6 +90,15 @@ public class ValidateQueryPlanConfigDictionaryAttribute : ValidationAttribute
             return;
         }
 
+        if (!Enum.IsDefined(typeof(OperationType), config.OperationType))
+        {
+            errors.Add($"Key '{key}': Invalid OperationType value for ParameterQueryConfig.");
+        }
+        else if (config.OperationType == OperationType.Read)
+        {
+            errors.Add($"Key '{key}': 'Read' is not a valid operation type for ParameterQueryConfig.");
+        }
+
         // Validate each parameter
         for (int i = 0; i < config.Parameters.Count; i++)
         {

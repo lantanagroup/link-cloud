@@ -137,7 +137,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         public async Task DeleteVendorVersionOperationPreset(Guid vendorId, Guid vendorVersionPresetId)
         {
             //Remove all of the operations that are only tied to this vendor version preset
-            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.VendorVersionOperationPresets.All(vp => vp.Id == vendorVersionPresetId));
+            var orts = await _database.OperationResourceTypes.FindAsync(ort =>
+                ort.VendorVersionOperationPresets.Any(vp => vp.Id == vendorVersionPresetId)
+                && ort.VendorVersionOperationPresets.All(vp => vp.Id == vendorVersionPresetId));
 
             foreach (var opId in orts.Select(ort => ort.OperationId).ToList())
             {
@@ -151,9 +153,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             //Remove the Preset
             var vendorPreset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(vvop => vvop.VendorVersion.Vendor.Id == vendorId && vvop.Id == vendorVersionPresetId);
 
+            // Operation deletion above can remove the preset as a side effect.
+            // Treat missing preset as already-deleted for idempotent delete behavior.
             if (vendorPreset == null)
             {
-                throw new InvalidOperationException($"No Vendor Operation Preset exists for the provided id: {vendorVersionPresetId}");
+                return;
             }
 
             _database.VendorVersionOperationPresets.Remove(vendorPreset);

@@ -1,4 +1,4 @@
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -32,8 +32,13 @@ public sealed class TestScenarioDocument
     /// <summary>Serialized cohort configuration as JSON string.</summary>
     public string PatientCohortsJson { get; set; } = "[]";
 
+    public string? NhsnOrganizationId { get; set; }
+
     [BsonRepresentation(BsonType.String)]
     public Guid? QueryPlanTemplateId { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     public bool CleanupServiceData { get; set; }
     public bool CleanupFhirData { get; set; } = true;

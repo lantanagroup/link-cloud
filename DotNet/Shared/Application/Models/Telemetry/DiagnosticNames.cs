@@ -7,45 +7,28 @@
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
         public const string EntityId = "entity.id";
-        public const string ReportId = "report.id";
+        public const string DataAcquisitionLogId = "log.id";
         public const string ReportTrackingId = "report.tracking.id";
-        public const string ReportScheduledId = "report.scheduled.id";
         public const string FacilityId = "facility.id";
         public const string PatientId = "patient.id";
         public const string PatientEvent = "patient.event";
-        public const string QueryType = "query.type";
+        public const string Phase = "phase";
         public const string Resource = "resource";
         public const string ResourceType = "resource.type";
         public const string ResourceId = "resource.id";
-        public const string NormalizationOperation = "normalization.operation";
-        public const string AuditId = "audit.id";
         public const string AuditLogAction = "audit.log.action";
-        public const string NotificationId = "notification.id";
-        public const string NotificationType = "notification.type";
-        public const string NotificationChannel = "notification.channel";
-        public const string RecipientCount = "recipient.count";
         public const string ReportType = "report.type";
         public const string PeriodStart = "period.start";
         public const string PeriodEnd = "period.end";
         public const string UserId = "user.id";
-        public const string UserName = "user.name";
         public const string Email = "email";
         public const string Role = "role";
-        public const string EncounterClass = "encounter.class";
-        public const string EncounterType = "encounter.type";
-        public const string LocationType = "location.type";
-        public const string DiagnosticReportCode = "diagnostic.report.code";
-        public const string MedicationCode = "medication.code";
-        public const string MedicationRequestReasonCode = "medication.request.reason.code";
-        public const string MedicationRequestCategory = "medicaton.request.category";
-        public const string ObservationCode = "observation.code";
-        public const string SpecimenType = "specimen.type";
-        public const string ServiceRequestCategory = "service.request.category";
-        public const string Measures = "report.measures";
         public const string Duration = "duration";
+        public const string OperationType = "operation.type";
+        public const string DestinationType = "destination.type";
+        public const string RetryAttempts = "retry.attempts";
 
         //Diagnostic tags Searching
-        public const string SearchText = "search.text";
         public const string SearchParameters = "search.parameters";
         public const string FacilityFilter = "facility.filter";
         public const string CorrelationFilter = "correlation.filter";
@@ -59,5 +42,18 @@
 
         //Diagnostic activity names
         public const string CreateAuditEvent = "Create Audit Event";
+        
+        //Diagnostic metric names
+        public const string DataAcquisitionQueryDuration = "link_data_acq_query_duration";
+        public const string DataAcquisitionResourceAcquiredCount = "link_data_acq_resource_acquired_count";
+        public const string NormalizationResourceChangedCount = "link_normalization_resource_changed_count";
+        public const string NormalizationResourceNotChangedCount = "link_normalization_resource_not_changed_count";
+        public const string NormalizationDuration = "link_normalization_duration";
+
+        public static string NormalizePhase(string? phase)
+        {
+            if (string.IsNullOrEmpty(phase) || phase.Length < 2) return phase;
+            return phase.Substring(0, 1).ToUpperInvariant() + phase.Substring(1).ToLowerInvariant();
+        }
     }
 }

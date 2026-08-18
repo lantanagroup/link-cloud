@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Services;
@@ -22,7 +22,9 @@ public record ResolvedRunOptions(
     List<PatientProfile> PatientProfiles,
     List<PatientCohortDefinition> PatientCohorts,
     ReportMethod ReportMethod = ReportMethod.Adhoc,
-    Guid? QueryPlanTemplateId = null)
+    Guid? QueryPlanTemplateId = null,
+    Guid? NormalizationSuiteId = null,
+    Guid? OrganizationResourceMapTemplateId = null)
 {
     /// <summary>
     /// Imported patients (referenced by ID, fetched from FHIR server at run time).
@@ -39,4 +41,7 @@ public record ResolvedRunOptions(
 
     /// <summary>Reporting period end (UTC). Null = use system default.</summary>
     public DateTimeOffset? ReportPeriodEnd { get; init; }
+
+    /// <summary>NHSN reporting Organization ID for this run.</summary>
+    public string NhsnOrganizationId { get; init; } = string.Empty;
 }

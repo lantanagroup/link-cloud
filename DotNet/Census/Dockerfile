@@ -6,6 +6,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Census/Census.csproj", "DotNet/Census/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Census/Census.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Census"

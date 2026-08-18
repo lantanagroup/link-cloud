@@ -1,4 +1,4 @@
-namespace UnitTests.QueryDispatch;
+﻿namespace UnitTests.QueryDispatch;
 
 public static class QueryDispatchTestsConstants
 {

@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
         }
 
-        public async Task<bool> Execute(SendNotificationModel model)
+        public async Task<bool> Execute(SendNotificationModel model, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Send Notification Command");
 
@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         var currentActivity = Activity.Current;
                         var sentDate = DateTimeOffset.UtcNow;
                         currentActivity?.AddEvent(new("Sending request to email channel service.", sentDate));
-                        await _emailService.Send(model.Id, model.Recipients, model.Bcc, model.Subject, model.Message, null);
+                        await _emailService.Send(model.Id, model.Recipients, model.Bcc, model.Subject, model.Message, null, cancellationToken);
                         _logger.LogNotificationSent(nameof(ChannelType.Email), sentDate.DateTime);
                             
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))

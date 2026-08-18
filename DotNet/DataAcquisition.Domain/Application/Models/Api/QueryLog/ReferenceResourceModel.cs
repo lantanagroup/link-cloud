@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -24,7 +24,7 @@ public class ReferenceResourceModel
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
             ReferenceResource = referenceResource.ReferenceResource,
-            QueryPhase = referenceResource.QueryPhase
+            QueryPhase = referenceResource.QueryPhase.GetValueOrDefault()
         };
     }
 }

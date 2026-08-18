@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
 
 public class FacilitySoftDeleteResult
 {

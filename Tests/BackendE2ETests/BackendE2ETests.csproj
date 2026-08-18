@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -13,6 +13,7 @@
           -->
         <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
         <RootNamespace>LantanaGroup.Link.Tests.BackendE2ETests</RootNamespace>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -32,16 +33,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
-        <PackageReference Include="Moq.AutoMock" Version="*-*" />
-        <PackageReference Include="coverlet.collector" Version="6.*">
+        <PackageReference Include="Hl7.Fhir.R4" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Moq.AutoMock" />
+        <PackageReference Include="coverlet.collector">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>        
-        <PackageReference Include="xunit" Version="2.*" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
-import {FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
+import {AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators} from '@angular/forms';
 import {
   ILiteralQueryParameterModel,
   IParameterQueryConfigModel,
@@ -43,8 +43,10 @@ export class QueryConfigEditComponent implements OnInit {
 
   queryForm!: FormGroup;
   resourceTypes = [
-    'Encounter', 'Location', 'Condition', 'Coverage', 'Observation', 'Procedure',
-    'ServiceRequest', 'Medication', 'DiagnosticReport', 'MedicationRequest', 'Specimen', 'Device', 'Patient', 'MedicationStatement', 'AllergyIntolerance'
+    'AllergyIntolerance', 'Condition', 'Coverage', 'Device', 'DiagnosticReport',
+    'Encounter', 'Location', 'Medication', 'MedicationAdministration',
+    'MedicationRequest', 'MedicationStatement', 'Observation', 'Patient',
+    'Procedure', 'ServiceRequest', 'Specimen'
   ].sort();
 
   queryConfigTypes = ['Parameter', 'Reference'];
@@ -107,7 +109,7 @@ export class QueryConfigEditComponent implements OnInit {
       resourceType: [this.config?.resourceType || '', Validators.required],
       queryConfigType: [this.config?.queryConfigType || 'Parameter', Validators.required],
       // Reference specific
-      operationType: [this.config?.queryConfigType === 'Reference' ? this.normalizeOperationType((this.config as IReferenceQueryConfigModel).operationType as unknown) : ReferenceQueryOperationType.search],
+      operationType: [this.normalizeOperationType((this.config as any)?.operationType)],
       paged: [this.config?.queryConfigType === 'Reference' ? (this.config as IReferenceQueryConfigModel).paged : 100],
       // Parameter specific
       parameters: this.fb.array([])
@@ -133,16 +135,36 @@ export class QueryConfigEditComponent implements OnInit {
   updateValidators(type: string): void {
     const operationTypeCtrl = this.queryForm.get('operationType');
     const pagedCtrl = this.queryForm.get('paged');
+    const parametersCtrl = this.parameters;
+    operationTypeCtrl?.setValidators(Validators.required);
 
     if (type === 'Reference') {
-      operationTypeCtrl?.setValidators(Validators.required);
       pagedCtrl?.setValidators([Validators.required, Validators.min(1)]);
+      // Reference queries don't use parameters.
+      parametersCtrl.clearValidators();
     } else {
-      operationTypeCtrl?.clearValidators();
       pagedCtrl?.clearValidators();
+      // A Parameter query must define at least one parameter (mirrors the
+      // backend rule in ValidateQueryPlanConfigDictionaryAttribute).
+      parametersCtrl.setValidators(this.minLengthArrayValidator(1));
+
+      // Since parameter doesn't use read, reset read to search
+      // which is the default for parameter
+      if (operationTypeCtrl?.value === ReferenceQueryOperationType.read) {
+        operationTypeCtrl.setValue(ReferenceQueryOperationType.search);
+      }
     }
     operationTypeCtrl?.updateValueAndValidity();
     pagedCtrl?.updateValueAndValidity();
+    parametersCtrl.updateValueAndValidity();
+  }
+
+  // Requires a FormArray to contain at least `min` entries.
+  private minLengthArrayValidator(min: number): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const length = (control as FormArray).length;
+      return length >= min ? null : { minLengthArray: { required: min, actual: length } };
+    };
   }
 
   get parameters(): FormArray {
@@ -210,7 +232,12 @@ export class QueryConfigEditComponent implements OnInit {
   }
 
   save(): void {
-    if (this.queryForm.invalid) return;
+    if (this.queryForm.invalid) {
+      // Surface validation errors (incl. the "at least one parameter" rule)
+      // that would otherwise stay hidden until a control is touched.
+      this.queryForm.markAllAsTouched();
+      return;
+    }
 
     const formValue = this.queryForm.value;
     let result: QueryConfigModel;
@@ -251,6 +278,7 @@ export class QueryConfigEditComponent implements OnInit {
       result = {
         resourceType: formValue.resourceType,
         queryConfigType: 'Parameter',
+        operationType: formValue.operationType,
         parameters: params
       } as IParameterQueryConfigModel;
     }

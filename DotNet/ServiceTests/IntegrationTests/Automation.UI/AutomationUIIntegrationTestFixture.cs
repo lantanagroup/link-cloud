@@ -1,7 +1,8 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -70,9 +71,12 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             Options.Create(new AutomationConfig()),
             NullLogger<AutomationRunManager>.Instance,
             new ServiceCollection().BuildServiceProvider(),
+            new ConfigurationBuilder().Build(),
             orchestrator,
             store,
-            Mock.Of<IQueryPlanTemplateStore>());
+            Mock.Of<IQueryPlanTemplateStore>(),
+            Mock.Of<INormalizationStore>(),
+            Mock.Of<IOrganizationResourceMapTemplateStore>());
     }
 
     public async Task InitializeAsync()

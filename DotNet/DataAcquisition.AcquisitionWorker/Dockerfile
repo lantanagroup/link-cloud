@@ -7,6 +7,7 @@ WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj", "DotNet/DataAcquisition.AcquisitionWorker/"]
 COPY ["DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj", "DotNet/DataAcquisition.Domain/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj" 
 COPY . .
 WORKDIR "/src/DotNet/DataAcquisition.AcquisitionWorker"

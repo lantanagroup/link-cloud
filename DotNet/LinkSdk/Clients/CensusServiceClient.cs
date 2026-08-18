@@ -23,60 +23,106 @@ public class CensusServiceClient : LinkApiClientBase, ICensusServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task<CensusConfigApiModel> CreateCensusConfigAsync(CensusConfigApiModel request, CancellationToken cancellationToken = default) =>
-        Request("census/config").PostJsonAsync(request, cancellationToken: cancellationToken).ReceiveJson<CensusConfigApiModel>();
+    public Task<LinkApiResponse<CensusConfigApiModel>> CreateCensusConfigAsync(CensusConfigApiModel request, CancellationToken cancellationToken = default) =>
+        SendAsync<CensusConfigApiModel>(() => Request("census/config").PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task<CensusConfigApiModel?> GetCensusConfigAsync(string facilityId, CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"census/config/{facilityId}").GetJsonAsync<CensusConfigApiModel>(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<CensusConfigApiModel>> GetCensusConfigAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        SendAsync<CensusConfigApiModel>(() => Request($"census/config/{facilityId}").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<CensusConfigApiModel> UpdateCensusConfigAsync(string facilityId, CensusConfigApiModel request, CancellationToken cancellationToken = default) =>
-        Request($"census/config/{facilityId}").PutJsonAsync(request, cancellationToken: cancellationToken).ReceiveJson<CensusConfigApiModel>();
+    public Task<LinkApiResponse<CensusConfigApiModel>> UpdateCensusConfigAsync(string facilityId, CensusConfigApiModel request, CancellationToken cancellationToken = default) =>
+        SendAsync<CensusConfigApiModel>(() => Request($"census/config/{facilityId}").PutJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task DeleteCensusConfigAsync(string facilityId, CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"census/config/{facilityId}").DeleteAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse> DeleteCensusConfigAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/config/{facilityId}").DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<CensusFhirListApiModel?> GetAdmittedPatientsAsync(string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"census/{facilityId}/history/admitted").SetQueryParam("startDate", startDate).SetQueryParam("endDate", endDate).GetJsonAsync<CensusFhirListApiModel>(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse> DisableFacilityJobsAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/config/{facilityId}/jobs").DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<CensusPatientEncounterApiModel>> GetCurrentPatientEncountersAsync(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+    public Task<LinkApiResponse> EnableFacilityJobsAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/config/{facilityId}/jobs/restore").PatchAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetAdmittedPatientsAsync(string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/{facilityId}/history/admitted").SetQueryParam("startDate", startDate).SetQueryParam("endDate", endDate).GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetCurrentPatientEncountersAsync(
+        string facilityId,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
-        var r = Request("census/patient-encounters/current").SetQueryParam("facilityId", facilityId).SetQueryParam("pageSize", pageSize).SetQueryParam("pageNumber", pageNumber);
+        var r = Request("census/patient-encounters/current")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+
         if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
         if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
         if (sortOrder.HasValue) r = r.SetQueryParam("sortOrder", sortOrder.Value.ToString());
-        return r.GetJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(cancellationToken: cancellationToken);
+
+        return SendAsync(() => r.GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<PagedConfigModel<CensusPatientEncounterApiModel>> GetHistoricalPatientEncountersAsync(string facilityId, DateTime dateThreshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+    public Task<LinkApiResponse> GetCurrentPatientEncountersAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        GetCurrentPatientEncountersAsync(
+            facilityId,
+            correlationId: null,
+            sortBy: null,
+            sortOrder: null,
+            pageSize: 10,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+
+    public Task<LinkApiResponse> GetHistoricalPatientEncountersAsync(
+        string facilityId,
+        DateTime? dateThreshold,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
-        var r = Request("census/patient-encounters/historical").SetQueryParam("facilityId", facilityId).SetQueryParam("dateThreshold", dateThreshold).SetQueryParam("pageSize", pageSize).SetQueryParam("pageNumber", pageNumber);
+        var r = Request("census/patient-encounters/historical")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+
+        if (dateThreshold.HasValue) r = r.SetQueryParam("dateThreshold", dateThreshold.Value);
+
         if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
         if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
         if (sortOrder.HasValue) r = r.SetQueryParam("sortOrder", sortOrder.Value.ToString());
-        return r.GetJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(cancellationToken: cancellationToken);
+
+        return SendAsync(() => r.GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task RebuildPatientEncountersAsync(string facilityId, string? correlationId = null, CancellationToken cancellationToken = default)
+    public Task<LinkApiResponse> GetHistoricalPatientEncountersAsync(string facilityId, DateTime? dateThreshold, CancellationToken cancellationToken = default) =>
+        GetHistoricalPatientEncountersAsync(
+            facilityId,
+            dateThreshold,
+            correlationId: null,
+            sortBy: null,
+            sortOrder: null,
+            pageSize: 10,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+
+    public Task<LinkApiResponse> RebuildPatientEncountersAsync(string facilityId, string? correlationId = null, CancellationToken cancellationToken = default)
     {
         var r = Request("census/patient-encounters/rebuild").SetQueryParam("facilityId", facilityId);
         if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
-        return r.PostAsync(cancellationToken: cancellationToken);
+        return SendAsync(() => r.PostAsync(cancellationToken: cancellationToken));
     }
 
-    public async Task<PagedConfigModel<CensusPatientEventApiModel>> GetPatientEventsAsync(string facilityId, string? correlationId = null, DateTime? startDate = null, DateTime? endDate = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
-    {
-        var r = Request("census/patient-events").SetQueryParam("facilityId", facilityId).SetQueryParam("pageSize", pageSize).SetQueryParam("pageNumber", pageNumber);
-        if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
-        if (startDate.HasValue) r = r.SetQueryParam("startDate", startDate.Value);
-        if (endDate.HasValue) r = r.SetQueryParam("endDate", endDate.Value);
-        if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
-        if (sortOrder.HasValue) r = r.SetQueryParam("sortOrder", sortOrder.Value.ToString());
-        return await GetOrDefaultAsync(() => r.GetJsonAsync<PagedConfigModel<CensusPatientEventApiModel>>(cancellationToken: cancellationToken)) ?? new PagedConfigModel<CensusPatientEventApiModel>();
-    }
+    public Task<LinkApiResponse> GetPatientEventsAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("census/patient-events").SetQueryParam("facilityId", facilityId).GetAsync(cancellationToken: cancellationToken));
 
-    public Task DeletePatientEventAsync(string id, CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"census/patient-events/{id}").DeleteAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse> DeletePatientEventAsync(string id, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/patient-events/{id}").DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task DeletePatientEventsByCorrelationAsync(string correlationId, CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"census/patient-events/visit/{correlationId}").DeleteAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse> DeletePatientEventsByCorrelationAsync(string correlationId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"census/patient-events/visit/{correlationId}").DeleteAsync(cancellationToken: cancellationToken));
 }

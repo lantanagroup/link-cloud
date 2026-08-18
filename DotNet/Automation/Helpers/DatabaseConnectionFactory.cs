@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Helpers;
+﻿namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
 /// Provides connection strings for direct database validation during automation.

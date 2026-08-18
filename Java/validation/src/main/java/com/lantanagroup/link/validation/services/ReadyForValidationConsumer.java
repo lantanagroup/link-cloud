@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
+import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
@@ -25,8 +26,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,12 +74,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
-        Instant start = Instant.now();
-        List<Result> results = validate(facilityId, patientId, reportId, bundle);
-        Instant end = Instant.now();
-        Duration duration = Duration.between(start, end);
+        List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
-        produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
     }
 
     private Bundle getBundleFromBlobStorage(String payloadUri) {
@@ -112,16 +107,68 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         return model.getBundle();
     }
 
-    private List<Result> validate(String facilityId, String patientId, String reportId, Bundle bundle) {
-        List<Result> results = validationService.validate(bundle);
+    private List<Result> validate(String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
+        List<Result> results;
+
+        Attributes attributes;
+
+        try (Timer timer = Timer.start()) {
+            results = validationService.validate(bundle);
+            _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
+
+            attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
+            validationMetrics.addToValidationCounter(attributes);
+            validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
+        }
+
         for (Result result : results) {
             result.setFacilityId(facilityId);
             result.setPatientId(patientId);
             result.setReportId(reportId);
         }
-        categorizationService.categorize(results);
+
+        try (Timer timer = Timer.start()) {
+            categorizationService.categorize(results);
+            validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
+        }
         resultRepository.saveAll(results);
         return results;
+    }
+
+    private Attributes buildMetricAttributes(Bundle bundle, List<Result> results, String correlationId, String facilityId, String patientId, String reportId) {
+
+        int resourceCount = bundle.getEntry().size();
+        int totalIssueCount = 0;
+        int uncategorizedIssueCount = 0;
+        int acceptableIssueCount = 0;
+        int unacceptableIssueCount = 0;
+        for (Result result : results) {
+            totalIssueCount++;
+            List<Category> categories = result.getCategories();
+            if (categories == null || categories.isEmpty()) {
+                uncategorizedIssueCount++;
+            } else {
+                if (categories.stream().allMatch(Category::isAcceptable)) {
+                    acceptableIssueCount++;
+                } else {
+                    unacceptableIssueCount++;
+                }
+            }
+        }
+        String validationOutcome = (uncategorizedIssueCount == 0 && unacceptableIssueCount == 0) ? "Passed" : "Failed";
+
+        return Attributes.builder()
+                .put(DiagnosticNames.CORRELATION_ID, correlationId)
+                .put(DiagnosticNames.FACILITY_ID, facilityId)
+                .put(DiagnosticNames.PATIENT_ID, patientId)
+                .put(DiagnosticNames.REPORT_TRACKING_ID, reportId)
+                .put(DiagnosticNames.RESOURCE_COUNT, resourceCount)
+                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
+                .put(DiagnosticNames.ISSUE_COUNT_TOTAL, totalIssueCount)
+                .put(DiagnosticNames.ISSUE_COUNT_UNCATEGORIZED, uncategorizedIssueCount)
+                .put(DiagnosticNames.ISSUE_COUNT_UNACCEPTABLE, unacceptableIssueCount)
+                .put(DiagnosticNames.ISSUE_COUNT_ACCEPTABLE, acceptableIssueCount)
+                .build();
     }
 
     private void produceValidationCompleteRecord(
@@ -150,48 +197,5 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             // (e.g., sending the source record to the Error topic)
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
         }
-    }
-
-    private void produceMetrics(
-            String correlationId,
-            String facilityId,
-            String patientId,
-            String reportId,
-            Bundle bundle,
-            List<Result> results,
-            Duration duration) {
-        int resourceCount = bundle.getEntry().size();
-        int totalIssueCount = 0;
-        int uncategorizedIssueCount = 0;
-        int acceptableIssueCount = 0;
-        int unacceptableIssueCount = 0;
-        for (Result result : results) {
-            totalIssueCount++;
-            List<Category> categories = result.getCategories();
-            if (categories.isEmpty()) {
-                uncategorizedIssueCount++;
-            } else {
-                if (categories.stream().allMatch(Category::isAcceptable)) {
-                    acceptableIssueCount++;
-                } else {
-                    unacceptableIssueCount++;
-                }
-            }
-        }
-        String validationOutcome = (uncategorizedIssueCount == 0 && unacceptableIssueCount == 0) ? "Passed" : "Failed";
-        Attributes attributes = Attributes.builder()
-                .put(DiagnosticNames.CORRELATION_ID, correlationId)
-                .put(DiagnosticNames.FACILITY_ID, facilityId)
-                .put(DiagnosticNames.PATIENT_ID, patientId)
-                .put(DiagnosticNames.REPORT_ID, reportId)
-                .put(DiagnosticNames.RESOURCE_COUNT, resourceCount)
-                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
-                .put(DiagnosticNames.ISSUE_COUNT_TOTAL, totalIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNCATEGORIZED, uncategorizedIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNACCEPTABLE, unacceptableIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_ACCEPTABLE, acceptableIssueCount)
-                .build();
-        validationMetrics.addToValidationCounter(attributes);
-        validationMetrics.recordValidationDuration(duration.toMillis(), attributes);
     }
 }

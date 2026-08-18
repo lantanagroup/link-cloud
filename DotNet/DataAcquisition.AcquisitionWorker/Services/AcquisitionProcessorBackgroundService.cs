@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Threading.Channels;
@@ -24,6 +25,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly ILogger<AcquisitionProcessorBackgroundService> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
+    private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -32,11 +34,13 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     public AcquisitionProcessorBackgroundService(
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
+        IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _resourceAcquiredProducer = resourceAcquiredProducer;
 
         if (settings?.Value != null)
         {
@@ -68,7 +72,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
             _logger.LogWarning("Channel full. Timed out enqueuing LogId {LogId}.", item.LogId);
             throw new Exception($"Internal queue capacity reached for LogId {item.LogId}");
@@ -149,6 +153,27 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     note: $"[{DateTime.UtcNow:O}] Deferred: waiting for {blockingList} queries to complete.",
                     cancellationToken: ct);
 
+                return;
+            }
+
+            if (!depResult.IsPatientReportable)
+            {
+                // Dependencies are satisfied but the patient has no org-mapped encounters, so this
+                // dependent log is preempted: mark it NotReportable (terminal) without acquiring, and
+                // still fire the tail. The Patient/Encounter/Location logs are NOT gated, so the patient
+                // bundle still reaches MeasureEval as a non-reportable outcome.
+                _logger.LogInformation(
+                    "Log {LogId} preempted: patient not reportable (no org-mapped encounters). Marking NotReportable.",
+                    log.Id.SanitizeForLog());
+
+                await logManager.TrySetLogStatusAsync(
+                    log.Id,
+                    [RequestStatus.Queued],
+                    RequestStatus.NotReportable,
+                    note: $"[{DateTime.UtcNow:O}] Patient not reportable (no org-mapped encounters); acquisition skipped.",
+                    cancellationToken: ct);
+
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
                 return;
             }
         }
@@ -234,7 +259,17 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return; // Group not yet complete.
             }
 
-            var producer = scopeProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+            // Remove non-org encounters from the cache before the bundle reaches MeasureEval. The
+            // Encounter was cached by its own (ungated) primary log, so the NotReportable status on a
+            // dependent log doesn't keep it out of evaluation. Stripping here means an all-non-org patient
+            // has no qualifying encounter (non-reportable outcome), and a mixed patient keeps only org
+            // encounters. Runs before ProduceAsync so Normalization rehydrates the already-filtered cache.
+            var locationMappingService = scopeProvider.GetRequiredService<ILocationMappingService>();
+            
+            // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
+            // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
+            await locationMappingService.StripNonOrgEncountersFromCacheAsync(
+                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
 
             var headers = new Headers
             {
@@ -247,18 +282,20 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
             }
 
-            await producer.ProduceAsync(
-                KafkaTopic.ResourceAcquired.ToString(),
-                new Message<ResourceKey, ResourceAcquired>
-                {
-                    Key = new ResourceKey
+
+            await _resourceAcquiredProducer.ProduceAsync(
+                    KafkaTopic.ResourcesAcquired.ToString(),
+                    new Message<ResourceKey, ResourcesAcquired>
                     {
-                        FacilityId = tailResult.FacilityId,
-                        CorrelationId = tailResult.CorrelationId
+                        Key = new ResourceKey
+                        {
+                            FacilityId = tailResult.FacilityId,
+                            PatientId = tailResult.PatientId
+                        },
+                        Headers = headers,
+                        Value = tailResult.ResourcesAcquired
                     },
-                    Headers = headers,
-                    Value = tailResult.ResourceAcquired
-                }, ct);
+                    ct);
 
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",

@@ -1,0 +1,22 @@
+{
+  "resourceType": "Patient",
+  "id": "patient-with-extensions",
+  "extension": [
+    {
+      "url": "http://example.com/fhir/extension/vendor-tag",
+      "valueString": "should be removed"
+    },
+    {
+      "url": "http://example.com/fhir/extension/internal-flag",
+      "valueBoolean": true
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName",
+      "valueString": "should be kept"
+    }
+  ],
+  "identifier": [{"use": "official", "system": "http://example.com/ids", "value": "12345"}],
+  "name": [{"family": "Test", "given": ["Patient"]}],
+  "gender": "male",
+  "birthDate": "1980-01-01"
+}

@@ -26,34 +26,18 @@ public class QueryPlanManager : IQueryPlanManager
     private readonly IDatabase _database;
     private readonly ILogger<QueryPlanManager> _logger;
     private readonly IQueryPlanValidator _validator;
+    private readonly ILocationResolutionValidator _locationResolutionValidator;
 
     public QueryPlanManager(
         IDatabase database,
         ILogger<QueryPlanManager> logger,
-        IQueryPlanValidator validator)
+        IQueryPlanValidator validator,
+        ILocationResolutionValidator locationResolutionValidator)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
-    }
-
-    /// <summary>
-    /// Returns a sanitized version of a value that is safe to include in log messages.
-    /// Removes newline characters to help prevent log forging.
-    /// </summary>
-    /// <param name="value">The original value.</param>
-    /// <returns>A logging-safe value.</returns>
-    private static string? SanitizeForLog(string? value)
-    {
-        if (value == null)
-        {
-            return null;
-        }
-
-        // Remove carriage return and line feed characters that can break log structure.
-        return value.Replace("\r", string.Empty)
-                    .Replace("\n", string.Empty)
-                    .SanitizeForLog();
+        _locationResolutionValidator = locationResolutionValidator ?? throw new ArgumentNullException(nameof(locationResolutionValidator));
     }
 
     /// <summary>
@@ -95,7 +79,7 @@ public class QueryPlanManager : IQueryPlanManager
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
 
-        var safeFacilityId = SanitizeForLog(model.FacilityId);
+        var safeFacilityId = model.FacilityId.SanitizeForLog();
 
         if (!validationResult.IsValid)
         {
@@ -113,6 +97,11 @@ public class QueryPlanManager : IQueryPlanManager
                 safeFacilityId,
                 string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
+
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
 
         var date = DateTime.UtcNow;
 
@@ -133,7 +122,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully created Query Plan for facility {FacilityId} with type {Type}",
-            SanitizeForLog(model.FacilityId),
+            model.FacilityId.SanitizeForLog(),
             model.Type);
 
         return QueryPlanModel.FromDomain(entity);
@@ -155,7 +144,7 @@ public class QueryPlanManager : IQueryPlanManager
         if (!validationResult.IsValid)
         {
             _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
-                SanitizeForLog(model.FacilityId),
+                model.FacilityId.SanitizeForLog(),
                 string.Join("; ", SanitizeLogMessages(validationResult.Errors)));
 
             throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
@@ -165,9 +154,14 @@ public class QueryPlanManager : IQueryPlanManager
         if (validationResult.Warnings.Any())
         {
             _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
-                SanitizeForLog(model.FacilityId),
+                model.FacilityId.SanitizeForLog(),
                 string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
+
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
 
         var existingQueryPlan = await _database.QueryPlanRepository.FirstOrDefaultAsync(
             q => q.FacilityId == model.FacilityId && q.Type == model.Type);
@@ -187,7 +181,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully updated Query Plan for facility {FacilityId} with type {Type}",
-            SanitizeForLog(model.FacilityId),
+            model.FacilityId.SanitizeForLog(),
             model.Type);
 
         return QueryPlanModel.FromDomain(existingQueryPlan);
@@ -210,7 +204,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully deleted Query Plan for facility {FacilityId} with type {Type}",
-            SanitizeForLog(facilityId),
+            facilityId.SanitizeForLog(),
             type);
     }
 
@@ -232,11 +226,11 @@ public class QueryPlanManager : IQueryPlanManager
             await _database.QueryPlanRepository.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Successfully deleted {Count} Query Plans for facility {FacilityId}",
                 facilityPlans.Count,
-                SanitizeForLog(facilityId));
+                facilityId.SanitizeForLog());
         }
         else
         {
-            _logger.LogInformation("No Query Plans found to delete for facility {FacilityId}", SanitizeForLog(facilityId));
+            _logger.LogInformation("No Query Plans found to delete for facility {FacilityId}", facilityId.SanitizeForLog());
         }
     }
 }

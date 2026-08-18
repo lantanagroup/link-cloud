@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Shared.Application.Utilities;
+﻿namespace LantanaGroup.Link.Shared.Application.Utilities;
 
 public static class MeasureNameShortener
 {

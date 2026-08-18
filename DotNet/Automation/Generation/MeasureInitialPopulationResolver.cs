@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Per-measure resolution of which encounter periods constitute the Initial Population
@@ -146,6 +146,18 @@ public static class IpWindowExtensions
         {
             var w = windows[i];
             if (instant >= w.Start && instant <= w.End) return true;
+        }
+        return false;
+    }
+
+    /// <summary>True when any IP window fully contains the closed interval [start, end].</summary>
+    public static bool AnyContains(this IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> windows, DateTime start, DateTime end)
+    {
+        if (windows == null) return false;
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var w = windows[i];
+            if (start >= w.Start && end <= w.End) return true;
         }
         return false;
     }

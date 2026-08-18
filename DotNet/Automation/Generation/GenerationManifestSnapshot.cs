@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Lightweight, serializable summary of a <see cref="GenerationManifest"/>
@@ -40,6 +40,10 @@ public sealed class GenerationManifestSnapshot
     /// <summary>Per-patient eligibility summary: patient ID → list of qualifying measure names.</summary>
     public IReadOnlyDictionary<string, List<string>> PatientEligibility { get; init; }
         = new Dictionary<string, List<string>>();
+
+    /// <summary>Per-patient scheduled inpatient pattern (enum name) used during generation.</summary>
+    public IReadOnlyDictionary<string, string> PatientInpatientPatterns { get; init; }
+        = new Dictionary<string, string>();
 
     /// <summary>
     /// Per-patient predicted ABS resource counts (generated ∩ query-plan-acquired ∩ CQL-referenced).

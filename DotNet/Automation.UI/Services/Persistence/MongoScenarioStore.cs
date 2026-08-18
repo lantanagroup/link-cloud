@@ -1,9 +1,9 @@
-using System.Text.Json;
-using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
+﻿using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -47,8 +47,18 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public sealed class MongoScenarioStore : IScenarioStore
 {
+    private static readonly JsonSerializerOptions CohortJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
+
+    static MongoScenarioStore()
+    {
+        CohortJsonOptions.Converters.Add(new JsonStringEnumConverter());
+    }
 
     public MongoScenarioStore(IMongoDatabase database)
     {
@@ -133,6 +143,16 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         foreach (var input in scenario.ImportedPatientBundles)
         {
+            if (input.UploadedBundleId.HasValue)
+            {
+                var attached = await AttachExistingBundleAsync(input.UploadedBundleId.Value, input, scenario.Id, now, ct);
+                if (attached == null)
+                    throw new InvalidOperationException($"Failed to attach uploaded bundle '{input.UploadedBundleId.Value}' for scenario '{scenario.Id}'.");
+
+                refs.Add(attached);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(input.BundleJson))
                 continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
 
@@ -171,6 +191,35 @@ public sealed class MongoScenarioStore : IScenarioStore
         }
 
         return refs;
+    }
+
+    private async Task<ImportedBundleReference?> AttachExistingBundleAsync(
+        Guid bundleId,
+        ImportedPatientInput input,
+        Guid scenarioId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var update = Builders<ImportedBundleDocument>.Update
+            .Set(b => b.UpdatedAt, now)
+            .Set(b => b.PatientId, input.PatientId ?? string.Empty)
+            .Set(b => b.FileName, input.FileName)
+            .AddToSet(b => b.ScenarioIds, scenarioId);
+
+        var bundleDoc = await _bundles.FindOneAndUpdateAsync(
+            b => b.Id == bundleId,
+            update,
+            new FindOneAndUpdateOptions<ImportedBundleDocument> { ReturnDocument = ReturnDocument.After },
+            ct);
+
+        if (bundleDoc == null)
+            return null;
+
+        return new ImportedBundleReference
+        {
+            BundleId = bundleDoc.Id,
+            PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+        };
     }
 
     /// <summary>
@@ -231,6 +280,7 @@ public sealed class MongoScenarioStore : IScenarioStore
                 Source = input.Source,
                 PatientId = input.PatientId,
                 FileName = input.FileName,
+                UploadedBundleId = input.UploadedBundleId,
                 BundleJson = null,
                 AutoDetect = input.AutoDetect,
                 MeasureEligibilities = input.MeasureEligibilities,
@@ -274,7 +324,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
+            NhsnOrganizationId = model.NhsnOrganizationId,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = model.OrganizationResourceMapTemplateId,
             CleanupServiceData = model.CleanupServiceData,
             CleanupFhirData = model.CleanupFhirData,
             ReportPeriodStart = model.ReportPeriodStart?.UtcDateTime,
@@ -304,7 +356,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
+            NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = doc.OrganizationResourceMapTemplateId,
             CleanupServiceData = doc.CleanupServiceData,
             CleanupFhirData = doc.CleanupFhirData,
             ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,
@@ -352,6 +406,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
             {
                 var bundleId = queue.Dequeue();
+                input.UploadedBundleId = bundleId;
                 if (bundlesById.TryGetValue(bundleId, out var json))
                     input.BundleJson = json;
             }
@@ -367,7 +422,33 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         try
         {
-            return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json, CohortJsonOptions) ?? [];
+
+            var cohorts = new List<PatientCohortDefinition>();
+            foreach (var cohortElement in doc.RootElement.EnumerateArray())
+            {
+                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(cohortElement.GetRawText(), CohortJsonOptions);
+                if (cohort == null)
+                    continue;
+
+                var hasExplicitCohortQualification = cohortElement.ValueKind == JsonValueKind.Object
+                    && cohortElement.EnumerateObject().Any(p =>
+                        string.Equals(p.Name, nameof(PatientCohortDefinition.CohortQualification), StringComparison.OrdinalIgnoreCase));
+
+                if (!hasExplicitCohortQualification)
+                {
+                    var allNonQualifying = cohort.MeasureEligibilities.Count > 0
+                        && cohort.MeasureEligibilities.Values.All(v => v == MeasureEligibility.NonQualifying);
+                    if (allNonQualifying)
+                        cohort.CohortQualification = MeasureEligibility.NonQualifying;
+                }
+
+                cohorts.Add(cohort);
+            }
+
+            return cohorts;
         }
         catch
         {

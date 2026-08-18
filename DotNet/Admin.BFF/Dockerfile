@@ -13,6 +13,7 @@ WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "Shared/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "Link.Authorization/"]
 COPY ["DotNet/Admin.BFF/Admin.BFF.csproj", "Admin.BFF/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "./Admin.BFF/./Admin.BFF.csproj"
 
 COPY ["DotNet/Shared/", "Shared/"]

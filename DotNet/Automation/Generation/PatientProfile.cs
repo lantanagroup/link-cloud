@@ -25,7 +25,9 @@ public record PatientProfile(
     Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities,
     int? SeedOffset = null,
     string? ClinicalScenarioId = null,
-    int? ResourcesPerPatient = null)
+    int? ResourcesPerPatient = null,
+    ScheduledInpatientPattern? ScheduledInpatientPattern = null,
+    MeasureEligibility CohortQualification = MeasureEligibility.Qualifying)
 {
     /// <summary>
     /// Returns true when this profile qualifies for the given measure.
@@ -69,6 +71,26 @@ public record PatientProfile(
         => measures.All(m => !QualifiesFor(m));
 
     /// <summary>
+    /// Returns true when this patient is expected to be report-eligible from cohort-level
+    /// designation and inpatient-pattern inclusion rules.
+    /// </summary>
+    public bool IsExpectedInReportByCohortAndPattern()
+    {
+        if (CohortQualification == MeasureEligibility.NonQualifying)
+            return false;
+
+        var pattern = ScheduledInpatientPattern
+            ?? global::LantanaGroup.Automation.Generation.ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+        return pattern.GetCensusBehavior().ExpectedInReport;
+    }
+
+    /// <summary>
+    /// Returns true when this patient should be predicted as submitted for selected measures.
+    /// </summary>
+    public bool IsExpectedToBeSubmitted(IReadOnlyList<ProfiledMeasureType> measures)
+        => IsExpectedInReportByCohortAndPattern() && QualifiesForAny(measures);
+
+    /// <summary>
     /// Builds a map of pipeline measure ID → number of qualifying patients from
     /// concrete cohort/profile data. This allows validators to know the expected
     /// shape of pipeline output without interrogating the pipeline's own data.
@@ -89,7 +111,7 @@ public record PatientProfile(
         for (var i = 0; i < measureIds.Count && i < selectedMeasures.Count; i++)
         {
             var measureType = selectedMeasures[i];
-            var count = profiles.Count(p => p.QualifiesFor(measureType));
+            var count = profiles.Count(p => p.IsExpectedInReportByCohortAndPattern() && p.QualifiesFor(measureType));
             result[measureIds[i]] = count;
         }
 

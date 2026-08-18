@@ -20,6 +20,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string? PublicNormalizationServiceUrl { get; set; }
         public string NotificationServiceUrl { get; set; } = null!;
         public string? PublicNotificationServiceUrl { get; set; }
+        public string AdminBffServiceUrl { get; set; } = null!;
+        public string? PublicAdminBffServiceUrl { get; set; }
         public string QueryDispatchServiceUrl { get; set; } = null!;
         public string? PublicQueryDispatchServiceUrl { get; set; }
         public string ReportServiceUrl { get; set; } = null!;
@@ -127,6 +129,23 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.NotificationServiceUrl))
                     return this.NotificationServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
+        public string AdminBffServiceApiUrl
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(this.AdminBffServiceUrl))
+                {
+                    var normalized = this.AdminBffServiceUrl.TrimEnd('/');
+                    if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+                        return normalized;
+
+                    return normalized + "/api";
+                }
 
                 return null;
             }
@@ -248,6 +267,23 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.PublicNotificationServiceUrl))
                     return this.PublicNotificationServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
+        public string? PublicAdminBffServiceApiUrl
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(this.PublicAdminBffServiceUrl))
+                {
+                    var normalized = this.PublicAdminBffServiceUrl.TrimEnd('/');
+                    if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+                        return normalized;
+
+                    return normalized + "/api";
+                }
 
                 return null;
             }

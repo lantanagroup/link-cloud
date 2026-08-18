@@ -121,3 +121,19 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   gap: 8px;                      // Space between icon and text
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
+
+// Styles for innerHTML content in AlertDialogComponent paste error dialogs
+.csv-error-label {
+  margin-bottom: 4px;
+}
+
+.csv-error-code {
+  text-align: left;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+  color: #333;
+  overflow-x: auto;
+}

@@ -9,6 +9,9 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 
@@ -21,22 +24,28 @@ namespace LantanaGroup.Link.Report.Application.Core
         private readonly BlobStorageService _blobStorageService;
         private readonly BlobContainerClient _containerClient;
         private readonly BlobStorageSettings _settings;
+        private readonly ITenantApiService _tenantApiService;
+        private readonly PatientAggregatorSettings _aggregatorSettings;
 
         public PatientAggregator(
             IReportServiceMetrics metrics,
             IReportEntryManager reportEntryManager,
             BlobStorageService blobStorageService,
-            IOptions<BlobStorageSettings> settings)
+            IOptions<BlobStorageSettings> settings,
+            ITenantApiService tenantApiService,
+            IOptions<PatientAggregatorSettings> aggregatorSettings)
         {
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
             _reportEntryManager = reportEntryManager;
             _blobStorageService = blobStorageService;
+            _tenantApiService = tenantApiService;
+            _aggregatorSettings = aggregatorSettings.Value;
 
             _settings = settings.Value;
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
-        public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule)
+        public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
@@ -45,7 +54,7 @@ namespace LantanaGroup.Link.Report.Application.Core
 
             AggregateResult aggregateResult = new AggregateResult();
 
-            var entry = await _reportEntryManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId);
+            var entry = await _reportEntryManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId, cancellationToken);
 
             if (entry == null)
             {
@@ -65,7 +74,7 @@ namespace LantanaGroup.Link.Report.Application.Core
             aggregateResult.Uri = writeBlobClient.Uri;
             aggregateResult.BlobName = blobName;
 
-            using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true))
+            using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true, cancellationToken: cancellationToken))
             using (StreamWriter writer = new StreamWriter(write_stream))
             {
                 foreach (var measureReportEntry in entry.MeasureReports.Where(x => x.Status == MeasureReportStatus.ReadyForValidation))
@@ -73,7 +82,7 @@ namespace LantanaGroup.Link.Report.Application.Core
                     BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
                     var aggregateMeasureReport = new AggregateMeasureReportResult() { ReportType = measureReportEntry.ReportType };
 
-                    using (Stream read_stream = await readBlobClient.OpenReadAsync(true))
+                    using (Stream read_stream = await readBlobClient.OpenReadAsync(cancellationToken: cancellationToken))
                     using (StreamReader reader = new StreamReader(read_stream))
                     {
                         while (reader.Peek() >= 0)
@@ -137,6 +146,24 @@ namespace LantanaGroup.Link.Report.Application.Core
                                 new KeyValuePair<string, object?>("measure", measureReport.Measure)
                             });
                         }
+                    }
+                }
+
+                if (_aggregatorSettings.IncludeOrganizationResource)
+                {
+                    var facilityConfig = await _tenantApiService.GetFacilityConfig(reportSchedule.FacilityId);
+                    if (facilityConfig != null)
+                    {
+                        var organization = FhirHelperMethods.CreateOrganization(
+                            facilityConfig.FacilityName,
+                            reportSchedule.FacilityId,
+                            ReportConstants.BundleSettings.SubmittingOrganizationProfile,
+                            ReportConstants.BundleSettings.OrganizationTypeSystem,
+                            ReportConstants.BundleSettings.CdcOrgIdSystem,
+                            ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl,
+                            ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                        var serializer = new FhirJsonSerializer();
+                        writer.WriteLine(serializer.SerializeToString(organization));
                     }
                 }
             }

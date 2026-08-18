@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
             {
@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             consumeResult = result;
 
@@ -109,11 +109,11 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);
 
-                                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+                                var scheduler = await _schedulerFactory.GetScheduler(consumeCancellationToken);
 
                                 _logger.LogInformation("Scheduling retry for {Topic}-{Id} at {ScheduledTrigger}, Retry Count: {RetryCount}", retryModel.Topic, retryModel.Id, retryModel.ScheduledTrigger, retryModel.RetryCount);
 
-                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler);
+                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -121,13 +121,18 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
                                 _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.Commit(consumeResult);
                             }
 
                         }, cancellationToken);

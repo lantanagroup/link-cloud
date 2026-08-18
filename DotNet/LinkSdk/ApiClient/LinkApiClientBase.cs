@@ -1,4 +1,5 @@
 ﻿using Flurl.Http;
+using Flurl.Http;
 using Flurl.Http.Configuration;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -34,8 +35,12 @@ public abstract class LinkApiClientBase : IDisposable
 
         if (bearerOptions.Value?.AllowAnonymous != true)
         {
-            _signingKey = tokenServiceSettings.Value?.SigningKey;
-            _tokenService = tokenService;
+            var key = tokenServiceSettings.Value?.SigningKey;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                _signingKey = key;
+                _tokenService = tokenService;
+            }
         }
     }
 
@@ -57,46 +62,173 @@ public abstract class LinkApiClientBase : IDisposable
     }
 
     /// <summary>
-    /// Returns null when the server responds with 404. All other errors propagate.
+    /// Executes a request and returns the full response (status code + deserialized body).
+    /// Does NOT swallow any status codes — the caller decides how to handle each response.
     /// </summary>
-    protected static async Task<T?> GetOrDefaultAsync<T>(Func<Task<T>> action) where T : class
+    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action)
     {
-        try { return await action(); }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404) { return null; }
-    }
-
-    /// <summary>
-    /// Returns false when the server responds with 404, true otherwise.
-    /// </summary>
-    protected static async Task<bool> ExistsAsync(Func<Task> action)
-    {
-        try { await action(); return true; }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404) { return false; }
-    }
-
-    /// <summary>
-    /// Returns true if created, false if the resource already exists (409 or 400+"already exists").
-    /// </summary>
-    protected static async Task<bool> CreateOrExistsAsync(Func<Task> action)
-    {
-        try { await action(); return true; }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 409) { return false; }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 400)
+        try
         {
-            var body = await ex.GetResponseStringAsync();
-            if (body?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true)
-                return false;
-            throw;
+            var response = await action();
+            var statusCode = response.StatusCode;
+            var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
+            var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
+            var traceId = ExtractTraceId(response);
+
+            if (statusCode is >= 200 and < 300)
+            {
+                var body = await response.GetJsonAsync<T>();
+                string? rawBody = null;
+                if (body is not null)
+                {
+                    try
+                    {
+                        rawBody = JsonSerializer.Serialize(body);
+                    }
+                    catch
+                    {
+                        rawBody = body.ToString();
+                    }
+                }
+
+                return new LinkApiResponse<T> { StatusCode = statusCode, Body = body, RawBody = rawBody, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+            }
+            var raw = await response.GetStringAsync();
+            return new LinkApiResponse<T> { StatusCode = statusCode, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+        catch (FlurlHttpException ex)
+        {
+            var raw = await ex.GetResponseStringAsync();
+            var requestUrl = ex.Call?.Request?.Url?.ToString();
+            var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
+            var traceId = ExtractTraceId(ex.Call?.Response);
+            return new LinkApiResponse<T> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
         }
     }
 
     /// <summary>
-    /// Silently succeeds if the resource is already gone (404).
+    /// Executes a request and returns the full response (status code + string body).
+    /// Does NOT swallow any status codes.
     /// </summary>
-    protected static async Task DeleteOrIgnoreAsync(Func<Task> action)
+    protected static async Task<LinkApiResponse<string>> SendStringAsync(Func<Task<IFlurlResponse>> action)
     {
-        try { await action(); }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404) { }
+        try
+        {
+            var response = await action();
+            var statusCode = response.StatusCode;
+            var body = await response.GetStringAsync();
+            var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
+            var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
+            var traceId = ExtractTraceId(response);
+
+            if (statusCode is >= 200 and < 300)
+                return new LinkApiResponse<string> { StatusCode = statusCode, Body = body, RawBody = body, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+            return new LinkApiResponse<string> { StatusCode = statusCode, RawBody = body, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+        catch (FlurlHttpException ex)
+        {
+            var raw = await ex.GetResponseStringAsync();
+            var requestUrl = ex.Call?.Request?.Url?.ToString();
+            var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
+            var traceId = ExtractTraceId(ex.Call?.Response);
+            return new LinkApiResponse<string> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+    }
+
+    /// <summary>
+    /// Executes a request and returns the response status code (no body deserialization).
+    /// Does NOT swallow any status codes.
+    /// </summary>
+    protected static async Task<LinkApiResponse> SendAsync(Func<Task<IFlurlResponse>> action)
+    {
+        try
+        {
+            var response = await action();
+            var raw = await response.GetStringAsync();
+            var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
+            var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
+            var traceId = ExtractTraceId(response);
+            return new LinkApiResponse { StatusCode = response.StatusCode, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+        catch (FlurlHttpException ex)
+        {
+            var raw = await ex.GetResponseStringAsync();
+            var requestUrl = ex.Call?.Request?.Url?.ToString();
+            var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
+            var traceId = ExtractTraceId(ex.Call?.Response);
+            return new LinkApiResponse { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+    }
+
+    /// <summary>
+    /// Executes a request and returns the response with raw bytes as body.
+    /// </summary>
+    protected static async Task<LinkApiResponse<byte[]>> SendBytesAsync(Func<Task<IFlurlResponse>> action)
+    {
+        try
+        {
+            var response = await action();
+            var statusCode = response.StatusCode;
+            var contentType = response.ResponseMessage.Content?.Headers?.ContentType?.ToString();
+            var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
+            var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
+            var traceId = ExtractTraceId(response);
+
+            if (statusCode is >= 200 and < 300)
+            {
+                var bytes = await response.GetBytesAsync();
+                return new LinkApiResponse<byte[]> { StatusCode = statusCode, Body = bytes, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+            }
+            var raw = await response.GetStringAsync();
+            return new LinkApiResponse<byte[]> { StatusCode = statusCode, RawBody = raw, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+        catch (FlurlHttpException ex)
+        {
+            var raw = await ex.GetResponseStringAsync();
+            var contentType = ex.Call?.Response?.ResponseMessage.Content?.Headers?.ContentType?.ToString();
+            var requestUrl = ex.Call?.Request?.Url?.ToString();
+            var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
+            var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
+            var traceId = ExtractTraceId(ex.Call?.Response);
+            return new LinkApiResponse<byte[]> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+        }
+    }
+
+    private static string? ExtractTraceId(IFlurlResponse? response)
+    {
+        if (response == null) return null;
+        if (response.Headers.TryGetFirst("traceparent", out var traceparent) && !string.IsNullOrWhiteSpace(traceparent))
+        {
+            var parts = traceparent.Split('-', StringSplitOptions.TrimEntries);
+            if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
+                return parts[1];
+        }
+        if (response.Headers.TryGetFirst("X-Trace-Id", out var xTraceId) && !string.IsNullOrWhiteSpace(xTraceId))
+            return xTraceId;
+        return null;
+    }
+
+    private static async Task<string?> ExtractRequestBodyAsync(HttpRequestMessage? requestMessage)
+    {
+        if (requestMessage?.Content == null)
+            return null;
+
+        try
+        {
+            var body = await requestMessage.Content.ReadAsStringAsync();
+            return string.IsNullOrWhiteSpace(body) ? null : body;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public void Dispose()

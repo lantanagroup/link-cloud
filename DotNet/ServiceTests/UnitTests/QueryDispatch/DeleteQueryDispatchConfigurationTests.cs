@@ -1,4 +1,4 @@
-using LantanaGroup.Link.QueryDispatch.Application.Models;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Moq;

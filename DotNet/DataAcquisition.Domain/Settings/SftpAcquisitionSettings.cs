@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Settings;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Settings;
 
 /// <summary>
 /// Configuration settings for SFTP acquisition processing job.

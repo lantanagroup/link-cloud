@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -303,47 +303,10 @@ static void RegisterServices(WebApplicationBuilder builder)
                 });
             }
 
-            c.AddSecurityDefinition("OAuth", new OpenApiSecurityScheme
-            {
-                Description = $"Authorization using OAuth",
-                Name = "OAuth",
-                Type = SecuritySchemeType.OAuth2,
-                Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-                Flows = new OpenApiOAuthFlows
-                {
-                    AuthorizationCode = new OpenApiOAuthFlow
-                    {
-                        AuthorizationUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!),
-                        TokenUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!),
-                        Scopes = new Dictionary<string, string>
-                    {
-                        { "openid", "OpenId" },
-                        { "profile", "Profile" },
-                        { "email", "Email" }
-                    }
-                    }
-                }
-
-            });
-
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Id = "OAuth",
-                        Type = ReferenceType.SecurityScheme
-                    },
-                    Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-                    Name = "Oauth",
-                    In = ParameterLocation.Header
-
-                },
-                new List<string>()
-            }
-        });
+            c.AddOAuthSecurityIfConfigured(
+                builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"),
+                builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization"),
+                builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token"));
             #endregion
         }
 

@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -40,6 +41,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
+                OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
+                OperationType.CopyLocationAliasToTypeIteratively => (object)(CopyLocationAliasToTypeIterativelyOperation)operation,
                 _ => null
             };
         }
@@ -86,7 +89,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to evaluate FHIRPath '{FhirPath}' for resource type {ResourceType}.", fhirPath, scopedNode.Name);
+                logger.LogError(ex, "Failed to evaluate FHIRPath '{FhirPath}' for resource type {ResourceType}.", fhirPath.SanitizeForLog(), scopedNode.Name.SanitizeForLog());
                 return (false, $"Failed to evaluate FHIRPath '{fhirPath}': {ex.Message}", null);
             }
         }
@@ -151,7 +154,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 if (targetProperty == null)
                 {
                     logger?.LogWarning("Property '{PropertyName}' not found on type '{TypeName}' for FHIRPath '{FhirPath}'.",
-                        propertyName, currentObject.GetType().Name, fhirPath);
+                        propertyName.SanitizeForLog(), currentObject.GetType().Name.SanitizeForLog(), fhirPath.SanitizeForLog());
                     return false;
                 }
 
@@ -174,7 +177,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         return true;
                     }
 
-                    logger?.LogWarning("Property '{PropertyName}' is a primitive and cannot be traversed further.", propertyName);
+                    logger?.LogWarning("Property '{PropertyName}' is a primitive and cannot be traversed further.", propertyName.SanitizeForLog());
                     return false;
                 }
                 else
@@ -209,7 +212,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 targetProperty = GetProperty(currentObject.GetType(), propertyName);
                 if (targetProperty == null)
                 {
-                    logger?.LogWarning("Property {PropertyName} not found for FHIRPath {FhirPath}.", propertyName, fhirPath);
+                    logger?.LogWarning("Property {PropertyName} not found for FHIRPath {FhirPath}.", propertyName.SanitizeForLog(), fhirPath.SanitizeForLog());
                     return (null, null);
                 }
 
@@ -284,7 +287,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 var property = GetProperty(currentObject.GetType(), propertyName);
                 if (property == null)
                 {
-                    logger?.LogWarning("Property {PropertyName} not found for parent path {ParentPath}.", propertyName, parentPath);
+                    logger?.LogWarning("Property {PropertyName} not found for parent path {ParentPath}.", propertyName.SanitizeForLog(), parentPath.SanitizeForLog());
                     return null;
                 }
 
@@ -424,12 +427,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     return complexValue;
                 }
 
-                logger?.LogWarning("Unsupported value type {ValueType} for property {PropertyName} of type {PropertyType}.", newValue.GetType().Name, propertyName, propertyType.Name);
+                logger?.LogWarning("Unsupported value type {ValueType} for property {PropertyName} of type {PropertyType}.", newValue.GetType().Name.SanitizeForLog(), propertyName.SanitizeForLog(), propertyType.Name.SanitizeForLog());
                 return newValue;
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "Failed to convert value of type {ValueType} to property {PropertyName} of type {PropertyType}.", newValue.GetType().Name, propertyName, propertyType.Name);
+                logger?.LogError(ex, "Failed to convert value of type {ValueType} to property {PropertyName} of type {PropertyType}.", newValue.GetType().Name.SanitizeForLog(), propertyName.SanitizeForLog(), propertyType.Name.SanitizeForLog());
                 return null;
             }
         }
@@ -577,7 +580,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to resolve and set value reflectively for FHIRPath '{TargetFhirPath}'.", targetFhirPath);
+                logger.LogError(ex, "Failed to resolve and set value reflectively for FHIRPath '{TargetFhirPath}'.", targetFhirPath.SanitizeForLog());
                 return SetValueResult.Failure($"Failed to set value reflectively for FHIRPath '{targetFhirPath}': {ex.Message}");
             }
         }
@@ -601,7 +604,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath.SanitizeForLog(), resource.TypeName.SanitizeForLog());
                     return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
                 }
             }
@@ -673,7 +676,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath, resource.TypeName);
+                    logger.LogError(ex, "Failed to set target element for FHIRPath '{TargetFhirPath}' in resource type {ResourceType}.", targetFhirPath.SanitizeForLog(), resource.TypeName.SanitizeForLog());
                     return SetValueResult.Failure($"Failed to set target element for FHIRPath '{targetFhirPath}': {ex.Message}");
                 }
             }
@@ -825,6 +828,44 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 else if (operation is CopyLocationOperation)
                 {
                     //No validation needed for CopyLocationOperation
+                }
+                else if (operation is CopyLocationAliasToTypeIterativelyOperation)
+                {
+                    var op = (CopyLocationAliasToTypeIterativelyOperation)operation;
+
+                    if (op.MaxIterations <= 0)
+                    {
+                        return (false, "CopyLocationAliasToTypeIterativelyOperation.MaxIterations must be greater than zero.");
+                    }
+                }
+                else if (operation is RemoveExtensionsOperation)
+                {
+                    var op = (RemoveExtensionsOperation)operation;
+
+                    if (op.ExtensionUrls == null || !op.ExtensionUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must contain at least one URL.");
+                    }
+
+                    var emptyUrls = op.ExtensionUrls.Where(string.IsNullOrWhiteSpace).ToList();
+                    if (emptyUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain null or empty entries.");
+                    }
+
+                    var paddedUrls = op.ExtensionUrls.Where(u => u != u.Trim()).ToList();
+                    if (paddedUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain entries with leading or trailing whitespace.");
+                    }
+
+                    var invalidUrls = op.ExtensionUrls
+                        .Where(u => !Uri.TryCreate(u, UriKind.Absolute, out _))
+                        .ToList();
+                    if (invalidUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must contain only valid absolute URLs.");
+                    }
                 }
                 else
                 {
