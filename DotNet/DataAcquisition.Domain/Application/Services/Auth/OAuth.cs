@@ -29,9 +29,9 @@ public class OAuth : IAuth
         _secretManager = secretManager;
     }
 
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
-        var cachedToken = _cacheService.Get<string>(facilityId);
+        var cachedToken = await _cacheService.GetAsync<string>(facilityId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, cachedToken));
@@ -77,7 +77,7 @@ public class OAuth : IAuth
 
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
+                    await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
                     return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
                 }
             }

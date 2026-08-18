@@ -126,8 +126,8 @@ public class LocationMappingServiceIntegrationTests
         // The FhirPath deliberately doesn't match the bare test Location, so it stays a non-org location.
         var mockCache = new Mock<ICacheService>();
         mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>
+            .Setup(c => c.GetAsync<List<OrganizationLocationConditionModel>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrganizationLocationConditionModel>
             {
                 new() { FhirPath = "managingOrganization.reference = 'Organization/never'", Priority = 1 }
             });
