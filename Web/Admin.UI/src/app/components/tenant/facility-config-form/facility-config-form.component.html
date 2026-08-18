@@ -71,6 +71,17 @@
       }
     </mat-form-field>
 
+    <!-- DMRP feature flag: when it is retired, keep this branch and delete the @else that holds the
+         report pickers, along with the two error blocks below it. -->
+    @if (dmrpEnabled) {
+      <div class="scheduled-reports-container">
+        <span class="title">Scheduled Reports</span>
+        <p>
+          Scheduled reports for this facility are derived from its DMRP reporting plans and cannot be
+          set here.
+        </p>
+      </div>
+    } @else {
     <div class="scheduled-reports-container">
       <span class="title">Scheduled Reports</span>
 
@@ -116,6 +127,7 @@
       <div>
         <small class="error">{{ noReportsEntered }}</small>
       </div>
+    }
     }
 
   </form>

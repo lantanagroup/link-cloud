@@ -686,6 +686,9 @@ services:
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
+      # DMRP system feature switch. Must match DMRP__Enabled on the services, which this stack sets
+      # true in the tenant service's appsettings.Docker.json.
+      LINK_DMRP_ENABLED: "true"
     networks:
       - link-nw
     depends_on:

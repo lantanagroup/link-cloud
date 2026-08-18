@@ -33,7 +33,7 @@ describe('FacilityConfigFormComponent', () => {
       providers: [
         { provide: TenantService, useValue: { getVendorVersions: () => of(vendors) } },
         { provide: MeasureDefinitionService, useValue: { getMeasureDefinitionConfigurations: () => of([]) } },
-        { provide: AppConfigService, useValue: { loadConfig: () => Promise.resolve({ allowAlphaNumericFacilityId: true }) } },
+        { provide: AppConfigService, useValue: { loadConfig: () => Promise.resolve({ allowAlphaNumericFacilityId: true, dmrpEnabled: false }) } },
         { provide: MatSnackBar, useValue: { open: () => {} } }
       ]
     })
