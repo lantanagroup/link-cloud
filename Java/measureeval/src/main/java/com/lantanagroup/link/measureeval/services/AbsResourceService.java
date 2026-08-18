@@ -7,6 +7,7 @@ import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.BlobStorageException;
 import com.azure.storage.blob.models.ListBlobsOptions;
 import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,11 +75,12 @@ public class AbsResourceService {
             // silently producing a not-reportable report and acking. Connectivity/timeout failures are
             // not BlobStorageException, so they are not caught here and propagate for the same reason.
             if (BlobErrorCode.BLOB_NOT_FOUND.equals(e.getErrorCode())) {
-                logger.debug("Blob '{}' not found for correlationId='{}'; treating as empty cache", blobName, correlationId);
+                logger.debug("Blob '{}' not found for correlationId='{}'; treating as empty cache",
+                        LogUtils.sanitize(blobName), LogUtils.sanitize(correlationId));
                 return resources;
             }
             logger.error("Failed to download blob '{}' for correlationId='{}' (errorCode={}); propagating for retry.",
-                    blobName, correlationId, e.getErrorCode());
+                    LogUtils.sanitize(blobName), LogUtils.sanitize(correlationId), LogUtils.sanitize(e.getErrorCode()));
             throw e;
         }
 

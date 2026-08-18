@@ -146,10 +146,24 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
     /**
      * Retry attempts recorded in the attempts header, or 0 if absent. Shared with KafkaConfig's
      * destination resolver so routing and stamping use the same count.
+     *
+     * <p>Tolerates both encodings spring-kafka accepts — the current four-byte int and the legacy
+     * single byte — since records can arrive carrying either (mixed-version rollouts, old in-flight
+     * retry records). Any other length reads as 0 ("no attempts yet") rather than throwing: a decode
+     * failure would propagate out of {@link #accept} and stall the partition, and the worst case of
+     * reading 0 is one extra pass through the retry ladder before dead-lettering.</p>
      */
     public static int currentAttempts(Headers headers) {
         var header = headers.lastHeader(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS);
-        if (header == null) return 0;
-        return ByteBuffer.wrap(header.value()).getInt();
+        if (header == null || header.value() == null) return 0;
+        byte[] value = header.value();
+        if (value.length == Integer.BYTES) {
+            return ByteBuffer.wrap(value).getInt();
+        }
+        if (value.length == 1) {
+            return value[0];
+        }
+        logger.warn("Unsupported attempts-header length {}; treating as 0 attempts.", value.length);
+        return 0;
     }
 }

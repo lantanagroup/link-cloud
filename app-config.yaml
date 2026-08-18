@@ -648,9 +648,11 @@ services:
     - key: "spring.kafka.retry.consumer-retry-duration"
       description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
       required: false
+      defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
+      defaultValue: "false"
   Normalization:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
@@ -808,9 +810,11 @@ services:
     - key: "spring.kafka.retry.consumer-retry-duration"
       description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
       required: false
+      defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
+      defaultValue: "false"
     - key: "internal-blob-storage.max-tries"
       description: "Azure SDK in-process tries per Validation blob call (patient NDJSON download and pre-qual append, both on the consumer path). Kept low deliberately: the Kafka retry-topic ladder owns real retrying, and the SDK default of 4 exponential tries blocked the single-threaded consumer executor for minutes during an ABS outage. Defaults to 2."
       required: false

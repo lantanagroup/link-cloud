@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.Resource;
 import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,7 @@ public class RedisResourceService {
 
         if (fields.isEmpty()) {
             // Reached only when the cache was reachable: the key genuinely has no fields.
-            logger.debug("No Redis entries for correlationId='{}' (cache reachable, key absent)", correlationId);
+            logger.debug("No Redis entries for correlationId='{}' (cache reachable, key absent)", LogUtils.sanitize(correlationId));
             return resources;
         }
 

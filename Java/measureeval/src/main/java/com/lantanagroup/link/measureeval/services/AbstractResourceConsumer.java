@@ -13,6 +13,7 @@ import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
@@ -228,7 +229,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             // its cached resources. Terminal (dead-letter) cleanup is the recoverer's job — it is the
             // only place the routing decision is known (see the terminal-failure hook in KafkaConfig).
             if (keepCacheForSupplemental) {
-                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", correlationId);
+                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", LogUtils.sanitize(correlationId));
             } else {
                 if (perf) taskStopWatch.start("cleanupCache");
                 try {

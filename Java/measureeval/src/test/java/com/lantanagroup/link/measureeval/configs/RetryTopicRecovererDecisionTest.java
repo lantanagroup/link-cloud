@@ -333,12 +333,51 @@ class RetryTopicRecovererDecisionTest {
     }
 
     @Test
+    void kafkaConfigHook_skipsCleanup_whenADeadLetteredValueIsNotAResourceRecord() {
+        // The other side of the hook's instanceof guard: a terminal record whose value never
+        // deserialized into a resource record (e.g. container-thread poison republished as raw
+        // content) has no cache key to read - the hook must skip, not throw, and leave whatever
+        // the record left behind to the cache expiration policy.
+        var redis = mock(com.lantanagroup.link.measureeval.services.RedisResourceService.class);
+
+        assertDoesNotThrow(() -> runThroughKafkaConfig(
+                new ConsumerRecord<>("ResourcesNormalized", 0, 0L, "key", "raw non-record value"),
+                new ValidationException("poison"), redis));
+
+        verifyNoInteractions(redis);
+    }
+
+    @Test
     void kafkaConfigHook_leavesTheResourceCache_whenARecordIsRetried() {
         var redis = mock(com.lantanagroup.link.measureeval.services.RedisResourceService.class);
 
         runThroughKafkaConfig(resourceRecord("corr-1"), new RuntimeException("transient boom"), redis);
 
         verify(redis, never()).cleanup(anyString());
+    }
+
+    @Test
+    void failedDeadLetterPublish_propagates_andTheHookDoesNotFire() {
+        // The recoverer must await the send result. If accept() returned after merely enqueueing the
+        // send, a broker failure would be invisible: the async consumer would ack the source record
+        // (losing it - neither retried nor dead-lettered) and the hook would release resources for a
+        // dead letter that never landed.
+        KafkaTemplate<Object, Object> template = mock(KafkaTemplate.class);
+        when(template.partitionsFor(anyString())).thenAnswer(invocation ->
+                List.of(new PartitionInfo(invocation.getArgument(0), 0, null, new Node[0], new Node[0])));
+        when(template.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("broker unavailable")));
+
+        List<String> events = new java.util.ArrayList<>();
+        RetryTopicRecoverer recoverer = RetryTopicRecovererFactory.create(
+                template, RETRY_TOPIC, ERROR_TOPIC, retryConfig(3, false), KafkaConfig.NON_RETRYABLE,
+                (r, e) -> events.add("hook"));
+
+        assertThrows(Exception.class,
+                () -> recoverer.accept(record(), new ValidationException("poison")),
+                "a failed dead-letter publish must propagate so the source offset stays uncommitted");
+        assertEquals(List.of(), events,
+                "resources must not be released for a dead letter that was never published");
     }
 
     @Test

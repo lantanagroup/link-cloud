@@ -5,6 +5,7 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.common.policy.RequestRetryOptions;
 import com.azure.storage.common.policy.RetryPolicyType;
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +48,8 @@ public class CacheBlobStorageConfig {
             return null;
         }
         logger.info("Creating AbsResourceService: container={}, blobRoot={}, maxTries={}, tryTimeout={}s",
-                blobContainerName, blobRoot, maxTries, tryTimeoutSeconds);
+                LogUtils.sanitize(blobContainerName), LogUtils.sanitize(blobRoot),
+                LogUtils.sanitize(maxTries), LogUtils.sanitize(tryTimeoutSeconds));
         BlobContainerClient client = new BlobServiceClientBuilder()
                 .connectionString(connectionString)
                 .retryOptions(buildRetryOptions())

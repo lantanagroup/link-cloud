@@ -77,6 +77,10 @@ public final class RetryTopicRecovererFactory {
                     return new TopicPartition(target, record.partition());
                 };
 
+        // Relies on spring-kafka's failIfSendResultIsError=true default (since 2.7): accept() awaits
+        // the send result (bounded by the producer's delivery.timeout.ms + buffer) and throws on
+        // failure, so the source offset stays uncommitted and the onDeadLetter hook only runs after a
+        // durable publish. Pinned by RetryTopicRecovererDecisionTest.failedDeadLetterPublish_*.
         DeadLetterPublishingRecoverer delegate = new DeadLetterPublishingRecoverer(kafkaTemplate, resolver);
 
         return new RetryTopicRecoverer(

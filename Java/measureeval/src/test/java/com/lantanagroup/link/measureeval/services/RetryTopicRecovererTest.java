@@ -50,6 +50,31 @@ class RetryTopicRecovererTest {
         return new BigInteger(value).longValue();
     }
 
+    private static RecordHeaders attemptsHeader(byte[] value) {
+        RecordHeaders headers = new RecordHeaders();
+        headers.add(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS, value);
+        return headers;
+    }
+
+    // ---- Attempts-header tolerance. spring-kafka accepts both the legacy one-byte and the current
+    //      four-byte encoding, and records can arrive carrying either (mixed-version rollouts, old
+    //      in-flight retry records). A decode failure here would propagate out of the recoverer and
+    //      stall the partition (the async consumer skips the ack), so unsupported lengths must read
+    //      as 0 - "no attempts yet" - rather than throw.
+
+    @Test
+    void currentAttempts_decodesLegacySingleByteHeader() {
+        assertEquals(3, RetryTopicRecoverer.currentAttempts(attemptsHeader(new byte[]{3})));
+    }
+
+    @Test
+    void currentAttempts_returnsZeroForUnsupportedLengths() {
+        assertEquals(0, RetryTopicRecoverer.currentAttempts(attemptsHeader(new byte[]{0, 1})),
+                "a two-byte value is neither encoding; it must read as zero, not throw");
+        assertEquals(0, RetryTopicRecoverer.currentAttempts(attemptsHeader(new byte[]{})),
+                "an empty value must read as zero, not throw");
+    }
+
     @Test
     void backoffTimestamp_decodesAsFutureDueTime_viaSpringReader() {
         RetryTopicRecoverer recoverer = newRecoverer(mock(DeadLetterPublishingRecoverer.class));
