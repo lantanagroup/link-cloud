@@ -67,6 +67,30 @@
                                 <option value="RegenerateReport">Regenerate Report</option>
                             </select>
                         </div>
+                        <div class="col-md-8" id="liveSimulationFields">
+                            <label class="form-label d-block">Live Scheduled Simulation</label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="IsLiveSimulation" />
+                                <label class="form-check-label" for="IsLiveSimulation">Hold a short reporting window and inject Admit/Discharge events</label>
+                            </div>
+                            <div class="row g-2" id="liveSimulationOptions">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="ReportingWindowMinutes">Reporting Window</label>
+                                    <select class="form-select" id="ReportingWindowMinutes">
+                                        <option value="5">5 minutes</option>
+                                        <option value="10" selected>10 minutes</option>
+                                        <option value="15">15 minutes</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="SeedPatientCount">
+                                        Seed Admitted Patients
+                                        <span class="au-info-icon" data-bs-toggle="tooltip" title="When Live Scheduled Simulation is enabled, this sets how many generated patients are admitted automatically when the live window opens. Use it to start the run with a few patients already in the hospital."><i class="bi bi-info-circle"></i></span>
+                                    </label>
+                                    <input class="form-control" type="number" min="0" id="SeedPatientCount" value="0" />
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-md-8">
                             <label class="form-label">Measures</label>
                             <div class="form-check">
@@ -982,7 +1006,20 @@
         document.getElementById('ReportMethod').addEventListener('change', function () {
             syncPatternColumns();
             syncReportPeriodPolicyUi();
+            syncLiveSimulationUi();
         });
+        document.getElementById('IsLiveSimulation').addEventListener('change', syncLiveSimulationUi);
+
+        function syncLiveSimulationUi() {
+            var fields = document.getElementById('liveSimulationFields');
+            var options = document.getElementById('liveSimulationOptions');
+            var liveToggle = document.getElementById('IsLiveSimulation');
+            if (!fields || !options || !liveToggle) return;
+            var scheduled = (document.getElementById('ReportMethod').value || '') === 'ScheduledReport';
+            fields.style.display = scheduled ? '' : 'none';
+            if (!scheduled) liveToggle.checked = false;
+            options.style.display = liveToggle.checked ? '' : 'none';
+        }
 
         // ---- Imported Patients ----
         var importedRows = document.getElementById('importedRows');
@@ -1493,7 +1530,10 @@
                     ? null
                     : ((document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null),
                 importedPatientIds: importedIds,
-                importedPatientBundles: importedBundles
+                importedPatientBundles: importedBundles,
+                isLiveSimulation: !!document.getElementById('IsLiveSimulation').checked,
+                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10),
+                seedPatientCount: parseInt(document.getElementById('SeedPatientCount').value || '0', 10)
             };
         }
 
@@ -1504,6 +1544,9 @@
             document.getElementById('ScenarioName').value = data.name || '';
             document.getElementById('ScenarioDescription').value = data.description || '';
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
+            document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
+            document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
+            document.getElementById('SeedPatientCount').value = data.seedPatientCount || 0;
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;

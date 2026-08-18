@@ -16,4 +16,8 @@ public interface IAutomationRunManager
     Task<GenerationManifestSnapshot?> GetGenerationManifestAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<AbsUploadSnapshot?> GetAbsUploadSnapshotAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default);
+    Task<PatientStateEvent> InjectAdmitAsync(Guid runId, string? patientId, string source, string? notes = null, CancellationToken cancellationToken = default);
+    Task<PatientStateEvent> InjectDischargeAsync(Guid runId, string patientId, string source, string? notes = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PatientStateEvent>> GetLiveEventsAsync(Guid runId, CancellationToken cancellationToken = default);
+    Task<LivePatientStateSnapshot> GetLivePatientStateAsync(Guid runId, CancellationToken cancellationToken = default);
 }

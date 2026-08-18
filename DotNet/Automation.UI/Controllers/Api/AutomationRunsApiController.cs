@@ -72,9 +72,7 @@ public sealed class AutomationRunsApiController(
         if (summary == null)
             return NotFound(new { error = $"Run {runId} not found." });
 
-        var isTerminal = summary.Status is AutomationRunStatus.Succeeded
-                                        or AutomationRunStatus.Failed
-                                        or AutomationRunStatus.Cancelled;
+        var isTerminal = summary.Status.IsTerminal();
 
         return Ok(new RunStatusResponse
         {
@@ -88,6 +86,92 @@ public sealed class AutomationRunsApiController(
             Duration = summary.Duration,
             Error = summary.Error,
         });
+    }
+
+    public sealed class LivePatientEventRequest
+    {
+        public string? PatientId { get; set; }
+        public string? Notes { get; set; }
+        public string? Source { get; set; }
+    }
+
+    [HttpPost("{runId:guid}/events/admit")]
+    public async Task<IActionResult> Admit(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
+    {
+        return await ExecuteLiveInjectAsync(
+            runId,
+            () => runManager.InjectAdmitAsync(
+                runId,
+                request?.PatientId,
+                string.IsNullOrWhiteSpace(request?.Source) ? "API" : request!.Source!.Trim(),
+                request?.Notes,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/events/discharge")]
+    public async Task<IActionResult> Discharge(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        return await ExecuteLiveInjectAsync(
+            runId,
+            () => runManager.InjectDischargeAsync(
+                runId,
+                request.PatientId,
+                string.IsNullOrWhiteSpace(request.Source) ? "API" : request.Source.Trim(),
+                request.Notes,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpGet("{runId:guid}/events")]
+    public async Task<IActionResult> GetEvents(Guid runId, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        var events = await runManager.GetLiveEventsAsync(runId, cancellationToken);
+        return Ok(events);
+    }
+
+    [HttpGet("{runId:guid}/patient-state")]
+    public async Task<IActionResult> GetPatientState(Guid runId, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        var state = await runManager.GetLivePatientStateAsync(runId, cancellationToken);
+        return Ok(new
+        {
+            admitted = state.Admitted,
+            dischargedDuringWindow = state.DischargedDuringWindow,
+            expectedPopulation = state.ExpectedPopulation,
+            acceptingInjections = state.AcceptingInjections,
+            windowStartUtc = state.WindowStartUtc,
+            windowEndUtc = state.WindowEndUtc,
+            reportGenerationTimeUtc = state.ReportGenerationTimeUtc
+        });
+    }
+
+    private async Task<IActionResult> ExecuteLiveInjectAsync(
+        Guid runId,
+        Func<Task<PatientStateEvent>> action,
+        CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        try
+        {
+            var evt = await action();
+            return Ok(evt);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
     }
 
     public sealed class StartScenarioApiRequest

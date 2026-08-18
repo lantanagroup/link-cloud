@@ -107,7 +107,7 @@
                             <div class="fw-semibold">@run.RunName</div>
                             <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
-                                <span class="badge @(run.Status == AutomationRunStatus.Running ? "au-badge-active" : "au-badge-muted")">@run.Status</span>
+                                <span class="badge @(run.Status.IsInProgress() ? "au-badge-active" : "au-badge-muted")">@run.Status</span>
                                 <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")">@elapsed.ToString(@"mm\:ss") elapsed</span>
                             </div>
                             <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
@@ -390,7 +390,7 @@
         if (s === 'succeeded' || s === '3') return 'au-badge-success';
         if (s === 'failed' || s === '4') return 'au-badge-danger';
         if (s === 'cancelled' || s === '2') return 'au-badge-warning';
-        if (s === 'running' || s === '1') return 'au-badge-active';
+        if (s === 'running' || s === '1' || s === 'livewindowopen' || s === 'reportfinalization' || s === '5' || s === '6') return 'au-badge-active';
         return 'au-badge-muted';
     }
 
@@ -401,7 +401,8 @@
 
     function isActive(status) {
         var s = String(status || '').toLowerCase();
-        return s === 'running' || s === 'queued' || s === '0' || s === '1';
+        return s === 'running' || s === 'queued' || s === 'livewindowopen' || s === 'reportfinalization'
+            || s === '0' || s === '1' || s === '5' || s === '6';
     }
 
     function formatDuration(seconds) {

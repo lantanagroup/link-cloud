@@ -107,6 +107,24 @@ public class TestScenarioDefinition
     /// </summary>
     public DateTimeOffset? ReportPeriodEnd { get; set; }
 
+    // ----- Live Scheduled Simulation -----
+
+    /// <summary>
+    /// When true, a ScheduledReport run holds a short live window and accepts
+    /// Admit/Discharge injections before finalizing the report.
+    /// </summary>
+    public bool IsLiveSimulation { get; set; }
+
+    /// <summary>
+    /// Live reporting window length in minutes (typically 5, 10, or 15).
+    /// </summary>
+    public int ReportingWindowMinutes { get; set; } = 10;
+
+    /// <summary>
+    /// Optional number of generated patients to admit when the live window opens.
+    /// </summary>
+    public int SeedPatientCount { get; set; }
+
     // ----- Imported Patients (supplemental, separate from cohorts/random pool) -----
 
     /// <summary>

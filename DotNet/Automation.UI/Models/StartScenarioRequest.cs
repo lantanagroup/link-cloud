@@ -97,6 +97,20 @@ public class StartScenarioRequest : IValidatableObject
     public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     /// <summary>
+    /// When true, a ScheduledReport run holds a short live window and accepts
+    /// Admit/Discharge injections before finalizing the report.
+    /// </summary>
+    public bool IsLiveSimulation { get; set; }
+
+    /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
+    [Range(1, 60)]
+    public int? ReportingWindowMinutes { get; set; }
+
+    /// <summary>Optional number of generated patients to admit when the live window opens.</summary>
+    [Range(0, 10000)]
+    public int? SeedPatientCount { get; set; }
+
+    /// <summary>
     /// Cross-field validation. Rejects inverted report windows
     /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
     /// boundary so that invalid windows are never forwarded to
@@ -133,6 +147,9 @@ public class StartScenarioRequest : IValidatableObject
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
+        IsLiveSimulation = scenario.IsLiveSimulation,
+        ReportingWindowMinutes = scenario.ReportingWindowMinutes,
+        SeedPatientCount = scenario.SeedPatientCount,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

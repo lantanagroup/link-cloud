@@ -12,7 +12,7 @@
             </div>
         </div>
         <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
-            @if (Model.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            @if (Model.Status.IsCancellable())
             {
                 <button type="button" class="btn btn-warning btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
             }
@@ -43,6 +43,59 @@
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
                 Finalizing…
             </span>
+        </div>
+    </div>
+
+    <div class="au-card" id="liveSimulationCard" style="display:none;">
+        @Html.AntiForgeryToken()
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-heart-pulse me-2"></i>Live Scheduled Simulation</span>
+            <span class="small text-muted" id="liveWindowCountdown">Window closed</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Admitted</div><div class="fs-4 fw-semibold" id="liveAdmittedCount">0</div></div></div>
+                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Discharged</div><div class="fs-4 fw-semibold" id="liveDischargedCount">0</div></div></div>
+                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Expected Population</div><div class="fs-4 fw-semibold" id="liveExpectedCount">0</div></div></div>
+                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Injections</div><div class="fs-6 fw-semibold" id="liveAcceptingLabel">Closed</div></div></div>
+            </div>
+            <div class="row g-3 mb-3" id="liveInjectControls">
+                <div class="col-md-5">
+                    <label class="form-label" for="liveAdmitPatientId">Admit patient ID</label>
+                    <div class="input-group">
+                        <input class="form-control" id="liveAdmitPatientId" placeholder="Leave blank to use next generated ID" />
+                        <button type="button" class="btn btn-success" id="btnLiveAdmit">Admit</button>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label" for="liveDischargePatientId">Discharge admitted patient</label>
+                    <div class="input-group">
+                        <select class="form-select" id="liveDischargePatientId"></select>
+                        <button type="button" class="btn btn-warning" id="btnLiveDischarge">Discharge</button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="liveEventNotes">
+                        Notes
+                        <span class="au-info-icon" data-bs-toggle="tooltip" title="Optional context for the next Admit/Discharge action. Saved with the event and shown in Event Log; does not change reportability."><i class="bi bi-info-circle"></i></span>
+                    </label>
+                    <input class="form-control" id="liveEventNotes" maxlength="200" placeholder="Optional: reason/context for this event" />
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="small text-muted">Expected Population</div>
+                        <div class="small text-muted" id="liveExpectedShownCount">0 of 0</div>
+                    </div>
+                    <input class="form-control form-control-sm mb-2" id="liveExpectedFilter" placeholder="Filter patient IDs" />
+                    <div id="liveExpectedList" class="small border rounded p-2" style="max-height:180px;overflow:auto;"></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="small text-muted mb-1">Event Log</div>
+                    <div id="liveEventLog" class="small border rounded p-2" style="max-height:180px;overflow:auto;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -928,6 +981,193 @@
             return value === 'succeeded' || value === 'failed' || value === 'cancelled' || value === '3' || value === '4' || value === '2';
         }
 
+        function isLiveWindowOpen(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'livewindowopen' || value === '5';
+        }
+
+        function parseRunConfig() {
+            try { return JSON.parse(runConfigurationJson || '{}'); } catch { return {}; }
+        }
+
+        const liveConfig = parseRunConfig();
+        const isLiveSimulationRun = !!liveConfig.isLiveSimulation;
+        const liveStateUrl = '@Url.Action("LivePatientState", "Runs")';
+        const liveEventsUrl = '@Url.Action("LiveEvents", "Runs")';
+        const liveAdmitUrl = '@Url.Action("AdmitJson", "Runs")';
+        const liveDischargeUrl = '@Url.Action("DischargeJson", "Runs")';
+        let liveWindowTimer = null;
+        let liveExpectedPopulation = [];
+
+        function renderExpectedPopulationList() {
+            const listBox = document.getElementById('liveExpectedList');
+            const filterInput = document.getElementById('liveExpectedFilter');
+            const shownCount = document.getElementById('liveExpectedShownCount');
+            if (!listBox || !filterInput || !shownCount) return;
+
+            const query = (filterInput.value || '').trim().toLowerCase();
+            const filtered = query
+                ? liveExpectedPopulation.filter(id => String(id || '').toLowerCase().includes(query))
+                : liveExpectedPopulation;
+
+            shownCount.textContent = `${filtered.length} of ${liveExpectedPopulation.length}`;
+
+            if (!filtered.length) {
+                listBox.innerHTML = '<span class="text-muted">No matching patients.</span>';
+                return;
+            }
+
+            listBox.innerHTML = filtered
+                .map(id => `<div class="py-1 border-bottom"><code>${escapeHtml(id)}</code></div>`)
+                .join('');
+        }
+
+        function setLiveCardVisible(visible) {
+            const card = document.getElementById('liveSimulationCard');
+            if (card) card.style.display = visible ? '' : 'none';
+        }
+
+        function formatUtc(value) {
+            if (!value) return '-';
+            try { return new Date(value).toISOString(); } catch { return String(value); }
+        }
+
+        function renderLiveState(state) {
+            if (!state) return;
+            const admitted = state.admitted || state.Admitted || [];
+            const discharged = state.dischargedDuringWindow || state.DischargedDuringWindow || [];
+            const expected = state.expectedPopulation || state.ExpectedPopulation || [];
+            const accepting = !!(state.acceptingInjections ?? state.AcceptingInjections);
+            document.getElementById('liveAdmittedCount').textContent = admitted.length;
+            document.getElementById('liveDischargedCount').textContent = discharged.length;
+            document.getElementById('liveExpectedCount').textContent = expected.length;
+            document.getElementById('liveAcceptingLabel').textContent = accepting ? 'Accepting' : 'Closed';
+            liveExpectedPopulation = Array.isArray(expected) ? expected : [];
+            renderExpectedPopulationList();
+
+            const dischargeSelect = document.getElementById('liveDischargePatientId');
+            const current = dischargeSelect.value;
+            dischargeSelect.innerHTML = admitted.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+            if (admitted.includes(current)) dischargeSelect.value = current;
+
+            const injectControls = document.getElementById('liveInjectControls');
+            injectControls.querySelectorAll('input, select, button').forEach(el => { el.disabled = !accepting; });
+
+            startLiveCountdown(state.windowEndUtc || state.WindowEndUtc, accepting);
+        }
+
+        function renderLiveEvents(events) {
+            const box = document.getElementById('liveEventLog');
+            const list = events || [];
+            if (!list.length) {
+                box.innerHTML = '<span class="text-muted">No events yet.</span>';
+                return;
+            }
+            box.innerHTML = list.map(evt => {
+                const type = evt.eventType || evt.EventType;
+                const ts = formatUtc(evt.timestampUtc || evt.TimestampUtc);
+                const patient = evt.patientId || evt.PatientId || '';
+                const notes = evt.notes || evt.Notes || '';
+                return `<div><strong>${escapeHtml(String(type))}</strong> <code>${escapeHtml(patient)}</code> <span class="text-muted">${escapeHtml(ts)}</span>${notes ? ` — ${escapeHtml(notes)}` : ''}</div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function startLiveCountdown(windowEnd, accepting) {
+            const label = document.getElementById('liveWindowCountdown');
+            if (liveWindowTimer) {
+                clearInterval(liveWindowTimer);
+                liveWindowTimer = null;
+            }
+            if (!windowEnd) {
+                label.textContent = accepting ? 'Window open' : 'Window closed';
+                return;
+            }
+            const endMs = Date.parse(windowEnd);
+            const tick = () => {
+                const remaining = endMs - Date.now();
+                if (remaining <= 0) {
+                    label.textContent = 'Window closed';
+                    if (liveWindowTimer) {
+                        clearInterval(liveWindowTimer);
+                        liveWindowTimer = null;
+                    }
+                    return;
+                }
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                label.textContent = `Closes in ${mins}:${String(secs).padStart(2, '0')}`;
+            };
+            tick();
+            if (accepting) liveWindowTimer = setInterval(tick, 1000);
+        }
+
+        async function refreshLiveSimulation() {
+            const statusHint = isLiveSimulationRun
+                || isLiveWindowOpen(currentRunStatus)
+                || String(currentRunStatus || '').toLowerCase() === 'reportfinalization';
+            try {
+                const [stateResp, eventsResp] = await Promise.all([
+                    fetch(`${liveStateUrl}?id=${encodeURIComponent(runId)}`),
+                    fetch(`${liveEventsUrl}?id=${encodeURIComponent(runId)}`)
+                ]);
+                const state = stateResp.ok ? await stateResp.json() : null;
+                const events = eventsResp.ok ? await eventsResp.json() : [];
+                const hasLiveData = !!(state && (state.windowStartUtc || state.WindowStartUtc || (state.expectedPopulation || state.ExpectedPopulation || []).length))
+                    || (Array.isArray(events) && events.length > 0);
+                if (!statusHint && !hasLiveData)
+                    return;
+                setLiveCardVisible(true);
+                if (state) renderLiveState(state);
+                renderLiveEvents(events);
+            } catch (err) {
+                console.error('Live simulation refresh failed', err);
+            }
+        }
+
+        function postLiveEvent(url, body) {
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiforgeryToken()
+                },
+                body: JSON.stringify(body)
+            }).then(async r => {
+                const payload = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(payload.error || payload.Error || 'Live event failed');
+                return payload;
+            });
+        }
+
+        document.getElementById('btnLiveAdmit').addEventListener('click', function () {
+            const patientId = document.getElementById('liveAdmitPatientId').value.trim();
+            const notes = document.getElementById('liveEventNotes').value.trim();
+            postLiveEvent(liveAdmitUrl, { id: runId, patientId: patientId || null, notes: notes || null })
+                .then(() => {
+                    document.getElementById('liveAdmitPatientId').value = '';
+                    refreshLiveSimulation();
+                })
+                .catch(err => alert(err.message));
+        });
+
+        document.getElementById('btnLiveDischarge').addEventListener('click', function () {
+            const patientId = document.getElementById('liveDischargePatientId').value;
+            const notes = document.getElementById('liveEventNotes').value.trim();
+            if (!patientId) {
+                alert('Select an admitted patient to discharge.');
+                return;
+            }
+            postLiveEvent(liveDischargeUrl, { id: runId, patientId, notes: notes || null })
+                .then(() => refreshLiveSimulation())
+                .catch(err => alert(err.message));
+        });
+
+        document.getElementById('liveExpectedFilter').addEventListener('input', renderExpectedPopulationList);
+
+        if (isLiveSimulationRun || isLiveWindowOpen(currentRunStatus) || String(currentRunStatus || '').toLowerCase() === 'reportfinalization')
+            setLiveCardVisible(true);
+
         function stopSnapshotPolling() {
             if (snapshotTimer) {
                 clearInterval(snapshotTimer);
@@ -1465,8 +1705,24 @@
                 swapCancelToDelete();
             }
 
+            if (isLiveSimulationRun || isLiveWindowOpen(currentRunStatus) || String(currentRunStatus || '').toLowerCase() === 'reportfinalization') {
+                setLiveCardVisible(true);
+                refreshLiveSimulation();
+            }
+
             refreshSnapshot();
         });
+
+        connection.on('PatientEventInjected', () => refreshLiveSimulation());
+        connection.on('PatientStateChanged', (state) => {
+            setLiveCardVisible(true);
+            renderLiveState(state);
+        });
+        connection.on('LiveWindowClosing', () => {
+            const label = document.getElementById('liveWindowCountdown');
+            if (label) label.textContent = 'Window closing…';
+        });
+        connection.on('LiveWindowClosed', () => refreshLiveSimulation());
 
         document.getElementById('measureErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Measure Eval'));
         document.getElementById('validationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Validation'));
@@ -1488,6 +1744,7 @@
 
         renderConfigProperties(runConfigurationJson);
         refreshSnapshot();
+        refreshLiveSimulation();
         if (!isRunComplete(currentRunStatus) && !currentFinishedAt)
             snapshotTimer = setInterval(refreshSnapshot, 2000);
 

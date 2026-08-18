@@ -54,6 +54,7 @@ internal sealed class RunExecutor
     private readonly ReportAbsManifestValidator.OperationOutcomeExpectationSettings _operationOutcomeExpectations;
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
+    private readonly ILivePatientEventInjector _liveInjector;
 
     internal sealed record GenerationPipelineRequest(
         IReadOnlyList<ProfiledMeasureType> SelectedMeasures,
@@ -73,7 +74,8 @@ internal sealed class RunExecutor
         IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         IConfiguration configuration,
-        ILogger logger)
+        ILogger logger,
+        ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
         _hostServices = hostServices;
@@ -93,6 +95,7 @@ internal sealed class RunExecutor
         _operationOutcomeExpectations = ooExpectations.Settings;
         _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
+        _liveInjector = liveInjector;
     }
 
     private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
@@ -176,12 +179,33 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
-            var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+            var isLiveSimulation = state.Options.IsLiveSimulation;
+            var usesScheduledWorkflow = isLiveSimulation
+                || state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
             var hasImportedPatients = state.Options.ImportedPatientIds.Count > 0 || state.Options.ImportedPatientBundles.Count > 0;
 
             // For scheduled-style runs, compute the active window immediately so generation
             // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
-            if (usesScheduledWorkflow)
+            if (isLiveSimulation)
+            {
+                var now = DateTimeOffset.UtcNow;
+                var alignedNow = new DateTimeOffset(
+                    now.Year, now.Month, now.Day,
+                    now.Hour, now.Minute, 0,
+                    TimeSpan.Zero);
+                var minutes = StartScenarioRequestResolver.NormalizeReportingWindowMinutes(state.Options.ReportingWindowMinutes);
+
+                // Live simulation needs a short operational inject window (minutes), but
+                // measure reportability still depends on clinically meaningful in-period data.
+                // Use a rolling multi-day report period ending at the live-window close so
+                // generated encounters/resources are not compressed into a minute-scale period.
+                // This mirrors scheduled-mode generation semantics while preserving short
+                // live-window interaction for Admit/Discharge injection.
+                scenarioConfig.StartDate = ToZulu(alignedNow.AddDays(-5));
+                scenarioConfig.EndDate = ToZulu(alignedNow.AddMinutes(minutes));
+                scenarioConfig.MaxPollingDurationMinutes = Math.Max(scenarioConfig.MaxPollingDurationMinutes, minutes + 30);
+            }
+            else if (usesScheduledWorkflow)
             {
                 // Imported-patient scheduled/regenerate runs must use an explicit
                 // configured report period so eligibility expectations remain deterministic.
@@ -426,7 +450,7 @@ internal sealed class RunExecutor
                     generationManifest.PatientIds,
                     generationManifest.Profiles);
 
-                if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+                if (state.Options.ReportMethod == ReportMethod.ScheduledReport && !isLiveSimulation)
                 {
                     expectedSubmittedPatientIds = ComputeExpectedScheduledSubmittedPatientIds(
                         patientIds,
@@ -520,7 +544,31 @@ internal sealed class RunExecutor
             Frequency? scheduledRunFrequency = null;
             string reportId;
             string normalizationEvidenceReportId;
-            if (usesScheduledWorkflow)
+            if (isLiveSimulation)
+            {
+                var scheduledWorkflowState = await ExecuteLiveScheduledReportWorkflowAsync(
+                    state,
+                    callbacks,
+                    reportHelper,
+                    output,
+                    facilityId,
+                    measureIds,
+                    scenarioConfig,
+                    patientIds,
+                    cancellationToken);
+
+                reportId = scheduledWorkflowState.ReportTrackingId;
+                normalizationEvidenceReportId = reportId;
+                scheduledRunFrequency = scheduledWorkflowState.Frequency;
+                var liveExpectedSet = _liveInjector.GetState(state.RunId)
+                    .ExpectedPopulation
+                    .ToHashSet(StringComparer.Ordinal);
+                expectedSubmittedPatientIds = expectedSubmittedPatientIds
+                    .Where(liveExpectedSet.Contains)
+                    .ToList();
+                expectedReportEntryPatientIds = expectedSubmittedPatientIds.ToList();
+            }
+            else if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
@@ -578,10 +626,27 @@ internal sealed class RunExecutor
                 // reached terminal values. Wait for terminal completion before snapshots
                 // and validators run. This wait is synchronization only; expected sets
                 // remain prediction-driven and are not overwritten from terminal-state output.
-                await reportHelper.WaitForTerminalReportStateAsync(
+                var terminalState = await reportHelper.WaitForTerminalReportStateAsync(
                     reportId,
                     allowEntrylessTerminal: expectedSubmittedPatientIds.Count == 0,
                     cancellationToken: cancellationToken);
+
+                if (isLiveSimulation)
+                {
+                    await _liveInjector.RecordActualPopulationAsync(
+                        state.RunId,
+                        terminalState.SubmittedPatientIds.Count > 0
+                            ? terminalState.SubmittedPatientIds
+                            : terminalState.EntryPatientIds,
+                        cancellationToken);
+                    var liveDiagnostics = _liveInjector.GetDiagnostics(state.RunId);
+                    output.WriteLine(
+                        $"Live inclusion: expected={liveDiagnostics.ExpectedPopulation.Count}, " +
+                        $"actual={liveDiagnostics.ActualPopulation.Count}, " +
+                        $"missing={liveDiagnostics.MissingFromReport.Count}, " +
+                        $"unexpected={liveDiagnostics.UnexpectedInReport.Count}, " +
+                        $"passed={liveDiagnostics.InclusionPassed}.");
+                }
 
                 // Refresh cached reads after the terminal-state wait so downstream
                 // snapshots/validators see committed entry statuses.
@@ -786,6 +851,24 @@ internal sealed class RunExecutor
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
+            if (isLiveSimulation)
+            {
+                await RunValidator("LIVE INCLUSION VALIDATION", () =>
+                {
+                    var diagnostics = _liveInjector.GetDiagnostics(state.RunId);
+                    if (diagnostics.InclusionPassed == false)
+                    {
+                        throw new InvalidOperationException(
+                            "Live expected population does not match the final report. " +
+                            $"Missing: [{string.Join(", ", diagnostics.MissingFromReport)}]. " +
+                            $"Unexpected: [{string.Join(", ", diagnostics.UnexpectedInReport)}].");
+                    }
+
+                    output.WriteLine("Live inclusion validation passed.");
+                    return Task.CompletedTask;
+                });
+            }
+
             await RunValidator("REPORT DATABASE VALIDATION", () =>
                 reportValidator.ValidateAllAsync(
                     facilityId,
@@ -921,6 +1004,11 @@ internal sealed class RunExecutor
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
+        }
+        finally
+        {
+            if (state.Options.IsLiveSimulation)
+                _liveInjector.CloseSession(state.RunId);
         }
     }
 
@@ -1172,6 +1260,110 @@ internal sealed class RunExecutor
             output.WriteLine($"{remainInpatient.Count} patient(s) remain inpatient; they will be acquired by the end-of-report-period job.");
 
         return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
+    }
+
+    private async Task<ScheduledWorkflowState> ExecuteLiveScheduledReportWorkflowAsync(
+        MutableRunState state,
+        ExecutorCallbacks callbacks,
+        ReportApiHelper reportHelper,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        TestScenarioConfig scenarioConfig,
+        IReadOnlyList<string> patientIds,
+        CancellationToken cancellationToken)
+    {
+        var window = DeriveScheduledReportWindow(scenarioConfig);
+        var scheduleFrequency = state.Options.SelectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            ? Frequency.Monthly
+            : Frequency.Daily;
+
+        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
+            facilityId,
+            measureIds,
+            window.Start,
+            window.Duration,
+            scheduleFrequency,
+            reportTrackingId: Guid.NewGuid().ToString());
+
+        lock (state.Sync)
+        {
+            state.ReportId = reportTrackingId;
+            state.LiveWindowStartUtc = window.Start;
+            state.LiveWindowEndUtc = window.Start + window.Duration;
+        }
+
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
+        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
+        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
+        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
+
+        var windowStart = new DateTimeOffset(persistedStartUtc);
+        var windowEnd = new DateTimeOffset(persistedEndUtc);
+        lock (state.Sync)
+        {
+            state.LiveWindowStartUtc = windowStart;
+            state.LiveWindowEndUtc = windowEnd;
+        }
+
+        var censusPublisher = new LiveCensusPublisher(reportHelper, facilityId, reportTrackingId, output);
+        _liveInjector.OpenSession(state.RunId, windowStart, windowEnd, patientIds, censusPublisher);
+
+        var seedCount = Math.Min(Math.Max(0, state.Options.SeedPatientCount), patientIds.Count);
+        for (var i = 0; i < seedCount; i++)
+        {
+            try
+            {
+                await _liveInjector.AdmitAsync(state.RunId, patientIds[i], "Seed", "Seeded at live window open", cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                output.WriteLine($"[WARN] Failed to seed-admit patient '{patientIds[i]}': {ex.Message}");
+            }
+        }
+
+        state.Status = AutomationRunStatus.LiveWindowOpen;
+        await callbacks.BroadcastStatus();
+        output.WriteLine(
+            $"Live window open until {windowEnd:u}. Seeded {seedCount} admit(s). Inject Admit/Discharge until the window closes.");
+
+        var remaining = windowEnd - DateTimeOffset.UtcNow;
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining, cancellationToken);
+
+        await _liveInjector.NotifyWindowClosingAsync(state.RunId, windowEnd, cancellationToken);
+        await _liveInjector.FreezeAsync(state.RunId, cancellationToken);
+
+        var expected = _liveInjector.GetState(state.RunId).ExpectedPopulation;
+        lock (state.Sync)
+        {
+            state.LiveExpectedPopulation = expected;
+            state.Status = AutomationRunStatus.ReportFinalization;
+        }
+
+        await callbacks.BroadcastStatus();
+        output.WriteLine(
+            $"Live window closed. Expected population={expected.Count} (admitted at close ∪ discharged during window). Finalizing report.");
+
+        return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
+    }
+
+    private sealed class LiveCensusPublisher(
+        ReportApiHelper reportHelper,
+        string facilityId,
+        string reportTrackingId,
+        IAutomationOutput output) : ILiveCensusPublisher
+    {
+        public async Task PublishAsync(PatientEventType eventType, string patientId, CancellationToken cancellationToken)
+        {
+            output.WriteLine($"Live census {eventType} — {patientId}");
+            await reportHelper.PublishPatientListAcquiredAsync(
+                facilityId,
+                reportTrackingId,
+                admitPatientIds: eventType == PatientEventType.Admit ? [patientId] : null,
+                dischargePatientIds: eventType == PatientEventType.Discharge ? [patientId] : null);
+        }
     }
 
     private static async Task WriteOrganizationLocationMappingStatusAsync(

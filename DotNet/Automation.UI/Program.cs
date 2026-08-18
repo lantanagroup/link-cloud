@@ -310,6 +310,7 @@ builder.Services.AddControllersWithViews()
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
+builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();

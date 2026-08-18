@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Models;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using System.Globalization;
 using System.IO.Compression;
@@ -83,6 +84,9 @@ public sealed class RunExportService : IRunExportService
 
             await SafeWriteAsync(archive, "Normalization.txt",
                 () => Task.FromResult(BuildNormalizationSection(run.Logs, pipelineSnapshot)));
+
+            await SafeWriteAsync(archive, "LiveSimulation.json",
+                async () => await BuildLiveSimulationSectionAsync(runId, cancellationToken));
 
             await SafeWriteAsync(archive, "abs/_README.txt",
                 async () => await WriteAbsFilesAsync(archive, run, cancellationToken));
@@ -672,5 +676,18 @@ public sealed class RunExportService : IRunExportService
             // Not valid JSON — return the original text so the caller still sees something.
             return json;
         }
+    }
+
+    private async Task<string> BuildLiveSimulationSectionAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        var snapshot = await _snapshotStore.GetDomainAsync<LiveSimulationDiagnostics>(
+            runId,
+            LivePatientEventInjector.SnapshotDomain,
+            cancellationToken);
+
+        if (snapshot?.Data == null)
+            return "{\n  \"message\": \"No live simulation snapshot persisted for this run.\"\n}";
+
+        return JsonSerializer.Serialize(snapshot.Data, PrettyJson);
     }
 }
