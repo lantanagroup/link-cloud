@@ -629,6 +629,14 @@ services:
     - key: "resource-cache.blob-storage.blob-root"
       description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
+    - key: "resource-cache.blob-storage.max-tries"
+      description: "Azure SDK in-process tries per ABS resource-cache call (initial call + quick retries). Kept low deliberately: the Kafka retry-topic ladder owns real retrying, and the SDK default of 4 exponential tries blocked the single-threaded consumer executor for minutes during an ABS outage. Defaults to 2."
+      required: false
+      defaultValue: "2"
+    - key: "resource-cache.blob-storage.try-timeout-seconds"
+      description: "Cap in seconds on a single ABS resource-cache network attempt; the SDK default is effectively unbounded. Defaults to 10."
+      required: false
+      defaultValue: "10"
     - key: "spring.kafka.retry.consumer-retry-duration"
       description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
       required: false
@@ -791,6 +799,14 @@ services:
     - key: "spring.kafka.retry.disable-retry-consumer"
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
+    - key: "internal-blob-storage.max-tries"
+      description: "Azure SDK in-process tries per Validation blob call (patient NDJSON download and pre-qual append, both on the consumer path). Kept low deliberately: the Kafka retry-topic ladder owns real retrying, and the SDK default of 4 exponential tries blocked the single-threaded consumer executor for minutes during an ABS outage. Defaults to 2."
+      required: false
+      defaultValue: "2"
+    - key: "internal-blob-storage.try-timeout-seconds"
+      description: "Cap in seconds on a single Validation blob network attempt; the SDK default is effectively unbounded. Defaults to 10."
+      required: false
+      defaultValue: "10"
 $defs:
   serviceMetaEntry:
     type: "object"
