@@ -9,7 +9,7 @@ pool:
     
 parameters:
   - name: environment
-    displayName: Which environment is this for? (DEV | TEST | QA)
+    displayName: Which environment is this for? (DEV | TEST | QA | QA2)
     type: string
     values:
       - dev-scale
