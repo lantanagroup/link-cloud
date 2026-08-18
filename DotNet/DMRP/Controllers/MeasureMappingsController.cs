@@ -40,8 +40,30 @@ namespace LantanaGroup.Link.DMRP.Controllers
         }
 
         /// <summary>
-        /// Get a paged list of measure mappings.
+        /// Gets a paged list of measure mappings, optionally filtered by measure, dQM or frequency.
         /// </summary>
+        /// <remarks>
+        /// A measure mapping relates an NHSN measure a facility enrolls in to the digital quality
+        /// measure Link evaluates patients against. DMRP reports the NHSN measure only, so this is how
+        /// Link translates a reporting plan into something it can schedule.
+        /// <para>
+        /// Every filter is optional and they combine with AND, so supplying none returns everything.
+        /// This is the only read for the collection: there is no unfiltered <c>GET</c> on the route
+        /// root, which answers 405.
+        /// </para>
+        /// </remarks>
+        /// <param name="searchDto">
+        /// Optional filters and paging. measure and dQM match exactly; frequency is one of Discharge,
+        /// Daily, Weekly, Monthly or Adhoc. pageSize is 1 to 100 and pageNumber 1 or greater; a value
+        /// outside either range is quietly replaced with the default rather than refused.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">A page of measure mappings with its paging metadata.</response>
+        /// <response code="204">
+        /// Nothing matched. Note this differs from the reporting plans endpoints, which answer an empty
+        /// match with 200 and an empty page.
+        /// </response>
+        /// <response code="500">The measure mappings could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedMeasureMappingDto))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -65,6 +87,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Gets a measure mapping by Id.
         /// </summary>
+        /// <param name="id">The mapping's own identifier, as returned by create or search.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">The measure mapping.</response>
+        /// <response code="404">No measure mapping has that Id.</response>
+        /// <response code="500">The measure mapping could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -86,6 +113,32 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Creates a measure mapping.
         /// </summary>
+        /// <remarks>
+        /// Leidos supplies the NHSN measure to dQM mappings; they are maintained here rather than
+        /// derived, because the DMRP API's response carries the NHSN measure alone. Until a measure is
+        /// mapped, a facility enrolled in it is scheduled for nothing.
+        /// <para>
+        /// The dQM is verified against MeasureEval before the row is written, so a mapping cannot name
+        /// a measure Link could not evaluate. A mapping is unique on measure and dQM.
+        /// </para>
+        /// </remarks>
+        /// <param name="request">
+        /// The mapping to create. measure is the NHSN module (for example HOB or HTCDI) and dQM the
+        /// digital quality measure it belongs to; both are required and limited to 255 characters.
+        /// frequency is Discharge, Daily, Weekly, Monthly or Adhoc, and defaults to Adhoc when omitted
+        /// — which schedules nothing, so set it deliberately. Any id in the body is ignored.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="201">The created mapping, with a Location header pointing at it.</response>
+        /// <response code="400">
+        /// A required field is missing or too long, the dQM is not present in MeasureEval, or a mapping
+        /// for that measure and dQM already exists.
+        /// </response>
+        /// <response code="502">
+        /// MeasureEval could not be reached or answered with an error, so the dQM could not be
+        /// verified. The mapping was not created; the request can be retried.
+        /// </response>
+        /// <response code="500">The measure mapping could not be created.</response>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
@@ -136,6 +189,32 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Updates a measure mapping.
         /// </summary>
+        /// <remarks>
+        /// Update only. A mapping that does not exist is not created here; the response is 404.
+        /// <para>
+        /// Reporting plans reference a mapping by Id, so changing its dQM or frequency changes what
+        /// every facility already enrolled in that measure gets scheduled for, from the next time a
+        /// schedule is derived.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">The mapping to replace. This wins over any id in the body.</param>
+        /// <param name="request">
+        /// The replacement values, validated exactly as they are on create. id may be omitted from the
+        /// body, but if present it must equal the id in the URL.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="202">The updated mapping.</response>
+        /// <response code="400">
+        /// The body's id does not match the URL, a required field is missing or too long, the dQM is
+        /// not present in MeasureEval, or the change would collide with an existing measure and dQM
+        /// pair.
+        /// </response>
+        /// <response code="404">No measure mapping has that Id.</response>
+        /// <response code="502">
+        /// MeasureEval could not be reached or answered with an error, so the dQM could not be
+        /// verified. The mapping was not changed; the request can be retried.
+        /// </response>
+        /// <response code="500">The measure mapping could not be updated.</response>
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(MeasureMappingModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -194,6 +273,20 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Deletes a measure mapping.
         /// </summary>
+        /// <remarks>
+        /// Reporting plans hold a restricting foreign key to the mapping, so one that facilities are
+        /// already enrolled against cannot be removed until those plans are gone. The plan rows are the
+        /// record of what DMRP said, and they must not be orphaned by a mapping disappearing.
+        /// </remarks>
+        /// <param name="id">The mapping to delete.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="204">The mapping was deleted.</response>
+        /// <response code="404">
+        /// No measure mapping has that Id — or the delete was refused because reporting plans still
+        /// reference it. The manager reports both as the same failure, so read the message: a refused
+        /// delete says the mapping "failed to delete" rather than that it was not found.
+        /// </response>
+        /// <response code="500">The measure mapping could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -222,8 +315,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Deletes all measure mappings.
         /// </summary>
+        /// <remarks>
+        /// Clears the whole table. Intended for resetting a test environment; there is no confirmation
+        /// step and no undo. With mappings gone every facility derives an empty schedule, so this is
+        /// not something to run against an environment that is reporting.
+        /// </remarks>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="204">The mappings were deleted. Deleting an empty table also succeeds.</response>
+        /// <response code="500">
+        /// The mappings could not be deleted, including when reporting plans still reference them.
+        /// </response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpDelete]
