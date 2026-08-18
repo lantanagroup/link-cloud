@@ -1653,6 +1653,15 @@
 			}
 		},
 		{
+			"key": "ResourceCache:Redis:CacheEntryTtlDays",
+			"value": "7",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
 			"key": "ResourceCache:Redis:Password",
 			"value": "{\"uri\":\"https://link-vault.vault.azure.net/secrets/redis-password\"}",
 			"label": null,

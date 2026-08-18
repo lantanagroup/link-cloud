@@ -1636,6 +1636,15 @@
 			}
 		},
 		{
+			"key": "ResourceCache:Redis:CacheEntryTtlDays",
+			"value": "7",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
 			"key": "ResourceCache:Redis:Password",
 			"value": "{\"uri\":\"https://nhsnlink-kv-qa.vault.azure.net/secrets/link-resource-cache-redis-password\"}",
 			"label": null,
