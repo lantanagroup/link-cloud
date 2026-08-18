@@ -180,6 +180,11 @@ namespace LantanaGroup.Link.DMRP.Business
             }
         }
 
+        /// <summary>
+        /// The remedy the message names has to be one the caller can actually carry out. Leaving
+        /// scheduledReports out of the request body is not: its three arrays are non-nullable, so model
+        /// binding rejects an absent block before this ever runs. An empty block is what gets through.
+        /// </summary>
         private static void RejectCallerSuppliedSchedule(FacilityModel facility)
         {
             if (!HasScheduledReports(facility.ScheduledReports))
@@ -188,7 +193,7 @@ namespace LantanaGroup.Link.DMRP.Business
             }
 
             throw new ScheduledReportsNotAcceptedException(
-                "Scheduled reports cannot be set on a facility while DMRP is enabled. They are derived from the facility's DMRP reporting plans. Resubmit without scheduledReports.");
+                "Scheduled reports cannot be set on a facility while DMRP is enabled. They are derived from the facility's DMRP reporting plans. Resubmit with empty daily, weekly and monthly arrays in scheduledReports.");
         }
 
         private static bool HasScheduledReports(TenantScheduledReportConfig? schedule) =>

@@ -187,6 +187,40 @@ namespace UnitTests.DMRP
             _inner.Verify(i => i.CreateAsync(It.IsAny<FacilityModel>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
+        /// <summary>
+        /// An empty block is the only way a caller can decline to set a schedule: the three arrays are
+        /// non-nullable, so model binding rejects a request that leaves scheduledReports out entirely.
+        /// It must therefore pass rather than be treated as a caller-supplied schedule.
+        /// </summary>
+        [Fact]
+        public async Task Accepts_an_explicitly_empty_schedule()
+        {
+            GivenPlan(new ReportingPlanEntry("HOB", "dqm-monthly", Frequency.Monthly));
+
+            var facility = Facility(Schedule());
+
+            await CreateOperations().CreateAsync(facility);
+
+            _inner.Verify(i => i.CreateAsync(facility, It.IsAny<CancellationToken>()), Times.Once);
+            Assert.Equal(new[] { "dqm-monthly" }, facility.ScheduledReports.Monthly);
+        }
+
+        /// <summary>
+        /// The message has to name a remedy the caller can carry out, which "resubmit without
+        /// scheduledReports" is not.
+        /// </summary>
+        [Fact]
+        public async Task Refusal_tells_the_caller_to_send_empty_arrays()
+        {
+            var operations = CreateOperations();
+
+            var ex = await Assert.ThrowsAsync<ScheduledReportsNotAcceptedException>(
+                () => operations.CreateAsync(Facility(Schedule(monthly: new[] { "dqm" }))));
+
+            Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("without scheduledReports", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
         [Fact]
         public async Task Update_refuses_a_caller_supplied_schedule()
         {
