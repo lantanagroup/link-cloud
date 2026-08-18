@@ -7,6 +7,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
@@ -23,19 +24,31 @@ public final class RetryTopicRecovererFactory {
     private RetryTopicRecovererFactory() {
     }
 
-    /**
-     * @param kafkaTemplate template used to publish to the resolved topic
-     * @param retryTopic    destination for transient failures with attempts remaining
-     * @param errorTopic    destination (dead-letter) for disabled/poison/exhausted failures
-     * @param config        retry policy (attempt count, per-attempt backoff, disable flag)
-     * @param nonRetryable  exception types that are poison anywhere in the cause chain
-     */
     public static RetryTopicRecoverer create(
             KafkaTemplate<?, ?> kafkaTemplate,
             String retryTopic,
             String errorTopic,
             KafkaRetryConfig config,
             Set<Class<? extends Throwable>> nonRetryable) {
+        return create(kafkaTemplate, retryTopic, errorTopic, config, nonRetryable, null);
+    }
+
+    /**
+     * @param kafkaTemplate template used to publish to the resolved topic
+     * @param retryTopic    destination for transient failures with attempts remaining
+     * @param errorTopic    destination (dead-letter) for disabled/poison/exhausted failures
+     * @param config        retry policy (attempt count, per-attempt backoff, disable flag)
+     * @param nonRetryable  exception types that are poison anywhere in the cause chain
+     * @param onDeadLetter  optional hook run after a record is durably dead-lettered (never on retry) —
+     *                      the safe moment to release the record's side resources; may be null
+     */
+    public static RetryTopicRecoverer create(
+            KafkaTemplate<?, ?> kafkaTemplate,
+            String retryTopic,
+            String errorTopic,
+            KafkaRetryConfig config,
+            Set<Class<? extends Throwable>> nonRetryable,
+            BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter) {
 
         // The single routing decision. Both the destination resolver below and the recoverer's log line
         // are derived from this, so a record can never be dead-lettered while the log reports a retry.
@@ -70,7 +83,8 @@ public final class RetryTopicRecovererFactory {
                 config.effectiveMaxAttempts(),
                 config::backoffMsForAttempt,
                 delegate,
-                decide);
+                decide,
+                onDeadLetter);
     }
 
     /**

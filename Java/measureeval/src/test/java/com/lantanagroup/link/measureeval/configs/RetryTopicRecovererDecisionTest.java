@@ -238,4 +238,119 @@ class RetryTopicRecovererDecisionTest {
         assertEquals(1, ByteBuffer.wrap(attempts.value()).getInt(),
                 "poison failed once and was never retried, so it must record exactly one attempt");
     }
+
+    // ---- Terminal-failure hook. A record routed to -Error is finished — it will never be redelivered —
+    //      so this is the one moment its resources (e.g. the cached FHIR bundle) may be released. The
+    //      hook must fire exactly on dead-letter decisions, only after the dead letter is durably
+    //      published, and must never turn a completed recovery back into a failure.
+
+    /** Drives the record through the 6-arg factory wiring, recording publish/hook ordering. */
+    @SuppressWarnings("unchecked")
+    private void runWithHook(KafkaRetryConfig config, ConsumerRecord<String, String> record,
+                             Exception exception,
+                             java.util.function.BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter,
+                             List<String> events) {
+        KafkaTemplate<Object, Object> template = mock(KafkaTemplate.class);
+        when(template.partitionsFor(anyString())).thenAnswer(invocation ->
+                List.of(new PartitionInfo(invocation.getArgument(0), 0, null, new Node[0], new Node[0])));
+        when(template.send(any(ProducerRecord.class))).thenAnswer(invocation -> {
+            events.add("published");
+            return CompletableFuture.completedFuture(null);
+        });
+
+        RetryTopicRecoverer recoverer = RetryTopicRecovererFactory.create(
+                template, RETRY_TOPIC, ERROR_TOPIC, config, KafkaConfig.NON_RETRYABLE, onDeadLetter);
+        recoverer.accept(record, exception);
+    }
+
+    @Test
+    void terminalHook_firesForPoison_afterTheDeadLetterIsPublished() {
+        List<String> events = new java.util.ArrayList<>();
+
+        runWithHook(retryConfig(3, false), record(), new ValidationException("Query Type is null."),
+                (r, e) -> events.add("hook"), events);
+
+        assertEquals(List.of("published", "hook"), events,
+                "the hook releases resources the record still needs until it is durably dead-lettered, "
+                        + "so it must run exactly once, after the publish");
+    }
+
+    @Test
+    void terminalHook_firesForExhaustedAttempts() {
+        ConsumerRecord<String, String> record = record();
+        stampAttempts(record, 2);
+        List<String> events = new java.util.ArrayList<>();
+
+        runWithHook(retryConfig(3, false), record, new RuntimeException("still failing"),
+                (r, e) -> events.add("hook"), events);
+
+        assertEquals(List.of("published", "hook"), events);
+    }
+
+    @Test
+    void terminalHook_doesNotFireForARetriedRecord() {
+        List<String> events = new java.util.ArrayList<>();
+
+        runWithHook(retryConfig(3, false), record(), new RuntimeException("transient boom"),
+                (r, e) -> events.add("hook"), events);
+
+        assertEquals(List.of("published"), events,
+                "a record routed to -Retry will be redelivered and still needs its resources — "
+                        + "the hook must not fire");
+    }
+
+    /** Drives a record through the REAL KafkaConfig recoverer bean, so the wiring itself is pinned. */
+    @SuppressWarnings("unchecked")
+    private void runThroughKafkaConfig(ConsumerRecord<String, Object> record, Exception exception,
+                                       com.lantanagroup.link.measureeval.services.RedisResourceService redis) {
+        KafkaTemplate<String, com.lantanagroup.link.measureeval.records.ResourcesNormalized> template =
+                mock(KafkaTemplate.class);
+        when(template.partitionsFor(anyString())).thenAnswer(invocation ->
+                List.of(new PartitionInfo(invocation.getArgument(0), 0, null, new Node[0], new Node[0])));
+        when(template.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        var recoverer = new KafkaConfig().resourceNormalizedRecoverer(
+                template, retryConfig(3, false),
+                new com.lantanagroup.link.measureeval.services.ResourceCacheCleanup(redis, null));
+        recoverer.accept(record, exception);
+    }
+
+    private static ConsumerRecord<String, Object> resourceRecord(String cacheKey) {
+        var value = new com.lantanagroup.link.measureeval.records.ResourcesNormalized();
+        value.setCacheKey(cacheKey);
+        value.setCacheType(com.lantanagroup.link.measureeval.entities.CacheType.REDIS);
+        return new ConsumerRecord<>("ResourcesNormalized", 0, 0L, "key", value);
+    }
+
+    @Test
+    void kafkaConfigHook_cleansTheResourceCache_whenARecordIsDeadLettered() {
+        var redis = mock(com.lantanagroup.link.measureeval.services.RedisResourceService.class);
+
+        runThroughKafkaConfig(resourceRecord("corr-1"), new ValidationException("poison"), redis);
+
+        verify(redis).cleanup("corr-1");
+    }
+
+    @Test
+    void kafkaConfigHook_leavesTheResourceCache_whenARecordIsRetried() {
+        var redis = mock(com.lantanagroup.link.measureeval.services.RedisResourceService.class);
+
+        runThroughKafkaConfig(resourceRecord("corr-1"), new RuntimeException("transient boom"), redis);
+
+        verify(redis, never()).cleanup(anyString());
+    }
+
+    @Test
+    void terminalHook_throwing_doesNotFailTheRecovery() {
+        List<String> events = new java.util.ArrayList<>();
+
+        // The dead letter is already published when the hook runs; a hook failure must not propagate,
+        // or the offset stays uncommitted and the record is redelivered into a duplicate dead letter.
+        assertDoesNotThrow(() -> runWithHook(
+                retryConfig(3, false), record(), new ValidationException("Query Type is null."),
+                (r, e) -> { throw new RuntimeException("hook failed"); }, events));
+
+        assertEquals(List.of("published"), events);
+    }
 }

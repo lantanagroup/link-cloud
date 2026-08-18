@@ -4,6 +4,9 @@ import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.records.*;
+import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.measureeval.services.RedisResourceService;
+import com.lantanagroup.link.measureeval.services.ResourceCacheCleanup;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
@@ -285,21 +288,41 @@ public class KafkaConfig {
             KafkaTemplate<?, ?> kafkaTemplate,
             String retryTopic,
             String errorTopic,
-            KafkaRetryConfig retryConfig) {
-        return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE);
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup cacheCleanup) {
+        // The consumer no longer cleans up the resource cache on failure — a record routed to -Retry
+        // is redelivered and still needs its cached resources. This hook is the failure-path cleanup:
+        // it runs only on terminal decisions (poison / exhausted / retries disabled), after the dead
+        // letter is durably published. A record whose value never deserialized is skipped; the cache
+        // expiration policy reclaims whatever it left behind.
+        return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE,
+                (record, exception) -> {
+                    if (record.value() instanceof AbstractResourceRecord resourceRecord) {
+                        cacheCleanup.cleanup(resourceRecord.getCacheKey(), resourceRecord.getCacheType());
+                    }
+                });
+    }
+
+    @Bean
+    public ResourceCacheCleanup resourceCacheCleanup(
+            RedisResourceService redisResourceService,
+            ObjectProvider<AbsResourceService> absResourceService) {
+        return new ResourceCacheCleanup(redisResourceService, absResourceService.getIfAvailable());
     }
 
     @Bean
     public ConsumerRecordRecoverer resourceNormalizedRecoverer(
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<String, ResourcesNormalized> kafkaTemplate,
-            KafkaRetryConfig retryConfig) {
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup resourceCacheCleanup) {
 
         return createRetryTopicRecoverer(
                 kafkaTemplate,
                 "ResourcesNormalized-Retry",
                 "ResourcesNormalized-Error",
-                retryConfig
+                retryConfig,
+                resourceCacheCleanup
         );
     }
 
@@ -307,13 +330,15 @@ public class KafkaConfig {
     public ConsumerRecordRecoverer evaluationRequestedRecoverer(
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<String, EvaluationRequested> kafkaTemplate,
-            KafkaRetryConfig retryConfig) {
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup resourceCacheCleanup) {
 
         return createRetryTopicRecoverer(
                 kafkaTemplate,
                 "EvaluationRequested-Retry",
                 "EvaluationRequested-Error",
-                retryConfig
+                retryConfig,
+                resourceCacheCleanup
         );
     }
 

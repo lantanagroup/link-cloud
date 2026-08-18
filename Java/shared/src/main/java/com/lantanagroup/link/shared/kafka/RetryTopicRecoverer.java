@@ -10,6 +10,7 @@ import org.springframework.kafka.retrytopic.RetryTopicHeaders;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.IntToLongFunction;
 
@@ -37,6 +38,7 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
     private final IntToLongFunction backoffMsForAttempt;
     private final DeadLetterPublishingRecoverer delegate;
     private final BiFunction<ConsumerRecord<?, ?>, Exception, Decision> decide;
+    private final BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter;
 
     /**
      * @param maxAttempts         attempt at which a record is exhausted (used for logging)
@@ -44,15 +46,30 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
      * @param delegate            publishes the record to the resolved {@code -Retry}/{@code -Error} topic
      * @param decide              the same decision the delegate's destination resolver applies; evaluated
      *                            after the attempts header is stamped so both see the identical count
+     * @param onDeadLetter        optional hook invoked when the decision is terminal (any {@code DLT_*}),
+     *                            after the dead letter is durably published — the one moment a record's
+     *                            side resources (e.g. cache entries) may safely be released, because the
+     *                            record will never be redelivered. Never invoked on {@link Decision#RETRY}.
+     *                            Failures are logged and swallowed: the recovery already succeeded, and
+     *                            propagating would redeliver the record into a duplicate dead letter.
      */
     public RetryTopicRecoverer(int maxAttempts,
                                IntToLongFunction backoffMsForAttempt,
                                DeadLetterPublishingRecoverer delegate,
-                               BiFunction<ConsumerRecord<?, ?>, Exception, Decision> decide) {
+                               BiFunction<ConsumerRecord<?, ?>, Exception, Decision> decide,
+                               BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter) {
         this.maxAttempts = maxAttempts;
         this.backoffMsForAttempt = backoffMsForAttempt;
         this.delegate = delegate;
         this.decide = decide;
+        this.onDeadLetter = onDeadLetter;
+    }
+
+    public RetryTopicRecoverer(int maxAttempts,
+                               IntToLongFunction backoffMsForAttempt,
+                               DeadLetterPublishingRecoverer delegate,
+                               BiFunction<ConsumerRecord<?, ?>, Exception, Decision> decide) {
+        this(maxAttempts, backoffMsForAttempt, delegate, decide, null);
     }
 
     /**
@@ -110,6 +127,20 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
         }
 
         delegate.accept(record, exception);
+
+        // The record is now durably on its destination topic. For a terminal decision it will never be
+        // redelivered, so its side resources may be released. Deliberately after the publish: if the
+        // publish throws, the record is redelivered and still needs those resources.
+        if (decision != Decision.RETRY && onDeadLetter != null) {
+            try {
+                onDeadLetter.accept(record, exception);
+            } catch (Exception hookError) {
+                // The recovery itself succeeded; never let the hook undo that. Whatever it failed to
+                // release is left to the resource's own expiration policy.
+                logger.error("Dead-letter hook failed for topic [{}]; the dead letter was already published.",
+                        record.topic(), hookError);
+            }
+        }
     }
 
     /**
