@@ -102,8 +102,6 @@ A typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed throu
   records for schedules, entries, populations, DA summaries, normalization ops, facility
   state, etc. Includes an 8-second TTL cache that collapses duplicate high-frequency queries
   across diagnostics, validators, and UI pollers.
-- **`DatabaseConnectionFactory`** -- direct DB connection string helper for validators that
-  need SQL access (notably Validation DB checks).
 
 ### 4.3 Monitoring and diagnostics layer (`Monitoring/`)
 

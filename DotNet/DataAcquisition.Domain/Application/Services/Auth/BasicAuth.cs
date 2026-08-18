@@ -15,7 +15,7 @@ public class BasicAuth : IAuth
         _secretManager = secretManager;
     }
 
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
         char[]? credentialsArray = null;
 
@@ -26,8 +26,8 @@ public class BasicAuth : IAuth
             if (string.IsNullOrWhiteSpace(authSettings.Password))
                 throw new ArgumentException("A secret name for Password must be provided for Basic authentication.");
 
-            var userName = await _secretManager.GetSecretAsync(authSettings.UserName, CancellationToken.None);
-            var password = await _secretManager.GetSecretAsync(authSettings.Password, CancellationToken.None);
+            var userName = await _secretManager.GetSecretAsync(authSettings.UserName, cancellationToken);
+            var password = await _secretManager.GetSecretAsync(authSettings.Password, cancellationToken);
 
             if (string.IsNullOrWhiteSpace(userName))
             {

@@ -17,7 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
-import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
+import {IVendorVersion} from 'src/app/interfaces/tenant/vendor-interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -94,7 +94,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
   timezones: string[] = moment.tz.names();
-  vendors = Object.values(Vendor);
+  vendors: IVendorVersion[] = [];
 
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
@@ -115,6 +115,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return (object1 && object2) && object1 === object2;
   }
 
+  compareVendors(vendor1: IVendorVersion | null, vendor2: IVendorVersion | null): boolean {
+    return vendor1?.id === vendor2?.id;
+  }
+
   async ngOnInit(): Promise<void> {
 
 
@@ -125,13 +129,23 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
         timeZone: new FormControl('', Validators.required),
-        vendor: new FormControl<Vendor | null>(null, Validators.required),
+        vendor: new FormControl<IVendorVersion | null>(null),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
       { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
+
+    this.tenantService.getVendorVersions().subscribe({
+      next: (vendors) => {
+        this.vendors = vendors;
+        this.setVendorFromItem();
+      },
+      error: (err) => {
+        this.submittedConfiguration.emit({id: '', message: err.message});
+      }
+    });
 
     this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
       {
@@ -156,8 +170,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
@@ -197,8 +210,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
       this.monthlyReportsControl.updateValueAndValidity();
@@ -267,6 +279,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   get dailyReportsControl(): FormControl {
     return this.facilityConfigForm.get('dailyReports') as FormControl;
+  }
+
+  private setVendorFromItem(): void {
+    const vendorVersionId = this.item?.vendorVersionId;
+    const vendor = this.vendors.find(candidate => candidate.id === vendorVersionId) ?? null;
+
+    this.vendorControl.setValue(vendor);
+    this.vendorControl.updateValueAndValidity();
   }
 
   clearFacilityId(): void {

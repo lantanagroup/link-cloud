@@ -56,7 +56,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- NormalizationsController inline CRUD for normalization operations/sequences/suites
 |   +-- ApiHealthController     API Health dashboard + SSE run streaming
 |   +-- Api/AutomationRunsApiController  external start/status API
-|   +-- HomeController          landing redirect
+|   +-- Api/ApiHealthRunsApiController  external API Health start/status API
 +-- Views/
 |   +-- Runs/Index.cshtml       dashboard: KPIs, run history, quick-launch
 |   +-- Runs/Details.cshtml     per-run live status, logs, pipeline snapshots, DA logs
@@ -78,9 +78,12 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- RunSnapshotOrchestrator background pollers per active run
 |   +-- StoreBackedServicePoller polls pipeline domains and writes snapshots
 |   +-- RunHub                  SignalR hub for run logs + dashboard updates
+|   +-- RunExportService        builds diagnostics ZIP from persisted run artifacts
 |   +-- ScenarioSeedService     seeds system scenarios at startup
 |   +-- NormalizationSuiteSeedService seeds system normalization operations/sequences/suites
 |   +-- NormalizationSuiteResolver resolves selected suite at run time
+|   +-- ScenarioRunStartupRecoveryService cancel/delete recovery for interrupted scenario runs
+|   +-- ApiHealthStartupRecoveryService reconciliation for interrupted API Health runs
 +-- Services/Persistence/
     +-- MongoSnapshotStore      run summaries, logs, per-domain snapshots
     +-- MongoScenarioStore      saved scenario templates
@@ -107,6 +110,7 @@ APIs.
 | Action | Method | Purpose |
 |---|---|---|
 | `Index` | GET | Dashboard page (KPIs, active runs, recent history, quick-launch). |
+| `RecentRunsPartial` | GET | Returns only the recent-runs table markup for in-place AJAX refresh/sort/paging. |
 | `DashboardStats` | GET | Returns `RunDashboardStats` JSON for AJAX refresh. |
 | `Start` | POST | Start a new automation run from a scenario configuration. |
 | `Details` | GET | Per-run detail page with live logs and pipeline state. |
@@ -114,6 +118,7 @@ APIs.
 | `ManifestData` | GET | JSON snapshot of the generation manifest for UI rendering. |
 | `AbsUploadData` | GET | JSON ABS upload snapshot for the Generated-vs-ABS comparison. |
 | `Status` | GET | JSON run status for polling. |
+| `Export` | GET | Download `TestRunDiagnostics-{runId}.zip` for a completed run (`Succeeded`/`Failed`/`Cancelled`). |
 | `Cancel` / `CancelJson` | POST | Cancel a running automation run. |
 | `Delete` / `DeleteJson` | POST | Delete a run and its artifacts. |
 | `PipelineSnapshot` | GET | Full diagnostic pipeline snapshot for a run. |
@@ -142,6 +147,7 @@ no separate Create/Edit/Details pages.
 | `Index` | GET | Scenario list page (uses shared editor modal). |
 | `GetJson` | GET | Return a single scenario as JSON. |
 | `SaveInline` | POST | Create or update a scenario (JSON body). Validates report period bounds and imported-patient inputs (see below). |
+| `UploadImportedBundle` | POST | Upload/validate bundle JSON (multipart form), stage it in `automation_imported_bundles`, and return `bundleId` metadata for later save/classify calls. |
 | `CloneInline` | POST | Clone an existing scenario (deep-copies cohorts and imported patient lists; resets `IsSystemScenario` to `false`). |
 | `DeleteInline` | POST | Delete a non-system scenario. |
 | `ClassifyImported` | POST | Classify an imported patient (by ID or supplied bundle JSON) and return per-measure Q/NQ eligibility, detected clinical scenario, and encounter date range. Drives the editor's auto-detect and Report-Period auto-suggest UX. |
@@ -162,6 +168,8 @@ the client side:
 - Imported encounter dates are NOT required to sit inside the configured Report Period.
   A scenario with a date mismatch is a legitimate test case (proper disqualification by
   measure-eval); the editor surfaces the mismatch as a warning instead of blocking save.
+- Uploaded bundle files are capped at 12 MB per file. Upload is content-addressed by hash,
+  so identical JSON payloads reuse the same staged bundle record.
 
 ### 3.3 `QueryPlansController`
 
@@ -221,11 +229,7 @@ org-location matching conditions per run.
 Templates store one or more FHIRPath conditions (evaluated against `Location`) and are
 applied with "any match" semantics.
 
-### 3.6 `HomeController`
-
-Redirects to `Runs/Index`.
-
-### 3.7 `ApiHealthController`
+### 3.6 `ApiHealthController`
 
 Primary API Health UI surface. Provides dashboard rendering, run launch, SSE streaming,
 active-run resume, and history APIs.
@@ -233,7 +237,6 @@ active-run resume, and history APIs.
 | Action | Method | Purpose |
 |---|---|---|
 | `Index` | GET | API Health matrix page (grouped by service, latest status per endpoint). |
-| `RunEndpoint` | POST | Run one endpoint test (seeded as required by suite contract). |
 | `RunServiceStream` | GET | Start service-scoped API Health run; stream events via SSE. |
 | `RunAllStream` | GET | Start run-all API Health run; stream events via SSE. |
 | `RunStream` | GET | Attach to an existing API Health run id and stream events. |
@@ -242,6 +245,26 @@ active-run resume, and history APIs.
 
 Execution events are streamed as `text/event-stream` (`phase`, `result`, `done`) and the
 client updates row status/badges in real time.
+
+### 3.7 `Api/AutomationRunsApiController`
+
+Bearer-protected service-to-service API for scenario automation:
+
+| Action | Method | Purpose |
+|---|---|---|
+| `POST /api/runs/start` | POST | Start a saved scenario by id and return `202 Accepted` with `runId`. |
+| `GET /api/runs/{runId}/status` | GET | Poll lightweight run state (`Status`, `IsTerminal`, timestamps, error). |
+
+### 3.8 `Api/ApiHealthRunsApiController`
+
+API surface for external API Health orchestration (UI + pipeline flows):
+
+| Action | Method | Purpose |
+|---|---|---|
+| `POST /api/api-health-runs/start-all` | POST | UI entry point with antiforgery token. Starts an "all services" API Health run. |
+| `POST /api/api-health-runs/start-all-for-pipeline` | POST | Bearer-protected pipeline entry point for "all services" runs. |
+| `GET /api/api-health-runs/{runId}/status` | GET | Poll aggregate endpoint counts, terminal state, and failed endpoint summaries. |
+| `GET /api/api-health-runs/{runId}/results` | GET | Get all endpoint-level results emitted for the run. |
 
 ---
 
@@ -301,9 +324,12 @@ becomes ready immediately.
 
 ### Antiforgery
 
-All POST endpoints use `[ValidateAntiForgeryToken]`. The token is rendered via
+Browser-initiated POST endpoints use `[ValidateAntiForgeryToken]`. The token is rendered via
 `@Html.AntiForgeryToken()` inside the modal and sent as a `RequestVerificationToken` request
 header.
+
+Exception: bearer-authenticated service-to-service endpoints under `Controllers/Api/*`
+(`ApiBearerPolicy`) do not use antiforgery.
 
 Antiforgery tokens are protected by ASP.NET Core Data Protection. `Automation.UI` persists the
 Data Protection key ring to MongoDB so redeploying the UI does not invalidate current browser
@@ -337,6 +363,7 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `PatientCount` | Computed from cohorts plus imported patients (read-only on the editor). |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
 | `PatientCohorts` | List of cohort definitions (count, `CohortQualification`, per-measure eligibility, clinical profiles, resource range, inpatient pattern). |
+| `NhsnOrganizationId` | NHSN reporting organization id applied to generated organization/facility context. |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
 | `OrganizationResourceMapTemplateId` | Optional override for org-location matching template (null = default template). |
 | `NormalizationSuiteId` | Optional override for the normalization suite (null = system default suite). |
@@ -378,6 +405,10 @@ each imported patient the editor calls `ScenariosController.ClassifyImported` to
 
 When an imported encounter falls outside the configured Report Period, the editor shows
 a warning so the user knows to expect non-qualification. The save proceeds either way.
+
+Bundle uploads are staged before save via `ScenariosController.UploadImportedBundle`
+(multipart form upload). The scenario then persists only `UploadedBundleId` references;
+bundle payloads are stored in `automation_imported_bundles` and deduplicated by content hash.
 
 > **Important for Custom / Uploaded patients:** imported data is used as-authored. To get
 > expected org-scoped acquisition and ABS outcomes, the selected Organization Resource Map
@@ -698,6 +729,19 @@ Per-run poller with one cadence for all key domains:
 Each domain write is independent and fault-isolated. Failures are logged to run logs without
 taking down the whole poll cycle.
 
+### `RunExportService`
+
+Builds per-run diagnostics ZIP packages (`TestRunDiagnostics-{runId}.zip`) from persisted
+data (run summary, logs, snapshots, manifest/ABS summaries, submission artifacts). Export is
+allowed only for terminal runs to avoid racing in-flight pollers.
+
+### Startup recovery hosted services
+
+- `ScenarioRunStartupRecoveryService` reconciles non-terminal scenario runs on process start
+  (cancel first, hard-delete fallback).
+- `ApiHealthStartupRecoveryService` marks interrupted API Health execution runs as failed and
+  reconciles any linked seed run.
+
 ### API Health services
 
 - `ApiEndpointRegistry` discovers/normalizes endpoint definitions from all registered suites.
@@ -728,14 +772,20 @@ This enables restart-safe run history and multi-instance read sharing.
 Collections:
 
 - `automation_runs` -- run summaries and status metadata.
+- `automation_run_inputs` -- per-run input snapshot (`RunConfigurationJson`, scenario metadata,
+  imported bundle ids) used for details-page hydration and restart-safe context.
 - `automation_snapshots` -- per-run, per-domain snapshot payloads.
 - `automation_logs` -- full run logs.
 - `automation_scenarios` -- user and system scenario templates.
+- `automation_imported_bundles` -- staged imported bundle payloads, metadata, and
+  cross-scenario reference tracking.
 - `automation_query_plan_templates` -- query plan templates.
 - `automation_normalization_operations` -- normalization operation definitions.
 - `automation_normalization_sequences` -- normalization sequence definitions.
 - `automation_normalization_suites` -- normalization suite definitions.
 - `api_health_runs` -- API Health endpoint execution history.
+- `api_health_execution_runs` -- API Health run-level execution state (active/phase/timestamps)
+  for resume/recovery.
 
 ### Document conventions
 
@@ -760,8 +810,8 @@ Initializes required indexes with Cosmos-safe behavior:
 ### Inbound (browser -- Automation.UI)
 
 External authentication is handled at the infrastructure layer (domain-level OAuth2 via
-reverse proxy or gateway). The application itself does not enforce inbound authentication --
-all authorization policies are pass-through:
+reverse proxy or gateway). The app itself keeps default authorization pass-through, but it
+also includes a fail-closed deployment guard:
 
 ```csharp
 builder.Services.AddAuthorization(options =>
@@ -771,6 +821,24 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 ```
+
+When `Authentication:EnableAnonymousAccess=false` (default), a startup middleware returns
+`503 Service Unavailable` for all non-`/health` requests. This prevents accidentally serving
+the UI without an upstream authenticating proxy.
+
+When `Authentication:EnableAnonymousAccess=true`, the UI serves requests normally (still
+assuming upstream authentication controls in production).
+
+### Inbound API bearer policy (service-to-service)
+
+`ApiBearerPolicy` can be enabled for external API endpoints with:
+
+- `Authentication:ApiBearer:Enabled=true`
+- `Authentication:ApiBearer:Authority`
+- `Authentication:ApiBearer:Audience`
+
+When enabled, `api/runs/*` and `api/api-health-runs/start-all-for-pipeline` require a valid
+JWT bearer token.
 
 ### Outbound (Automation.UI -- Link services)
 
@@ -795,10 +863,12 @@ Key sections:
 
 | Section | Purpose |
 |---|---|
-| `Automation` | Runtime orchestration settings (FHIR / AdminBFF / Loki / query behavior). |
+| `Automation` | Runtime orchestration settings (FHIR, run behavior, and automation-specific integration settings). |
+| `Loki` | Shared log-query settings consumed by automation diagnostics (`Url`, `App`). |
 | `ServiceRegistry` | Base URLs for Link services used by `LinkSdk` clients. |
 | `MongoDB` | Connection/database for UI persistence. |
-| `Authentication` | Outbound bearer toggle. |
+| `Authentication` | Outbound bearer toggle, anonymous-access guard, and optional inbound API bearer settings. |
+| `DataProtection` | Optional app name/key collection overrides for persisted key ring. |
 | `LinkTokenService` | System-token signing/issuer settings for outbound service calls. |
 
 ---

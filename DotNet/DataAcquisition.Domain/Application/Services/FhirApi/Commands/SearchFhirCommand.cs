@@ -97,14 +97,14 @@ public class SearchFhirCommand : ISearchFhirCommand
         _logger.LogDebug(
             "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
             request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
                 request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
@@ -159,7 +159,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                     _logger.LogDebug(
                         "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
                         request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
-                    using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+                    using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
                     {
                         var semAcquiredAt = DateTime.UtcNow;
                         _logger.LogDebug(
@@ -212,7 +212,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _logger.LogDebug(
             "Semaphore: SearchNonPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
             request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, maxConcurrent);
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
@@ -229,7 +229,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 PreferredFormat = ResourceFormat.Json
             });
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)

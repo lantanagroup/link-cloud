@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
@@ -22,7 +23,8 @@ public class DataAcquisitionDatabaseValidator
         List<string> expectedPatientIds,
         bool expectDataAcquisitionData = true,
         bool expectLocationResources = false,
-        bool expectEncounterResources = false)
+        bool expectEncounterResources = false,
+        GenerationManifest? manifest = null)
     {
         var errors = new List<string>();
 
@@ -33,7 +35,14 @@ public class DataAcquisitionDatabaseValidator
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
             await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
-            await ValidateOrganizationLocationTracking(facilityId, reportId, errors, expectDataAcquisitionData, expectLocationResources, expectEncounterResources);
+            await ValidateOrganizationLocationTracking(
+                facilityId,
+                reportId,
+                errors,
+                expectDataAcquisitionData,
+                expectLocationResources,
+                expectEncounterResources,
+                manifest);
         }
         catch (Exception ex)
         {
@@ -209,7 +218,8 @@ public class DataAcquisitionDatabaseValidator
         List<string> errors,
         bool expectDataAcquisitionData,
         bool expectLocationResources,
-        bool expectEncounterResources)
+        bool expectEncounterResources,
+        GenerationManifest? manifest)
     {
         var configs = await _reader.GetOrganizationLocationConfigurationsAsync(facilityId);
         var hasActiveConfiguredOrgLocation = configs.Any(c => c.IsActive && c.ConditionsCount > 0);
@@ -234,14 +244,18 @@ public class DataAcquisitionDatabaseValidator
 
         if (!hasLocationResourceEvidence)
         {
-            if (expectDataAcquisitionData && expectLocationResources)
+            var manifestExpectsLocationEvidence = manifest == null || ManifestExpectsLocationEvidence(manifest);
+
+            if (expectDataAcquisitionData && expectLocationResources && manifestExpectsLocationEvidence)
             {
                 AddError(errors,
                     "Org-location mapping is enabled and Location resources are expected by the query plan, but no Location acquisition evidence was observed in DataAcquisition logs.");
             }
             else
             {
-                _output.WriteLine("  Org-location mapping configured, but no Location acquisition evidence was observed for this run; skipping strict mapping-row assertions.");
+                _output.WriteLine(
+                    "  Org-location mapping configured, but no Location acquisition evidence was observed for this run; " +
+                    "skipping strict mapping-row assertions because generated submitted-patient expectations do not require Location evidence.");
             }
             return;
         }
@@ -275,6 +289,23 @@ public class DataAcquisitionDatabaseValidator
 
         ValidateLocationHierarchy(activeMappings, errors);
         await ValidateEncounterMappingTracking(facilityId, reportId, logs, activeMappings, errors, expectDataAcquisitionData, expectEncounterResources);
+    }
+
+    private static bool ManifestExpectsLocationEvidence(GenerationManifest manifest)
+    {
+        var submittedPatients = manifest.ExpectedSubmittedPatientIds();
+        foreach (var patientId in submittedPatients)
+        {
+            var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+            if (expectedCounts != null
+                && expectedCounts.TryGetValue("Location", out var locationCount)
+                && locationCount > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static readonly HashSet<string> AllowedWhenNotReportable =

@@ -106,6 +106,7 @@ secret-management:
 authentication:
   anonymous: false
   authority: 'https://localhost:7004'
+  signing-key: ''
 
 link:
   info-route: /api/validation/info
@@ -131,3 +132,7 @@ link:
 internal-blob-storage:
   connection-string: ''
   blob-container-name: ''
+
+pre-qualification:
+  write-pre-qual-operation-outcome: false
+  write-expressions-in-operation-outcome: true

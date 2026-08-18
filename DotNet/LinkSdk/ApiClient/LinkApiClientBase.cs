@@ -78,6 +78,11 @@ public abstract class LinkApiClientBase : IDisposable
 
             if (statusCode is >= 200 and < 300)
             {
+                if (statusCode == 204 || response.ResponseMessage.Content?.Headers.ContentLength == 0)
+                {
+                    return new LinkApiResponse<T> { StatusCode = statusCode, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+                }
+
                 var body = await response.GetJsonAsync<T>();
                 string? rawBody = null;
                 if (body is not null)

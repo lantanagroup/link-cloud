@@ -35,7 +35,10 @@ public class AutomationRunManager : IAutomationRunManager
         ISnapshotStore snapshotStore,
         IQueryPlanTemplateStore queryPlanTemplateStore,
         INormalizationStore normalizationStore,
-        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore)
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -55,6 +58,9 @@ public class AutomationRunManager : IAutomationRunManager
             _queryPlanResolver,
             _normalizationSuiteResolver,
             _organizationResourceMapResolver,
+            importedBundleResolver,
+            generatedTemplateCache,
+            generatedTemplateVersionStore,
             configuration,
             _logger);
     }
@@ -65,7 +71,7 @@ public class AutomationRunManager : IAutomationRunManager
         var options = StartScenarioRequestResolver.Resolve(request);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
+        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
         await PersistRunInputAsync(runId, request);
@@ -556,6 +562,10 @@ public class AutomationRunManager : IAutomationRunManager
                 Error = state.Error,
                 FacilityId = state.FacilityId,
                 ReportId = state.ReportId,
+                GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
+                GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
+                GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
+                GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
                 Logs = state.Logs.ToList()
             };
         }

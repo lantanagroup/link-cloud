@@ -12,10 +12,10 @@ public class StartScenarioRequestResolverTests
     // ---------- Non-Custom scenarios use scenario-kind defaults outright ----------
 
     [Theory]
-    [InlineData(AutomationScenarioKind.AdhocReportTest, 1, 1000, 20260326)]
-    [InlineData(AutomationScenarioKind.MultiPatientTest, 1000, 100, 20260328)]
+    [InlineData(AutomationScenarioKind.AdhocReportTest, 1, 1000, 20260326, 0)]
+    [InlineData(AutomationScenarioKind.MultiPatientTest, 1000, 100, 20260328, 0)]
     public void Non_custom_scenarios_use_scenario_kind_defaults(
-        AutomationScenarioKind scenario, int expectedPatientCount, int expectedResources, int expectedSeed)
+        AutomationScenarioKind scenario, int expectedPatientCount, int expectedResources, int expectedSeed, int expectedMaxPollingDurationMinutes)
     {
         var request = new StartScenarioRequest
         {
@@ -31,6 +31,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(expectedPatientCount);
         options.ResourcesPerPatient.Should().Be(expectedResources);
         options.Seed.Should().Be(expectedSeed);
+        options.MaxPollingDurationMinutes.Should().Be(expectedMaxPollingDurationMinutes);
     }
 
     [Fact]
@@ -76,6 +77,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(7);
         options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
+        options.MaxPollingDurationMinutes.Should().Be(30);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
@@ -366,6 +368,8 @@ public class StartScenarioRequestResolverTests
     {
         var json = """
             {
+                "reportPeriodStart": "2024-03-01T00:00:00Z",
+                "reportPeriodEnd":   "2024-03-31T23:59:59Z",
                 "importedPatientIds": [
                     { "source": "ExistingId", "patientId": "abc" }
                 ],
@@ -385,6 +389,27 @@ public class StartScenarioRequestResolverTests
             .Which.PatientId.Should().Be("abc");
         options.ImportedPatientBundles.Should().ContainSingle()
             .Which.PatientId.Should().Be("xyz");
+    }
+
+    [Fact]
+    public void Imported_patients_require_explicit_report_period()
+    {
+        var json = """
+            {
+                "importedPatientIds": [
+                    { "source": "ExistingId", "patientId": "abc" }
+                ]
+            }
+            """;
+
+        var act = () => StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Report period start and end are required when imported patients are included in a run.*");
     }
 
     [Fact]

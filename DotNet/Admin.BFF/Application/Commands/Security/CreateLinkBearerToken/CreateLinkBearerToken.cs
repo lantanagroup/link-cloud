@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
-        public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
+        public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
 
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         //attempt to get signing key from cache
                         try
                         {
-                            bearerKey = _cache.Get<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
+                            bearerKey = await _cache.GetAsync<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, cancellationToken) ?? string.Empty;
                         }
                         catch (Exception ex)
                         {
@@ -71,18 +71,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         //if key is not in cache, get it from the secret manager
                         if (string.IsNullOrEmpty(bearerKey))
                         {
-                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, cancellationToken);
 
                             //store signing key in cache
                             try
                             {
                                 if (_dataProtectionSettings.Value.Enabled)
                                 {
-                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey), TimeSpan.FromMinutes(5));
+                                    await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey), TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
                                 }
                                 else
                                 {
-                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey, TimeSpan.FromMinutes(5));
+                                    await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey, TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
                                 }
                             }
                             catch (Exception ex)

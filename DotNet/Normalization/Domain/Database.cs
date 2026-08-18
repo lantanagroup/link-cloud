@@ -11,8 +11,6 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<OperationSequence> OperationSequences { get; set; }
         IEntityRepository<ResourceType> ResourceTypes { get; set; }
         IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
-        IEntityRepository<Vendor> Vendors { get; set; }
-        IEntityRepository<VendorVersion> VendorVersions { get; set; }
         IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
         Task<IDbContextTransaction> BeginTransactionAsync();
@@ -27,8 +25,6 @@ namespace LantanaGroup.Link.Normalization.Domain
         public IEntityRepository<OperationSequence> OperationSequences { get; set; }
         public IEntityRepository<ResourceType> ResourceTypes { get; set; }
         public IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
-        public IEntityRepository<Vendor> Vendors { get; set; }
-        public IEntityRepository<VendorVersion> VendorVersions { get; set; }
         public IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
         public Database(NormalizationDbContext dbContext,
@@ -36,8 +32,6 @@ namespace LantanaGroup.Link.Normalization.Domain
             IEntityRepository<OperationSequence> operationSequences,
             IEntityRepository<ResourceType> resourceTypes,
             IEntityRepository<OperationResourceType> operationResourceTypeMaps,
-            IEntityRepository<Vendor> vendors,
-            IEntityRepository<VendorVersion> vendorVersions,
             IEntityRepository<VendorVersionOperationPreset> vendorOperationPresets)
         {
             _dbContext = dbContext;
@@ -45,8 +39,6 @@ namespace LantanaGroup.Link.Normalization.Domain
             OperationSequences = operationSequences;
             ResourceTypes = resourceTypes;
             OperationResourceTypes = operationResourceTypeMaps;
-            Vendors = vendors;
-            VendorVersions = vendorVersions;
             VendorVersionOperationPresets = vendorOperationPresets;
         }
 
