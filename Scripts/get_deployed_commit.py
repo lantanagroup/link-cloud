@@ -22,7 +22,7 @@ import sys
 import json
 import urllib.request
 
-REPO_COMMIT_ROOT = 'https://github.com/lantanagroup/link-cloud/commit/'
+REPO_COMMITS_API_ROOT = 'https://api.github.com/repos/lantanagroup/link-cloud/commits/'
 
 def fail(msg: str):
     print(f"ERROR: {msg}", file=sys.stderr)
@@ -99,19 +99,32 @@ def main():
     if not commit:
         fail("Could not find 'Commit' in /api/info response.")
 
-    # If we got a short hash, try to match it with the full hash from git log
+    # If we got a short hash, resolve it to the full hash. list-deploy-changes.py fetches both
+    # refs with 'git fetch origin <ref>', and GitHub only serves unadvertised objects by full SHA.
+    # The 'sha' media type returns the 40-character hash as plain text.
     if len(commit) < 40:  # Full SHA-1 hash is 40 characters
         print(f"Attempting to translate short commit hash {commit} to full commit hash")
         try:
             request = urllib.request.Request(
-                f"{REPO_COMMIT_ROOT}{commit}",
-                headers={'Accept': 'application/json'}
+                f"{REPO_COMMITS_API_ROOT}{commit}",
+                headers={'Accept': 'application/vnd.github.sha'}
             )
             with urllib.request.urlopen(request) as response:
-                full_commit_data = json.loads(response.read().decode("utf-8"))
-                commit = full_commit_data.get('payload', {}).get('commit', {}).get("sha2", commit)
+                full_commit = response.read().decode("utf-8").strip()
+
+            if len(full_commit) == 40:
+                commit = full_commit
+            else:
+                print(f"Warning: Unexpected response resolving full commit hash: '{full_commit[:100]}'", file=sys.stderr)
         except Exception as e:
             print(f"Warning: Could not resolve full commit hash: {e}", file=sys.stderr)
+
+    # A short hash here breaks the downstream fetch in list-deploy-changes.py, which fails
+    # silently and yields an empty summary. Say so rather than letting it pass unnoticed.
+    if len(commit) < 40:
+        print(f"Warning: '{commit}' is not a full commit hash. "
+              f"'git fetch origin {commit}' will fail and the deployment summary may be empty.",
+              file=sys.stderr)
 
     print(f"FromCommit: {commit}")
 
