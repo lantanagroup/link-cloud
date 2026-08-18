@@ -46,54 +46,87 @@
         </div>
     </div>
 
-    <div class="au-card" id="liveSimulationCard" style="display:none;">
+    <div class="au-card au-live-panel" id="liveSimulationCard" style="display:none;">
         @Html.AntiForgeryToken()
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-heart-pulse me-2"></i>Live Scheduled Simulation</span>
-            <span class="small text-muted" id="liveWindowCountdown">Window closed</span>
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-broadcast me-2"></i>Live Scheduled Simulation</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="au-live-countdown" id="liveWindowCountdown" aria-live="polite">Window closed</span>
+                <span class="badge au-badge-muted" id="liveAcceptingLabel">Injections closed</span>
+            </div>
         </div>
         <div class="card-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Admitted</div><div class="fs-4 fw-semibold" id="liveAdmittedCount">0</div></div></div>
-                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Discharged</div><div class="fs-4 fw-semibold" id="liveDischargedCount">0</div></div></div>
-                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Expected Population</div><div class="fs-4 fw-semibold" id="liveExpectedCount">0</div></div></div>
-                <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Injections</div><div class="fs-6 fw-semibold" id="liveAcceptingLabel">Closed</div></div></div>
-            </div>
-            <div class="row g-3 mb-3" id="liveInjectControls">
-                <div class="col-md-5">
-                    <label class="form-label" for="liveAdmitPatientId">Admit patient ID</label>
-                    <div class="input-group">
-                        <input class="form-control" id="liveAdmitPatientId" placeholder="Leave blank to use next generated ID" />
-                        <button type="button" class="btn btn-success" id="btnLiveAdmit">Admit</button>
+            <div class="row g-3 mb-3" id="liveMetrics">
+                <div class="col-6 col-md">
+                    <div class="au-summary-item">
+                        <span class="au-label">Pool</span>
+                        <span class="au-value" id="livePoolCount">0</span>
                     </div>
                 </div>
-                <div class="col-md-5">
-                    <label class="form-label" for="liveDischargePatientId">Discharge admitted patient</label>
-                    <div class="input-group">
-                        <select class="form-select" id="liveDischargePatientId"></select>
-                        <button type="button" class="btn btn-warning" id="btnLiveDischarge">Discharge</button>
+                <div class="col-6 col-md">
+                    <div class="au-summary-item">
+                        <span class="au-label">Not admitted</span>
+                        <span class="au-value" id="liveNotAdmittedCount">0</span>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="liveEventNotes">
-                        Notes
-                        <span class="au-info-icon" data-bs-toggle="tooltip" title="Optional context for the next Admit/Discharge action. Saved with the event and shown in Event Log; does not change reportability."><i class="bi bi-info-circle"></i></span>
-                    </label>
-                    <input class="form-control" id="liveEventNotes" maxlength="200" placeholder="Optional: reason/context for this event" />
+                <div class="col-6 col-md">
+                    <div class="au-summary-item au-live-metric-accent">
+                        <span class="au-label">Admitted</span>
+                        <span class="au-value" id="liveAdmittedCount">0</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="au-summary-item">
+                        <span class="au-label">Discharged</span>
+                        <span class="au-value" id="liveDischargedCount">0</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="au-summary-item au-live-metric-accent">
+                        <span class="au-label">Report expected</span>
+                        <span class="au-value" id="liveExpectedCount">0</span>
+                    </div>
                 </div>
             </div>
+
+            <div class="mb-3" id="liveInjectControls">
+                <h6 class="text-uppercase text-muted small mb-2">Add to pool</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveGenerate">Generate</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveUpload">Upload</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveReference">FHIR ID</button>
+                </div>
+                <input type="file" id="liveUploadFile" accept=".json,application/json" class="d-none" />
+            </div>
+
+            <details class="mb-3">
+                <summary class="text-muted small">How this works</summary>
+                <p class="small text-muted mb-0 mt-2">Patterns drive automatic census. Use Admit / Discharge / Re-admit on a pool row to change acquisition timing only — that does not rewrite generated clinical data or the generation manifest. Generate, Upload, and FHIR ID add patients with generation/import tracking so report validation can evaluate their data.</p>
+            </details>
+
             <div class="row g-3">
-                <div class="col-md-6">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="small text-muted">Expected Population</div>
+                <div class="col-lg-7">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                        <h6 class="text-uppercase text-muted small mb-0">Patient pool</h6>
+                        <div class="small text-muted" id="livePoolShownCount">0 of 0</div>
+                    </div>
+                    <input class="form-control form-control-sm mb-2" id="livePoolFilter" placeholder="Filter by patient, origin, pattern, or state" />
+                    <div class="table-responsive au-live-pool-wrap">
+                        <table class="table au-table mb-0" id="livePoolTable">
+                            <thead><tr><th>Patient</th><th>Origin</th><th>Pattern</th><th>State</th><th>Actions</th></tr></thead>
+                            <tbody id="livePoolBody"><tr><td colspan="5" class="text-muted">No pool patients yet.</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-uppercase text-muted small mb-0">Report inclusion · <span id="liveExpectedHeaderCount">0</span></h6>
                         <div class="small text-muted" id="liveExpectedShownCount">0 of 0</div>
                     </div>
                     <input class="form-control form-control-sm mb-2" id="liveExpectedFilter" placeholder="Filter patient IDs" />
-                    <div id="liveExpectedList" class="small border rounded p-2" style="max-height:180px;overflow:auto;"></div>
-                </div>
-                <div class="col-md-6">
-                    <div class="small text-muted mb-1">Event Log</div>
-                    <div id="liveEventLog" class="small border rounded p-2" style="max-height:180px;overflow:auto;"></div>
+                    <div id="liveExpectedList" class="au-live-log border rounded p-2 mb-3"></div>
+                    <h6 class="text-uppercase text-muted small mb-2">Census event log</h6>
+                    <div id="liveEventLog" class="au-live-log border rounded p-2"></div>
                 </div>
             </div>
         </div>
@@ -996,8 +1029,12 @@
         const liveEventsUrl = '@Url.Action("LiveEvents", "Runs")';
         const liveAdmitUrl = '@Url.Action("AdmitJson", "Runs")';
         const liveDischargeUrl = '@Url.Action("DischargeJson", "Runs")';
+        const liveGenerateUrl = '@Url.Action("GeneratePoolJson", "Runs")';
+        const liveUploadUrl = '@Url.Action("UploadPoolJson", "Runs")';
+        const liveReferenceUrl = '@Url.Action("ReferencePoolJson", "Runs")';
         let liveWindowTimer = null;
         let liveExpectedPopulation = [];
+        let livePoolSnapshot = { pool: [], accepting: false };
 
         function renderExpectedPopulationList() {
             const listBox = document.getElementById('liveExpectedList');
@@ -1032,6 +1069,153 @@
             try { return new Date(value).toISOString(); } catch { return String(value); }
         }
 
+        function censusStateName(value) {
+            const raw = String(value ?? '');
+            if (raw === '0' || raw.toLowerCase() === 'notadmitted') return 'NotAdmitted';
+            if (raw === '1' || raw.toLowerCase() === 'admitted') return 'Admitted';
+            if (raw === '2' || raw.toLowerCase() === 'dischargedduringwindow') return 'DischargedDuringWindow';
+            return raw || 'Unknown';
+        }
+
+        function censusStateBadge(census) {
+            if (census === 'Admitted')
+                return { label: 'Admitted', css: 'badge au-badge-success' };
+            if (census === 'DischargedDuringWindow')
+                return { label: 'Discharged', css: 'badge au-badge-warning' };
+            return { label: 'Not admitted', css: 'badge au-badge-muted' };
+        }
+
+        function eventTypeName(value) {
+            const raw = String(value ?? '');
+            if (raw === '0' || raw.toLowerCase() === 'admit') return 'Admit';
+            if (raw === '1' || raw.toLowerCase() === 'discharge') return 'Discharge';
+            if (raw === '2' || raw.toLowerCase() === 'inject') return 'Inject';
+            return raw || 'Event';
+        }
+
+        function eventTypeBadgeClass(name) {
+            if (name === 'Admit') return 'badge au-badge-success';
+            if (name === 'Discharge') return 'badge au-badge-warning';
+            return 'badge au-badge-muted';
+        }
+
+        function formatLogTime(value) {
+            if (!value) return '-';
+            try {
+                const d = new Date(value);
+                if (Number.isNaN(d.getTime())) return String(value);
+                return d.toISOString().slice(11, 19) + 'Z';
+            } catch {
+                return String(value);
+            }
+        }
+
+        function originName(value) {
+            const map = { 0: 'Cohort', 1: 'Import', 2: 'Generated', 3: 'Upload', 4: 'FhirId' };
+            if (map[value] !== undefined) return map[value];
+            return String(value || '');
+        }
+
+        function patternLabel(value) {
+            if (value === null || value === undefined || value === '') return '';
+            const labels = {
+                0: 'Before -> Remains after',
+                1: 'Before -> Discharged during',
+                2: 'During -> Remains after',
+                3: 'During -> Discharged during',
+                4: 'Before -> Before',
+                5: 'After -> After',
+                'AdmittedBeforePeriodRemainsInpatientAfterPeriod': 'Before -> Remains after',
+                'AdmittedBeforePeriodDischargedDuringPeriod': 'Before -> Discharged during',
+                'AdmittedDuringPeriodRemainsInpatientAfterPeriod': 'During -> Remains after',
+                'AdmittedDuringPeriodDischargedDuringPeriod': 'During -> Discharged during',
+                'AdmittedAndDischargedBeforePeriod': 'Before -> Before',
+                'AdmittedAndDischargedAfterPeriod': 'After -> After'
+            };
+            return labels[value] || String(value);
+        }
+
+        function poolSearchText(entry) {
+            const id = entry.patientId || entry.PatientId || '';
+            const origin = originName(entry.origin ?? entry.Origin);
+            const pattern = patternLabel(entry.pattern ?? entry.Pattern);
+            const census = censusStateName(entry.censusState ?? entry.CensusState);
+            const expected = !!(entry.expectedInReport ?? entry.ExpectedInReport);
+            return `${id} ${origin} ${pattern} ${census} ${expected ? 'report expected' : 'not expected'}`.toLowerCase();
+        }
+
+        function renderLivePool(state, accepting) {
+            const body = document.getElementById('livePoolBody');
+            if (!body) return;
+            const pool = state.pool || state.Pool || [];
+            livePoolSnapshot = { pool, accepting };
+            const totals = state.poolTotals || state.PoolTotals || {};
+            document.getElementById('livePoolCount').textContent = totals.total ?? totals.Total ?? pool.length;
+            document.getElementById('liveNotAdmittedCount').textContent = totals.notAdmitted ?? totals.NotAdmitted ?? pool.filter(p => censusStateName(p.censusState ?? p.CensusState) === 'NotAdmitted').length;
+
+            const filterInput = document.getElementById('livePoolFilter');
+            const shownCount = document.getElementById('livePoolShownCount');
+            const query = (filterInput?.value || '').trim().toLowerCase();
+            const filtered = query
+                ? pool.filter(entry => poolSearchText(entry).includes(query))
+                : pool;
+            if (shownCount)
+                shownCount.textContent = `${filtered.length} of ${pool.length}`;
+
+            if (!pool.length) {
+                body.innerHTML = '<tr><td colspan="5" class="text-muted">No pool patients yet.</td></tr>';
+                return;
+            }
+            if (!filtered.length) {
+                body.innerHTML = '<tr><td colspan="5" class="text-muted">No matching patients.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map(entry => {
+                const id = entry.patientId || entry.PatientId || '';
+                const origin = originName(entry.origin ?? entry.Origin);
+                const pattern = patternLabel(entry.pattern ?? entry.Pattern);
+                const census = censusStateName(entry.censusState ?? entry.CensusState);
+                const expected = !!(entry.expectedInReport ?? entry.ExpectedInReport);
+                const stateBadge = censusStateBadge(census);
+                let action = '';
+                if (accepting && census === 'NotAdmitted')
+                    action = `<button type="button" class="btn btn-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Admit</button>`;
+                else if (accepting && census === 'Admitted')
+                    action = `<button type="button" class="btn btn-warning btn-sm live-pool-discharge" data-patient-id="${escapeHtml(id)}">Discharge</button>`;
+                else if (accepting && census === 'DischargedDuringWindow')
+                    action = `<button type="button" class="btn btn-outline-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Re-admit</button>`;
+                return `<tr>
+                    <td>
+                        <code>${escapeHtml(id)}</code>
+                        ${expected ? '' : '<div class="small text-muted">Not expected in report</div>'}
+                    </td>
+                    <td class="text-muted">${escapeHtml(origin)}</td>
+                    <td class="text-muted">${escapeHtml(pattern)}</td>
+                    <td><span class="${stateBadge.css}">${escapeHtml(stateBadge.label)}</span></td>
+                    <td>${action}</td>
+                </tr>`;
+            }).join('');
+            body.querySelectorAll('.live-pool-admit').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const patientId = btn.getAttribute('data-patient-id');
+                    const expected = btn.getAttribute('data-expected') === 'true';
+                    if (!expected && !window.confirm(
+                        `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation. Continue?`))
+                        return;
+                    postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
+                        .then(() => refreshLiveSimulation())
+                        .catch(err => alert(err.message));
+                });
+            });
+            body.querySelectorAll('.live-pool-discharge').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    postLiveEvent(liveDischargeUrl, { id: runId, patientId: btn.getAttribute('data-patient-id'), notes: null })
+                        .then(() => refreshLiveSimulation())
+                        .catch(err => alert(err.message));
+                });
+            });
+        }
+
         function renderLiveState(state) {
             if (!state) return;
             const admitted = state.admitted || state.Admitted || [];
@@ -1041,36 +1225,46 @@
             document.getElementById('liveAdmittedCount').textContent = admitted.length;
             document.getElementById('liveDischargedCount').textContent = discharged.length;
             document.getElementById('liveExpectedCount').textContent = expected.length;
-            document.getElementById('liveAcceptingLabel').textContent = accepting ? 'Accepting' : 'Closed';
+            const headerCount = document.getElementById('liveExpectedHeaderCount');
+            if (headerCount) headerCount.textContent = expected.length;
+            const acceptingLabel = document.getElementById('liveAcceptingLabel');
+            if (acceptingLabel) {
+                acceptingLabel.textContent = accepting ? 'Injections accepting' : 'Injections closed';
+                acceptingLabel.className = accepting ? 'badge au-badge-active' : 'badge au-badge-muted';
+            }
             liveExpectedPopulation = Array.isArray(expected) ? expected : [];
             renderExpectedPopulationList();
-
-            const dischargeSelect = document.getElementById('liveDischargePatientId');
-            const current = dischargeSelect.value;
-            dischargeSelect.innerHTML = admitted.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
-            if (admitted.includes(current)) dischargeSelect.value = current;
+            renderLivePool(state, accepting);
 
             const injectControls = document.getElementById('liveInjectControls');
-            injectControls.querySelectorAll('input, select, button').forEach(el => { el.disabled = !accepting; });
+            if (injectControls)
+                injectControls.querySelectorAll('input, select, button').forEach(el => { el.disabled = !accepting; });
 
             startLiveCountdown(state.windowEndUtc || state.WindowEndUtc, accepting);
         }
 
         function renderLiveEvents(events) {
             const box = document.getElementById('liveEventLog');
-            const list = events || [];
+            const list = [...(events || [])].reverse();
             if (!list.length) {
                 box.innerHTML = '<span class="text-muted">No events yet.</span>';
                 return;
             }
             box.innerHTML = list.map(evt => {
-                const type = evt.eventType || evt.EventType;
-                const ts = formatUtc(evt.timestampUtc || evt.TimestampUtc);
+                const type = eventTypeName(evt.eventType ?? evt.EventType);
+                const ts = formatLogTime(evt.timestampUtc || evt.TimestampUtc);
                 const patient = evt.patientId || evt.PatientId || '';
+                const source = evt.source || evt.Source || '';
                 const notes = evt.notes || evt.Notes || '';
-                return `<div><strong>${escapeHtml(String(type))}</strong> <code>${escapeHtml(patient)}</code> <span class="text-muted">${escapeHtml(ts)}</span>${notes ? ` — ${escapeHtml(notes)}` : ''}</div>`;
+                return `<div class="d-flex flex-wrap align-items-baseline gap-2 py-1 border-bottom">
+                    <span class="au-live-log-time">${escapeHtml(ts)}</span>
+                    <span class="${eventTypeBadgeClass(type)}">${escapeHtml(type)}</span>
+                    <code>${escapeHtml(patient)}</code>
+                    <span class="text-muted">${escapeHtml(String(source))}</span>
+                    ${notes ? `<span class="text-muted">— ${escapeHtml(notes)}</span>` : ''}
+                </div>`;
             }).join('');
-            box.scrollTop = box.scrollHeight;
+            box.scrollTop = 0;
         }
 
         function startLiveCountdown(windowEnd, accepting) {
@@ -1140,30 +1334,41 @@
             });
         }
 
-        document.getElementById('btnLiveAdmit').addEventListener('click', function () {
-            const patientId = document.getElementById('liveAdmitPatientId').value.trim();
-            const notes = document.getElementById('liveEventNotes').value.trim();
-            postLiveEvent(liveAdmitUrl, { id: runId, patientId: patientId || null, notes: notes || null })
-                .then(() => {
-                    document.getElementById('liveAdmitPatientId').value = '';
-                    refreshLiveSimulation();
-                })
-                .catch(err => alert(err.message));
-        });
-
-        document.getElementById('btnLiveDischarge').addEventListener('click', function () {
-            const patientId = document.getElementById('liveDischargePatientId').value;
-            const notes = document.getElementById('liveEventNotes').value.trim();
-            if (!patientId) {
-                alert('Select an admitted patient to discharge.');
-                return;
-            }
-            postLiveEvent(liveDischargeUrl, { id: runId, patientId, notes: notes || null })
+        document.getElementById('btnLiveGenerate').addEventListener('click', function () {
+            postLiveEvent(liveGenerateUrl, { id: runId })
                 .then(() => refreshLiveSimulation())
                 .catch(err => alert(err.message));
         });
 
+        document.getElementById('btnLiveReference').addEventListener('click', function () {
+            const patientId = window.prompt('Enter an existing FHIR patient ID');
+            if (!patientId) return;
+            postLiveEvent(liveReferenceUrl, { id: runId, patientId: patientId.trim() })
+                .then(() => refreshLiveSimulation())
+                .catch(err => alert(err.message));
+        });
+
+        document.getElementById('btnLiveUpload').addEventListener('click', function () {
+            document.getElementById('liveUploadFile').click();
+        });
+
+        document.getElementById('liveUploadFile').addEventListener('change', function () {
+            const file = this.files && this.files[0];
+            this.value = '';
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function () {
+                postLiveEvent(liveUploadUrl, { id: runId, content: String(reader.result || ''), fileName: file.name })
+                    .then(() => refreshLiveSimulation())
+                    .catch(err => alert(err.message));
+            };
+            reader.readAsText(file);
+        });
+
         document.getElementById('liveExpectedFilter').addEventListener('input', renderExpectedPopulationList);
+        document.getElementById('livePoolFilter').addEventListener('input', () => {
+            renderLivePool({ pool: livePoolSnapshot.pool }, livePoolSnapshot.accepting);
+        });
 
         if (isLiveSimulationRun || isLiveWindowOpen(currentRunStatus) || String(currentRunStatus || '').toLowerCase() === 'reportfinalization')
             setLiveCardVisible(true);
@@ -1714,6 +1919,7 @@
         });
 
         connection.on('PatientEventInjected', () => refreshLiveSimulation());
+        connection.on('PoolPatientAdded', () => refreshLiveSimulation());
         connection.on('PatientStateChanged', (state) => {
             setLiveCardVisible(true);
             renderLiveState(state);

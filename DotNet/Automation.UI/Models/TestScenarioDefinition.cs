@@ -120,11 +120,6 @@ public class TestScenarioDefinition
     /// </summary>
     public int ReportingWindowMinutes { get; set; } = 10;
 
-    /// <summary>
-    /// Optional number of generated patients to admit when the live window opens.
-    /// </summary>
-    public int SeedPatientCount { get; set; }
-
     // ----- Imported Patients (supplemental, separate from cohorts/random pool) -----
 
     /// <summary>

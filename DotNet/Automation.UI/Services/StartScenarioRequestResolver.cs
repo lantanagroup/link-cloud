@@ -84,23 +84,20 @@ public static class StartScenarioRequestResolver
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
 
         var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
-        if (hasImportedPatients && (!reportStart.HasValue || !reportEnd.HasValue))
-        {
-            throw new InvalidOperationException(
-                "Report period start and end are required when imported patients are included in a run.");
-        }
-
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
         var isLiveSimulation = request.IsLiveSimulation
             || ExtractBoolFromJson(request.RunConfigurationJson, "isLiveSimulation") == true;
+        var scheduledLike = isLiveSimulation
+            || request.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+        if (hasImportedPatients && !scheduledLike && (!reportStart.HasValue || !reportEnd.HasValue))
+        {
+            throw new InvalidOperationException(
+                "Report period start and end are required when imported patients are included in an adhoc run.");
+        }
         var reportingWindowMinutes = NormalizeReportingWindowMinutes(
             request.ReportingWindowMinutes
             ?? ExtractIntFromJson(request.RunConfigurationJson, "reportingWindowMinutes"));
-        var seedPatientCount = Math.Max(0,
-            request.SeedPatientCount
-            ?? ExtractIntFromJson(request.RunConfigurationJson, "seedPatientCount")
-            ?? 0);
         var reportMethod = isLiveSimulation && request.ReportMethod == ReportMethod.Adhoc
             ? ReportMethod.ScheduledReport
             : request.ReportMethod;
@@ -135,8 +132,7 @@ public static class StartScenarioRequestResolver
             ReportPeriodEnd = reportEnd,
             NhsnOrganizationId = nhsnOrganizationId,
             IsLiveSimulation = isLiveSimulation,
-            ReportingWindowMinutes = reportingWindowMinutes,
-            SeedPatientCount = seedPatientCount
+            ReportingWindowMinutes = reportingWindowMinutes
         };
     }
 

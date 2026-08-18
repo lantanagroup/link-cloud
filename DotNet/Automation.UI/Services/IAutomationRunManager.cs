@@ -18,6 +18,9 @@ public interface IAutomationRunManager
     Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default);
     Task<PatientStateEvent> InjectAdmitAsync(Guid runId, string? patientId, string source, string? notes = null, CancellationToken cancellationToken = default);
     Task<PatientStateEvent> InjectDischargeAsync(Guid runId, string patientId, string source, string? notes = null, CancellationToken cancellationToken = default);
+    Task<LivePatientPoolEntry> GenerateLivePoolPatientAsync(Guid runId, string source, CancellationToken cancellationToken = default);
+    Task<LivePatientPoolEntry> UploadLivePoolPatientAsync(Guid runId, string content, string? fileName, string source, CancellationToken cancellationToken = default);
+    Task<LivePatientPoolEntry> ReferenceLivePoolPatientAsync(Guid runId, string patientId, string source, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PatientStateEvent>> GetLiveEventsAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<LivePatientStateSnapshot> GetLivePatientStateAsync(Guid runId, CancellationToken cancellationToken = default);
 }

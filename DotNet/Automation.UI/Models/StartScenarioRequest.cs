@@ -106,10 +106,6 @@ public class StartScenarioRequest : IValidatableObject
     [Range(1, 60)]
     public int? ReportingWindowMinutes { get; set; }
 
-    /// <summary>Optional number of generated patients to admit when the live window opens.</summary>
-    [Range(0, 10000)]
-    public int? SeedPatientCount { get; set; }
-
     /// <summary>
     /// Cross-field validation. Rejects inverted report windows
     /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
@@ -149,7 +145,6 @@ public class StartScenarioRequest : IValidatableObject
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
         IsLiveSimulation = scenario.IsLiveSimulation,
         ReportingWindowMinutes = scenario.ReportingWindowMinutes,
-        SeedPatientCount = scenario.SeedPatientCount,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

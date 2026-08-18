@@ -3,5 +3,6 @@
 public enum PatientEventType
 {
     Admit,
-    Discharge
+    Discharge,
+    Inject
 }

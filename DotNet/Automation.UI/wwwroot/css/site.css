@@ -247,6 +247,44 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-summary-item code { font-size: .82rem; }
 
 /* ===================================================================
+   Live simulation panel (Run Details)
+   =================================================================== */
+.au-live-panel .au-live-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.au-live-panel .au-live-log {
+  max-height: 16rem;
+  overflow: auto;
+  font-size: .8125rem;
+}
+.au-live-panel .au-live-log-time {
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-live-panel .au-live-actions-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .au-live-panel .au-live-actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.au-live-panel .au-live-metric-accent {
+  border-left: 3px solid var(--au-accent);
+  padding-left: .6rem;
+}
+.au-live-panel .au-live-pool-wrap {
+  max-height: 22rem;
+  overflow: auto;
+}
+.au-live-panel details > summary {
+  cursor: pointer;
+}
+
+/* ===================================================================
    Cohort summary table (Details page)
    =================================================================== */
 .au-cohort-summary-table {

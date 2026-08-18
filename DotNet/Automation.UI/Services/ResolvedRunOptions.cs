@@ -54,6 +54,4 @@ public record ResolvedRunOptions(
     /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
     public int ReportingWindowMinutes { get; init; } = 10;
 
-    /// <summary>Optional number of generated patients to admit when the live window opens.</summary>
-    public int SeedPatientCount { get; init; }
 }

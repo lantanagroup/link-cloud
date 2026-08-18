@@ -67,13 +67,13 @@
                                 <option value="RegenerateReport">Regenerate Report</option>
                             </select>
                         </div>
-                        <div class="col-md-8" id="liveSimulationFields">
+                        <div class="col-md-8" id="liveSimulationFields" style="display:none;">
                             <label class="form-label d-block">Live Scheduled Simulation</label>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="IsLiveSimulation" />
-                                <label class="form-check-label" for="IsLiveSimulation">Hold a short reporting window and inject Admit/Discharge events</label>
+                                <label class="form-check-label" for="IsLiveSimulation">Hold a short reporting window. Inpatient patterns admit/discharge automatically; interactive inject is optional.</label>
                             </div>
-                            <div class="row g-2" id="liveSimulationOptions">
+                            <div class="row g-2" id="liveSimulationOptions" style="display:none;">
                                 <div class="col-md-6">
                                     <label class="form-label" for="ReportingWindowMinutes">Reporting Window</label>
                                     <select class="form-select" id="ReportingWindowMinutes">
@@ -81,13 +81,6 @@
                                         <option value="10" selected>10 minutes</option>
                                         <option value="15">15 minutes</option>
                                     </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="SeedPatientCount">
-                                        Seed Admitted Patients
-                                        <span class="au-info-icon" data-bs-toggle="tooltip" title="When Live Scheduled Simulation is enabled, this sets how many generated patients are admitted automatically when the live window opens. Use it to start the run with a few patients already in the hospital."><i class="bi bi-info-circle"></i></span>
-                                    </label>
-                                    <input class="form-control" type="number" min="0" id="SeedPatientCount" value="0" />
                                 </div>
                             </div>
                         </div>
@@ -1008,7 +1001,16 @@
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
         });
-        document.getElementById('IsLiveSimulation').addEventListener('change', syncLiveSimulationUi);
+        document.getElementById('IsLiveSimulation').addEventListener('change', function () {
+            syncLiveSimulationUi();
+            syncReportPeriodPolicyUi();
+        });
+        var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
+        if (reportingWindowEl) {
+            reportingWindowEl.addEventListener('change', function () {
+                if (isScheduledLikeMethod()) syncReportPeriodPolicyUi();
+            });
+        }
 
         function syncLiveSimulationUi() {
             var fields = document.getElementById('liveSimulationFields');
@@ -1049,6 +1051,39 @@
             return method === 'ScheduledReport' || method === 'RegenerateReport';
         }
 
+        function scheduledWindowExtraMinutes() {
+            var liveToggle = document.getElementById('IsLiveSimulation');
+            if (liveToggle && liveToggle.checked) {
+                var raw = parseInt((document.getElementById('ReportingWindowMinutes') || {}).value || '10', 10);
+                return isNaN(raw) || raw <= 0 ? 10 : raw;
+            }
+            // Matches RunExecutor non-live scheduled close: aligned now + 2 minutes.
+            return 2;
+        }
+
+        function formatUtcDateInput(d) {
+            function pad(n) { return n < 10 ? '0' + n : '' + n; }
+            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+        }
+
+        function computeScheduledEndUtc() {
+            return new Date(Date.now() + scheduledWindowExtraMinutes() * 60000);
+        }
+
+        function applyScheduledEndLock() {
+            var endEl = document.getElementById('ReportPeriodEnd');
+            if (!endEl) return;
+            endEl.value = formatUtcDateInput(computeScheduledEndUtc());
+        }
+
+        function ensureScheduledStartDefault() {
+            var startEl = document.getElementById('ReportPeriodStart');
+            if (!startEl || (startEl.value || '').trim()) return;
+            var start = new Date(Date.now());
+            start.setUTCDate(start.getUTCDate() - 5);
+            startEl.value = formatUtcDateInput(start);
+        }
+
         function syncReportPeriodPolicyUi() {
             var startEl = document.getElementById('ReportPeriodStart');
             var endEl = document.getElementById('ReportPeriodEnd');
@@ -1056,7 +1091,6 @@
             if (!startEl || !endEl || !hintEl) return;
 
             var scheduledLike = isScheduledLikeMethod();
-            var hasImported = hasImportedRows();
 
             if (!scheduledLike) {
                 startEl.disabled = false;
@@ -1067,31 +1101,32 @@
                 return;
             }
 
-            if (hasImported) {
-                startEl.disabled = false;
-                endEl.disabled = false;
-                startEl.required = true;
-                endEl.required = true;
-                hintEl.textContent = 'Required for imported-patient scheduled/regenerate runs. The configured period will be used exactly.';
-                return;
-            }
-
-            // Generated-only scheduled/regenerate runs use an automatic rolling window.
-            startEl.value = '';
-            endEl.value = '';
-            startEl.disabled = true;
+            ensureScheduledStartDefault();
+            applyScheduledEndLock();
+            startEl.disabled = false;
             endEl.disabled = true;
             startEl.required = false;
             endEl.required = false;
-            hintEl.textContent = 'Generated-only scheduled/regenerate runs use an automatic rolling report window. Import a patient to set an explicit period.';
+            var extra = scheduledWindowExtraMinutes();
+            var live = !!(document.getElementById('IsLiveSimulation') || {}).checked;
+            hintEl.textContent = live
+                ? ('End is locked to today plus the live inject window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.')
+                : ('End is locked to today plus the scheduled close window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.');
         }
 
-        // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
-        // when the period inputs are currently empty (never overwrite a user-set value).
+        // Adhoc: fill empty start/end from encounter dates (month snap, never overwrite).
+        // Scheduled: if the encounter range is entirely outside the locked window, ask to
+        // push Start back to the earliest encounter day. End stays locked.
         function suggestPeriodFromEncounter(encStartIso, encEndIso) {
             var startEl = document.getElementById('ReportPeriodStart');
             var endEl = document.getElementById('ReportPeriodEnd');
             if (!startEl || !endEl) return;
+
+            if (isScheduledLikeMethod()) {
+                offerToExtendScheduledStart(encStartIso, encEndIso);
+                return;
+            }
+
             var hasStart = !!(startEl.value || '').trim();
             var hasEnd = !!(endEl.value || '').trim();
             if (hasStart && hasEnd) return;
@@ -1102,15 +1137,45 @@
             if (!s) s = e;
             if (!e) e = s;
 
-            // Snap to the calendar-month containing the encounter window.
             var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
             var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
 
-            function pad(n) { return n < 10 ? '0' + n : '' + n; }
-            function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+            if (!hasStart) startEl.value = formatUtcDateInput(monthStart);
+            if (!hasEnd) endEl.value = formatUtcDateInput(monthEnd);
+        }
 
-            if (!hasStart) startEl.value = iso(monthStart);
-            if (!hasEnd) endEl.value = iso(monthEnd);
+        function offerToExtendScheduledStart(encStartIso, encEndIso) {
+            ensureScheduledStartDefault();
+            applyScheduledEndLock();
+            var startEl = document.getElementById('ReportPeriodStart');
+            if (!startEl) return;
+
+            var status = compareEncounterToPeriod(encStartIso, encEndIso);
+            if (status === 'overlap' || status === 'unknown') return;
+
+            if (status === 'outside-after') {
+                showWarning('Imported patient data starts after the locked report end (' +
+                    (document.getElementById('ReportPeriodEnd').value || 'today') +
+                    '). End is not moved. This patient will stay outside the reporting window.');
+                return;
+            }
+
+            var encS = encStartIso ? new Date(encStartIso) : null;
+            if (!encS || isNaN(encS.getTime())) return;
+            var proposed = formatUtcDateInput(encS);
+            var current = (startEl.value || '').trim();
+            if (current && proposed >= current) return;
+
+            var endVal = (document.getElementById('ReportPeriodEnd').value || '').trim();
+            var msg = 'This patient\'s data is entirely before the current report period'
+                + (current ? ' (starts ' + current + ')' : '')
+                + '. Push Report Start back to ' + proposed
+                + ' so the patient is inside the window? End stays '
+                + (endVal || 'locked') + '.';
+            if (!window.confirm(msg)) return;
+
+            startEl.value = proposed;
+            rerenderImportedEncounterCells();
         }
 
         function importedRowEligEditor(elig) {
@@ -1494,7 +1559,19 @@
         // Report Period inputs change (so the user gets immediate feedback when adjusting it).
         ['ReportPeriodStart', 'ReportPeriodEnd'].forEach(function (id) {
             var el = document.getElementById(id);
-            if (el) el.addEventListener('change', rerenderImportedEncounterCells);
+            if (!el) return;
+            el.addEventListener('change', function () {
+                if (isScheduledLikeMethod()) {
+                    applyScheduledEndLock();
+                    var startEl = document.getElementById('ReportPeriodStart');
+                    var endEl = document.getElementById('ReportPeriodEnd');
+                    if (startEl && endEl && startEl.value && endEl.value && startEl.value > endEl.value) {
+                        showWarning('Report Start cannot be after the locked End. Start was set to End.');
+                        startEl.value = endEl.value;
+                    }
+                }
+                rerenderImportedEncounterCells();
+            });
         });
 
         // ---- Collect form into JSON payload ----
@@ -1503,7 +1580,9 @@
             var imported = getImportedPatients();
             var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
             var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
-            var useRollingWindow = isScheduledLikeMethod() && imported.length === 0;
+            if (isScheduledLikeMethod()) applyScheduledEndLock();
+            var startVal = (document.getElementById('ReportPeriodStart').value || '').trim();
+            var endVal = (document.getElementById('ReportPeriodEnd').value || '').trim();
             return {
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
@@ -1523,17 +1602,12 @@
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
                 normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
                 organizationResourceMapTemplateId: document.getElementById('OrganizationResourceMap').value || null,
-                reportPeriodStart: useRollingWindow
-                    ? null
-                    : ((document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null),
-                reportPeriodEnd: useRollingWindow
-                    ? null
-                    : ((document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null),
+                reportPeriodStart: startVal ? (startVal + 'T00:00:00Z') : null,
+                reportPeriodEnd: endVal ? (endVal + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
                 importedPatientBundles: importedBundles,
                 isLiveSimulation: !!document.getElementById('IsLiveSimulation').checked,
-                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10),
-                seedPatientCount: parseInt(document.getElementById('SeedPatientCount').value || '0', 10)
+                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10)
             };
         }
 
@@ -1546,7 +1620,6 @@
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
             document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
             document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
-            document.getElementById('SeedPatientCount').value = data.seedPatientCount || 0;
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
@@ -1630,6 +1703,7 @@
             syncCount();
             syncNhsnOrganizationFromUploadedPatients();
             syncReportPeriodPolicyUi();
+            syncLiveSimulationUi();
         }
 
         // ---- Open modal ----
@@ -1659,6 +1733,8 @@
                 document.getElementById('ScenarioName').value = '';
                 document.getElementById('ScenarioDescription').value = '';
                 document.getElementById('ReportMethod').value = 'Adhoc';
+                document.getElementById('IsLiveSimulation').checked = false;
+                document.getElementById('ReportingWindowMinutes').value = '10';
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
@@ -1677,6 +1753,7 @@
                 syncCount();
                 syncNhsnOrganizationFromUploadedPatients();
                 syncReportPeriodPolicyUi();
+                syncLiveSimulationUi();
                 openModal();
             }
         }

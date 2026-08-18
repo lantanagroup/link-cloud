@@ -54,7 +54,6 @@ public sealed class TestScenarioDocument
 
     public bool IsLiveSimulation { get; set; }
     public int ReportingWindowMinutes { get; set; } = 10;
-    public int SeedPatientCount { get; set; }
 
     /// <summary>Serialized List&lt;ImportedPatientInput&gt; for ID-based imported patients.</summary>
     public string ImportedPatientIdsJson { get; set; } = "[]";

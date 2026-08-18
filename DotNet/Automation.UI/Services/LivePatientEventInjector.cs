@@ -19,10 +19,14 @@ public sealed class LivePatientEventInjector(
         DateTimeOffset windowStartUtc,
         DateTimeOffset windowEndUtc,
         IEnumerable<string>? generatedPatientIds = null,
-        ILiveCensusPublisher? censusPublisher = null)
+        ILiveCensusPublisher? censusPublisher = null,
+        IEnumerable<LivePatientSeed>? poolSeeds = null,
+        ILivePatientProvisioner? patientProvisioner = null)
     {
-        var tracker = new LiveExpectedStateTracker(runId, windowStartUtc, windowEndUtc, generatedPatientIds);
-        var session = new LiveSession(tracker, censusPublisher)
+        var tracker = poolSeeds != null
+            ? new LiveExpectedStateTracker(runId, windowStartUtc, windowEndUtc, poolSeeds)
+            : new LiveExpectedStateTracker(runId, windowStartUtc, windowEndUtc, generatedPatientIds);
+        var session = new LiveSession(tracker, censusPublisher, patientProvisioner)
         {
             LastDiagnostics = tracker.ToDiagnostics()
         };
@@ -42,6 +46,16 @@ public sealed class LivePatientEventInjector(
         tracker = null!;
         return false;
     }
+
+    public Task<IReadOnlyList<PatientStateEvent>> ApplyAutomaticAdmitsAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default)
+        => ApplyAutomaticEventsAsync(runId, tracker => tracker.ApplyAutomaticAdmits(), cancellationToken);
+
+    public Task<IReadOnlyList<PatientStateEvent>> ApplyAutomaticDischargesAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default)
+        => ApplyAutomaticEventsAsync(runId, tracker => tracker.ApplyAutomaticDischarges(), cancellationToken);
 
     public async Task<PatientStateEvent> AdmitAsync(
         Guid runId,
@@ -111,6 +125,119 @@ public sealed class LivePatientEventInjector(
         return evt;
     }
 
+    public async Task<LivePatientPoolEntry> GeneratePoolPatientAsync(
+        Guid runId,
+        string? source = null,
+        CancellationToken cancellationToken = default)
+    {
+        var session = GetRequiredSession(runId);
+        LiveProvisionedPatient provisioned;
+        try
+        {
+            provisioned = session.PatientProvisioner != null
+                ? await session.PatientProvisioner.GenerateQualifyingPatientAsync(cancellationToken)
+                : new LiveProvisionedPatient($"live-gen-{Guid.NewGuid():N}", ExpectedInReport: false);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to generate live pool patient for run {RunId}.", runId);
+            throw new LiveInjectionException(
+                $"Failed to generate patient: {ex.Message}",
+                StatusCodes.Status502BadGateway);
+        }
+
+        return await AddPoolPatientAsync(
+            session,
+            provisioned.PatientId,
+            LivePatientOrigin.Generated,
+            cancellationToken,
+            expectedInReport: provisioned.ExpectedInReport,
+            source: source ?? LiveEventSources.Generated);
+    }
+
+    public async Task<LivePatientPoolEntry> UploadPoolPatientAsync(
+        Guid runId,
+        string content,
+        string? fileName = null,
+        string? source = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            throw new LiveInjectionException("Upload content is required.", StatusCodes.Status400BadRequest);
+
+        var session = GetRequiredSession(runId);
+        LiveProvisionedPatient provisioned;
+        try
+        {
+            provisioned = session.PatientProvisioner != null
+                ? await session.PatientProvisioner.UploadPatientAsync(content, fileName, cancellationToken)
+                : new LiveProvisionedPatient(
+                    ExtractPatientIdFromBundle(content) ?? $"live-upload-{Guid.NewGuid():N}",
+                    ExpectedInReport: false);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload live pool patient for run {RunId}.", runId);
+            throw new LiveInjectionException(
+                $"Failed to upload patient: {ex.Message}",
+                StatusCodes.Status502BadGateway);
+        }
+
+        return await AddPoolPatientAsync(
+            session,
+            provisioned.PatientId,
+            LivePatientOrigin.Upload,
+            cancellationToken,
+            expectedInReport: provisioned.ExpectedInReport,
+            source: source ?? LiveEventSources.Upload);
+    }
+
+    public async Task<LivePatientPoolEntry> ReferencePoolPatientAsync(
+        Guid runId,
+        string patientId,
+        string? source = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            throw new LiveInjectionException("patientId is required.", StatusCodes.Status400BadRequest);
+
+        var session = GetRequiredSession(runId);
+        LiveProvisionedPatient provisioned;
+        try
+        {
+            provisioned = session.PatientProvisioner != null
+                ? await session.PatientProvisioner.ReferencePatientAsync(patientId.Trim(), cancellationToken)
+                : new LiveProvisionedPatient(patientId.Trim(), ExpectedInReport: false);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to reference live pool patient {PatientId} for run {RunId}.", patientId, runId);
+            throw new LiveInjectionException(
+                $"Failed to reference patient: {ex.Message}",
+                StatusCodes.Status502BadGateway);
+        }
+
+        return await AddPoolPatientAsync(
+            session,
+            provisioned.PatientId,
+            LivePatientOrigin.FhirId,
+            cancellationToken,
+            expectedInReport: provisioned.ExpectedInReport,
+            source: source ?? LiveEventSources.FhirId);
+    }
+
     public IReadOnlyList<PatientStateEvent> GetEvents(Guid runId)
     {
         return _sessions.TryGetValue(runId, out var session)
@@ -149,6 +276,8 @@ public sealed class LivePatientEventInjector(
             Admitted = data.CurrentlyAdmitted,
             DischargedDuringWindow = data.DischargedDuringWindow,
             ExpectedPopulation = data.ExpectedPopulation,
+            Pool = data.Pool,
+            PoolTotals = data.PoolTotals,
             AcceptingInjections = false,
             WindowStartUtc = data.WindowStartUtc,
             WindowEndUtc = data.WindowEndUtc,
@@ -182,6 +311,18 @@ public sealed class LivePatientEventInjector(
         if (!_sessions.TryGetValue(runId, out var session))
             return;
 
+        if (session.Tracker.AcceptingInjections)
+        {
+            try
+            {
+                await ApplyAutomaticDischargesAsync(runId, cancellationToken);
+            }
+            catch (LiveInjectionException)
+            {
+                // Window may already be frozen or empty; freeze still proceeds.
+            }
+        }
+
         session.Tracker.Freeze();
         session.LastDiagnostics = session.Tracker.ToDiagnostics();
         await PersistAsync(session, cancellationToken);
@@ -197,6 +338,7 @@ public sealed class LivePatientEventInjector(
     public async Task RecordActualPopulationAsync(
         Guid runId,
         IEnumerable<string> actualPopulation,
+        IEnumerable<string>? expectedPopulation = null,
         CancellationToken cancellationToken = default)
     {
         if (!_sessions.TryGetValue(runId, out var session))
@@ -207,14 +349,26 @@ public sealed class LivePatientEventInjector(
             .Select(id => id.Trim())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var expected = session.Tracker.GetExpectedPopulation();
+        // Inclusion comparison uses classic data/pattern expected IDs when the caller
+        // supplies them (GenerationManifest). The tracker is not the sole authority.
+        var expected = (expectedPopulation ?? session.Tracker.GetExpectedPopulation())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
         var expectedSet = expected.ToHashSet(StringComparer.Ordinal);
         var actualSet = actual.ToHashSet(StringComparer.Ordinal);
         var missing = expected.Where(id => !actualSet.Contains(id)).ToArray();
         var unexpected = actual.Where(id => !expectedSet.Contains(id)).ToArray();
         var passed = missing.Length == 0;
 
-        session.LastDiagnostics = session.Tracker.ToDiagnostics(actual, passed, missing, unexpected);
+        session.LastDiagnostics = session.Tracker.ToDiagnostics(
+            actual,
+            passed,
+            missing,
+            unexpected,
+            expected);
         await PersistAsync(session, cancellationToken);
     }
 
@@ -257,10 +411,125 @@ public sealed class LivePatientEventInjector(
         }
     }
 
-    private sealed class LiveSession(LiveExpectedStateTracker tracker, ILiveCensusPublisher? censusPublisher)
+    private async Task<IReadOnlyList<PatientStateEvent>> ApplyAutomaticEventsAsync(
+        Guid runId,
+        Func<LiveExpectedStateTracker, IReadOnlyList<PatientStateEvent>> apply,
+        CancellationToken cancellationToken)
+    {
+        var session = GetRequiredSession(runId);
+        var events = apply(session.Tracker);
+        foreach (var evt in events)
+        {
+            try
+            {
+                if (session.CensusPublisher != null)
+                    await session.CensusPublisher.PublishAsync(evt.EventType, evt.PatientId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to publish automatic {EventType} for run {RunId}, patient {PatientId}.", evt.EventType, runId, evt.PatientId);
+                throw new LiveInjectionException(
+                    $"Automatic {evt.EventType} recorded locally but census publish failed: {ex.Message}",
+                    StatusCodes.Status502BadGateway);
+            }
+            finally
+            {
+                await PersistAndBroadcastAsync(session, evt, cancellationToken);
+            }
+        }
+
+        if (events.Count == 0)
+        {
+            session.LastDiagnostics = session.Tracker.ToDiagnostics();
+            await PersistAsync(session, cancellationToken);
+        }
+
+        return events;
+    }
+
+    private async Task<LivePatientPoolEntry> AddPoolPatientAsync(
+        LiveSession session,
+        string patientId,
+        LivePatientOrigin origin,
+        CancellationToken cancellationToken,
+        bool? expectedInReport = null,
+        string? source = null)
+    {
+        LivePatientPoolEntry entry;
+        try
+        {
+            entry = session.Tracker.AddToPool(
+                patientId,
+                origin,
+                expectedInReport: expectedInReport,
+                source: source);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+
+        session.LastDiagnostics = session.Tracker.ToDiagnostics();
+        await PersistAsync(session, cancellationToken);
+        var group = session.Tracker.RunId.ToString();
+        var injectEvent = session.Tracker.GetEvents().LastOrDefault(e =>
+            e.EventType == PatientEventType.Inject
+            && string.Equals(e.PatientId, entry.PatientId, StringComparison.Ordinal));
+        if (injectEvent != null)
+            await hub.Clients.Group(group).SendAsync("PatientEventInjected", injectEvent, cancellationToken);
+        await hub.Clients.Group(group).SendAsync("PoolPatientAdded", entry, cancellationToken);
+        await hub.Clients.Group(group).SendAsync("PatientStateChanged", session.Tracker.GetState(), cancellationToken);
+        return entry;
+    }
+
+    private static string? ExtractPatientIdFromBundle(string content)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(content);
+            var root = doc.RootElement;
+            var resourceType = root.TryGetProperty("resourceType", out var rt) ? rt.GetString() : null;
+            if (!string.Equals(resourceType, "Bundle", StringComparison.OrdinalIgnoreCase)
+                && root.TryGetProperty("id", out var rootId)
+                && rootId.ValueKind == System.Text.Json.JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(rootId.GetString()))
+            {
+                return rootId.GetString();
+            }
+
+            if (root.TryGetProperty("entry", out var entries) && entries.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var entry in entries.EnumerateArray())
+                {
+                    if (!entry.TryGetProperty("resource", out var resource))
+                        continue;
+                    var type = resource.TryGetProperty("resourceType", out var typeEl) ? typeEl.GetString() : null;
+                    if (!string.Equals(type, "Patient", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (resource.TryGetProperty("id", out var idEl)
+                        && idEl.ValueKind == System.Text.Json.JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(idEl.GetString()))
+                    {
+                        return idEl.GetString();
+                    }
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    private sealed class LiveSession(
+        LiveExpectedStateTracker tracker,
+        ILiveCensusPublisher? censusPublisher,
+        ILivePatientProvisioner? patientProvisioner)
     {
         public LiveExpectedStateTracker Tracker { get; } = tracker;
         public ILiveCensusPublisher? CensusPublisher { get; } = censusPublisher;
+        public ILivePatientProvisioner? PatientProvisioner { get; } = patientProvisioner;
         public LiveSimulationDiagnostics? LastDiagnostics { get; set; }
     }
 }

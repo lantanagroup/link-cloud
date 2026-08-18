@@ -284,6 +284,8 @@ public class RunsController(
     {
         if (request?.Id == null || request.Id == Guid.Empty)
             return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest(new { error = "patientId is required." });
 
         try
         {
@@ -332,6 +334,74 @@ public class RunsController(
             return NotFound();
 
         return Json(await runManager.GetLivePatientStateAsync(id, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeneratePoolJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+
+        try
+        {
+            return Ok(await runManager.GenerateLivePoolPatientAsync(request.Id, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    public class LivePoolUploadRequest
+    {
+        public Guid Id { get; set; }
+        public string? Content { get; set; }
+        public string? FileName { get; set; }
+    }
+
+    public class LivePoolReferenceRequest
+    {
+        public Guid Id { get; set; }
+        public string? PatientId { get; set; }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadPoolJson([FromBody] LivePoolUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest(new { error = "Upload content is required." });
+
+        try
+        {
+            return Ok(await runManager.UploadLivePoolPatientAsync(request.Id, request.Content, request.FileName, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReferencePoolJson([FromBody] LivePoolReferenceRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        try
+        {
+            return Ok(await runManager.ReferenceLivePoolPatientAsync(request.Id, request.PatientId, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
     }
 
     [HttpGet]

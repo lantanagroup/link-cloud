@@ -98,13 +98,16 @@ public sealed class AutomationRunsApiController(
     [HttpPost("{runId:guid}/events/admit")]
     public async Task<IActionResult> Admit(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
         return await ExecuteLiveInjectAsync(
             runId,
             () => runManager.InjectAdmitAsync(
                 runId,
-                request?.PatientId,
-                string.IsNullOrWhiteSpace(request?.Source) ? "API" : request!.Source!.Trim(),
-                request?.Notes,
+                request.PatientId,
+                string.IsNullOrWhiteSpace(request.Source) ? "API" : request.Source.Trim(),
+                request.Notes,
                 cancellationToken),
             cancellationToken);
     }
@@ -147,12 +150,51 @@ public sealed class AutomationRunsApiController(
         {
             admitted = state.Admitted,
             dischargedDuringWindow = state.DischargedDuringWindow,
-            expectedPopulation = state.ExpectedPopulation,
+            expectedPopulation = state.ExpectedPopulation, // data/pattern inclusion, not census union
+            pool = state.Pool,
+            poolTotals = state.PoolTotals,
             acceptingInjections = state.AcceptingInjections,
             windowStartUtc = state.WindowStartUtc,
             windowEndUtc = state.WindowEndUtc,
             reportGenerationTimeUtc = state.ReportGenerationTimeUtc
         });
+    }
+
+    public sealed class LivePoolReferenceRequest
+    {
+        public string? PatientId { get; set; }
+    }
+
+    [HttpPost("{runId:guid}/pool/generate")]
+    public async Task<IActionResult> GeneratePoolPatient(Guid runId, CancellationToken cancellationToken)
+    {
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.GenerateLivePoolPatientAsync(runId, "API", cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/pool/upload")]
+    public async Task<IActionResult> UploadPoolPatient(Guid runId, CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var content = await reader.ReadToEndAsync(cancellationToken);
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.UploadLivePoolPatientAsync(runId, content, Request.ContentType, "API", cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/pool/reference")]
+    public async Task<IActionResult> ReferencePoolPatient(Guid runId, [FromBody] LivePoolReferenceRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.ReferenceLivePoolPatientAsync(runId, request.PatientId, "API", cancellationToken),
+            cancellationToken);
     }
 
     private async Task<IActionResult> ExecuteLiveInjectAsync(
@@ -167,6 +209,25 @@ public sealed class AutomationRunsApiController(
         {
             var evt = await action();
             return Ok(evt);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    private async Task<IActionResult> ExecuteLivePoolAsync(
+        Guid runId,
+        Func<Task<LivePatientPoolEntry>> action,
+        CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        try
+        {
+            var entry = await action();
+            return Ok(entry);
         }
         catch (LiveInjectionException ex)
         {

@@ -504,6 +504,75 @@ public class AutomationRunManager : IAutomationRunManager
     public Task<IReadOnlyList<PatientStateEvent>> GetLiveEventsAsync(Guid runId, CancellationToken cancellationToken = default)
         => _liveInjector.GetEventsAsync(runId, cancellationToken);
 
+    public async Task<LivePatientPoolEntry> GenerateLivePoolPatientAsync(
+        Guid runId,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live generate failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<LivePatientPoolEntry> UploadLivePoolPatientAsync(
+        Guid runId,
+        string content,
+        string? fileName,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live upload failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<LivePatientPoolEntry> ReferenceLivePoolPatientAsync(
+        Guid runId,
+        string patientId,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live reference failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
     public Task<LivePatientStateSnapshot> GetLivePatientStateAsync(Guid runId, CancellationToken cancellationToken = default)
         => _liveInjector.GetStateAsync(runId, cancellationToken);
 

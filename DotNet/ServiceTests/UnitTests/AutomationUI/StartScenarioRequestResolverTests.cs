@@ -409,7 +409,7 @@ public class StartScenarioRequestResolverTests
         });
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Report period start and end are required when imported patients are included in a run.*");
+            .WithMessage("*Report period start and end are required when imported patients are included in an adhoc run.*");
     }
 
     [Fact]
@@ -515,14 +515,12 @@ public class StartScenarioRequestResolverTests
             Scenario = AutomationScenarioKind.Custom,
             ReportMethod = ReportMethod.Adhoc,
             IsLiveSimulation = true,
-            ReportingWindowMinutes = 15,
-            SeedPatientCount = 2
+            ReportingWindowMinutes = 15
         });
 
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(15);
-        options.SeedPatientCount.Should().Be(2);
         options.MaxPollingDurationMinutes.Should().Be(45);
     }
 
@@ -532,13 +530,12 @@ public class StartScenarioRequestResolverTests
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = AutomationScenarioKind.Custom,
-            RunConfigurationJson = """{ "isLiveSimulation": true, "reportingWindowMinutes": 7, "seedPatientCount": 4 }"""
+            RunConfigurationJson = """{ "isLiveSimulation": true, "reportingWindowMinutes": 7 }"""
         });
 
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(10);
-        options.SeedPatientCount.Should().Be(4);
         options.MaxPollingDurationMinutes.Should().Be(40);
     }
 

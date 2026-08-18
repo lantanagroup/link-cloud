@@ -26,13 +26,13 @@ public sealed class GenerationManifest
         new(StringComparer.OrdinalIgnoreCase) { "MeasureReport", "OperationOutcome" };
 
     /// <summary>Ordered patient IDs, same order as the profiles.</summary>
-    public IReadOnlyList<string> PatientIds { get; init; } = [];
+    public IReadOnlyList<string> PatientIds { get; set; } = [];
 
     /// <summary>Ordered patient profiles (eligibility, resource count, scenario).</summary>
-    public IReadOnlyList<PatientProfile> Profiles { get; init; } = [];
+    public IReadOnlyList<PatientProfile> Profiles { get; set; } = [];
 
     /// <summary>Selected measure enum types used during generation.</summary>
-    public IReadOnlyList<ProfiledMeasureType> SelectedMeasures { get; init; } = [];
+    public IReadOnlyList<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
     /// <summary>
     /// Pipeline measure ID strings (from <c>MeasureLoader.MeasureIds</c>), same order
@@ -126,7 +126,7 @@ public sealed class GenerationManifest
     /// Every resource key (<c>ResourceType/ResourceId</c>) from the generated FHIR bundles,
     /// keyed per patient. Shared infrastructure resources are stored under the empty-string key.
     /// </summary>
-    public IReadOnlyDictionary<string, HashSet<string>> ResourceKeysByPatient { get; init; }
+    public IReadOnlyDictionary<string, HashSet<string>> ResourceKeysByPatient { get; set; }
         = new Dictionary<string, HashSet<string>>();
 
     /// <summary>
@@ -134,22 +134,22 @@ public sealed class GenerationManifest
     /// Key = patient ID, Value = { ResourceType -> count }.
     /// Shared infrastructure resources are stored under the empty-string key.
     /// </summary>
-    public IReadOnlyDictionary<string, Dictionary<string, int>> ResourceCountsByPatientType { get; init; }
+    public IReadOnlyDictionary<string, Dictionary<string, int>> ResourceCountsByPatientType { get; set; }
         = new Dictionary<string, Dictionary<string, int>>();
 
     /// <summary>Aggregate resource type -> count across all patients (excluding shared).</summary>
-    public IReadOnlyDictionary<string, int> TotalCountsByType { get; init; }
+    public IReadOnlyDictionary<string, int> TotalCountsByType { get; set; }
         = new Dictionary<string, int>();
 
     /// <summary>Total number of generated resource entries across all bundles.</summary>
-    public int TotalResourceCount { get; init; }
+    public int TotalResourceCount { get; set; }
 
     /// <summary>
     /// Patient IDs whose data was already on the FHIR server before the run (imported by ID).
     /// These patients are included in the manifest and report, but their resources are NOT
     /// tracked for cleanup expunge — only resources we uploaded during the run are tracked.
     /// </summary>
-    public IReadOnlySet<string> PreExistingPatientIds { get; init; }
+    public IReadOnlySet<string> PreExistingPatientIds { get; set; }
         = new HashSet<string>(StringComparer.Ordinal);
 
     // ----- Acquired / Expected-in-ABS resource type filters -----
@@ -424,6 +424,151 @@ public sealed class GenerationManifest
         }
         return result;
     }
+
+    /// <summary>
+    /// Appends a new patient row and its generation/import tracking. Existing rows are
+    /// never rewritten (census Admit/Discharge must not call this).
+    /// Returns <c>false</c> when <paramref name="patientId"/> is already present.
+    /// </summary>
+    public bool TryAppendPatient(
+        string patientId,
+        PatientProfile profile,
+        IReadOnlyCollection<string>? resourceKeys = null,
+        IReadOnlyDictionary<string, int>? resourceCountsByType = null,
+        IReadOnlyCollection<string>? simulatedAcquiredKeys = null,
+        IReadOnlyCollection<string>? cqlFilteredKeys = null,
+        bool preExisting = false)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            return false;
+
+        var id = patientId.Trim();
+        if (PatientIds.Any(existing => string.Equals(existing, id, StringComparison.Ordinal)))
+            return false;
+
+        var ids = EnsureMutableList(PatientIds);
+        var profiles = EnsureMutableList(Profiles);
+        ids.Add(id);
+        profiles.Add(profile);
+        PatientIds = ids;
+        Profiles = profiles;
+
+        if (resourceKeys is { Count: > 0 })
+        {
+            var keysByPatient = EnsureMutableDictionary(ResourceKeysByPatient);
+            keysByPatient[id] = new HashSet<string>(resourceKeys, StringComparer.OrdinalIgnoreCase);
+            ResourceKeysByPatient = keysByPatient;
+            TotalResourceCount += resourceKeys.Count;
+        }
+
+        if (resourceCountsByType is { Count: > 0 })
+        {
+            var countsByPatient = EnsureMutableDictionary(ResourceCountsByPatientType);
+            countsByPatient[id] = new Dictionary<string, int>(resourceCountsByType, StringComparer.OrdinalIgnoreCase);
+            ResourceCountsByPatientType = countsByPatient;
+
+            var totals = EnsureMutableDictionary(TotalCountsByType, StringComparer.OrdinalIgnoreCase);
+            foreach (var (type, count) in resourceCountsByType)
+                totals[type] = totals.TryGetValue(type, out var existing) ? existing + count : count;
+            TotalCountsByType = totals;
+        }
+
+        if (simulatedAcquiredKeys is { Count: > 0 })
+        {
+            var simulated = EnsureMutableDictionary(SimulatedAcquiredResourceKeysByPatient);
+            simulated[id] = new HashSet<string>(simulatedAcquiredKeys, StringComparer.OrdinalIgnoreCase);
+            SimulatedAcquiredResourceKeysByPatient = simulated;
+        }
+
+        if (cqlFilteredKeys is { Count: > 0 })
+        {
+            var filtered = EnsureMutableDictionary(CqlFilteredResourceKeysByPatient);
+            filtered[id] = new HashSet<string>(cqlFilteredKeys, StringComparer.OrdinalIgnoreCase);
+            CqlFilteredResourceKeysByPatient = filtered;
+        }
+
+        if (preExisting)
+        {
+            var preExistingIds = EnsureMutableSet(PreExistingPatientIds);
+            preExistingIds.Add(id);
+            PreExistingPatientIds = preExistingIds;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Appends patient rows from <paramref name="other"/> that are not already present.
+    /// Existing rows are left untouched. Shared-infrastructure keys (empty patient id)
+    /// are merged only when this manifest does not already have them.
+    /// </summary>
+    public int AppendFrom(GenerationManifest other)
+    {
+        if (other == null)
+            return 0;
+
+        if (SelectedMeasures.Count == 0 && other.SelectedMeasures.Count > 0)
+            SelectedMeasures = other.SelectedMeasures.ToList();
+        if (MeasureIds.Count == 0 && other.MeasureIds.Count > 0)
+            MeasureIds = other.MeasureIds.ToList();
+
+        MergeSharedInfrastructure(other);
+
+        var added = 0;
+        for (var i = 0; i < other.PatientIds.Count; i++)
+        {
+            var id = other.PatientIds[i];
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            var profile = i < other.Profiles.Count
+                ? other.Profiles[i]
+                : new PatientProfile([]);
+
+            other.ResourceKeysByPatient.TryGetValue(id, out var keys);
+            other.ResourceCountsByPatientType.TryGetValue(id, out var counts);
+            other.SimulatedAcquiredResourceKeysByPatient.TryGetValue(id, out var simulated);
+            other.CqlFilteredResourceKeysByPatient.TryGetValue(id, out var cqlFiltered);
+            var preExisting = other.PreExistingPatientIds.Contains(id);
+
+            if (TryAppendPatient(id, profile, keys, counts, simulated, cqlFiltered, preExisting))
+                added++;
+        }
+
+        return added;
+    }
+
+    private void MergeSharedInfrastructure(GenerationManifest other)
+    {
+        if (!other.ResourceKeysByPatient.TryGetValue(string.Empty, out var sharedKeys) || sharedKeys.Count == 0)
+            return;
+
+        var keysByPatient = EnsureMutableDictionary(ResourceKeysByPatient);
+        if (keysByPatient.TryGetValue(string.Empty, out var existing) && existing.Count > 0)
+            return;
+
+        keysByPatient[string.Empty] = new HashSet<string>(sharedKeys, StringComparer.OrdinalIgnoreCase);
+        ResourceKeysByPatient = keysByPatient;
+
+        if (other.ResourceCountsByPatientType.TryGetValue(string.Empty, out var sharedCounts))
+        {
+            var countsByPatient = EnsureMutableDictionary(ResourceCountsByPatientType);
+            countsByPatient[string.Empty] = new Dictionary<string, int>(sharedCounts, StringComparer.OrdinalIgnoreCase);
+            ResourceCountsByPatientType = countsByPatient;
+        }
+    }
+
+    private static List<T> EnsureMutableList<T>(IReadOnlyList<T> source)
+        => source as List<T> ?? source.ToList();
+
+    private static Dictionary<string, TValue> EnsureMutableDictionary<TValue>(
+        IReadOnlyDictionary<string, TValue> source,
+        IEqualityComparer<string>? comparer = null)
+        => source as Dictionary<string, TValue>
+           ?? new Dictionary<string, TValue>(source, comparer ?? StringComparer.Ordinal);
+
+    private static HashSet<string> EnsureMutableSet(IReadOnlySet<string> source)
+        => source as HashSet<string> ?? new HashSet<string>(source, StringComparer.Ordinal);
 
     /// <summary>
     /// Returns all generated resource keys (Type/Id) across all patients, excluding shared
