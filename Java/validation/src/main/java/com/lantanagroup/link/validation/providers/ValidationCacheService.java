@@ -70,7 +70,7 @@ public class ValidationCacheService {
      */
     @Cacheable(
             value = "lookupCodeCache",
-            key = "T(java.util.Objects).hash(#code, #system, #displayLanguage, #propertyNames)",
+            key = "#root.target.validateCodeCacheKey(#code, #system, #displayLanguage, #propertyNames)",
             unless = "#result == null"
     )
     public IValidationSupport.LookupCodeResult cachedLookupCode(
