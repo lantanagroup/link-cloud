@@ -1,27 +1,45 @@
-﻿using LantanaGroup.Link.Normalization.Application.Settings;
-using System.Diagnostics.Metrics;
+﻿using System.Diagnostics.Metrics;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 
 namespace LantanaGroup.Link.Normalization.Application.Services
 {
     public interface INormalizationServiceMetrics
     {
-        void IncrementResourceNormalizedCounter(List<KeyValuePair<string, object?>> tags);
+        void IncrementResourceChangedCounter(List<KeyValuePair<string, object?>> tags, bool changed);
+        TrackedRequestDuration MeasureNormalizationDuration(List<KeyValuePair<string, object?>> tags);
     }
 
     public class NormalizationServiceMetrics : INormalizationServiceMetrics
     {
-        public const string MeterName = $"Link.{NormalizationConstants.ServiceName}";
+        private readonly TimeProvider _timeProvider;
+        private readonly Histogram<double> _normalizationDuration;
+        private readonly Counter<long> _resourceChangedCounter;
+        private readonly Counter<long> _resourceNotChangedCounter;
 
-        public NormalizationServiceMetrics(IMeterFactory meterFactory)
+        public NormalizationServiceMetrics(IMeterFactory meterFactory, TimeProvider timeProvider, ServiceInformation serviceInformation)
         {
-            Meter meter = meterFactory.Create(MeterName);
-            ResourceNormalizedCounter = meter.CreateCounter<long>("link_normalization_service.resource_normalized.count");
+            _timeProvider = timeProvider;
+            
+            // Use the configured service name for the meter name
+            Meter meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
+            _normalizationDuration = meter.CreateHistogram<double>(DiagnosticNames.NormalizationDuration, "ms");
+            _resourceChangedCounter = meter.CreateCounter<long>(DiagnosticNames.NormalizationResourceChangedCount);
+            _resourceNotChangedCounter = meter.CreateCounter<long>(DiagnosticNames.NormalizationResourceNotChangedCount);
+        }
+        
+        public void IncrementResourceChangedCounter(List<KeyValuePair<string, object?>> tags, bool changed)
+        {
+            if (changed)
+                _resourceChangedCounter.Add(1, tags.ToArray());
+            else
+                _resourceNotChangedCounter.Add(1, tags.ToArray());
         }
 
-        public Counter<long> ResourceNormalizedCounter { get; private set; }
-        public void IncrementResourceNormalizedCounter(List<KeyValuePair<string, object?>> tags)
+        public TrackedRequestDuration MeasureNormalizationDuration(List<KeyValuePair<string, object?>> tags)
         {
-            ResourceNormalizedCounter.Add(1, tags.ToArray());
+            return new TrackedRequestDuration(_normalizationDuration, _timeProvider, tags);
         }
     }
 }

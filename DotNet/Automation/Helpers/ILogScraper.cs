@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Helpers;
+﻿namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
 /// Generic interface for scraping logs from a centralized logging system.

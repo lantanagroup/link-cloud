@@ -1,7 +1,6 @@
-version: '3.4'
-
 #### services and ports
 ## fhir_server: 6157
+## mock-fhir-server: 6158
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017 
@@ -37,12 +36,20 @@ services:
   ###########################################
   ### FHIR Server (HAPI) - For testing
   ###########################################
+  fhir_server_prep:
+    image: alpine:latest
+    volumes:
+      - fhir_data:/data
+    # Give HAPI's (non-root) user access to the volume
+    command: >-
+      chown 65532:65532 /data
+
   fhir_server:
-    build:
-      context: .
-      dockerfile: Dockerfile.hapi
-    image: link-fhir-server
+    image: hapiproject/hapi:v8.10.0-2
     container_name: fhir-server
+    depends_on:
+      fhir_server_prep:
+        condition: service_completed_successfully
     ports:
       - "6157:8080"
     environment:
@@ -67,12 +74,13 @@ services:
       - hapi.fhir.binary_storage_enabled=false
       - hapi.fhir.validation.requests_enabled=false
       - hapi.fhir.validation.responses_enabled=false
+      - spring.datasource.url=jdbc:h2:file:/data/h2
     volumes:
       - fhir_data:/data
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "wget", "-q", "--timeout=5", "--tries=1", "--spider", "http://localhost:8080/fhir/metadata"]
+      test: ["CMD", "java", "-cp", "/app", "HealthCheck"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -109,6 +117,7 @@ services:
     ports:
       - "10000:10000"
     container_name: azurite
+    command: azurite --skipApiVersionCheck -l /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
     volumes:
       - azurite_data:/data
     healthcheck:
@@ -394,7 +403,9 @@ services:
       - link-nw
 
   rest-proxy:
-    image: confluentinc/cp-kafka-rest:latest
+    # Pinned to a 7.x release (aligns with the Kafka 3.4 broker and ships curl for the healthcheck);
+    # ':latest' drifted to Confluent Platform 8.x and broke the healthcheck.
+    image: confluentinc/cp-kafka-rest:7.4.0
     depends_on:
       kafka_b:
         condition: service_healthy
@@ -414,7 +425,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     networks:
       - link-nw
 
@@ -472,6 +483,13 @@ services:
     container_name: link-admin-bff
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Authentication__EnableAnonymousAccess: ${LOCAL_AUTH_ENABLE_ANONYMOUS_ACCESS:-true}
+      Authentication__DefaultChallengeScheme: "link_cookie"
+      Authentication__Schemas__Oauth2__Enabled: ${LOCAL_AUTH_ENABLE_OAUTH2:-false}
+      Authentication__Schemas__OpenIdConnect__Enabled: ${LOCAL_AUTH_ENABLE_OPENID_CONNECT:-false}
+      Authentication__Schemas__Jwt__Enabled: ${LOCAL_AUTH_ENABLE_JWT:-false}
+      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
+      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
@@ -579,6 +597,12 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
+      ResourceCache__CacheImplementation: Hybrid
+      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ResourceCache__BlobStorage__BlobRoot: resource-cache
     ports:
       - "8065:8065"
     build:
@@ -592,6 +616,8 @@ services:
       kafka_init:
         condition: service_completed_successfully
       mssql_init:
+        condition: service_completed_successfully
+      azurite_init:
         condition: service_completed_successfully
       tenant:
         condition: service_healthy
@@ -614,6 +640,12 @@ services:
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
+       ResourceCache__CacheImplementation: Hybrid
+       ResourceCache__Redis__ConnectionString: redis_cache:6379
+       ResourceCache__Redis__Password: ${REDIS_PASS}
+       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+       ResourceCache__BlobStorage__BlobRoot: resource-cache
      ports:
        - "8078:8078"
      build:
@@ -627,6 +659,8 @@ services:
        kafka_init:
          condition: service_completed_successfully
        mssql_init:
+         condition: service_completed_successfully
+       azurite_init:
          condition: service_completed_successfully
        otel-collector:
          condition: service_started
@@ -650,7 +684,7 @@ services:
     build:
       context: Web/Admin.UI
     environment:
-      LINK_AUTH_REQUIRED: false
+      LINK_AUTH_REQUIRED: ${LOCAL_ADMIN_UI_AUTH_REQUIRED:-false}
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
@@ -664,6 +698,11 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Automation__LokiBaseUrl: http://loki:3100
+      Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
+      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
+      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
+      PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -692,7 +731,11 @@ services:
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      resource-cache.blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      resource-cache.blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      resource-cache.blob-storage.blob-root: resource-cache
       link.report.base-url: http://report:8072
+      spring.data.redis.password: ${REDIS_PASS}
     ports:
       - "8067:8067"
     build:
@@ -723,6 +766,12 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ResourceCache__BlobStorage__BlobRoot: resource-cache
+      ResourceCache__CacheImplementation: Hybrid
     ports:
       - "8068:8068"
     build:
@@ -737,10 +786,14 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      azurite_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
         condition: service_started
+      redis_cache:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8068/health"]
       start_period: 3s
@@ -784,6 +837,7 @@ services:
     container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
@@ -827,6 +881,7 @@ services:
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ExternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ExternalBlobStorage__BlobContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+      ExternalBlobStorage__FlattenHierarchy: ${EXTERNAL_BLOB_FLATTEN_HIERARCHY}
     ports:
       - "8073:8073"
     build:
@@ -916,6 +971,30 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
+      start_period: 15s
+      interval: 5s
+      retries: 10
+
+  mock-fhir-server:
+    image: mock-fhir-server
+    container_name: mock-fhir-server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      MockFhirServer__PreGeneratedPatientCount: 10
+      MockFhirServer__ResourcesPerPatient: 10
+      MockFhirServer__ClinicalPeriodStart: "2026-01-01"
+      MockFhirServer__ClinicalPeriodEnd: "2026-01-31"
+    ports:
+      - "6158:8080"
+    build:
+      context: .
+      dockerfile: DotNet/MockFhirServer/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       start_period: 15s
       interval: 5s
       retries: 10

@@ -12,6 +12,12 @@
   @if (operationType === OperationType.CopyLocation) {
     <app-copy-location  #copylocation [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location>
   }
+  @if (operationType === OperationType.CopyLocationAliasToTypeIteratively) {
+    <app-copy-location-alias-to-type-iteratively [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location-alias-to-type-iteratively>
+  }
+  @if (operationType === OperationType.RemoveExtensions) {
+    <app-remove-extensions [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-remove-extensions>
+  }
 </div>
 <div mat-dialog-actions align="end">
   @if (!viewOnly) {

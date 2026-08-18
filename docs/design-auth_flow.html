@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Link Inner-Service Auth Flow</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <p>The Link Admin BFF (Backend for Frontend) implements a secure authentication flow using OAuth 2.0 with cookie-based session management. This provides a robust security model where the BFF acts as the OAuth client and manages user sessions through secure HTTP-only cookies.</p>
+<h1 id="authentication-flow" class="content-heading">Authentication Flow <a id="authentication-flow" href="#authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ol>
+<li><strong>Initial Login Request</strong></li>
+</ol>
+<ul>
+<li>The UI redirects users to <code>/api/login</code> on the BFF</li>
+<li>The BFF initiates the authorization by redirecting to the configured Identity Provider (IdP) or Authorization Server</li>
+<li>The OAuth provider authenticates the user and returns an authorization code</li>
+</ul>
+<ol start="2">
+<li><strong>Token Exchange &amp; Session Creation</strong></li>
+</ol>
+<ul>
+<li>The BFF exchanges the authorization code for access/refresh tokens</li>
+<li>The BFF creates a session and issues a secure HTTP-only cookie named &quot;link_cookie&quot;</li>
+<li>The cookie contains session information but not the actual OAuth tokens</li>
+<li>OAuth tokens are securely stored server-side and managed by the BFF</li>
+</ul>
+<ol start="3">
+<li><strong>Subsequent Requests</strong></li>
+</ol>
+<ul>
+<li>The UI includes the session cookie automatically with each request</li>
+<li>The BFF validates the cookie and retrieves the associated session</li>
+<li>The BFF uses the OAuth tokens to make authenticated requests to backend services</li>
+<li>Token refresh is handled transparently by the BFF when needed</li>
+<li>The BFF generates a short lived JWT token and adds it to the Authorization header when making requests to backend services</li>
+</ul>
+<h1 id="cookie-security" class="content-heading">Cookie Security <a id="cookie-security" href="#cookie-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cookie Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>Cookies are HTTP-only to prevent XSS attacks</li>
+<li>Secure flag ensures cookies only sent over HTTPS</li>
+<li>Anti-forgery protection enabled</li>
+<li>Session cookies with server-side storage</li>
+</ul>
+<h1 id="token-security" class="content-heading">Token Security <a id="token-security" href="#token-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>OAuth tokens never exposed to the frontend</li>
+<li>Tokens stored securely server-side</li>
+<li>Token refresh handled by BFF</li>
+<li>Short-lived access tokens with automatic refresh</li>
+</ul>
+<h1 id="cors-protection" class="content-heading">CORS Protection <a id="cors-protection" href="#cors-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>Strict CORS policy configured</li>
+<li>Credentials mode enabled for cookie transmission</li>
+<li>Only trusted origins allowed</li>
+</ul>
+<h1 id="pkce-proof-key-for-code-exchange" class="content-heading">PKCE (Proof Key for Code Exchange) <a id="pkce-proof-key-for-code-exchange" href="#pkce-proof-key-for-code-exchange" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PKCE (Proof Key for Code Exchange)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>PKCE is implemented to secure the OAuth authorization code flow and prevent authorization code interception attacks:</p>
+<p><strong>Code Verifier Generation</strong></p>
+<ul>
+<li>A cryptographically random code verifier is generated for each authentication request</li>
+<li>The verifier is stored securely server-side in the BFF</li>
+<li>Length and character requirements follow OAuth PKCE specifications</li>
+</ul>
+<p><strong>Code Challenge</strong></p>
+<ul>
+<li>The code challenge is derived from the verifier using SHA-256</li>
+<li>Challenge is included in the initial authorization request</li>
+<li>The challenge method is set to &quot;S256&quot; (SHA-256)</li>
+</ul>
+<p><strong>Code Exchange</strong></p>
+<ul>
+<li>Original code verifier is included when exchanging the authorization code</li>
+<li>OAuth provider validates the code challenge/verifier pair</li>
+<li>Prevents malicious actors from using intercepted auth codes</li>
+</ul>
+<h1 id="state-parameter-protection" class="content-heading">State Parameter Protection <a id="state-parameter-protection" href="#state-parameter-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: State Parameter Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The state parameter provides CSRF protection during the OAuth flow:</p>
+<p><strong>State Generation</strong></p>
+<ul>
+<li>Cryptographically secure random state value generated per request</li>
+<li>State is bound to the user's session</li>
+<li>Stored server-side in the BFF</li>
+</ul>
+<p><strong>State Validation</strong></p>
+<ul>
+<li>State parameter included in authorization request</li>
+<li>Returned state must match the original stored value</li>
+<li>Requests with invalid/missing state are rejected</li>
+<li>Protects against CSRF and replay attacks</li>
+</ul>
+<h1 id="scope-restrictions" class="content-heading">Scope Restrictions <a id="scope-restrictions" href="#scope-restrictions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope Restrictions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>OAuth scopes are strictly controlled to limit access:</p>
+<p><strong>Required Scopes</strong></p>
+<p>openid profile email</p>
+<p><strong>Scope Validation</strong></p>
+<ul>
+<li>Only pre-configured scopes are allowed</li>
+<li>Scope requests are validated against allowed list</li>
+<li>Additional scopes require explicit configuration</li>
+<li>Prevents scope elevation attacks</li>
+</ul>
+<p><strong>Scope Usage</strong></p>
+<ul>
+<li>Scopes map to specific API permissions</li>
+<li>Access tokens only receive approved scopes</li>
+<li>Resource access is restricted by granted scopes</li>
+</ul>
+<h1 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The BFF's OAuth and cookie settings are configured in <code>appsettings.json</code>:</p>
+<pre><code class="language-json">&quot;Authentication&quot;: {
+  &quot;DefaultScheme&quot;: &quot;link_cookie&quot;,
+  &quot;DefaultChallengeScheme&quot;: &quot;link_oauth2&quot;,
+  &quot;Schemas&quot;: {
+    &quot;Cookie&quot;: {
+      &quot;HttpOnly&quot;: true,
+      &quot;Domain&quot;: &quot;&quot;,
+      &quot;Path&quot;: &quot;/&quot;
+    },
+    &quot;Oauth2&quot;: {
+      &quot;Enabled&quot;: true,
+      &quot;ClientId&quot;: &quot;&quot;,
+      &quot;ClientSecret&quot;: &quot;&quot;,
+      &quot;Endpoints&quot;: {
+        &quot;Authorization&quot;: &quot;&quot;,
+        &quot;Token&quot;: &quot;&quot;,
+        &quot;UserInformation&quot;: &quot;&quot;
+      },
+      &quot;CallbackPath&quot;: &quot;/api/signin-oauth2&quot;
+    }
+  }
+}
+</code></pre>
+<h1 id="ui-integration" class="content-heading">UI Integration <a id="ui-integration" href="#ui-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UI Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The UI application interacts with the BFF's authentication system through:</p>
+<h2 id="login" class="content-heading">Login <a id="login" href="#login" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Login"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Redirect to BFF login endpoint
+window.location.href = '/api/login';
+</code></pre>
+<h2 id="session-status" class="content-heading">Session Status <a id="session-status" href="#session-status" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Session Status"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Check if user is authenticated
+fetch('/api/user', {
+credentials: 'include' // Important for cookie transmission
+});
+</code></pre>
+<h2 id="logout" class="content-heading">Logout <a id="logout" href="#logout" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logout"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Redirect to BFF logout endpoint
+    window.location.href = '/api/logout';
+</code></pre>
+<hr />
+<p>The UI never directly handles OAuth tokens or credentials - all authentication is delegated to and managed by the BFF or a designated identity provider such as Azure or Keycloak.</p>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nauth_flow_5628E6A4["Design: Link Inner-Service Auth Flow"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

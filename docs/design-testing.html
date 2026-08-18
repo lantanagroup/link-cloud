@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Testing</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="deployment-validation" class="content-heading">Deployment Validation <a id="deployment-validation" href="#deployment-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ol>
+<li>Confirm that the following Link Cloud service containers are running:
+<ul>
+<li>link-account</li>
+<li>link-audit</li>
+<li>link-bff</li>
+<li>link-census</li>
+<li>link-dataacquisition</li>
+<li>link-measureeval</li>
+<li>link-normalization</li>
+<li>link-notification</li>
+<li>link-querydispatch</li>
+<li>link-report</li>
+<li>link-submission</li>
+<li>link-tenant</li>
+<li>link-validation</li>
+</ul>
+</li>
+<li>Confirm that the following Link Cloud dependent containers are running:
+<ul>
+<li><strong>Databases/Cache</strong>
+<ul>
+<li>sql-server</li>
+<li>mongo</li>
+<li>redis</li>
+</ul>
+</li>
+<li><strong>Telemetry/Observability</strong>
+<ul>
+<li>otel-collector</li>
+<li>grafana</li>
+<li>loki</li>
+<li>promeutheus</li>
+<li>tempo</li>
+</ul>
+</li>
+<li><strong>Kafka</strong>
+<ul>
+<li>kafka-broker</li>
+<li>kafka-rest-proxy</li>
+<li>kafka-ui</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Two 'init' containers are creating SQL database tables and Kafka topics. After the following containers run their process, they will automatically stop.
+<ul>
+<li>kafka-init</li>
+<li>sql-init</li>
+</ul>
+</li>
+<li>Open a web browser and access Kafka UI. By default, the page can be accessed at <code>http://localhost:9095</code>. Click the <code>Topics</code> tab and ensure that Kafka topics exist (see example screenshot below). If there aren't any topics populated (shown in the image above), attempt to rerun the following command: <code>docker compose up kafka_init -d</code></li>
+<li>Open SQL Server Management Studio and connect. The default server name should be <code>127.0.0.1,1433</code>. The <code>SA</code> password can be found in the <code>.env</code> file (The <code>LINK_DB_PASS</code> variable) in the Link Cloud repository. Ensure that the following databases were created:
+<ul>
+<li>link-account</li>
+<li>link-audit</li>
+<li>link-census</li>
+<li>link-dataacquisition</li>
+<li>link-normalization</li>
+<li>link-notification</li>
+<li>link-querydispatch</li>
+<li>link-tenant</li>
+<li>link-validation</li>
+</ul>
+</li>
+</ol>
+<img src="/images/readme_kafkaui.png" width="75%" height="75%" alt="Kafka UI showing Link topics" />
+<Admonition type="info">
+  If the databases listed above don't exist, you may attempt to rerun the following command: `docker compose up mssql_init -d`
+</Admonition>
+<h1 id="basic-testing" class="content-heading">Basic Testing <a id="basic-testing" href="#basic-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Basic Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Configuration database scripts are provided to generate a tenant named <code>Test-Hospital</code>. These scripts will load most of the service configurations needed to run Link Cloud. To be capable of performing resource acquisition, a FHIR endpoint will need to be manually added (detailed below). Here are the steps to run the scripts:</p>
+<ol>
+<li><p>Open SQL Server Management Studio and connect to your SQL Server Docker container (Defaulted to port 1433).</p>
+</li>
+<li><p>Open and run <code>\link-cloud\Scripts\load-sql-data.sql</code>.</p>
+</li>
+<li><p>To properly query for FHIR resources, update the FHIR endpoints in the SQL <code>link-dataacquisition</code> database:</p>
+</li>
+</ol>
+<pre><code>UPDATE fhirQueryConfiguration
+set FhirServerBaseUrl = '** INSERT FHIR BASE URL HERE **'
+
+UPDATE fhirListConfiguration
+set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
+</code></pre>
+<ol start="4">
+<li>Open Mongosh in a separate terminal and run the following: <code>load(&quot;\\link-cloud\\Scripts\\load-mongo-data.js&quot;)</code>.</li>
+</ol>
+<h1 id="manual-reporting" class="content-heading">Manual Reporting <a id="manual-reporting" href="#manual-reporting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Manual Reporting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Automated report scheduling can be configured through the Tenant API. However, a manual approach can be done to immediately generate a report. Open Kafka UI and produce the following into the <code>ReportScheduled</code> topic:</p>
+<p><strong>Key:</strong></p>
+<pre><code>{
+  &quot;FacilityId&quot;: &quot;Test-Hospital&quot;,
+  &quot;ReportType&quot;: &quot;NHSNdQMAcuteCareHospitalInitialPopulation&quot;
+}
+</code></pre>
+<p><strong>Value:</strong></p>
+<pre><code>{
+  &quot;Parameters&quot;: [
+  {
+    &quot;Key&quot;: &quot;StartDate&quot;,
+    &quot;Value&quot;: &quot;2024-09-01T00:00:00&quot;
+  },
+  {
+    &quot;Key&quot;: &quot;EndDate&quot;,
+    &quot;Value&quot;: &quot;2024-09-30T23:59:59&quot;
+  }]
+}
+</code></pre>
+<p>Because the report generation process runs immediately after the set <code>EndDate</code>, allocate enough time (a few minutes) to perform the subsequent steps.</p>
+<p>To manually admit patients, produce the following into the <code>PatientListsAcquired</code> topic in Kafka UI:</p>
+<div class="markdown-alert markdown-alert-note">
+<p class="markdown-alert-title"><svg viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>Note</p>
+<p>The patients included in the event below are examples only. Add patient identifiers that exist in your EHR endpoint.</p>
+</div>
+<p><strong>Key:</strong></p>
+<pre><code>Test-Hospital
+</code></pre>
+<p><strong>Value:</strong></p>
+<pre><code>{
+	&quot;ReportTrackingId&quot;: null,
+	&quot;PatientLists&quot;: [
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;Between24To48Hours&quot;,
+			&quot;PatientIds&quot;: []
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;LessThan24Hours&quot;,
+			&quot;PatientIds&quot;: [
+				&quot;hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee&quot;,
+				&quot;0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk&quot;
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;MoreThan48Hours&quot;,
+			&quot;PatientIds&quot;: []
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;Between24To48Hours&quot;,
+			&quot;PatientIds&quot;: [
+				&quot;9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m&quot;
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;MoreThan48Hours&quot;,
+			&quot;PatientIds&quot;: [
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;LessThan24Hours&quot;,
+			&quot;PatientIds&quot;: [
+			]
+		}
+	]
+}
+</code></pre>
+<p>To discharge a patient and begin their reporting workflow, produce the same <code>PatientListsAcquired</code> event without the discharged patient in the list. The example below will discharge <code>Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk</code>:</p>
+<p><strong>Key:</strong></p>
+<pre><code>Test-Hospital
+</code></pre>
+<p><strong>Value:</strong></p>
+<pre><code>{
+	&quot;ReportTrackingId&quot;: null,
+	&quot;PatientLists&quot;: [
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;Between24To48Hours&quot;,
+			&quot;PatientIds&quot;: []
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;LessThan24Hours&quot;,
+			&quot;PatientIds&quot;: [
+				&quot;hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee&quot;
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;MoreThan48Hours&quot;,
+			&quot;PatientIds&quot;: []
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;Between24To48Hours&quot;,
+			&quot;PatientIds&quot;: [
+				&quot;9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m&quot;
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Admit&quot;,
+			&quot;TimeFrame&quot;: &quot;MoreThan48Hours&quot;,
+			&quot;PatientIds&quot;: [
+			]
+		},
+		{
+			&quot;ListType&quot;: &quot;Discharge&quot;,
+			&quot;TimeFrame&quot;: &quot;LessThan24Hours&quot;,
+			&quot;PatientIds&quot;: [
+				&quot;0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk&quot;
+			]
+		}
+	]
+}
+</code></pre>
+<p>At the end of the reporting period, the Report service will make additional requests to query and evaluate patients that are currently admitted in the facility prior to submitting. After each of those admitted patients are evaluated, the Report service will then produce a <code>SubmitReport</code> event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the <code>link-submission</code> container. Select the <code>files</code> tab and navigate to the <code>app\submissions</code> folder. There, you'll be able to download the submission results for the reporting period:</p>
+<img src="/images/docker_submission.png" width="75%" height="75%" alt="Docker Desktop UI showing submissions folder" />
+<h1 id="reporting-event-workflow" class="content-heading">Reporting Event Workflow <a id="reporting-event-workflow" href="#reporting-event-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Event Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<blockquote>
+<p>Note: As Link Cloud continues to develop, the workflow detailed below to generate reports may be subject to large changes.</p>
+</blockquote>
+<p>Detailed below are the steps Link Cloud takes to generate a report for a tenant reporting period. They are broken into phases. Each phase has a sequence diagram to visualize the workflow.</p>
+<h2 id="report-scheduling" class="content-heading">Report Scheduling <a id="report-scheduling" href="#report-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre class="mermaid">sequenceDiagram
+    participant Tenant as Tenant Service
+    participant Kafka
+    participant Report as Report Service
+    participant Query as Query Dispatch Service
+
+    Tenant->>Kafka: Produce - ReportScheduled()
+    Kafka->>Report: Consume - ReportScheduled()
+    Report->>Report: Persist reporting updates()
+    Report->>Report: Create job to trigger report submission for the end of the report period()
+    Report->>Query: Consume - ReportScheduled()
+    Query->>Query: Persist reporting updates()
+</pre>
+<p>At the beginning of a new reporting period, the Tenant service produces a <code>ReportScheduled</code> event. The Query Dispatch and Report services consume and persist the reporting information in the event into their databases. The Report service sets an internal cron job (based on the EndDate of the consumed event) to execute the work needed to complete the report.</p>
+<h2 id="census-acquisition-and-discharge" class="content-heading">Census Acquisition and Discharge <a id="census-acquisition-and-discharge" href="#census-acquisition-and-discharge" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Acquisition and Discharge"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre class="mermaid">sequenceDiagram
+    participant Census as Census Service
+    participant Kafka
+    participant Acquisition as Data Acquisition Service
+    participant EHR
+    participant Query as Query Dispatch Service
+
+    Census->>Kafka: Produce - CensusAcquisitionScheduled()
+    Kafka->>Acquisition: Consume - CensusAcquisitionScheduled()
+    Acquisition->>EHR: Query STU3 Patient List()
+    Acquisition-->>Kafka: Produce - PatientListsAcquired()
+    Kafka->>Census: Consume - PatientListsAcquired()
+    Census->>Census: Persist and admit patient ID’s from the consumed list()
+    Census->>Census: Discharge patients who were admitted and are no longer on the consumed list()
+    Census-->>Kafka: Produce - PatientEvent(discharge)
+    Kafka->>Query: Consume - PatientEvent(discharge)
+    Query->>Kafka: Produce - DataAcquisitionRequested()
+    Kafka->>Acquisition: Consume - DataAcquisitionRequested()
+    Acquisition->>Acquisition: Schedules a lag time before querying for patient resources()
+</pre>
+<p>During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the <code>CensusAcquisitionScheduled</code> event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a <code>PatientListsAcquired</code> event that contains a list of all patients that are currently admitted in the facility.</p>
+<p>The Census service consumes the <code>PatientListsAcquired</code> event and applies updates in the database for patients have been admitted or discharged.</p>
+<blockquote>
+<p>Note: The Census service treats any patient in the PatientListsAcquired list as an admitted patient. If the Census service has a patient marked as admitted in the database, but the patient is no longer present on the consumed list, it treats the patient as a discharge.</p>
+</blockquote>
+<p>A <code>PatientEvent</code> Kafka message is produced for each patient that has been discharged.</p>
+<p>The QueryDispatch service consumes the patient events and appends the tenants' reporting information (the info consumed in the <code>ReportScheduled</code> event). The service then sets a cron job based on the configured lag time that the facility wants to apply for each discharge. When that lag time is met, the Query Dispatch service produces a <code>DataAcquisitionRequested</code> event to trigger the acquisition and evaluation steps.</p>
+<h2 id="resource-acquisition-and-evaluation" class="content-heading">Resource Acquisition and Evaluation <a id="resource-acquisition-and-evaluation" href="#resource-acquisition-and-evaluation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Acquisition and Evaluation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre class="mermaid">sequenceDiagram
+    participant Kafka
+    participant Acquisition as Data Acquisition
+    participant EHR
+    participant Normalization
+    participant Eval as Measure Eval
+    participant Report
+
+    Kafka->>Acquisition: Consume - DataAcquisitionRequested()
+    Acquisition->>EHR: Query for patient resources()
+    Acquisition-->>Kafka: Produce - ResourceAcquired()
+    Kafka->>Normalization: Consume - ResourceAcquired()
+    Normalization->>Normalization: Applies relevant normalizations (e.g., Concept Maps)
+    Normalization-->>Kafka: Produce - ResourceNormalized()
+    Kafka->>Eval: Consume - ResourceNormalized()
+    Eval->>Eval: Determine if all resources required to perform the evaluation()
+    Eval->>Eval: Evaluate()
+    Eval-->>Kafka: Produce - ResourceEvaluated()
+    Kafka->>Report: Consume - ResourceEvaluated()
+    Report->>Report: Persist MeasureReport's and resources()
+</pre>
+<p>A <code>DataAcquisitionRequested</code> event is generated for patients that have either been discharged or are still admitted when the reporting period end date is met. This event is the trigger that causes the resource acquisition, normalization and evaluation phases for a patient.</p>
+<p>When the Data Acquisition service consumes the <code>DataAcquisitionRequested</code> event, the service will use the persisted query plan to make requests to the EHR endpoint for patient FHIR resources that correspond with the report type that is in the value of the consumed event. A <code>ResourceAcquired</code> event is produced for each resource that the EHR endpoint responds with.</p>
+<p>The Normalization service consumes the <code>ResourceAcquired</code> event and applies any normalization configurations that the facility is configured for (Example: Concept Maps). After a resource has been normalized, the service produces a <code>ResourceNormalized</code> event.</p>
+<p>The Measure Eval service consumes the <code>ResourceNormalized</code> events and persists each resource into its database. When the service has accounted for every normalized resource for a patient, it will then perform work to bundle and evaluate those resources against the CQF libraries for the report type in the event. The generated MeasureReport and its evaluated resources are then produced as separate <code>ResourceEvaluated</code> events</p>
+<Admonition type="info">
+  Due to the potential large size of a MeasureReport, the MeasureEval service will produce a single ResourceEvaluated event for the MeasureReport that contains only resource references. Then, the MeasureEval service will produce ResourceEvaluated events for each evaluated resource in the MeasureReport. There is information within the event that allows for the consuming Report service to associate evaluated resources to their corresponding MeasureReport.
+</Admonition>
+<Admonition type="info">
+  The MeasureEval service is capable of producing DataAcquisitionRequested events if the reporting measure also includes the need for additional supplemental data for a patient that meets the initial population criteria of a measure. If this is the case, the MeasureEval service will only produce ResourceEvaluated events after it has evaluated a patient that had had their supplemental resources acquired and normalized.
+</Admonition>
+<p>When the end of the reporting period is met, the Report service will confirm that it has MeasureReport's for all discharged patients that were within the reporting period. Additionally, it will request that currently admitted patients be evaluated for that reporting period. The service does this by producing <code>DataAcquisitionRequested</code> events for each admitted patient which triggers the acquisition/evaluation workflow mentioned above. After those patient MeasureReports are accounted for, the Report service will produce a <code>SubmitReport</code> for the Submission service.</p>
+<h1 id="automated-smoke-testing" class="content-heading">Automated Smoke Testing <a id="automated-smoke-testing" href="#automated-smoke-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Automated Smoke Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>An automated smoke test can be found in the <code>/Tests/E2ETests</code> folder/project which performs the following actions:</p>
+<ol>
+<li>Loads a FHIR server with pre-defined synthetic test data</li>
+<li>Loads a measure definition's evaluation artifacts in the measure eval service</li>
+<li>Loads the measure definition's validation artifacts in the validation service</li>
+<li>Creates a basic tenant configuration</li>
+<li>Initiates the generation of an adhoc report</li>
+<li>Monitors/waits for the report to complete generating</li>
+<li>Downloads the report and associated data</li>
+<li>Perform assertions/validation of the resulting submitted data</li>
+</ol>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+ntesting_7D11EE2F["Design: Testing"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

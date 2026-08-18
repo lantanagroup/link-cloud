@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using Moq;

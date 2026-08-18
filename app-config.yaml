@@ -1,4 +1,4 @@
-﻿$schema: "https://json-schema.org/draft/2020-12/schema"
+$schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Link App Configuration Registry"
 description: "Enumerates all required application configuration keys needed to run the system in any deployed environment."
 type: "object"
@@ -28,8 +28,27 @@ global:
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
+  # Automation.UI inbound-auth coordination note:
+  # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
+  # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
+  # every non-/health request is returned as 503 before bearer-token validation can run.
+  # To make ApiBearer-protected endpoints reachable, EnableAnonymousAccess and
+  # Authentication:ApiBearer:Enabled must be configured together for the target environment.
+  # Canonical key path is Authentication:ApiBearer:* (not top-level ApiBearer:*).
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
+    required: true
+  - key: "Authentication:EnableAnonymousAccess"
+    description: "Controls whether Automation.UI serves non-health traffic. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation."
+    required: true
+  - key: "Authentication:ApiBearer:Enabled"
+    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
+    required: true
+  - key: "Authentication:ApiBearer:Authority"
+    description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    required: true
+  - key: "Authentication:ApiBearer:Audience"
+    description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
@@ -69,6 +88,9 @@ global:
     required: true
   - key: "ServiceRegistry:DataAcquisitionServiceUrl"
     description: "The base URL for the Data Acquisition Service."
+    required: true
+  - key: "ServiceRegistry:AdminBffServiceUrl"
+    description: "The base URL for the Admin BFF service used by Automation.UI and LinkSdk Admin.BFF integration calls."
     required: true
   - key: "ServiceRegistry:NormalizationServiceUrl"
     description: "The base URL for the Normalization Service."
@@ -163,6 +185,30 @@ services:
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: true
+    - key: "Cache:Type"
+      description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
+      required: false
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
       description: "The maximum number of concurrent data acquisition tasks."
@@ -170,6 +216,30 @@ services:
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
+    - key: "Cache:Type"
+      description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
+      required: false
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   Census:
     - key: "CensusSettings:ObservationCodes"
       description: "Comma-separated list of FHIR Observation codes used to identify census events."
@@ -190,6 +260,15 @@ services:
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
       required: true
+    - key: "resource-cache.blob-storage.connection-string"
+      description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
+      required: false
+    - key: "resource-cache.blob-storage.blob-container-name"
+      description: "Name of the blob container backing the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
+    - key: "resource-cache.blob-storage.blob-root"
+      description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
   Normalization: []
   Notification:
     - key: "SmtpConnection:Host"
@@ -206,6 +285,9 @@ services:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
       description: "Boolean flag to enable detailed logging of database queries."
       required: true
+    - key: "PatientAggregator:IncludeOrganizationResource"
+      description: "Whether to include the submitting Organization in patient bundles."
+      required: false
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
@@ -213,12 +295,30 @@ services:
     - key: "SubmissionServiceConfig:PatientBundleBatchSize"
       description: "The number of patient bundles to process in a single batch."
       required: true
+    - key: "InternalBlobStorage:ConnectionString"
+      description: "The connection string for the internal Azure Blob Storage (where submissions are stored)."
+      required: true
+    - key: "InternalBlobStorage:BlobContainerName"
+      description: "The name of the blob container used for internal storage."
+      required: true
     - key: "ExternalBlobStorage:ConnectionString"
       description: "The connection string for the external Azure Blob Storage (where submissions are stored)."
       required: true
     - key: "ExternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for external storage."
       required: true
+    - key: "ExternalBlobStorage:FlattenHierarchy"
+      description: "Whether to flatten the submission hierarchy (i.e., upload all bundles to the blob root)."
+      required: false
+    - key: "ExternalBlobStorage:SuppressManifest"
+      description: "Whether to suppress submission of manifest bundles."
+      required: false
+    - key: "ExternalBlobStorage:UseMeasurePrefix"
+      description: "Whether to use a measure prefix (i.e., dQM-specific directory following the blob root) for external blobs."
+      required: false
+    - key: "ExternalBlobStorage:MeasurePrefixesByReportType"
+      description: "Mapping of report types to measure prefixes."
+      required: false
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."

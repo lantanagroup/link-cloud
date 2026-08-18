@@ -1,1 +1,0 @@
-import{s as o,o as e,c as l,r as s}from"./index.CnjeSbCO.js";const t={},c={class:"*:border-t-1/2 xl:*:border-l-1/2 custom-scroll flex flex-col pr-0 first:*:border-t-0 xl:flex-row xl:*:border-t-0 xl:first:*:border-l-0"};function n(r,d){return e(),l("div",c,[s(r.$slots,"default")])}const x=o(t,[["render",n]]);export{x};

@@ -1,4 +1,5 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Net.Sockets;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -8,10 +9,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Process
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -293,7 +290,7 @@ public class SftpAcquisitionHandler(
             tags: null,
             links: links);
 
-        activity?.AddTag("log.id", log.ExternalId);
+        activity?.AddTag(DiagnosticNames.DataAcquisitionLogId, log.ExternalId);
         activity?.AddTag(DiagnosticNames.FacilityId, log.FacilityId);
 
         // Try to claim the log
@@ -398,7 +395,7 @@ public class SftpAcquisitionHandler(
         }
 
         // Network/IO exceptions that may indicate connection issues
-        if (ex is IOException or System.Net.Sockets.SocketException)
+        if (ex is IOException or SocketException)
         {
             return true;
         }

@@ -1,4 +1,4 @@
-namespace Automation.UI.Models;
+﻿namespace Automation.UI.Models;
 
 public class AutomationRunIndexViewModel
 {

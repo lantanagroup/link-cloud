@@ -1,4 +1,4 @@
-using IntegrationTests.AutomationUI;
+﻿using IntegrationTests.AutomationUI;
 using IntegrationTests.Census;
 using IntegrationTests.DataAcquisition;
 using IntegrationTests.Normalization;

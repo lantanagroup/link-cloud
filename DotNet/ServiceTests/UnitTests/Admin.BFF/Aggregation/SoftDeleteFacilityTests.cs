@@ -1,4 +1,4 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Facility;
 using LantanaGroup.Link.Shared.Application.Models.Configs;

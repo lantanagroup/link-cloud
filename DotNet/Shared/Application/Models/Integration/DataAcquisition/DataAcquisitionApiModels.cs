@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Utilities;
+﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
@@ -104,6 +104,66 @@ public class CreateQueryPlanRequestApiModel
     public Dictionary<string, object> SupplementalQueries { get; set; } = [];
 }
 
+public class CreateOrganizationLocationConditionApiModel
+{
+    public string FhirPath { get; set; } = string.Empty;
+    public int Priority { get; set; } = 1;
+}
+
+public class CreateOrganizationLocationConfigurationApiModel
+{
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public List<CreateOrganizationLocationConditionApiModel> Conditions { get; set; } = [];
+}
+
+public class OrganizationLocationConditionApiModel
+{
+    public int ConditionId { get; set; }
+    public string? FhirPath { get; set; }
+    public int Priority { get; set; }
+}
+
+public class OrganizationLocationConfigurationApiModel
+{
+    public int ConfigId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; }
+    public List<OrganizationLocationConditionApiModel> Conditions { get; set; } = [];
+}
+
+public class OrganizationLocationMappingApiModel
+{
+    public int LocationMappingId { get; set; }
+    public string? FacilityId { get; set; }
+    public string? LocationId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public string? PartOfValue { get; set; }
+    public int? PartOfId { get; set; }
+    public bool IsOrgLocation { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class EncounterLocationApiModel
+{
+    public int EncounterLocationId { get; set; }
+    public int EncounterMappingId { get; set; }
+    public int OrganizationLocationMappingId { get; set; }
+    public string? LocationId { get; set; }
+}
+
+public class EncounterMappingApiModel
+{
+    public int EncounterMappingId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string PatientId { get; set; } = string.Empty;
+    public string EncounterId { get; set; } = string.Empty;
+    public bool MappedToOrg { get; set; }
+    public List<EncounterLocationApiModel> EncounterLocations { get; set; } = [];
+}
+
 public class DataAcquisitionLogStatusStatisticsApiModel
 {
     public string ReportId { get; set; } = string.Empty;
@@ -120,27 +180,42 @@ public class DataAcquisitionLogStatusCountApiModel
 public enum RequestStatus
 {
     [StringValue("Pending")]
+    [CancellableStatus]
     Pending,
     [StringValue("Ready")]
+    [CancellableStatus]
     Ready,
     [StringValue("Queued")]
+    [CancellableStatus]
     Queued,
     [StringValue("Processing")]
+    [CancellableStatus]
     Processing,
     [StringValue("Completed")]
+    [TerminalStatus]
     Completed,
     [StringValue("Failed")]
+    [CancellableStatus]
     Failed,
     [StringValue("Max Retries Reached")]
+    [TerminalStatus]
     MaxRetriesReached,
     [StringValue("Skipped")]
+    [TerminalStatus]
     Skipped,
     [StringValue("Configuration Required")]
+    [CancellableStatus]
     ConfigurationRequired,
     [StringValue("Cancelled")]
+    [TerminalStatus]
     Cancelled,
     [StringValue("Configuration Missing")]
-    ConfigurationMissing
+    [TerminalStatus]
+    ConfigurationMissing,
+
+    [StringValue("Not Reportable")]
+    [TerminalStatus]
+    NotReportable
 }
 
 public enum QueryPhase

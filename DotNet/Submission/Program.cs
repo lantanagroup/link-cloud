@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -149,13 +149,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
-    builder.Services.AddSingleton<BlobStorageService>();
+    builder.Services.AddSingleton<IStorageService, BlobStorageService>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
-
-    builder.Services.AddSingleton<ReportClient>();
 
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();

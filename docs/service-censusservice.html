@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Census Service</h1>
+<div class="row">
+    <div class="col-md-8">
+        <div class="mb-3"><strong>Produces:</strong> <a href="event-auditableeventoccurred.html">Auditable Event Occurred [event]</a>, <a href="event-patientcensusscheduled.html">Patient Census Scheduled [event]</a>, <a href="event-patientevent.html">Patient Event [event]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-patientlistsacquired.html">Patient Lists Acquired [event]</a>, <a href="event-cernerpatientsacquired.html">Cerner Patients Acquired [event]</a></div>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service is primarily responsible for maintaining a tenants admit and discharge patient information needed to determine when a patient is ready for reporting. To accomplish this, the Census service has functionality in place to request an updated FHIR List of recently admitted patients. The frequency that the request is made is based on a Tenant configuration made in the Census service.</p>
+<p>The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.</p>
+<div class="mermaid-container"><pre class="mermaid">
+flowchart LR
+nCensusService_1BD4C8F8["Service: Census Service"]
+  nCensusService_1BD4C8F8 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
+  nCensusService_1BD4C8F8 -->|produces| nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"]
+  nCensusService_1BD4C8F8 -->|produces| nPatientEvent_34D33665["Event: PatientEvent"]
+  nPatientListsAcquired_4681892E["Event: PatientListsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
+  nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nAuditableEventOccurred_2E7ED8D7
+  end
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_3467767F
+    nPatientListsAcquired_4681892E
+  end
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPatientCensusScheduled_2383C0C6
+    nPatientEvent_34D33665
+  end
+  subgraph nTenant_379CD514_domain["Domain: Tenant"]
+    nCensusService_1BD4C8F8
+  end
+</pre></div>
+<h2 id="event-sourcing-workflow" class="content-heading">Event Sourcing Workflow <a id="event-sourcing-workflow" href="#event-sourcing-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Sourcing Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service consumes <code>PatientListsAcquired</code> and <code>CernerPatientsAcquired</code> events from Kafka. When a new event is received, the <code>PatientListsAcquiredListener</code> processes the payload, updating census records for the specified facility. This enables downstream reporting and data acquisition.</p>
+<p><strong>Workflow Steps:</strong></p>
+<ol>
+<li><strong>Scheduling:</strong> A scheduled job (per tenant configuration) triggers a request for updated patient lists.</li>
+<li><strong>Data Acquisition:</strong> The system sends a <code>DataAcquisitionRequested</code> event, prompting the acquisition of FHIR patient lists.</li>
+<li><strong>Event Production:</strong> Upon successful acquisition, a <code>PatientListsAcquired</code> or <code>CernerPatientsAcquired</code> event is produced, containing the list of admitted and discharged patients.</li>
+<li><strong>Census Update:</strong> The Census service consumes the event and updates its records accordingly.</li>
+</ol>
+<h2 id="event-payload-structures" class="content-heading">Event Payload Structures <a id="event-payload-structures" href="#event-payload-structures" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Payload Structures"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="fhirlistadmitpayload-event" class="content-heading">FHIRListAdmitPayload Event <a id="fhirlistadmitpayload-event" href="#fhirlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;patientId&quot;: &quot;string&quot;,
+  &quot;admitDate&quot;: &quot;string (ISO 8601 datetime)&quot;
+}
+</code></pre>
+<ul>
+<li><strong>patientId</strong>: The unique FHIR ID of the patient being admitted.</li>
+<li><strong>admitDate</strong>: The datetime when the patient was admitted.</li>
+<li><strong>payloadType</strong>: Automatically set to &quot;FHIRListAdmit&quot; (not included in JSON).</li>
+</ul>
+<p>This event is used to track patient admissions detected through FHIR list processing. When processed, it creates a new PatientEncounter record in the system with the admission date and patient identifier.</p>
+<h3 id="fhirlistdischargepayload-event" class="content-heading">FHIRListDischargePayload Event <a id="fhirlistdischargepayload-event" href="#fhirlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;patientId&quot;: &quot;string&quot;,
+  &quot;dischargeDate&quot;: &quot;string (ISO 8601 datetime)&quot;
+}
+</code></pre>
+<ul>
+<li><strong>patientId</strong>: The unique FHIR ID of the patient being discharged.</li>
+<li><strong>dischargeDate</strong>: The datetime when the patient was discharged.</li>
+<li><strong>payloadType</strong>: Automatically set to &quot;FHIRListDischarge&quot; (not included in JSON).</li>
+</ul>
+<p>This event is used to track patient discharges detected through FHIR list processing. When processed, it updates an existing PatientEncounter record with the discharge date, indicating the patient's encounter has concluded.</p>
+<p>Both FHIR list payloads are critical components of the patient census tracking system, enabling the service to maintain accurate patient encounter records as patients enter and exit the healthcare facility. These events, along with other event types, help build a complete picture of patient movement for reporting purposes.</p>
+<h3 id="cernerlistadmitpayload-event" class="content-heading">CernerListAdmitPayload Event <a id="cernerlistadmitpayload-event" href="#cernerlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;patientId&quot;: &quot;string&quot;,
+  &quot;admitDate&quot;: &quot;string (ISO 8601 datetime)&quot;,
+  &quot;encounterId&quot;: &quot;string&quot;,
+  &quot;finNumber&quot;: &quot;string&quot;,
+  &quot;medicalRecordNumber&quot;: &quot;string&quot;,
+  &quot;encounterStatus&quot;: &quot;string&quot;,
+  &quot;encounterType&quot;: &quot;string&quot;
+}
+</code></pre>
+<ul>
+<li><strong>patientId</strong>: The unique FHIR ID of the patient being admitted.</li>
+<li><strong>admitDate</strong>: The datetime when the patient was admitted.</li>
+<li><strong>encounterId</strong>: The FHIR Encounter Id that was included in the Cerner acquisition file.</li>
+<li><strong>finNumber</strong>: Another identifier that was included in the Cerner acquisition file.</li>
+<li><strong>medicalRecordNumber</strong>: The MRN of the patient.</li>
+<li><strong>encounterStatus</strong>: The current Encounter.status of the patient.</li>
+<li><strong>encounterType</strong>: The Encounter.type of the patient.</li>
+<li><strong>payloadType</strong>: Automatically set to &quot;CernerListAdmit&quot; (not included in JSON).</li>
+</ul>
+<p>This event is used to track patient admissions that are sourced from the Cerner SFTP acquisitions. When processed, it creates a new PatientEncounter record in the system with the admission date and patient identifier.</p>
+<h3 id="cernerlistdischargepayload-event" class="content-heading">CernerListDischargePayload Event <a id="cernerlistdischargepayload-event" href="#cernerlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;patientId&quot;: &quot;string&quot;,
+  &quot;dischargeDate&quot;: &quot;string (ISO 8601 datetime)&quot;
+}
+</code></pre>
+<ul>
+<li><strong>patientId</strong>: The unique FHIR ID of the patient being admitted.</li>
+<li><strong>discharge</strong>: The datetime when the patient was discharged.</li>
+<li><strong>payloadType</strong>: Automatically set to &quot;CernerListDischarge&quot; (not included in JSON).</li>
+</ul>
+<p>This event is used to track patient discharges that are sourced from the Cerner SFTP acquisitions. When a patient is admitted in Link, but no longer is in the latest Cerner acquired file, Link will generate a discharge event for the patient.</p>
+<h3 id="cernerlistupdatepayload-event" class="content-heading">CernerListUpdatePayload Event <a id="cernerlistupdatepayload-event" href="#cernerlistupdatepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListUpdatePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;patientId&quot;: &quot;string&quot;,
+  &quot;encounterId&quot;: &quot;string&quot;,
+  &quot;finNumber&quot;: &quot;string&quot;,
+  &quot;medicalRecordNumber&quot;: &quot;string&quot;,
+  &quot;encounterStatus&quot;: &quot;string&quot;,
+  &quot;encounterType&quot;: &quot;string&quot;
+}
+</code></pre>
+<ul>
+<li><strong>patientId</strong>: The unique FHIR ID of the patient being admitted.</li>
+<li><strong>encounterId</strong>: The FHIR Encounter Id that was included in the Cerner acquisition file.</li>
+<li><strong>finNumber</strong>: Another identifier that was included in the Cerner acquisition file.</li>
+<li><strong>medicalRecordNumber</strong>: The MRN of the patient.</li>
+<li><strong>encounterStatus</strong>: The current Encounter.status of the patient.</li>
+<li><strong>encounterType</strong>: The Encounter.type of the patient.</li>
+<li><strong>payloadType</strong>: Automatically set to &quot;CernerListUpdate&quot; (not included in JSON).</li>
+</ul>
+<p>This event is used to track patient updates to current admitted patients. When a patient is admitted in Link, but an update to one of the values have been made in the latest Cerner acquired file, Link will generate an update event for the patient.</p>
+<h2 id="api-documentation" class="content-heading">API Documentation <a id="api-documentation" href="#api-documentation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: API Documentation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="census-configuration-controller" class="content-heading">Census Configuration Controller <a id="census-configuration-controller" href="#census-configuration-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Configuration Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Census service exposes REST endpoints to manage tenant-specific census configuration.</p>
+<h4 id="get-censusconfigfacilityid" class="content-heading">GET /census/config/{facilityId} <a id="get-census-config-facilityid" href="#get-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Retrieves the census configuration for a specific facility.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (path, required): The unique identifier of the facility.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Returns the census configuration.</li>
+<li><code>404 Not Found</code>: If no configuration exists for the specified facilityId.</li>
+</ul>
+<p><strong>Response Model:</strong></p>
+<pre><code class="language-json">{
+  &quot;facilityId&quot;: &quot;string&quot;,
+  &quot;scheduledTrigger&quot;: &quot;string&quot;,
+  &quot;enabled&quot;: boolean
+}
+</code></pre>
+<h4 id="post-censusconfig" class="content-heading">POST /census/config <a id="post-census-config" href="#post-census-config" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /census/config"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Creates a new census configuration.</p>
+<p><strong>Request Body:</strong></p>
+<pre><code class="language-json">{
+  &quot;facilityId&quot;: &quot;string&quot;,
+  &quot;scheduledTrigger&quot;: &quot;string&quot;,
+  &quot;enabled&quot;: boolean
+}
+</code></pre>
+<ul>
+<li><code>facilityId</code> (required): The unique identifier of the facility.</li>
+<li><code>scheduledTrigger</code> (required): A CRON expression defining the schedule for census acquisition.</li>
+<li><code>enabled</code> (optional, default: true): Whether the census acquisition is enabled.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>201 Created</code>: Configuration created successfully.</li>
+<li><code>400 Bad Request</code>: If the request is invalid.</li>
+</ul>
+<p><strong>Response Model:</strong></p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;string&quot;
+}
+</code></pre>
+<h4 id="put-censusconfigfacilityid" class="content-heading">PUT /census/config/{facilityId} <a id="put-census-config-facilityid" href="#put-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PUT /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Updates an existing census configuration.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (path, required): The unique identifier of the facility.</li>
+</ul>
+<p><strong>Request Body:</strong></p>
+<pre><code class="language-json">{
+  &quot;facilityId&quot;: &quot;string&quot;,
+  &quot;scheduledTrigger&quot;: &quot;string&quot;,
+  &quot;enabled&quot;: boolean
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Configuration updated successfully.</li>
+<li><code>404 Not Found</code>: If no configuration exists for the specified facilityId.</li>
+</ul>
+<h4 id="delete-censusconfigfacilityid" class="content-heading">DELETE /census/config/{facilityId} <a id="delete-census-config-facilityid" href="#delete-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Deletes a census configuration.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (path, required): The unique identifier of the facility.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Configuration deleted successfully.</li>
+<li><code>404 Not Found</code>: If no configuration exists for the specified facilityId.</li>
+</ul>
+<h3 id="census-controller" class="content-heading">Census Controller <a id="census-controller" href="#census-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Endpoints for retrieving patient census data and patient lists.</p>
+<h4 id="get-apicensusfacilityidhistoryadmitted" class="content-heading">GET /api/census/{facilityId}/history/admitted <a id="get-api-census-facilityid-history-admitted" href="#get-api-census-facilityid-history-admitted" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/{facilityId}/history/admitted"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Gets the admitted patients for a facility within a date range. Returns a FHIR List resource containing patient references.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (path, required): The unique identifier of the facility.</li>
+<li><code>startDate</code> (query, required): Start date for the date range filter.</li>
+<li><code>endDate</code> (query, required): End date for the date range filter.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Returns a FHIR List resource with admitted patients.</li>
+<li><code>404 Not Found</code>: If no patients found for the specified facility.</li>
+<li><code>400 Bad Request</code>: If invalid arguments are provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<p><strong>Response Model:</strong>
+Returns a FHIR List resource with the following structure:</p>
+<ul>
+<li><code>status</code>: Current</li>
+<li><code>mode</code>: Snapshot</li>
+<li><code>extension</code>: Contains applicable period with start and end dates</li>
+<li><code>entry[]</code>: Array of patient references in format &quot;Patient/{patientId}&quot;</li>
+</ul>
+<h3 id="patient-encounters-controller" class="content-heading">Patient Encounters Controller <a id="patient-encounters-controller" href="#patient-encounters-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Encounters Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Endpoints for managing and retrieving patient encounter materialized views.</p>
+<h4 id="get-apicensuspatient-encounterscurrent" class="content-heading">GET /api/census/patient-encounters/current <a id="get-api-census-patient-encounters-current" href="#get-api-census-patient-encounters-current" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/current"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Returns the current materialized view state for patient encounters for a given facility.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (query, required): The unique identifier for the facility.</li>
+<li><code>correlationId</code> (query, optional): Optional correlation ID to filter patient encounters.</li>
+<li><code>sortBy</code> (query, optional): Field to sort by (e.g., &quot;CorrelationId&quot;, &quot;AdmitDate&quot;).</li>
+<li><code>sortOrder</code> (query, optional): Sort order (Ascending or Descending).</li>
+<li><code>pageSize</code> (query, optional): Number of records per page (default: 10).</li>
+<li><code>pageNumber</code> (query, optional): Page number to retrieve (default: 1).</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Returns a paged list of current patient encounters.</li>
+<li><code>400 Bad Request</code>: If facilityId is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<p><strong>Response Model:</strong></p>
+<pre><code class="language-json">{
+  &quot;records&quot;: [
+    {
+      &quot;id&quot;: &quot;string&quot;,
+      &quot;correlationId&quot;: &quot;string&quot;,
+      &quot;facilityId&quot;: &quot;string&quot;,
+      &quot;medicalRecordNumber&quot;: &quot;string&quot;,
+      &quot;admitDate&quot;: &quot;datetime&quot;,
+      &quot;dischargeDate&quot;: &quot;datetime&quot;,
+      &quot;encounterType&quot;: &quot;string&quot;,
+      &quot;encounterStatus&quot;: &quot;string&quot;,
+      &quot;encounterClass&quot;: &quot;string&quot;,
+      &quot;createDate&quot;: &quot;datetime&quot;,
+      &quot;modifyDate&quot;: &quot;datetime&quot;,
+      &quot;patientVisitIdentifiers&quot;: [],
+      &quot;patientIdentifiers&quot;: []
+    }
+  ],
+  &quot;pageNumber&quot;: 1,
+  &quot;pageSize&quot;: 10,
+  &quot;totalCount&quot;: 100
+}
+</code></pre>
+<h4 id="get-apicensuspatient-encountershistorical" class="content-heading">GET /api/census/patient-encounters/historical <a id="get-api-census-patient-encounters-historical" href="#get-api-census-patient-encounters-historical" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/historical"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Returns an ad hoc generated materialized view state for patient encounters for a given facility as of a specific date.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (query, required): The unique identifier for the facility.</li>
+<li><code>correlationId</code> (query, optional): Optional correlation ID to filter patient encounters.</li>
+<li><code>dateThreshold</code> (query, required): The date as of which to generate the historical view.</li>
+<li><code>sortBy</code> (query, optional): Field to sort by (e.g., &quot;CorrelationId&quot;, &quot;AdmitDate&quot;).</li>
+<li><code>sortOrder</code> (query, optional): Sort order (Ascending or Descending).</li>
+<li><code>pageSize</code> (query, optional): Number of records per page (default: 10).</li>
+<li><code>pageNumber</code> (query, optional): Page number to retrieve (default: 1).</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Returns a paged list of patient encounters as of the specified date.</li>
+<li><code>400 Bad Request</code>: If facilityId or dateThreshold is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<p><strong>Response Model:</strong> Same as current patient encounters endpoint.</p>
+<h4 id="post-apicensuspatient-encountersrebuild" class="content-heading">POST /api/census/patient-encounters/rebuild <a id="post-api-census-patient-encounters-rebuild" href="#post-api-census-patient-encounters-rebuild" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /api/census/patient-encounters/rebuild"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Deletes and rebuilds the materialized view records for a given facility.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (query, required): The unique identifier for the facility.</li>
+<li><code>correlationId</code> (query, optional): Optional correlation ID to filter which materialized view to rebuild.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>202 Accepted</code>: If the rebuild is successful.</li>
+<li><code>400 Bad Request</code>: If facilityId is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<h3 id="patient-events-controller" class="content-heading">Patient Events Controller <a id="patient-events-controller" href="#patient-events-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Events Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Endpoints for managing and retrieving patient events.</p>
+<h4 id="get-apicensuspatient-events" class="content-heading">GET /api/census/patient-events <a id="get-api-census-patient-events" href="#get-api-census-patient-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Returns all events stored in the patient events data store for the given facility.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>facilityId</code> (query, required): The unique identifier for the facility.</li>
+<li><code>correlationId</code> (query, optional): Optional correlation ID to filter events.</li>
+<li><code>startDate</code> (query, optional): Optional start date to filter events.</li>
+<li><code>endDate</code> (query, optional): Optional end date to filter events.</li>
+<li><code>sortBy</code> (query, optional): Field to sort by.</li>
+<li><code>sortOrder</code> (query, optional): Sort order (Ascending or Descending).</li>
+<li><code>pageSize</code> (query, optional): Number of records per page (default: 10).</li>
+<li><code>pageNumber</code> (query, optional): Page number to retrieve (default: 1).</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>200 OK</code>: Returns a paged list of patient events.</li>
+<li><code>404 Not Found</code>: If no patient events found for the facility.</li>
+<li><code>400 Bad Request</code>: If facilityId is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<p><strong>Response Model:</strong></p>
+<pre><code class="language-json">{
+  &quot;records&quot;: [
+    {
+      &quot;id&quot;: &quot;string&quot;,
+      &quot;facilityId&quot;: &quot;string&quot;,
+      &quot;correlationId&quot;: &quot;string&quot;,
+      &quot;sourcePatientId&quot;: &quot;string&quot;,
+      &quot;sourceVisitId&quot;: &quot;string&quot;,
+      &quot;medicalRecordNumber&quot;: &quot;string&quot;,
+      &quot;eventType&quot;: &quot;string&quot;,
+      &quot;payload&quot;: {},
+      &quot;sourceType&quot;: &quot;string&quot;
+    }
+  ],
+  &quot;pageNumber&quot;: 1,
+  &quot;pageSize&quot;: 10,
+  &quot;totalCount&quot;: 100
+}
+</code></pre>
+<h4 id="delete-apicensuspatient-eventsid" class="content-heading">DELETE /api/census/patient-events/{id} <a id="delete-api-census-patient-events-id" href="#delete-api-census-patient-events-id" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/{id}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Soft deletes a patient event and rebuilds the materialized view for the related correlation id.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>id</code> (path, required): The unique identifier of the patient event to delete.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>202 Accepted</code>: If deletion is successful.</li>
+<li><code>400 Bad Request</code>: If patient event ID is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<h4 id="delete-apicensuspatient-eventsvisitcorrelationid" class="content-heading">DELETE /api/census/patient-events/visit/{correlationId} <a id="delete-api-census-patient-events-visit-correlationid" href="#delete-api-census-patient-events-visit-correlationid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/visit/{correlationId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>correlationId</code> (path, required): The correlation ID for the visit to delete.</li>
+</ul>
+<p><strong>Response:</strong></p>
+<ul>
+<li><code>202 Accepted</code>: If deletion is successful.</li>
+<li><code>400 Bad Request</code>: If correlation ID is not provided.</li>
+<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+</ul>
+<h2 id="technical-implementation" class="content-heading">Technical Implementation <a id="technical-implementation" href="#technical-implementation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Technical Implementation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service is implemented as a .NET 8.0 web application with the following key components:</p>
+<h3 id="core-technologies" class="content-heading">Core Technologies <a id="core-technologies" href="#core-technologies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Technologies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Framework</strong>: .NET 8.0</li>
+<li><strong>Database</strong>: Microsoft SQL Server via Entity Framework Core 8.0.3</li>
+<li><strong>Messaging</strong>: Kafka (Confluent.Kafka 2.*)</li>
+<li><strong>Scheduling</strong>: Quartz.NET 3.*</li>
+<li><strong>API Documentation</strong>: Swagger/OpenAPI</li>
+<li><strong>Logging</strong>: Serilog with Grafana Loki integration</li>
+</ul>
+<h3 id="database-schema" class="content-heading">Database Schema <a id="database-schema" href="#database-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Database Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Census service uses Entity Framework Core with SQL Server for data persistence. The database schema includes:</p>
+<ol>
+<li><p><strong>CensusConfiguration</strong>: Stores facility-specific census configurations</p>
+<ul>
+<li>Primary Key: FacilityId (string)</li>
+<li>ScheduledTrigger (string): CRON expression for scheduling</li>
+<li>Enabled (bool): Flag to enable/disable census acquisition</li>
+</ul>
+</li>
+<li><p><strong>PatientCensus</strong>: Tracks patient census information</p>
+<ul>
+<li>Primary Key: Id (Guid)</li>
+<li>FacilityId (string): Facility identifier</li>
+<li>PatientId (string): FHIR patient identifier</li>
+<li>AdmissionDate (DateTime?): Optional admission date</li>
+<li>DischargeDate (DateTime?): Optional discharge date</li>
+<li>LastUpdated (DateTime): Timestamp of last update</li>
+</ul>
+</li>
+</ol>
+<h3 id="scheduled-jobs" class="content-heading">Scheduled Jobs <a id="scheduled-jobs" href="#scheduled-jobs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduled Jobs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Census service uses Quartz.NET with ADO Job Stores for scheduling the census acquisition jobs based on tenant configurations. Each job:</p>
+<ol>
+<li>Reads the facility-specific configuration</li>
+<li>Triggers the census acquisition process</li>
+<li>Emits the appropriate events</li>
+<li>Updates the database with the results</li>
+</ol>
+<h3 id="event-processing" class="content-heading">Event Processing <a id="event-processing" href="#event-processing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Processing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Census service processes incoming Kafka events via dedicated listeners and produces events when census data is acquired or scheduled.</p>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#kafka">Kafka Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#kafka-consumer-settings">Kafka Consumer Retry Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#service-registry">Service Registry Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#cors">CORS Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#token-service-settings">Token Service Configuration</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
+<li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
+</ul>
+<h2 id="application-settings" class="content-heading">Application Settings <a id="application-settings" href="#application-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Application Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service uses the following configuration settings:</p>
+<pre><code class="language-json">{
+  &quot;ServiceInformation&quot;: {
+    &quot;Name&quot;: &quot;Census&quot;,
+    &quot;Version&quot;: &quot;0.5.0&quot;
+  },
+  &quot;ConnectionStrings&quot;: {
+    &quot;CensusDatabase&quot;: &quot;[connection-string]&quot;
+  },
+  &quot;Kafka&quot;: {
+    &quot;bootstrap.servers&quot;: &quot;localhost:9092&quot;,
+    &quot;group.id&quot;: &quot;census-service&quot;,
+    &quot;auto.offset.reset&quot;: &quot;earliest&quot;
+  },
+  &quot;KafkaTopics&quot;: {
+    &quot;PatientListsAcquired&quot;: &quot;patient-lists-acquired&quot;,
+    &quot;PatientCensusScheduled&quot;: &quot;patient-census-scheduled&quot;,
+    &quot;AuditableEventOccurred&quot;: &quot;audit-events&quot;,
+    &quot;PatientEvent&quot;: &quot;patient-events&quot;
+  },
+  &quot;Quartz&quot;: {
+    &quot;quartz.scheduler.instanceName&quot;: &quot;Census-Scheduler&quot;
+  },
+  &quot;Logging&quot;: {
+    &quot;LogLevel&quot;: {
+      &quot;Default&quot;: &quot;Information&quot;,
+      &quot;Microsoft.AspNetCore&quot;: &quot;Warning&quot;
+    }
+  },
+  &quot;Serilog&quot;: {
+    &quot;Using&quot;: [
+      &quot;Serilog.Sinks.Console&quot;,
+      &quot;Serilog.Sinks.Grafana.Loki&quot;
+    ],
+    &quot;MinimumLevel&quot;: {
+      &quot;Default&quot;: &quot;Information&quot;,
+      &quot;Override&quot;: {
+        &quot;Microsoft&quot;: &quot;Warning&quot;,
+        &quot;System&quot;: &quot;Warning&quot;
+      }
+    },
+    &quot;WriteTo&quot;: [
+      {
+        &quot;Name&quot;: &quot;Console&quot;
+      },
+      {
+        &quot;Name&quot;: &quot;GrafanaLoki&quot;,
+        &quot;Args&quot;: {
+          &quot;uri&quot;: &quot;[loki-url]&quot;,
+          &quot;labels&quot;: [
+            {
+              &quot;key&quot;: &quot;app&quot;,
+              &quot;value&quot;: &quot;census-service&quot;
+            }
+          ]
+        }
+      }
+    ],
+    &quot;Enrich&quot;: [
+      &quot;FromLogContext&quot;,
+      &quot;WithMachineName&quot;,
+      &quot;WithThreadId&quot;,
+      &quot;WithSpan&quot;
+    ]
+  }
+}
+</code></pre>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Link includes a <strong>Census Management</strong> module designed to acquire, evaluate, and maintain a real-time census of patients actively or recently treated within a hospital system. This module supports the submission of required patient data to governing bodies (such as NHSN) per established reporting criteria.</p>
+<p>The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.</p>
+<h3 id="census-data-acquisition-methods" class="content-heading">Census Data Acquisition Methods <a id="census-data-acquisition-methods" href="#census-data-acquisition-methods" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Data Acquisition Methods"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h4 id="fhir-standard-list-resource" class="content-heading">1. FHIR Standard - List Resource <a id="1-fhir-standard-list-resource" href="#1-fhir-standard-list-resource" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. FHIR Standard - List Resource"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>The <strong>FHIR List Resource</strong> method is one of the primary approaches for acquiring patient lists from hospital EHR systems. In systems like Epic, patient lists are generated through proprietary queries within the EHR, associated with the FHIR List resource for access through FHIR integrations.</p>
+<ul>
+<li><strong>Endpoint</strong>: <code>GET /List/&lt;listId&gt;</code></li>
+<li><strong>Functionality</strong>: Queries the EHR for patient lists identified by a <code>listId</code>.</li>
+<li><strong>Tenant Configurability</strong>: The <code>listId</code> is configurable per tenant within Link, allowing each institution to define the patient population that constitutes their census.</li>
+<li><strong>Applicability</strong>: This method supports census management for any EHR that utilizes FHIR Lists representing relevant patient groups.</li>
+<li><strong>Rules</strong>: The following rules are enforced by Census when processing FHIR List resources:
+<ul>
+<li>Admission lists are processed before discharge lists.</li>
+<li>If a patient appears on a discharge lists with no corresponding admit event, an admission event is created and then the patient is discharged.</li>
+<li>If a patient is admitted and then disappears off of all incoming lists, the patient is discharged.</li>
+</ul>
+</li>
+</ul>
+<h4 id="fhir-standard-bulk-fhir-implementation-guide" class="content-heading">2. FHIR Standard - Bulk FHIR Implementation Guide <a id="2-fhir-standard-bulk-fhir-implementation-guide" href="#2-fhir-standard-bulk-fhir-implementation-guide" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 2. FHIR Standard - Bulk FHIR Implementation Guide"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>The <strong>Bulk FHIR</strong> method allows Link to acquire patient data via batch processing, useful for large patient groups in systems that support flexible querying.</p>
+<ul>
+<li><strong>Endpoint</strong>: Bulk FHIR <code>$export</code> request with <code>groupId</code></li>
+<li><strong>Process</strong>:
+<ul>
+<li>Link initiates a <code>$export</code> request for patient data by <code>groupId</code>.</li>
+<li>The export process is monitored and polled routinely until completion.</li>
+<li>Upon completion, patient resources are retrieved, and the FHIR ID of each patient is extracted and stored.</li>
+</ul>
+</li>
+<li><strong>Tenant Configurability</strong>: Each tenant configures a unique <code>groupId</code> corresponding to their desired patient group.</li>
+</ul>
+<h4 id="adt-feeds-under-exploration" class="content-heading">3. ADT Feeds (Under Exploration) <a id="3-adt-feeds-under-exploration" href="#3-adt-feeds-under-exploration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 3. ADT Feeds (Under Exploration)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Link is evaluating the feasibility of using <strong>ADT feeds</strong>—specifically for admission, discharge, and cancellation events—to dynamically manage census data. This approach would offer real-time census updates and potentially enhance the accuracy and responsiveness of the census.</p>
+<h3 id="scheduling-and-frequency" class="content-heading">Scheduling and Frequency <a id="scheduling-and-frequency" href="#scheduling-and-frequency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduling and Frequency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Both the FHIR List and Bulk FHIR methods utilize a configurable scheduling system, allowing each tenant to define query intervals. The scheduling system is based on CRON patterns, ensuring Link can automatically query the EHR at specified times to maintain an updated census.</p>
+<p>Census uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for scheduling Patient List retrieval and Retry events.</p>
+<h3 id="data-persistence-and-tracking" class="content-heading">Data Persistence and Tracking <a id="data-persistence-and-tracking" href="#data-persistence-and-tracking" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Persistence and Tracking"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Currently, Link persists only the <strong>FHIR ID</strong> of each patient. This identifier allows Link to accurately track patients across census updates without storing additional demographic information.</p>
+<h4 id="future-considerations" class="content-heading">Future Considerations <a id="future-considerations" href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>In the interest of enhancing the user interface, Link is considering storing additional data elements, such as the <strong>patient name</strong> associated with each FHIR ID. This would provide users with meaningful patient identifiers, facilitating easier navigation and record management within the Link UI.</p>
+<h2 id="build-and-deployment" class="content-heading">Build and Deployment <a id="build-and-deployment" href="#build-and-deployment" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Build and Deployment"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service is containerized using Docker with Linux as the target OS. It is designed to be deployed as part of a larger microservices architecture, with dependencies on other Link services for complete functionality.</p>
+
+        
+<h3 class="mt-4">Database Schema</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-0" aria-expanded="false"><strong>dbo.__EFMigrationsHistory</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-0" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">MigrationId</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">ProductVersion</span></td><td>string</td><td>Yes</td><td>32</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-1" aria-expanded="false"><strong>dbo.CensusConfig</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-1" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityID</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledTrigger</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Enabled</span></td><td>boolean</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-2" aria-expanded="false"><strong>dbo.EventRetries</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-2" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">ServiceName</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Topic</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Key</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Value</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Headers</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledTrigger</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">RetryCount</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-3" aria-expanded="false"><strong>dbo.PatientEncounters</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-3" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">MedicalRecordNumber</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">AdmitDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DischargeDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EncounterType</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EncounterStatus</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EncounterClass</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-4" aria-expanded="false"><strong>dbo.PatientEvents</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-4" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>No</td><td>450</td></tr><tr><td><span style="padding-left:0px">SourcePatientId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">SourceVisitId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MedicalRecordNumber</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EventType</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">Payload</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SourceType</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EventDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-5" aria-expanded="false"><strong>dbo.PatientIdentifiers</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-5" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">PatientEncounterId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">Identifier</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SourceType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-censusservice-6" aria-expanded="false"><strong>dbo.PatientVisitIdentifiers</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-censusservice-6" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">PatientEncounterId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">Identifier</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SourceType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<h3 class="mt-4">OpenAPI Operations</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-info" aria-expanded="false"><strong>GET</strong> <code>/api/census/info</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-info" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-facilityid-history-admitted" aria-expanded="false"><strong>GET</strong> <code>/api/census/{facilityId}/history/admitted</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-facilityid-history-admitted" class="card-body export-collapsible">
+    <p class="text-muted">Gets the admitted patients for a facility within a date range.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>startDate</td><td></td><td>No</td><td></td></tr><tr><td>endDate</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-post-api-census-config" aria-expanded="false"><strong>POST</strong> <code>/api/census/config</code></a></div>
+  <div id="openapi-card-censusservice-post-api-census-config" class="card-body export-collapsible">
+    <p class="text-muted">Creates a CensusConfig for o given censusConfig</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-config-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/census/config/{facilityId}</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-config-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">Returns the CensusConfig for a given facilityId</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-put-api-census-config-facilityid" aria-expanded="false"><strong>PUT</strong> <code>/api/census/config/{facilityId}</code></a></div>
+  <div id="openapi-card-censusservice-put-api-census-config-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">Updates a CensusConfig for a given censusConfigModel and facilityId</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-delete-api-census-config-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/census/config/{facilityId}</code></a></div>
+  <div id="openapi-card-censusservice-delete-api-census-config-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">Deletes the CensusConfig for a given facilityId</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-delete-api-census-config-facilityid-jobs" aria-expanded="false"><strong>DELETE</strong> <code>/api/census/config/{facilityId}/jobs</code></a></div>
+  <div id="openapi-card-censusservice-delete-api-census-config-facilityid-jobs" class="card-body export-collapsible">
+    <p class="text-muted">Disables census scheduling for a facility and removes its cron jobs.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-patch-api-census-config-facilityid-jobs-restore" aria-expanded="false"><strong>PATCH</strong> <code>/api/census/config/{facilityId}/jobs/restore</code></a></div>
+  <div id="openapi-card-censusservice-patch-api-census-config-facilityid-jobs-restore" class="card-body export-collapsible">
+    <p class="text-muted">Enables census scheduling for a facility and recreates its cron jobs.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-patient-encounters-current" aria-expanded="false"><strong>GET</strong> <code>/api/census/patient-encounters/current</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-patient-encounters-current" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>correlationId</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-patient-encounters-historical" aria-expanded="false"><strong>GET</strong> <code>/api/census/patient-encounters/historical</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-patient-encounters-historical" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>correlationId</td><td></td><td>No</td><td></td></tr><tr><td>dateThreshold</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-post-api-census-patient-encounters-rebuild" aria-expanded="false"><strong>POST</strong> <code>/api/census/patient-encounters/rebuild</code></a></div>
+  <div id="openapi-card-censusservice-post-api-census-patient-encounters-rebuild" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>correlationId</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-api-census-patient-events" aria-expanded="false"><strong>GET</strong> <code>/api/census/patient-events</code></a></div>
+  <div id="openapi-card-censusservice-get-api-census-patient-events" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>correlationId</td><td></td><td>No</td><td></td></tr><tr><td>startDate</td><td></td><td>No</td><td></td></tr><tr><td>endDate</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-delete-api-census-patient-events-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/census/patient-events/{id}</code></a></div>
+  <div id="openapi-card-censusservice-delete-api-census-patient-events-id" class="card-body export-collapsible">
+    <p class="text-muted">Deletes a patient event and rebuilds the materialized view for the related correlation id.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The unique identifier of the patient event to delete. (Required)</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-delete-api-census-patient-events-visit-correlationid" aria-expanded="false"><strong>DELETE</strong> <code>/api/census/patient-events/visit/{correlationId}</code></a></div>
+  <div id="openapi-card-censusservice-delete-api-census-patient-events-visit-correlationid" class="card-body export-collapsible">
+    <p class="text-muted">Deletes the patient event store for the given correlation id and removes the corresponding materialized view.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>correlationId</td><td></td><td>Yes</td><td>The correlation ID for the visit to delete. (Required)</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-censusservice-get-health" aria-expanded="false"><strong>GET</strong> <code>/health</code></a></div>
+  <div id="openapi-card-censusservice-get-health" class="card-body export-collapsible">
+    <p class="text-muted">Health check endpoint</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nCensusService_1BD4C8F8["Service: Census Service"]
+  nCensusService_1BD4C8F8 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
+  nCensusService_1BD4C8F8 -->|produces| nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"]
+  nCensusService_1BD4C8F8 -->|produces| nPatientEvent_34D33665["Event: PatientEvent"]
+  nPatientListsAcquired_4681892E["Event: PatientListsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
+  nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nAuditableEventOccurred_2E7ED8D7
+  end
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_3467767F
+    nPatientListsAcquired_4681892E
+  end
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPatientCensusScheduled_2383C0C6
+    nPatientEvent_34D33665
+  end
+  subgraph nTenant_379CD514_domain["Domain: Tenant"]
+    nCensusService_1BD4C8F8
+  end</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

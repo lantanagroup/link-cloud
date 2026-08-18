@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 
 /// <summary>
 /// Combined configuration settings for all SFTP-related validation

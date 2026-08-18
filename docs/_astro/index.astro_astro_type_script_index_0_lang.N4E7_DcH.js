@@ -1,1 +1,0 @@
-import{d as m,r as a}from"./mermaid-zoom.CX53-pPE.js";document.addEventListener("astro:page-load",()=>{m();const e=document.getElementsByClassName("mermaid");e.length>0&&a(e,window.eventcatalog?.mermaid)});const t=document.getElementsByClassName("mermaid");t.length>0&&a(t,window.eventcatalog?.mermaid);window.renderDiagrams=e=>{a(e,window.eventcatalog?.mermaid)};

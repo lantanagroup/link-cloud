@@ -7,13 +7,13 @@ import com.lantanagroup.link.validation.entities.ResultField;
 import com.lantanagroup.link.validation.matchers.CompositeMatcher;
 import com.lantanagroup.link.validation.matchers.RegexMatcher;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
-import io.opentelemetry.api.metrics.LongUpDownCounter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,18 +25,12 @@ public class CategorizationServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
-    @Mock
-    private MetricService metricService;
-
     @InjectMocks
     private CategorizationService categorizationService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-
-        LongUpDownCounter counter = mock(LongUpDownCounter.class);
-        when(metricService.getCategorizationDurationUpDown()).thenReturn(counter);
     }
 
     @Test
@@ -260,6 +254,41 @@ public class CategorizationServiceTest {
         categorizationService.categorize(List.of(result));
 
         assertFalse(result.getCategories().contains(category));
+    }
+
+    @Test
+    void categorizeAssignsInactiveCodeCategoryForInactiveMessage() throws IOException {
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
+
+        Result result = new Result();
+        // Exactly what RemoteTermServiceValidation emits for an inactive code, located on Encounter.type.
+        result.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
+        result.setExpression("Bundle.entry[0].resource.ofType(Encounter).type[0].coding[0]");
+
+        categorizationService.categorize(List.of(result));
+
+        // The composite matcher (inactive message AND Encounter.type expression) assigns this category ...
+        assertTrue(
+                result.getCategories().stream().anyMatch(category -> "missing_active_encounter_type_code".equals(category.getId())),
+                "An inactive Encounter.type code should be categorized as missing_active_encounter_type_code");
+        // ... and the expression discriminates it from other resources' inactive categories.
+        assertFalse(
+                result.getCategories().stream().anyMatch(category -> "missing_active_condition_code".equals(category.getId())),
+                "An Encounter.type expression must not match the Condition.code inactive category");
+    }
+
+    @Test
+    void categorizeDoesNotAssignInactiveCodeCategoryForOtherMessage() throws IOException {
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
+
+        Result result = new Result();
+        result.setMessage("Some other rule");
+
+        categorizationService.categorize(List.of(result));
+
+        assertFalse(
+                result.getCategories().stream().anyMatch(category -> "missing_active_encounter_type_code".equals(category.getId())),
+                "A non-inactive message must not be categorized as inactive_code");
     }
 }
 

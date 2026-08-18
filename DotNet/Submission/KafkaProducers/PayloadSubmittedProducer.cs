@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;

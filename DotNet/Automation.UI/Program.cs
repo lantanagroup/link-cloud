@@ -1,6 +1,5 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
-using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -9,7 +8,10 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +35,41 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+
+var grafanaBaseUrlFallback =
+    builder.Configuration["GRAFANA_URL"]
+    ?? builder.Configuration["GRAFANA_BASE_URL"]
+    ?? builder.Configuration["GrafanaBaseUrl"];
+
+if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
+{
+    builder.Services.PostConfigure<AutomationConfig>(cfg =>
+    {
+        if (string.IsNullOrWhiteSpace(cfg.GrafanaBaseUrl)
+            || string.Equals(cfg.GrafanaBaseUrl, "http://localhost:3000", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.GrafanaBaseUrl = grafanaBaseUrlFallback.TrimEnd('/');
+        }
+    });
+}
+
+var lokiAppLabelFallback = builder.Configuration["/loki/app"]
+    ?? builder.Configuration["loki/app"]
+    ?? builder.Configuration["Loki:App"]
+    ?? builder.Configuration["Automation:LokiAppLabel"];
+
+if (!string.IsNullOrWhiteSpace(lokiAppLabelFallback))
+{
+    builder.Services.PostConfigure<AutomationConfig>(cfg =>
+    {
+        if (string.IsNullOrWhiteSpace(cfg.LokiAppLabel)
+            || string.Equals(cfg.LokiAppLabel, "link-cloud", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.LokiAppLabel = lokiAppLabelFallback.Trim();
+        }
+    });
+}
+
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
 
@@ -61,11 +98,81 @@ builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServi
 var allowAnonymousAccess = builder.Configuration
     .GetValue<bool>("Authentication:EnableAnonymousAccess");
 
+const string ApiBearerPolicyName = "ApiBearerPolicy";
+const string ApiBearerSchemeName = "ApiBearer";
+const string ApiBearerConfigSection = "Authentication:ApiBearer";
+
+var apiBearerEnabled = builder.Configuration.GetValue<bool>($"{ApiBearerConfigSection}:Enabled");
+var apiBearerAuthority = builder.Configuration[$"{ApiBearerConfigSection}:Authority"];
+var apiBearerAudience = builder.Configuration[$"{ApiBearerConfigSection}:Audience"];
+
+static IReadOnlyCollection<string> BuildValidAudiences(string configuredAudience)
+{
+    var normalized = configuredAudience.Trim().TrimEnd('/');
+    var audiences = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        normalized
+    };
+
+    const string ApiUriPrefix = "api://";
+    if (normalized.StartsWith(ApiUriPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var rawAudience = normalized[ApiUriPrefix.Length..].TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(rawAudience))
+            audiences.Add(rawAudience);
+    }
+    else
+    {
+        audiences.Add($"{ApiUriPrefix}{normalized}");
+    }
+
+    return audiences;
+}
+
+if (apiBearerEnabled)
+{
+    if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
+    {
+        throw new InvalidOperationException(
+            $"{ApiBearerConfigSection} is enabled but {ApiBearerConfigSection}:Authority/{ApiBearerConfigSection}:Audience are not configured.");
+    }
+
+    builder.Services
+        .AddAuthentication()
+        .AddJwtBearer(ApiBearerSchemeName, options =>
+        {
+            var validAudiences = BuildValidAudiences(apiBearerAudience);
+
+            options.Authority = apiBearerAuthority;
+            options.Audience = apiBearerAudience;
+            options.RequireHttpsMetadata = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidAudiences = validAudiences,
+            };
+        });
+}
+
 builder.Services.AddAuthorization(options =>
 {
     options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
         .RequireAssertion(_ => true)
         .Build();
+
+    if (apiBearerEnabled)
+    {
+        options.AddPolicy(ApiBearerPolicyName, policy =>
+        {
+            policy.AddAuthenticationSchemes(ApiBearerSchemeName);
+            policy.RequireAuthenticatedUser();
+        });
+    }
+    else
+    {
+        options.AddPolicy(ApiBearerPolicyName, policy => policy.RequireAssertion(_ => true));
+    }
 });
 
 // -- LinkSdk service clients (all resolve URLs from ServiceRegistry) --
@@ -104,10 +211,52 @@ var mongoClientSettings = MongoClientSettings.FromUrl(mongoUrl);
 
 builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoClientSettings));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+
+var dataProtectionApplicationName = builder.Configuration.GetValue<string>("DataProtection:ApplicationName")
+    ?? $"Link.Automation.UI:{builder.Environment.EnvironmentName}";
+var dataProtectionKeyCollectionName = builder.Configuration.GetValue<string>("DataProtection:KeyCollectionName")
+    ?? "automation_data_protection_keys";
+
+builder.Services.AddSingleton(new MongoDataProtectionOptions
+{
+    ApplicationName = dataProtectionApplicationName,
+    KeyCollectionName = dataProtectionKeyCollectionName
+});
+builder.Services.AddSingleton<MongoDataProtectionXmlRepository>();
+builder.Services.AddDataProtection()
+    .SetApplicationName(dataProtectionApplicationName);
+builder.Services.AddOptions<KeyManagementOptions>()
+    .Configure<MongoDataProtectionXmlRepository>((options, repository) =>
+    {
+        options.XmlRepository = repository;
+    });
+
 builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
+builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
+
+// -- API Health test suites --
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.TenantServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DataAcquisitionTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.NormalizationTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.CensusServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ReportServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.QueryDispatchTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.SubmissionServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiEndpointRegistry>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutionRunManager>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
+builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
+builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
+builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -126,6 +275,8 @@ builder.Services.AddScoped<PipelineDataReader>();
 // -- Seed system scenarios and query plan templates --
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
+builder.Services.AddHostedService<NormalizationSuiteSeedService>();
+builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
 
 // -- Seed synthetic runs for dashboard verification.
 //    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.
@@ -199,6 +350,8 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -6,9 +6,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Medallion.Threading;
 using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -24,6 +26,8 @@ public class DataAcquisitionLogManagerTests
     private readonly Mock<IDatabase> _database = new();
     private readonly Mock<IDataAcquisitionLogQueries> _queries = new();
     private readonly Mock<IEntityRepository<DataAcquisitionLog>> _logRepo = new();
+    private readonly Mock<IDistributedSemaphoreProvider> _semaphoreProvider = new();
+    private readonly Mock<IResourceCache> _resourceCache = new();
     private readonly DataAcquisitionDbContext _dbContext;
 
     public DataAcquisitionLogManagerTests()
@@ -36,10 +40,19 @@ public class DataAcquisitionLogManagerTests
             .UseInMemoryDatabase($"DataAcquisitionLogManagerTests_{Guid.NewGuid():N}")
             .Options;
         _dbContext = new DataAcquisitionDbContext(options);
+
+        var semaphoreHandle = new Mock<IDistributedSynchronizationHandle>();
+        var semaphore = new Mock<IDistributedSemaphore>();
+        semaphore
+            .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle?>(semaphoreHandle.Object));
+        _semaphoreProvider
+            .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns(semaphore.Object);
     }
 
     private DataAcquisitionLogManager CreateManager() =>
-        new(_logger.Object, _database.Object, _dbContext, _queries.Object);
+        new(_logger.Object, _database.Object, _dbContext, _queries.Object, _semaphoreProvider.Object, _resourceCache.Object);
 
     [Fact]
     public async Task CreateAsync_NullModel_ThrowsArgumentNull()

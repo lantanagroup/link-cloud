@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Tenant.Models;
+﻿namespace LantanaGroup.Link.Tenant.Models;
 
 public class GenerateAdhocReportResponse(Guid reportId)
 {

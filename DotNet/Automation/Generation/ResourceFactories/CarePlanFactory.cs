@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;

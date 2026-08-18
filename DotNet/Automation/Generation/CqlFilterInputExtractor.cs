@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using System.Globalization;
 using System.Text.Json;
 
@@ -32,6 +32,7 @@ public static class CqlFilterInputExtractor
         var medicationAdministrations = new List<MedicationAdministration>();
         var coverages = new List<Coverage>();
         var serviceRequests = new List<ServiceRequest>();
+        var specimens = new List<Specimen>();
 
         foreach (var entry in entries)
         {
@@ -61,6 +62,9 @@ public static class CqlFilterInputExtractor
                 case ServiceRequest sr:
                     serviceRequests.Add(sr);
                     break;
+                case Specimen specimen:
+                    specimens.Add(specimen);
+                    break;
             }
         }
 
@@ -83,6 +87,7 @@ public static class CqlFilterInputExtractor
         var medicationAdministrationContexts = medicationAdministrations.Select(BuildMedicationAdministrationContext).ToList();
         var coverageContexts = coverages.Select(BuildCoverageContext).ToList();
         var serviceRequestContexts = serviceRequests.Select(BuildServiceRequestContext).ToList();
+        var specimenContexts = specimens.Select(BuildSpecimenContext).ToList();
 
         return new CqlFilterSimulator.PatientCqlInput(
             patientId,
@@ -97,7 +102,8 @@ public static class CqlFilterInputExtractor
             MedicationRequests = medicationRequestContexts,
             MedicationAdministrations = medicationAdministrationContexts,
             Coverages = coverageContexts,
-            ServiceRequests = serviceRequestContexts
+            ServiceRequests = serviceRequestContexts,
+            Specimens = specimenContexts
         };
     }
 
@@ -179,7 +185,11 @@ public static class CqlFilterInputExtractor
             loinc,
             categories,
             effectiveStart,
-            effectiveEnd);
+            effectiveEnd)
+        {
+            Status = obs.Status?.ToString() ?? string.Empty,
+            SpecimenReference = obs.Specimen?.Reference ?? string.Empty
+        };
     }
 
     // ---------- Procedure / MedicationRequest / MedicationAdministration / Coverage / ServiceRequest ----------
@@ -264,5 +274,34 @@ public static class CqlFilterInputExtractor
             sr.Id,
             authoredOn,
             sr.Encounter?.Reference ?? string.Empty);
+    }
+
+    private static CqlFilterSimulator.SpecimenContext BuildSpecimenContext(Specimen specimen)
+    {
+        DateTime collectionStart;
+        DateTime collectionEnd;
+        switch (specimen.Collection?.Collected)
+        {
+            case Period p:
+                collectionStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                collectionEnd = ParseFhirDateTime(p.End) ?? collectionStart;
+                break;
+            case FhirDateTime dt:
+                collectionStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                collectionEnd = collectionStart;
+                break;
+            default:
+                collectionStart = DateTime.MinValue;
+                collectionEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.SpecimenContext(
+            specimen.Id,
+            collectionStart,
+            collectionEnd)
+        {
+            SubjectReference = specimen.Subject?.Reference ?? string.Empty
+        };
     }
 }

@@ -1,7 +1,11 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,8 +20,12 @@ namespace LantanaGroup.Link.Terminology.Services;
 public class CodeGroupCacheService(
     ILogger<CodeGroupCacheService> logger,
     IMemoryCache cache,
-    IOptions<TerminologyConfig> terminologyConfig)
+    IOptions<TerminologyConfig> terminologyConfig) : ICodeGroupCacheService
 {
+    private static readonly Regex ScientificNotationPattern = new(
+        @"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+$",
+        RegexOptions.CultureInvariant);
+
     private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
@@ -63,7 +71,7 @@ public class CodeGroupCacheService(
         CacheKey? key = null;
 
         if (version == null)
-            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version).FirstOrDefault();
+            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version, Comparer<string>.Create(CompareVersions)).FirstOrDefault();
         else
             key = _cacheKeys.FirstOrDefault(k => k.Type == type && k.Id == id && string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
 
@@ -83,47 +91,68 @@ public class CodeGroupCacheService(
     /// <returns>The requested code group if it exists in the cache; otherwise, null.</returns>
     public CodeGroup? GetCodeGroup(CodeGroup.CodeGroupTypes type, string identifier, string? version = null)
     {
-        CacheKey? key = null;
-
-        if (version == null)
+        // A canonical URL may carry a version suffix, e.g. "http://example.org/ValueSet/x|4.0.1".
+        // Split it off so the URL matches the cached (unversioned) key, and treat the embedded
+        // version as the requested version when one was not supplied explicitly.
+        var pipeIndex = identifier.IndexOf('|');
+        if (pipeIndex >= 0)
         {
-            key = _cacheKeys
-                .Where(k => k.Type == type)
-                .Where(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase))
-                .OrderByDescending(k => k.Version)
-                .FirstOrDefault();
-
-            if (key == null)
-            {
-                key = _cacheKeys
-                    .Where(k => k.Type == type)
-                    .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)))
-                    .OrderByDescending(k => k.Version)
-                    .FirstOrDefault();
-            }
+            version ??= identifier[(pipeIndex + 1)..];
+            identifier = identifier[..pipeIndex];
         }
-        else
-        {
 
-            var keys = _cacheKeys
-                .Where(k => k.Type == type)
-                .Where(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase))
+        var byType = _cacheKeys.Where(k => k.Type == type).ToList();
+
+        // Prefer a match on Url; fall back to a match on a secondary identifier.
+        var candidates = byType
+            .Where(k => string.Equals(k.Url, identifier, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            candidates = byType
+                .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-
-            key = keys
-                .FirstOrDefault(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase));
-
-            if (key == null)
-                key = keys.FirstOrDefault(k =>
-                    k.Identifiers.Any(i =>
-                        string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)));
         }
+
+        // Prefer the requested version if it is loaded; otherwise fall back to the latest.
+        CacheKey? key = null;
+        if (version != null)
+            key = candidates.FirstOrDefault(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
+
+        key ??= candidates.OrderByDescending(k => k.Version, Comparer<string>.Create(CompareVersions)).FirstOrDefault();
 
         if (key == null)
             return null;
 
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
+    }
+
+    /// <summary>
+    /// Compares two version strings semantically (e.g. "4.0.10" &gt; "4.0.9") when both parse as
+    /// dotted-numeric versions; otherwise falls back to a case-insensitive ordinal string comparison.
+    /// </summary>
+    private static int CompareVersions(string? a, string? b)
+    {
+        if (TryParseVersion(a, out var versionA) && TryParseVersion(b, out var versionB))
+            return versionA.CompareTo(versionB);
+
+        return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Attempts to parse a version string as a dotted-numeric <see cref="Version"/>. A bare component
+    /// like "4" is padded to "4.0" since <see cref="Version"/> requires at least major.minor.
+    /// </summary>
+    private static bool TryParseVersion(string? value, out Version version)
+    {
+        version = new Version(0, 0);
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Contains('.') ? value : value + ".0";
+        return Version.TryParse(normalized, out version!);
     }
 
     /// <summary>
@@ -138,7 +167,7 @@ public class CodeGroupCacheService(
             .Where(k => k.Type == type)
             .Select(k => cache.Get<CodeGroup>(k.Key))
             .Where(cg => cg != null)
-            .OrderByDescending(cg => cg!.Version)
+            .OrderByDescending(cg => cg!.Version, Comparer<string?>.Create(CompareVersions))
             .ToList()!;
 
         // Remove all but the first duplicate by id (returning only the HEAD/latest version)
@@ -223,6 +252,8 @@ public class CodeGroupCacheService(
             string code = record.Code;
             string display = record.Display;
 
+            LogScientificNotationWarning(code, codeGroup.Id);
+
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
                 if (string.IsNullOrEmpty(record.System))
@@ -269,9 +300,9 @@ public class CodeGroupCacheService(
         csv.Read();
         csv.ReadHeader();
         var headers = csv.HeaderRecord;
-        if (headers == null || headers.Length != 2)
+        if (headers == null || headers.Length > 3 || headers.Length < 2)
         {
-            throw new InvalidOperationException("CodeSystem CSV must have exactly 2 columns: code and display");
+            throw new InvalidOperationException($"CodeSystem CSV must have exactly 2 or 3 columns: code, display, and optionally status.");
         }
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
@@ -281,19 +312,34 @@ public class CodeGroupCacheService(
         {
             string code = record.Code;
             string display = record.Display;
+            CodeStatus status = record.Status;
+
+            LogScientificNotationWarning(code, codeGroup.Id);
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
 
-            codeGroup.Codes[system].Add(new Code
+            codeGroup.Codes[system].Add(new CodeSystemCode
             {
                 Value = code,
-                Display = display
+                Display = display,
+                Status = status
             });
         }
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+    }
+
+    private void LogScientificNotationWarning(string code, string? codeGroupId)
+    {
+        if (ScientificNotationPattern.IsMatch(code))
+        {
+            logger.LogWarning(
+                "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
+                code.SanitizeForLog(),
+                codeGroupId.SanitizeForLog());
+        }
     }
 
     /// <summary>
@@ -340,25 +386,30 @@ public class CodeGroupCacheService(
 
                 // Read the CSV file and extract "system", "code" and "display" values from each row
                 var csvContent = await ReadAllTextAsync(csvFilePath);
-                using (var reader = new StringReader(csvContent))
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                using var reader = new StringReader(csvContent);
+                var config = new CsvConfiguration(CultureInfo.InvariantCulture);
+
+                // CodeSystem CSVs have an optional trailing status column, so a missing field is
+                // tolerated there. ValueSet keeps strict missing-field validation.
+                if (codeGroup.Type == CodeGroup.CodeGroupTypes.CodeSystem)
+                    config.MissingFieldFound = null;
+
+                using var csv = new CsvReader(reader, config);
+                switch (codeGroup.Type)
                 {
-                    switch (codeGroup.Type)
-                    {
-                        case CodeGroup.CodeGroupTypes.CodeSystem:
-                            logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
-                            this.ProcessCodeSystemCsv(codeGroup, csv);
-                            loadedCodeSystems++;
-                            break;
-                        case CodeGroup.CodeGroupTypes.ValueSet:
-                            logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
-                            this.ProcessValueSetCsv(codeGroup, csv);
-                            loadedValueSets++;
-                            break;
-                        default:
-                            logger.LogWarning("Code group type {Type} is not supported", codeGroup.Type);
-                            break;
-                    }
+                    case CodeGroup.CodeGroupTypes.CodeSystem:
+                        logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
+                        this.ProcessCodeSystemCsv(codeGroup, csv);
+                        loadedCodeSystems++;
+                        break;
+                    case CodeGroup.CodeGroupTypes.ValueSet:
+                        logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
+                        this.ProcessValueSetCsv(codeGroup, csv);
+                        loadedValueSets++;
+                        break;
+                    default:
+                        logger.LogWarning("Code group type {Type} is not supported", codeGroup.Type);
+                        break;
                 }
             }
             catch (Exception ex)

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Report;
 

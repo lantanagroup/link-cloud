@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Configuring .NET Services</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="swagger" class="content-heading">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EnableSwagger</td>
+<td>Enable Swagger spec and UI</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="azure-app-config-environment-variables" class="content-heading">Azure App Config Environment Variables <a id="azure-app-config-environment-variables" href="#azure-app-config-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The following should be specified as environment variables when launching the service:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ExternalConfigurationSource</td>
+<td>Specifies the configuration source to use</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ConnectionStrings__AzureAppConfiguration</td>
+<td>Connection string for Azure App Configuration</td>
+<td>Yes (if using Azure)</td>
+<td>None</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h1 id="blob-storage" class="content-heading">Blob Storage <a id="blob-storage" href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>InternalBlobStorage__ConnectionString</td>
+<td>Connection string for internal ABS</td>
+<td>Yes (if using ABS)</td>
+<td>None</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>InternalBlobStorage__BlobContainerName</td>
+<td>Blob container name for internal ABS</td>
+<td>Yes (if using ABS)</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>InternalBlobStorage__BlobRoot</td>
+<td>Blob root (name prefix) for internal ABS</td>
+<td>No</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ExternalBlobStorage__ConnectionString</td>
+<td>Connection string for external ABS</td>
+<td>No</td>
+<td>None</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>ExternalBlobStorage__BlobContainerName</td>
+<td>Blob container name for external ABS</td>
+<td>Yes (if using ABS)</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ExternalBlobStorage__BlobRoot</td>
+<td>Blob root (name prefix) for external ABS</td>
+<td>Yes (if using ABS)</td>
+<td>None</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="kafka" class="content-heading">Kafka <a id="kafka" href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>KafkaConnection__BootstrapServers__0</td>
+<td>Kafka broker address</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__GroupId</td>
+<td>Consumer group identifier</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__ClientId</td>
+<td>Unique client identifier</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__SaslProtocolEnabled</td>
+<td>Whether to enable SASL auth</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__Mechanism</td>
+<td>SASL mechanism</td>
+<td>No</td>
+<td>Plain</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__Protocol</td>
+<td>SASL protocol</td>
+<td>No</td>
+<td>SaslPlaintext</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Note: Mechanism and Protocol are only used when SASL authentication is enabled.</p>
+</blockquote>
+<p>Options for Mechanism:</p>
+<ul>
+<li><strong>Plain</strong></li>
+<li>Gssapi</li>
+<li>ScramSHA256</li>
+<li>ScramSHA512</li>
+<li>OAuthBearer</li>
+</ul>
+<p>Options for Protocol:</p>
+<ul>
+<li><strong>SaslPlaintext</strong></li>
+<li>Plaintext</li>
+<li>Ssl</li>
+<li>SaslSsl</li>
+</ul>
+<h2 id="sasl-plain-text-authentication" class="content-heading">SASL Plain Text Authentication <a id="sasl-plain-text-authentication" href="#sasl-plain-text-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SASL Plain Text Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Include the following configuration properties to connecto to Kafka that requires SASL_PLAINTEXT authentication:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>KafkaConnection__SaslProtocolEnabled</td>
+<td>true</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__SaslUsername</td>
+<td>&lt;username&gt;</td>
+<td>No</td>
+</tr>
+<tr>
+<td>KafkaConnection__SaslPassword</td>
+<td>&lt;password&gt;</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="kafka-consumer-settings" class="content-heading">Kafka Consumer Settings <a id="kafka-consumer-settings" href="#kafka-consumer-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ConsumerSettings__ConsumerRetryDuration</td>
+<td>A list of strings representing retry duration intervals for consumers</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ConsumerSettings__DisableRetryConsumer</td>
+<td>A boolean flag to enable/disable the retry mechanism for consumers</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ConsumerSettings__DisableConsumer</td>
+<td>A boolean flag to completely enable/disable the consumer</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="cors" class="content-heading">CORS <a id="cors" href="#cors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CORS__AllowAllOrigins</td>
+<td>Allow all origins</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>CORS__AllowedOrigins</td>
+<td>Array of allowed origins</td>
+<td>No</td>
+<td>[]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>CORS__AllowAllMethods</td>
+<td>Allow all HTTP methods</td>
+<td>No</td>
+<td>true</td>
+<td>No</td>
+</tr>
+<tr>
+<td>CORS__AllowedMethods</td>
+<td>Array of allowed HTTP methods</td>
+<td>No</td>
+<td>[&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>CORS__AllowAllHeaders</td>
+<td>Allow all headers</td>
+<td>No</td>
+<td>true</td>
+<td>No</td>
+</tr>
+<tr>
+<td>CORS__MaxAge</td>
+<td>Preflight cache duration (seconds)</td>
+<td>No</td>
+<td>600</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="token-service-settings" class="content-heading">Token Service Settings <a id="token-service-settings" href="#token-service-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Service Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>TODO: Describe what the purpose of the token endpoint is</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LinkTokenService__EnableTokenGenerationEndpoint</td>
+<td>bool</td>
+<td>Controls whether the token generation endpoint is enabled</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>LinkTokenService__Authority</td>
+<td>string</td>
+<td>The authority URL used for token validation/generation</td>
+<td>Required (no default)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>LinkTokenService__LinkAdminEmail</td>
+<td>string?</td>
+<td>Email address for Link administration</td>
+<td>null</td>
+<td>No</td>
+</tr>
+<tr>
+<td>LinkTokenService__TokenLifespan</td>
+<td>int</td>
+<td>The lifespan of generated tokens in minutes</td>
+<td>10</td>
+<td>No</td>
+</tr>
+<tr>
+<td>LinkTokenService__SigningKey</td>
+<td>string?</td>
+<td>The key used for signing tokens</td>
+<td>null</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>LinkTokenService__LogToken</td>
+<td>bool</td>
+<td>Controls whether token logging is enabled</td>
+<td>false</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="service-authentication" class="content-heading">Service Authentication <a id="service-authentication" href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Authentication__EnableAnonymousAccess</td>
+<td>Enable anonymous access to the service</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Authentication__Schemas__LinkBearer__Authority</td>
+<td>Authority URL for Link Bearer authentication</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Authentication__Schemas__LinkBearer__ValidateToken</td>
+<td>Validate the token on each request</td>
+<td>No</td>
+<td>true</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DataProtection__Enabled</td>
+<td>Enable data protection for sensitive data</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="redis" class="content-heading">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ConnectionStrings__Redis</td>
+<td>Redis connection string</td>
+<td>Yes (if caching enabled)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Redis__Password</td>
+<td>Redis Password</td>
+<td>Yes (if caching enabled)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Cache__Enabled</td>
+<td>Toggle for Redis caching</td>
+<td>No</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="telemetry" class="content-heading">Telemetry <a id="telemetry" href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Telemetry__EnableTelemetry</td>
+<td>Enable Telemetry</td>
+<td>Yes (bool)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Telemetry__EnableTracing</td>
+<td>Enable tracing</td>
+<td>Yes (bool)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Telemetry__EnableOtelCollector</td>
+<td>Enable Otel collector</td>
+<td>Yes (bool)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Telemetry__OtelCollectorEndpoint</td>
+<td>Otel collector endpoint</td>
+<td>Yes (uri)</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h1 id="service-registry" class="content-heading">Service Registry <a id="service-registry" href="#service-registry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The Service Registry section contains URLs and configurations for all microservices in the Link Cloud ecosystem. Configuration key: <code>ServiceRegistry</code></p>
+<p>Not all services use every URL. The configuration is provided for completeness and future-proofing. If using Azure App Configuration, all service URLs should be specified, and each service will use only the URLs it needs.</p>
+<h2 id="service-urls" class="content-heading">Service URLs <a id="service-urls" href="#service-urls" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service URLs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th style="text-align: left;">Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ServiceRegistry__AccountServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Account service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicAccountServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Account service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__AuditServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Audit service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicAuditServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Audit service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__CensusServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Census service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicCensusServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Census service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__DataAcquisitionServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Data Acquisition service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicDataAcquisitionServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Data Acquisition service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__MeasureServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Measure service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicMeasureServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Measure service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__NormalizationServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Normalization service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicNormalizationServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Normalization service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__NotificationServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Notification service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicNotificationServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Notification service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__QueryDispatchServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Query Dispatch service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicQueryDispatchServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Query Dispatch service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__ReportServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Report service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicReportServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Report service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__SubmissionServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Submission service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicSubmissionServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Submission service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__ValidationServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Validation service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicValidationServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Validation service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__TerminologyServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Terminology service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__PublicTerminologyServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Terminology service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__TenantService__TenantServiceUrl</td>
+<td style="text-align: left;">Yes</td>
+<td>Base URL for the Tenant service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__TenantService__PublicTenantServiceUrl</td>
+<td style="text-align: left;">No</td>
+<td>Public base URL for the Tenant service</td>
+</tr>
+<tr>
+<td>ServiceRegistry__TenantService__CheckIfTenantExists</td>
+<td style="text-align: left;">No</td>
+<td>Whether to validate tenant's existence in other services such as Data Acquisition</td>
+</tr>
+<tr>
+<td>ServiceRegistry__TenantService__GetTenantRelativeEndpoint</td>
+<td style="text-align: left;">No</td>
+<td>Relative endpoint path for tenant retrieval in other services such as Data Acquisition; excluding &quot;/api&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-configuration-in-json" class="content-heading">Example Configuration in JSON <a id="example-configuration-in-json" href="#example-configuration-in-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Configuration in JSON"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-json">{
+  &quot;ServiceRegistry&quot;: {
+    &quot;AccountServiceUrl&quot;: &quot;http://localhost:8060&quot;,
+    &quot;AuditServiceUrl&quot;: &quot;http://localhost:8062&quot;,
+    &quot;CensusServiceUrl&quot;: &quot;http://localhost:8064&quot;,
+    &quot;DataAcquisitionServiceUrl&quot;: &quot;http://localhost:8065&quot;,
+    &quot;MeasureServiceUrl&quot;: &quot;http://localhost:8067&quot;,
+    &quot;NormalizationServiceUrl&quot;: &quot;http://localhost:8068&quot;,
+    &quot;NotificationServiceUrl&quot;: &quot;http://localhost:7434&quot;,
+    &quot;QueryDispatchServiceUrl&quot;: &quot;http://localhost:8071&quot;,
+    &quot;ReportServiceUrl&quot;: &quot;http://localhost:8072&quot;,
+    &quot;SubmissionServiceUrl&quot;: &quot;http://localhost:8073&quot;,
+    &quot;TenantService&quot;: {
+      &quot;TenantServiceUrl&quot;: &quot;http://localhost:8074&quot;,
+      &quot;CheckIfTenantExists&quot;: true,
+      &quot;GetTenantRelativeEndpoint&quot;: &quot;facility/&quot;
+    },
+    &quot;ValidationServiceUrl&quot;: &quot;http://localhost:8075&quot;,
+    &quot;TerminologyServiceUrl&quot;: &quot;http://localhost:8076&quot;
+  }
+}
+</code></pre>
+<h2 id="tenant-service-configuration" class="content-heading">Tenant Service Configuration <a id="tenant-service-configuration" href="#tenant-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TenantService__TenantServiceUrl</td>
+<td>Base URL for the Tenant service</td>
+<td>Yes</td>
+<td>None</td>
+</tr>
+<tr>
+<td>TenantService__CheckIfTenantExists</td>
+<td>Whether to validate tenant existence</td>
+<td>No</td>
+<td>true</td>
+</tr>
+<tr>
+<td>TenantService__GetTenantRelativeEndpoint</td>
+<td>Relative endpoint path for tenant retrieval</td>
+<td>No</td>
+<td>&quot;facility/&quot;</td>
+</tr>
+<tr>
+<td>FacilityIdSettings__NumericOnlyFacilityId</td>
+<td>Enforce NHSN ORG ID format (5 digits)</td>
+<td>No PRD ONLY</td>
+<td>false</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-acquisition-service-configuration" class="content-heading">Data Acquisition Service Configuration <a id="data-acquisition-service-configuration" href="#data-acquisition-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The following settings are specific to the Data Acquisition service.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AcquisitionJobSettings__CronSchedule</td>
+<td>Cron schedule for the data acquisition background job (e.g., &quot;0/10 * * * * ?&quot; for every 10s)</td>
+<td>No</td>
+<td>&quot;0/10 * * * * ?&quot;</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h2 id="databases" class="content-heading">Databases <a id="databases" href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="sql-server-database" class="content-heading">SQL Server Database <a id="sql-server-database" href="#sql-server-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DatabaseProvider</td>
+<td>Database provider to use</td>
+<td>No</td>
+<td>SqlServer</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ConnectionStrings__DatabaseConnection</td>
+<td>MSSQL connection string</td>
+<td>Yes</td>
+<td>None</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>AutoMigrate</td>
+<td>Automatically migrate the database schema</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mongo-database" class="content-heading">Mongo Database <a id="mongo-database" href="#mongo-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MongoDB__ConnectionString</td>
+<td>MongoDB connection string</td>
+<td>Yes</td>
+<td>None</td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td>MongoDB__DatabaseName</td>
+<td>MongoDB database name</td>
+<td>Yes</td>
+<td>None</td>
+<td>No</td>
+<td>\</td>
+</tr>
+</tbody>
+</table>
+<h1 id="service-information" class="content-heading">Service Information <a id="service-information" href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The ServiceInformation configuration allows exposing build, version and deployment information through the <code>/api/XXX/info</code> (i.e. <code>/api/audit/info</code>) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ServiceInformation__ServiceName</td>
+<td>Display name of the service</td>
+<td>No</td>
+<td>Varies service by service</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ServiceInformation__Version</td>
+<td>Version of the service</td>
+<td>No</td>
+<td>Assembly ver.</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ServiceInformation__ProductVersion</td>
+<td>Version of the product as a whole</td>
+<td>No</td>
+<td>N/A</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ServiceInformation__Build</td>
+<td>Build number from CI/CD pipeline</td>
+<td>No</td>
+<td>&quot;dev&quot; when using Docker Compose</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ServiceInformation__Commit</td>
+<td>Git commit hash of deployed version</td>
+<td>No</td>
+<td>None</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p>The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file</p>
+<h1 id="ef-core-query-logging" class="content-heading">EF Core Query Logging <a id="ef-core-query-logging" href="#ef-core-query-logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EF Core Query Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Configure EF Core to log queries, including sensitive data, by setting up the <code>appsettings.json</code> file and adjusting the <code>Program.cs</code> file. This allows dynamic adjustment of logging levels in Serilog based on the <code>EnableEnhancedQueryLogging</code> setting.</p>
+<h2 id="configuration-in-appsettings.json" class="content-heading">Configuration in appsettings.json <a id="configuration-in-appsettings-json" href="#configuration-in-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Add the following section to enable enhanced query logging:</p>
+<pre><code class="language-json">&quot;EnhancedQueryLoggingSettings&quot;: {
+  &quot;EnableEnhancedQueryLogging&quot;: false
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+<th>Required</th>
+<th>Default Value</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EnhancedQueryLoggingSettings__EnableEnhancedQueryLogging</td>
+<td>Flag to enable detailed EF Core query logging (Information level)</td>
+<td>No</td>
+<td>false</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration-in-program.cs" class="content-heading">Configuration in Program.cs <a id="configuration-in-program-cs" href="#configuration-in-program-cs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in Program.cs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>In <code>Program.cs</code>, configure Serilog to dynamically set log levels for EF Core namespaces and enable EF Core logging in the DbContext setup.</p>
+<p>For Serilog configuration (e.g., in a <code>ConfigureLogging</code> method):</p>
+<pre><code class="language-csharp">// Bind the enhanced logging settings
+var enhancedLoggingSettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get&lt;EnhancedQueryLoggingSettings&gt;();
+
+// Create Serilog logger configuration
+var loggerConfig = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    // ... other enrichers and filters ...
+
+// Conditionally override EF Core log levels
+var efCoreLogLevel = enhancedLoggingSettings != null &amp;&amp; enhancedLoggingSettings.EnableEnhancedQueryLogging
+    ? LogEventLevel.Information
+    : LogEventLevel.Warning;
+
+loggerConfig
+    .MinimumLevel.Override(&quot;Microsoft.EntityFrameworkCore&quot;, efCoreLogLevel)
+    .MinimumLevel.Override(&quot;Microsoft.EntityFrameworkCore.Database.Command&quot;, efCoreLogLevel);
+
+Log.Logger = loggerConfig.CreateLogger();
+builder.Logging.AddSerilog();
+</code></pre>
+<p>For DbContext registration (e.g., when using MongoDB provider for EF Core):</p>
+<pre><code class="language-csharp">builder.Services.AddDbContext&lt;MongoDbContext&gt;((sp, options) =&gt;
+{
+    var querySettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get&lt;EnhancedQueryLoggingSettings&gt;();
+
+    // ... client and settings setup ...
+
+    if (querySettings != null &amp;&amp; querySettings.EnableEnhancedQueryLogging)
+    {
+        var loggerFactory = sp.GetRequiredService&lt;ILoggerFactory&gt;();
+        options.UseMongoDB(client, mongoSettings.DatabaseName)
+            .UseLoggerFactory(loggerFactory)
+            .EnableSensitiveDataLogging();
+    }
+    else
+    {
+        options.UseMongoDB(client, mongoSettings.DatabaseName);
+    }
+});
+</code></pre>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+ndotnet_704D25B0["Design: Configuring .NET Services"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

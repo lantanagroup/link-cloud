@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Models;
 
@@ -54,6 +54,11 @@ public class TestScenarioDefinition
     /// </summary>
     public List<PatientCohortDefinition> PatientCohorts { get; set; } = [];
 
+    /// <summary>
+    /// Configured NHSN reporting Organization ID for this scenario.
+    /// </summary>
+    public string NhsnOrganizationId { get; set; } = string.Empty;
+
     // ----- Housekeeping -----
 
     /// <summary>
@@ -62,6 +67,20 @@ public class TestScenarioDefinition
     /// When null, the system default query plan is used.
     /// </summary>
     public Guid? QueryPlanTemplateId { get; set; }
+
+    /// <summary>
+    /// Optional normalization suite ID. When set, the scenario uses this suite's
+    /// operations instead of creating a simple default normalization.
+    /// When null, the system default normalization suite is used.
+    /// </summary>
+    public Guid? NormalizationSuiteId { get; set; }
+
+    /// <summary>
+    /// Optional organization-resource-map template ID used to configure
+    /// DataAcquisition organization-location mapping behavior for the run.
+    /// When null, the system default template is used.
+    /// </summary>
+    public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     /// <summary>
     /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.

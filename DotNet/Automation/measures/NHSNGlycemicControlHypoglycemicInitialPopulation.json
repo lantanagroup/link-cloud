@@ -2736,6 +2736,16 @@
         "supplementalData": [
           {
             "id": "sde-chief-complaint",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Chief Complaint"
@@ -2743,6 +2753,16 @@
           },
           {
             "id": "sde-condition",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Condition"
@@ -2750,6 +2770,16 @@
           },
           {
             "id": "sde-condition-during-encounter",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Condition during Encounter"
@@ -2757,6 +2787,16 @@
           },
           {
             "id": "sde-encounter-discharge-dispositions",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Encounter Discharge Dispositions"
@@ -2764,6 +2804,16 @@
           },
           {
             "id": "sde-encounter-locations",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Encounter Locations"
@@ -2771,6 +2821,16 @@
           },
           {
             "id": "sde-medication-administration",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Medication Administration"
@@ -2778,6 +2838,16 @@
           },
           {
             "id": "sde-medication-request",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Medication Request"
@@ -2785,6 +2855,16 @@
           },
           {
             "id": "sde-blood-glucose-observation",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Blood Glucose Observation"
@@ -2792,6 +2872,16 @@
           },
           {
             "id": "sde-coverage",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Coverage"
@@ -2799,6 +2889,16 @@
           },
           {
             "id": "sde-specimen",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Specimen"
@@ -2806,6 +2906,16 @@
           },
           {
             "id": "sde-minimal-patient",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Minimal Patient"
@@ -2813,6 +2923,16 @@
           },
           {
             "id": "sde-initial-population-encounters",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Initial Population Encounters"
@@ -2820,6 +2940,16 @@
           },
           {
             "id": "sde-medication",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Medication"
@@ -2827,6 +2957,16 @@
           },
           {
             "id": "sde-service-request",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Service Request"
@@ -2834,6 +2974,16 @@
           },
           {
             "id": "sde-location",
+            "usage": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/measure-data-usage",
+                    "code": "supplemental-data"
+                  }
+                ]
+              }
+            ],
             "criteria": {
               "language": "text/cql-identifier",
               "expression": "SDE Location"

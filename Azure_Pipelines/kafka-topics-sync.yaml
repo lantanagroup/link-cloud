@@ -20,9 +20,12 @@ parameters:
 variables:
 - group: kafka_topics # variable group `kafka_topics`
 
+- name: gitBranch
+  value: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
+
   # GitHub Topics File
 - name: TOPICS_URL
-  value: "https://raw.githubusercontent.com/lantanagroup/link-cloud/dev/topics.txt"
+  value: "https://raw.githubusercontent.com/lantanagroup/link-cloud/$(gitBranch)/topics.txt"
 
 # REST URL
 - name: restUrl

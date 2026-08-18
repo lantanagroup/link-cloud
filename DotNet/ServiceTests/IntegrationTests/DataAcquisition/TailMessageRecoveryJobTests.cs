@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -35,7 +35,7 @@ public class TailMessageRecoveryJobTests
     [Fact]
     public async Task Execute_RespectsMaxGroupsPerRun_ProcessesSmallBatchOnly()
     {
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var tag = Guid.NewGuid().ToString("N");
         var facilityId = $"TailRecoveryFac_{tag}";
@@ -71,7 +71,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -80,10 +80,10 @@ public class TailMessageRecoveryJobTests
 
         await job.Execute(jobContextMock.Object);
 
-        _fixture.ResourceAcquiredProducerMock.Verify(
+        _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
-                KafkaTopic.ResourceAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
+                KafkaTopic.ResourcesAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -110,7 +110,7 @@ public class TailMessageRecoveryJobTests
     [Fact]
     public async Task Execute_WhenTimeBudgetIsZero_DoesNotProcessAnyGroups()
     {
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var tag = Guid.NewGuid().ToString("N");
         var facilityId = $"TailRecoveryFac_{tag}";
@@ -139,7 +139,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -148,10 +148,10 @@ public class TailMessageRecoveryJobTests
 
         await job.Execute(jobContextMock.Object);
 
-        _fixture.ResourceAcquiredProducerMock.Verify(
+        _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
-                KafkaTopic.ResourceAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
+                KafkaTopic.ResourcesAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 

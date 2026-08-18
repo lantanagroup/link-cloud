@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Configuration;
+﻿namespace LantanaGroup.Automation.Configuration;
 
 /// <summary>
 /// Basic authentication configuration (username/password).

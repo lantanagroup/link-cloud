@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Services.Security
 {

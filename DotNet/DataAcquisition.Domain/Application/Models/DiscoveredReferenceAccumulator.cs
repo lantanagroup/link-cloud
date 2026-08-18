@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 /// <summary>
 /// Per-primary-log-execution collector for reference resource ids discovered while
@@ -35,6 +35,17 @@ public sealed class DiscoveredReferenceAccumulator
             lock (_sync)
             {
                 return ByType.Any(kvp => kvp.Value.Count > 0);
+            }
+        }
+    }
+
+    public int Count
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return ByType.Sum(kvp => kvp.Value.Count);
             }
         }
     }

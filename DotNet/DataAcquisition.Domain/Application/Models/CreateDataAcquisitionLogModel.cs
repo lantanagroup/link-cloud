@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;

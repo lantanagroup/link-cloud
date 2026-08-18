@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Helpers;
+﻿namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
 /// Generic test run monitor that orchestrates pluggable probes, detects stalls,

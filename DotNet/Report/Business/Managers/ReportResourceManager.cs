@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;

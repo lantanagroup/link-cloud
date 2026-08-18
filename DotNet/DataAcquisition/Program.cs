@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -160,6 +160,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckType.Database.ToString())
+        .AddCheck<ResourceCacheHealthCheck>(HealthCheckType.Cache.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddSingleton(TimeProvider.System);

@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.Timer;
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategoryRule;
 import com.lantanagroup.link.validation.entities.CategorySnapshot;
@@ -9,6 +10,7 @@ import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
+import io.opentelemetry.api.common.Attributes;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,19 +39,16 @@ public class CategorizationService {
     private final CategoryRepository categoryRepository;
     private final CategoryRuleRepository categoryRuleRepository;
     private final ResultRepository resultRepository;
-    private final MetricService metricService;
 
     public CategorizationService(
             ObjectMapper objectMapper,
             CategoryRepository categoryRepository,
             CategoryRuleRepository categoryRuleRepository,
-            ResultRepository resultRepository,
-            MetricService metricService) {
+            ResultRepository resultRepository) {
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
         this.categoryRuleRepository = categoryRuleRepository;
         this.resultRepository = resultRepository;
-        this.metricService = metricService;
     }
 
     /**
@@ -102,19 +101,14 @@ public class CategorizationService {
     }
 
     private void doCategorize(List<Result> results, List<CategoryRule> categoryRules) {
-        try (Timer timer = Timer.start()) {
-            results.parallelStream().forEach(result -> {
-                List<Category> categories = categoryRules.stream()
-                        .filter(Objects::nonNull)
-                        .filter(categoryRule -> categoryRule.getMatcher().isMatch(result))
-                        .map(CategoryRule::getCategory)
-                        .toList();
-                result.setCategories(categories);
-            });
-
-            this.metricService.getCategorizationDurationUpDown().add((long) timer.getSeconds());
-            logger.debug("Categorization completed in {} seconds", String.format("%.2f", timer.getSeconds()));
-        }
+        results.parallelStream().forEach(result -> {
+            List<Category> categories = categoryRules.stream()
+                    .filter(Objects::nonNull)
+                    .filter(categoryRule -> categoryRule.getMatcher().isMatch(result))
+                    .map(CategoryRule::getCategory)
+                    .toList();
+            result.setCategories(categories);
+        });
     }
 
     public void categorize(List<Result> results) {

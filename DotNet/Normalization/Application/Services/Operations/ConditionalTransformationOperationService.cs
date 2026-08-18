@@ -5,6 +5,7 @@ using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
@@ -19,7 +20,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null,CancellationToken cancellationToken = default)
         {
             foreach (var condition in operation.Conditions)
             {
@@ -39,7 +40,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
 
             if (result.SuccessCode == OperationStatus.Success) {
-                _logger.LogDebug("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+                _logger.LogDebug("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
             }
 
             return result;
@@ -86,7 +87,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
             catch (InvalidCastException ex)
             {
-                Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value, condition.FhirPathSource);
+                Logger.LogError(ex, "Type conversion failed for value {Value} against FHIRPath {FhirPath}.", condition.Value?.SanitizeForLog(), condition.FhirPathSource.SanitizeForLog());
                 return (false, true, ex.Message);
             }
         }

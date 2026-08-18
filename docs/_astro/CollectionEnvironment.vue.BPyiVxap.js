@@ -1,1 +1,0 @@
-import{_ as o}from"./ViewLayoutSection.vue.DilYLQ7X.js";import{d as t,o as n,e as r,w as a,E as s}from"./index.CnjeSbCO.js";const p=t({__name:"CollectionEnvironment",setup(l){return(i,e)=>(n(),r(o,null,{title:a(()=>e[0]||(e[0]=[s("Environments")])),_:1}))}});export{p as default};

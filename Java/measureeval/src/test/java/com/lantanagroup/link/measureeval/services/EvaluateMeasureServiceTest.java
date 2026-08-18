@@ -93,6 +93,7 @@ class EvaluateMeasureServiceTest {
         report.setStartDate(startDate);
         report.setEndDate(endDate);
         report.setReportType("measure-1");
+        report.setReportTrackingId("09234u2384772344");
         report.setFrequency("monthly");
 
         Bundle bundle = new Bundle();
@@ -110,10 +111,8 @@ class EvaluateMeasureServiceTest {
         assertNotNull(actualReport);
         assertEquals(expectedReport, actualReport);
 
-        // Verify metric recording
-        ArgumentCaptor<Long> durationCaptor = ArgumentCaptor.forClass(Long.class);
-        verify(measureEvalMetrics).MeasureEvalDuration(durationCaptor.capture(), any());
-        assertTrue(durationCaptor.getValue() >= 0);
+        // Verify no metric recording when queryType is not provided
+        verifyNoInteractions(measureEvalMetrics);
     }
 
     @Test
@@ -148,6 +147,7 @@ class EvaluateMeasureServiceTest {
         report.setStartDate(startDate);
         report.setEndDate(endDate);
         report.setReportType("measure-1");
+        report.setReportTrackingId("09234u2384772344");
         report.setFrequency("monthly");
 
         Bundle bundle = new Bundle();
@@ -173,7 +173,8 @@ class EvaluateMeasureServiceTest {
         io.opentelemetry.api.common.Attributes attributes = attributesCaptor.getValue();
         assertEquals("facility-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.FACILITY_ID)));
         assertEquals("patient-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PATIENT_ID)));
-        assertEquals("measure-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TYPE)));
-        assertEquals("test-query", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.QUERY_TYPE)));
+        assertEquals("09234u2384772344", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TRACKING_ID)));
+        assertEquals("Test-query", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PHASE)));
+        assertEquals("correlation-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.CORRELATION_ID)));
     }
 }

@@ -1,7 +1,11 @@
 <div class="dialog-container">
   <mat-icon class="alert-icon" [color]="iconColor">{{ icon }}</mat-icon>
   <h1 class="dialog-title">{{ data.title }}</h1>
-  <p class="dialog-message">{{ data.message }}</p>
+  @if (data.isHtml) {
+    <div class="dialog-message" [innerHTML]="data.message"></div>
+  } @else {
+    <p class="dialog-message">{{ data.message }}</p>
+  }
   <div class="dialog-actions">
     <button mat-raised-button color="primary" (click)="onClose()">OK</button>
   </div>

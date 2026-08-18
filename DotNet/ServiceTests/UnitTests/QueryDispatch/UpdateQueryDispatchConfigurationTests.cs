@@ -1,4 +1,4 @@
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;

@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Kafka DeadLetter/Retry Scenarios</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="error-retry-and-dead-letter-scenarios" class="content-heading">Error Retry and Dead-letter Scenarios <a id="error-retry-and-dead-letter-scenarios" href="#error-retry-and-dead-letter-scenarios" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Retry and Dead-letter Scenarios"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>This document outlines the error retry and dead-letter handling strategies for services in the platform. Each service section details its approach to Kafka message processing failures, including retry logic and dead-letter queue (DLQ) handling.</p>
+<hr />
+<h2 id="tenant-service" class="content-heading">Tenant Service <a id="tenant-service" href="#tenant-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Tenant service is responsible for producing the <code>ReportScheduled</code> Kafka message. It does not directly implement retry or dead-letter handling for this message. Instead, these actions are performed by downstream services that consume the message (such as Report, QueryDispatch, etc.).</p>
+<ul>
+<li><strong>Message Production:</strong> Tenant produces the <code>ReportScheduled</code> event for downstream processing.</li>
+<li><strong>Error Handling:</strong> Retry and dead-letter logic for this message is managed by the consumer services, not by Tenant itself.</li>
+<li><strong>See Also:</strong> Refer to the relevant consumer service sections for details on how retry and dead-letter scenarios are handled for <code>ReportScheduled</code> and other messages.</li>
+</ul>
+<hr />
+<h2 id="census-service" class="content-heading">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Census service interacts with several Kafka topics as both a producer and consumer. Below are the error retry and dead-letter handling strategies for each relevant topic.</p>
+<h3 id="patientlistsacquired-consumer" class="content-heading">PatientListsAcquired (Consumer) <a id="patientlistsacquired-consumer" href="#patientlistsacquired-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PatientListsAcquired (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Census consumes <code>PatientListsAcquired</code> events to process patient lists for facilities.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>If message processing fails with a transient error, the message is retried according to the configured retry policy (using the shared <code>TransientExceptionHandler</code>).</li>
+<li><strong>Exceptions triggering retry:</strong> Any exception of type <code>TransientException</code> (e.g., temporary network issues, database timeouts, or other recoverable errors) will trigger the retry workflow.</li>
+<li>Retry topics follow the <code>{TopicName}-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>If all retries fail or a non-retryable error occurs, the message is sent to the <code>PatientListsAcquired-Error</code> dead-letter topic (using the shared <code>DeadLetterExceptionHandler</code>).</li>
+<li><strong>Exceptions triggering dead-letter:</strong> Any exception of type <code>DeadLetterException</code> (e.g., validation errors, unrecoverable business logic errors) or unhandled exceptions not marked as transient.</li>
+<li>DLQ topics follow the <code>{TopicName}-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="patientevent-producer" class="content-heading">PatientEvent (Producer) <a id="patientevent-producer" href="#patientevent-producer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PatientEvent (Producer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Production:</strong> Census produces <code>PatientEvent</code> messages to signal patient-related events (admit, discharge, etc.).</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>If message production fails, the error is logged and will enter retry topic for production failures in Census itself.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>If retry fails after 5 attempts, the message will be deadlettered.</li>
+</ul>
+</li>
+</ul>
+<h3 id="patientcensusscheduled-producer" class="content-heading">PatientCensusScheduled (Producer) <a id="patientcensusscheduled-producer" href="#patientcensusscheduled-producer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PatientCensusScheduled (Producer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Production:</strong> Census produces <code>PatientCensusScheduled</code> messages to schedule census-related jobs.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>Production errors are logged, but there is no built-in retry topic for production failures in Census.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>There is no built-in DLQ for production failures in Census. Downstream consumers handle dead-letter scenarios.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="data-acquisition-service" class="content-heading">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Data Acquisition service manages FHIR queries and utilizes a state-managed background worker for execution.</p>
+<h3 id="dataacquisitionrequested-consumer" class="content-heading">DataAcquisitionRequested (Consumer) <a id="dataacquisitionrequested-consumer" href="#dataacquisitionrequested-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DataAcquisitionRequested (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Consumes <code>DataAcquisitionRequested</code> events to initiate data retrieval logs.</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Exceptions triggering dead-letter: Throws <code>ArgumentNullException</code> (triggering the <code>DeadLetterExceptionHandler</code>) if the CorrelationId is missing from headers.</li>
+</ul>
+</li>
+</ul>
+<h3 id="patientcensusscheduled-consumer" class="content-heading">PatientCensusScheduled (Consumer) <a id="patientcensusscheduled-consumer" href="#patientcensusscheduled-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PatientCensusScheduled (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Consumes <code>PatientCensusScheduled</code> events to trigger patient list updates.</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Exceptions triggering dead-letter: Throws <code>DeadLetterException</code> if the FacilityId is missing from the message key or if an error occurs during log creation.</li>
+</ul>
+</li>
+</ul>
+<h3 id="readytoacquire-consumer-worker-logic" class="content-heading">ReadyToAcquire (Consumer - Worker Logic) <a id="readytoacquire-consumer-worker-logic" href="#readytoacquire-consumer-worker-logic" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: ReadyToAcquire (Consumer - Worker Logic)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> The Acquisition Worker consumes <code>ReadyToAcquire</code> messages to execute FHIR queries.</li>
+<li><strong>Retry Strategy (State-Based):</strong>
+<ul>
+<li><code>ProcessingDelayException</code>: If the execution date is in the future, the log status remains Pending to be picked up later.</li>
+<li><code>ProduceException</code>: Production failures for <code>ResourceAcquired</code> messages trigger a <code>TransientException</code> for Kafka-level retry.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Kafka DLQ: Thrown if the LogId or FacilityId is null or empty in the message.</li>
+<li>Internal Failure: If a general exception occurs during acquisition, the worker updates the DataAcquisitionLog status to Failed and records the error notes before throwing a <code>DeadLetterException</code>.</li>
+</ul>
+</li>
+</ul>
+<h3 id="producers" class="content-heading">Producers <a id="producers" href="#producers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Producers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>ResourceAcquired (Producer):</strong> Produces results of successful FHIR queries.</li>
+<li><strong>Error Handling:</strong> Failures update the DataAcquisitionLog status to Failed. Producer failures are primarily managed via the worker's internal state logic.</li>
+</ul>
+<hr />
+<h2 id="normalization-service" class="content-heading">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Normalization service processes FHIR resources acquired by the platform to ensure they meet standard evaluation requirements.</p>
+<h3 id="resourceacquired-consumer" class="content-heading">ResourceAcquired (Consumer) <a id="resourceacquired-consumer" href="#resourceacquired-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: ResourceAcquired (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Consumes <code>ResourceAcquired</code> messages containing FHIR resources or acquisition completion signals.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>If a transient error occurs during processing, the message is retried via the <code>TransientExceptionHandler</code>.</li>
+<li><strong>Exceptions triggering retry:</strong> Any exception not explicitly caught as a dead-letter or transient exception type will default to the retry workflow.</li>
+<li>Retry topics follow the <code>ResourceAcquired-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Messages are moved to the DLQ if a non-retryable error occurs or if metadata extraction fails.</li>
+<li><strong>Exceptions triggering dead-letter:</strong>
+<ul>
+<li>Missing FacilityId (message key).</li>
+<li>Missing or empty CorrelationId in the message headers.</li>
+<li>Unsupported resource types during deserialization.</li>
+<li>Validation failures, such as a null message value or missing ReportableEvent.</li>
+</ul>
+</li>
+<li>DLQ topics follow the <code>ResourceAcquired-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="resourcenormalized-producer" class="content-heading">ResourceNormalized (Producer) <a id="resourcenormalized-producer" href="#resourcenormalized-producer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: ResourceNormalized (Producer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Production:</strong> Produces <code>ResourceNormalized</code> messages after successful transformation.</li>
+<li><strong>Error Handling:</strong> If production fails, the error is logged. There is no built-in Kafka-level retry for producer failures; errors are surfaced to the background service.</li>
+</ul>
+<hr />
+<h2 id="report-service" class="content-heading">Report Service <a id="report-service" href="#report-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Report service consumes and produces several Kafka topics. Below are the error retry and dead-letter handling strategies for each relevant topic, based on the actual code implementation.</p>
+<h3 id="reportscheduled-consumer" class="content-heading">ReportScheduled (Consumer) <a id="reportscheduled-consumer" href="#reportscheduled-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: ReportScheduled (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Report consumes <code>ReportScheduled</code> events to schedule reports for facilities.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>If message processing fails with a transient error (e.g., temporary network issues, database timeouts), the message is retried using the shared <code>TransientExceptionHandler</code>.</li>
+<li><strong>Exceptions triggering retry:</strong> Any exception of type <code>TransientException</code> or general exceptions not explicitly marked as dead-letter.</li>
+<li>Retry topics follow the <code>ReportScheduled-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>If a non-retryable error occurs (e.g., validation errors, duplicate report IDs), the message is sent to the <code>ReportScheduled-Error</code> dead-letter topic using the shared <code>DeadLetterExceptionHandler</code>.</li>
+<li><strong>Exceptions triggering dead-letter:</strong> Any exception of type <code>DeadLetterException</code> or unhandled validation/business logic errors.</li>
+<li>DLQ topics follow the <code>ReportScheduled-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="patientlistsacquired-consumer-1" class="content-heading">PatientListsAcquired (Consumer) <a id="patientlistsacquired-consumer-1" href="#patientlistsacquired-consumer-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PatientListsAcquired (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Report consumes <code>PatientListsAcquired</code> events to update patient submission entries for scheduled reports.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>Transient errors (e.g., missing scheduled reports, temporary DB issues) trigger the retry workflow via <code>TransientExceptionHandler</code>.</li>
+<li>Retry topics follow the <code>PatientListsAcquired-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Non-retryable errors (e.g., invalid patient list data) are sent to the <code>PatientListsAcquired-Error</code> dead-letter topic via <code>DeadLetterExceptionHandler</code>.</li>
+<li>DLQ topics follow the <code>PatientListsAcquired-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="generatereportrequested-consumer" class="content-heading">GenerateReportRequested (Consumer) <a id="generatereportrequested-consumer" href="#generatereportrequested-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GenerateReportRequested (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Report consumes <code>GenerateReportRequested</code> events to generate or regenerate reports.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>Transient errors (e.g., missing report schedule, temporary failures) trigger the retry workflow via <code>TransientExceptionHandler</code>.</li>
+<li>Retry topics follow the <code>GenerateReportRequested-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Non-retryable errors (e.g., invalid facility ID, missing required fields) are sent to the <code>GenerateReportRequested-Error</code> dead-letter topic via <code>DeadLetterExceptionHandler</code>.</li>
+<li>DLQ topics follow the <code>GenerateReportRequested-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="payloadsubmitted-consumer" class="content-heading">PayloadSubmitted (Consumer) <a id="payloadsubmitted-consumer" href="#payloadsubmitted-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PayloadSubmitted (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Report consumes <code>PayloadSubmitted</code> events to update submission status for reports and patients.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>Transient errors (e.g., DB update failures, timeouts) trigger the retry workflow via <code>TransientExceptionHandler</code>.</li>
+<li>Retry topics follow the <code>PayloadSubmitted-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Non-retryable errors (e.g., invalid payload data) are sent to the <code>PayloadSubmitted-Error</code> dead-letter topic via <code>DeadLetterExceptionHandler</code>.</li>
+<li>DLQ topics follow the <code>PayloadSubmitted-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="resourceevaluated-consumer" class="content-heading">ResourceEvaluated (Consumer) <a id="resourceevaluated-consumer" href="#resourceevaluated-consumer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: ResourceEvaluated (Consumer)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Consumption:</strong> Report consumes <code>ResourceEvaluated</code> events to process evaluated resources and update submission entries.</li>
+<li><strong>Retry:</strong>
+<ul>
+<li>Transient errors (e.g., missing report schedule, deserialization issues, timeouts) trigger the retry workflow via <code>TransientExceptionHandler</code>.</li>
+<li>Retry topics follow the <code>ResourceEvaluated-Retry</code> naming convention.</li>
+</ul>
+</li>
+<li><strong>Dead-letter:</strong>
+<ul>
+<li>Non-retryable errors (e.g., missing correlation ID, invalid resource data) are sent to the <code>ResourceEvaluated-Error</code> dead-letter topic via <code>DeadLetterExceptionHandler</code>.</li>
+<li>DLQ topics follow the <code>ResourceEvaluated-Error</code> naming convention.</li>
+</ul>
+</li>
+</ul>
+<h3 id="producers-1" class="content-heading">Producers <a id="producers-1" href="#producers-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Producers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Report service produces several Kafka topics. Below are the error handling and dead-letter strategies for each relevant producer, based on the actual code implementation.</p>
+<ul>
+<li><p><strong>DataAcquisitionRequested (Producer):</strong></p>
+<ul>
+<li>Produces <code>DataAcquisitionRequested</code> messages for each patient to trigger data acquisition.</li>
+<li><strong>Error Handling:</strong>
+<ul>
+<li>If message production fails (e.g., Kafka unavailable), an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>ReadyForValidation (Producer):</strong></p>
+<ul>
+<li>Produces <code>ReadyForValidation</code> messages when patient data is ready for validation.</li>
+<li><strong>Error Handling:</strong>
+<ul>
+<li>If message production fails, an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>SubmitPayload (Producer):</strong></p>
+<ul>
+<li>Produces <code>SubmitPayload</code> messages to signal that a report or patient payload is ready for submission.</li>
+<li><strong>Error Handling:</strong>
+<ul>
+<li>If message production fails, an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>ReportManifest (Producer):</strong></p>
+<ul>
+<li>Produces report manifest payloads and triggers <code>SubmitPayload</code> production.</li>
+<li><strong>Error Handling:</strong>
+<ul>
+<li>If manifest upload to blob storage fails, an audit event is produced and the failure is logged. If producing the <code>SubmitPayload</code> message fails, the error is surfaced as above.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>AuditableEventOccurred (Producer):</strong></p>
+<ul>
+<li>Produces audit event messages for operational and error tracking.</li>
+<li><strong>Error Handling:</strong>
+<ul>
+<li>If message production fails, the error is logged. There is no retry or DLQ for audit event production failures.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>Note:</strong></p>
+<ul>
+<li>The Report service does not implement Kafka-level retry or dead-letter topics for producer failures. All error handling for producers is at the application/service level, with errors logged and surfaced to the caller for possible retry by the job or workflow logic.</li>
+</ul>
+<hr />
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nerror_retry_scenarios_75C80AB2["Design: Kafka DeadLetter/Retry Scenarios"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

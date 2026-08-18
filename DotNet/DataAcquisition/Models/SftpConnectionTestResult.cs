@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Models;
+﻿namespace LantanaGroup.Link.DataAcquisition.Models;
 
 /// <summary>
 /// Result model for SFTP connection test operations.

@@ -26,49 +26,91 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         _serviceRegistry = serviceRegistry;
     }
 
-    public Task<FacilityModel> CreateAsync(
+    public Task<LinkApiResponse<FacilityModel>> CreateAsync(
         FacilityModel request,
         CancellationToken cancellationToken = default) =>
-        Request("/Facility")
-            .PostJsonAsync(request, cancellationToken: cancellationToken)
-            .ReceiveJson<FacilityModel>();
+        SendAsync<FacilityModel>(() => Request("/Facility")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task<FacilityModel?> GetAsync(
+    public Task<LinkApiResponse<FacilityModel>> GetAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"/Facility/{facilityId}")
-            .GetJsonAsync<FacilityModel>(cancellationToken: cancellationToken));
+        SendAsync<FacilityModel>(() => Request($"/Facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<bool> CheckFacilityExistsAsync(
+    public Task<LinkApiResponse<FacilityModel>> UpdateAsync(
+        string facilityId,
+        FacilityModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityModel>(() => Request($"/Facility/{facilityId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CheckFacilityExistsAsync(
         string facilityId,
         CancellationToken cancellationToken = default)
     {
         if (_serviceRegistry.Value.TenantService?.CheckIfTenantExists != true)
-            return Task.FromResult(true);
+            return Task.FromResult(new LinkApiResponse { StatusCode = 200 });
 
-        return ExistsAsync(() => Request($"/Facility/{facilityId}")
+        return SendAsync(() => Request($"/Facility/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task DeleteAsync(
+    public Task<LinkApiResponse> DeleteAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"/Facility/{facilityId}")
+        SendAsync(() => Request($"/Facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<GenerateAdhocReportResponseApiModel> GenerateAdhocReportAsync(
+    public Task<LinkApiResponse> SoftDeleteAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/Facility/softDelete/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> RestoreAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/Facility/restore/{facilityId}")
+            .PatchAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchFacilitiesAsync(
+        string? facilityId = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request("/Facility")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            req = req.SetQueryParam("facilityId", facilityId);
+        return SendAsync(() => req.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(
+        string? search = null,
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request("/Facility/list")
+            .SetQueryParam("includeDeleted", includeDeleted);
+        if (!string.IsNullOrWhiteSpace(search))
+            req = req.SetQueryParam("search", search);
+        return SendAsync<Dictionary<string, string>>(() => req.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(
         string facilityId,
         AdHocReportRequest request,
         CancellationToken cancellationToken = default) =>
-        Request($"/Facility/{facilityId}/AdHocReport")
-            .PostJsonAsync(request, cancellationToken: cancellationToken)
-            .ReceiveJson<GenerateAdhocReportResponseApiModel>();
+        SendAsync<GenerateAdhocReportResponseApiModel>(() => Request($"/Facility/{facilityId}/AdHocReport")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task<GenerateAdhocReportResponseApiModel> RegenerateReportAsync(
+    public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> RegenerateReportAsync(
         string facilityId,
         RegenerateReportRequest request,
         CancellationToken cancellationToken = default) =>
-        Request($"/Facility/{facilityId}/RegenerateReport")
-            .PostJsonAsync(request, cancellationToken: cancellationToken)
-            .ReceiveJson<GenerateAdhocReportResponseApiModel>();
+        SendAsync<GenerateAdhocReportResponseApiModel>(() => Request($"/Facility/{facilityId}/RegenerateReport")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
 }

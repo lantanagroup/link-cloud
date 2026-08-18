@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+﻿﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -22,34 +22,101 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task<PagedConfigModel<NormalizationOperationApiModel>> SearchFacilityOperationsAsync(
+    public Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(
         string facilityId,
         bool includeDisabled = true,
         int pageSize = 100,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        Request($"normalization/Operations/facility/{facilityId}")
+        SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() => Request($"normalization/Operations/facility/{facilityId}")
             .SetQueryParam("includeDisabled", includeDisabled)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
-            .GetJsonAsync<PagedConfigModel<NormalizationOperationApiModel>>(cancellationToken: cancellationToken);
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task CreateOperationAsync(
+    public Task<LinkApiResponse> CreateOperationAsync(
         CreateNormalizationOperationRequestApiModel requestBody,
         CancellationToken cancellationToken = default) =>
-        Request("normalization/Operations")
-            .PostJsonAsync(requestBody, cancellationToken: cancellationToken);
+        SendAsync(() => Request("normalization/Operations")
+            .PostJsonAsync(requestBody, cancellationToken: cancellationToken));
 
-    public Task DeleteFacilityOperationsAsync(
+    public Task<LinkApiResponse> DeleteFacilityOperationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"normalization/operations/facility/{facilityId}")
+        SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<List<NormalizationOperationSequenceApiModel>> GetOperationSequencesAsync(
+    public Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        Request("normalization/OperationSequence")
+        SendAsync<List<NormalizationOperationSequenceApiModel>>(() => Request("normalization/OperationSequence")
             .SetQueryParam("facilityId", facilityId)
-            .GetJsonAsync<List<NormalizationOperationSequenceApiModel>>(cancellationToken: cancellationToken);
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateOperationSequencesAsync(
+        string facilityId,
+        string resourceType,
+        List<CreateNormalizationOperationSequenceApiModel> sequences,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("normalization/OperationSequence")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("resourceType", resourceType)
+            .PostJsonAsync(sequences, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteOperationSequencesAsync(
+        string facilityId,
+        string? resourceType = null,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request("normalization/OperationSequence")
+            .SetQueryParam("facilityId", facilityId);
+        if (!string.IsNullOrWhiteSpace(resourceType)) req = req.SetQueryParam("resourceType", resourceType);
+        return SendAsync(() => req.DeleteAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<NormalizationVendorApiModel>> CreateVendorAsync(
+        string vendorName,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<NormalizationVendorApiModel>(() => Request($"normalization/Vendor/{vendorName}")
+            .PostAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetVendorAsync(
+        string vendor,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<NormalizationVendorApiModel>>(() => Request($"normalization/Vendor/{vendor}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetAllVendorsAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<NormalizationVendorApiModel>>(() => Request("normalization/Vendor/vendors")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteVendorAsync(
+        string vendor,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/Vendor/{vendor}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<NormalizationVendorPresetApiModel>> CreateVendorPresetAsync(
+        CreateNormalizationVendorPresetRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<NormalizationVendorPresetApiModel>(() => Request("normalization/Vendor/presets")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<NormalizationVendorPresetApiModel>>> GetVendorPresetsAsync(
+        string vendor,
+        string? resource = null,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request($"normalization/Vendor/presets/{vendor}");
+        if (!string.IsNullOrWhiteSpace(resource)) req = req.SetQueryParam("resource", resource);
+        return SendAsync<List<NormalizationVendorPresetApiModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse> DeleteVendorPresetAsync(
+        string vendor,
+        Guid presetId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/Vendor/presets/{vendor}/{presetId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 }

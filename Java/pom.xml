@@ -13,15 +13,16 @@
 
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>main</artifactId>
-    <version>0.6.0</version>
+    <version>0.7.0</version>
     <packaging>pom</packaging>
 
     <name>Link Java Modules</name>
     <description>Project/folder of Java modules/services for Link</description>
 
     <properties>
-        <cqf-fhir.version>3.12.0</cqf-fhir.version>
-        <hapi-fhir.version>7.6.1</hapi-fhir.version>
+        <cqf-fhir.version>4.5.1</cqf-fhir.version>
+        <hapi-fhir.version>8.10.0</hapi-fhir.version>
+        <kotlin.version>2.1.20</kotlin.version>
         <janino.version>2.7.8</janino.version>
         <jacoco.version>0.8.12</jacoco.version>
     </properties>
@@ -175,6 +176,12 @@
                 <groupId>com.azure</groupId>
                 <artifactId>azure-storage-blob</artifactId>
                 <version>12.32.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>${kotlin.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

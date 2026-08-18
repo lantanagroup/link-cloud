@@ -1,135 +1,606 @@
-<!DOCTYPE html><html lang="en" data-catalog-theme="default"> <head><!-- Inline script to prevent flash of wrong theme --><script>(function(){const catalogTheme = "default";
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
 
-      (function () {
-        function getSystemTheme() {
-          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return 'dark';
-          }
-          return 'light';
-        }
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
 
-        function applyTheme() {
-          // Check localStorage first, fall back to system preference
-          const stored = localStorage.getItem('eventcatalog-theme');
-          const theme = stored === 'light' || stored === 'dark' ? stored : getSystemTheme();
-          document.documentElement.setAttribute('data-theme', theme);
-          // Also ensure catalog theme is set (for page transitions)
-          document.documentElement.setAttribute('data-catalog-theme', catalogTheme);
-        }
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
 
-        // Apply on initial load
-        applyTheme();
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
 
-        // Apply after Astro page transitions
-        document.addEventListener('astro:after-swap', applyTheme);
-        document.addEventListener('astro:page-load', applyTheme);
-      })();
-    })();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/svg+xml" href="/link-cloud/favicon.ico"><title>EventCatalog | EventCatalog</title><link rel="canonical" href="https://lantanagroup.github.io/link-cloud/"><meta name="description" content="This internal platform provides a comprehensive view of our event-driven architecture across all systems. Use this portal to discover existing domains, explore services and their dependencies, and understand the message contracts that connect our infrastructure"><meta name="robots" content="index, follow"><meta property="og:title" content="EventCatalog"><meta property="og:type" content="website"><meta property="og:image" content="https://lantanagroup.github.io/link-cloud/_astro/opengraph.L5gHdVBc.png"><meta property="og:url" content="https://lantanagroup.github.io/link-cloud"><meta property="og:image:url" content="https://lantanagroup.github.io/link-cloud/_astro/opengraph.L5gHdVBc.png"><meta property="og:image:secure_url" content="https://lantanagroup.github.io/link-cloud/_astro/opengraph.L5gHdVBc.png"><meta property="og:image:alt" content="EventCatalog"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="EventCatalog"><meta name="twitter:image" content="https://lantanagroup.github.io/link-cloud/_astro/opengraph.L5gHdVBc.png"><meta name="twitter:image:alt" content="EventCatalog"><meta name="twitter:description" content="This internal platform provides a comprehensive view of our event-driven architecture across all systems. Use this portal to discover existing domains, explore services and their dependencies, and understand the message contracts that connect our infrastructure"><meta name="og:locale" content="en_US"><meta name="og:description" content="This internal platform provides a comprehensive view of our event-driven architecture across all systems. Use this portal to discover existing domains, explore services and their dependencies, and understand the message contracts that connect our infrastructure"><meta name="og:site_name" content="https://lantanagroup.github.io/link-cloud"><link rel="stylesheet" href="/link-cloud/_astro/VerticalSideBarLayout.tNNRtIIW.css">
-<style>.ec-stat-card{position:relative}.ec-stat-card:before{content:"";position:absolute;inset:0;border-radius:inherit;transition:opacity .3s ease;opacity:0;pointer-events:none;z-index:0}:root[data-theme=dark] .ec-stat-card:before{background:radial-gradient(400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),var(--glow-color) 0%,transparent 70%)}:root[data-theme=dark] .ec-stat-card:hover:before{opacity:.15}:root:not([data-theme=dark]) .ec-stat-card:before,:root[data-theme=light] .ec-stat-card:before{background:rgb(var(--ec-content-hover))}:root:not([data-theme=dark]) .ec-stat-card:hover:before,:root[data-theme=light] .ec-stat-card:hover:before{opacity:1}.ec-stat-card>*{position:relative;z-index:1}
-.accordian-group .accordion{border:none;border-bottom:1px solid #e2e8f0}.tile-card[data-astro-cid-3ryt2ijw]:hover{box-shadow:0 10px 15px -3px rgb(var(--ec-accent) / .1),0 4px 6px -4px rgb(var(--ec-accent) / .1)}.tile-grid[data-astro-cid-3ryt2ijw]{background-image:linear-gradient(rgb(var(--ec-accent) / .2) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--ec-accent) / .2) 1px,transparent 1px);background-size:16px 16px}.tile-icon[data-astro-cid-3ryt2ijw]{color:rgb(var(--ec-accent))}.step a{color:rgb(var(--ec-page-text-muted));text-decoration:underline;&:hover{color:#b977f9}}.line-clamp-2[data-astro-cid-xdeqlg57]{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.tab-button.tab-active{color:rgb(var(--ec-accent));border-color:rgb(var(--ec-accent))}.react-flow__attribution{display:none}
-</style>
-<link rel="stylesheet" href="/link-cloud/_astro/tailwind.gI5xUnEp.css">
-<style>.react-flow__attribution{display:none}
-html[data-theme=dark] h1:not(.no-dark-override),html[data-theme=dark] h2:not(.no-dark-override),html[data-theme=dark] h3:not(.no-dark-override),html[data-theme=dark] h4:not(.no-dark-override){color:#f0f0f0}html[data-theme=dark] a:not(.no-dark-override){color:#add8e6;text-decoration:underline}
-</style>
-<link rel="stylesheet" href="/link-cloud/_astro/styles-core.BqtaChDh.css">
-<style>.tooltip{visibility:hidden;position:absolute}.has-tooltip:hover .tooltip{visibility:visible;z-index:100}.pill-item:hover,.owner-item:hover{background:linear-gradient(to left,rgb(var(--ec-accent-gradient-from)),rgb(var(--ec-accent-gradient-to)));color:#fff;font-weight:400}
-</style>
-<link rel="stylesheet" href="/link-cloud/_astro/SchemaDetailsPanel.BgE3edmZ.css"></head> <body>   <script type="module" src="/link-cloud/_astro/SearchDataLoader.astro_astro_type_script_index_0_lang.Cd5agw5p.js"></script> <main id="eventcatalog-application" class="relative"> <div data-astro-transition-persist="site-header"> <nav id="eventcatalog-header" class="fixed top-0 left-0 right-0 h-header bg-[rgb(var(--ec-header-bg))] border-b border-[rgb(var(--ec-header-border))] py-3 font-bold text-xl z-10 text-[rgb(var(--ec-header-text))]" data-astro-cid-3ef6ksr2> <div class="px-4 sm:px-4 lg:px-4" data-astro-cid-3ef6ksr2> <div class="flex justify-between items-center" data-astro-cid-3ef6ksr2> <div class="flex-shrink-0 flex items-center w-3/12 lg:w-[360px]" data-astro-cid-3ef6ksr2> <a href="/link-cloud/" class="flex space-x-2 items-center group" data-astro-cid-3ef6ksr2> <img alt="EventCatalog Logo" src="/link-cloud/logo.png" class="w-8 h-8 transition-transform group-hover:scale-105" data-astro-cid-3ef6ksr2> <span class="hidden sm:inline-block text-[1em] transition-colors group-hover:text-gray-600" data-astro-cid-3ef6ksr2>EventCatalog</span> </a> </div> <div class="hidden lg:flex flex-grow -ml-1 items-center" data-astro-cid-3ef6ksr2> <div class="w-full max-w-xl" data-astro-cid-3ef6ksr2> <div data-astro-cid-v6ilzprt> <div class="relative flex items-center w-full pr-4 ml-1" data-astro-cid-v6ilzprt> <input id="search-dummy-input" type="text" name="search" placeholder="Search EventCatalog" autocomplete="off" class="block w-full rounded-md caret-transparent border-0 py-1.5 pr-14 pl-10! text-[rgb(var(--ec-header-text))] bg-[rgb(var(--ec-dropdown-bg))] shadow-xs ring-1 ring-inset ring-[rgb(var(--ec-dropdown-border))] placeholder:text-[rgb(var(--ec-icon-color))] font-light sm:text-sm sm:leading-6" data-astro-cid-v6ilzprt> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon" class="absolute inset-y-0 left-0 h-9 w-8 flex items-center pl-4 text-[rgb(var(--ec-icon-color))]" data-astro-cid-v6ilzprt="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg> <div class="absolute inset-y-0 right-0 flex py-1.5 pr-6" data-astro-cid-v6ilzprt> <kbd class="inline-flex items-center rounded px-1 font-sans text-xs text-[rgb(var(--ec-icon-color))]" data-astro-cid-v6ilzprt>⌘K</kbd> </div> </div> </div> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var l=(n,t)=>{let i=async()=>{await(await n())()},e=typeof t.value=="object"?t.value:void 0,s={timeout:e==null?void 0:e.timeout};"requestIdleCallback"in window?window.requestIdleCallback(i,s):setTimeout(i,s.timeout||200)};(self.Astro||(self.Astro={})).idle=l;window.dispatchEvent(new Event("astro:idle"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>Number.POSITIVE_INFINITY*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="E6D9x" prefix="r18" component-url="/link-cloud/_astro/SearchModal.d7nsQkk3.js" component-export="default" renderer-url="/link-cloud/_astro/client.D2YREm5k.js" props="{&quot;data-astro-cid-v6ilzprt&quot;:[0,true]}" ssr client="idle" opts="{&quot;name&quot;:&quot;SearchModal&quot;,&quot;value&quot;:true}"></astro-island> <script type="module">window.searchModalState={isOpen:!1,isClosing:!1,open:function(){this.isClosing||(this.isOpen=!0,this.render())},toggle:function(){this.isClosing||(this.isOpen=!this.isOpen,this.render())},close:function(){this.isOpen=!1,this.isClosing=!0,this.render(),setTimeout(()=>{this.isClosing=!1},500)},render:function(){const e=new CustomEvent("searchModalToggle",{detail:{isOpen:this.isOpen}});window.dispatchEvent(e)}};function o(){const e=document.getElementById("search-dummy-input");if(e){const n=e.cloneNode(!0);e.parentNode?.replaceChild(n,e);const t=document.getElementById("search-dummy-input");t?.addEventListener("click",function(s){s.preventDefault(),this.blur(),window.searchModalState.open()}),t?.addEventListener("focus",function(s){s.preventDefault(),this.blur(),window.searchModalState.open()})}}window.addEventListener("keydown",e=>{(e.metaKey||e.ctrlKey)&&e.key==="k"&&(e.preventDefault(),window.searchModalState.open())});window.addEventListener("searchModalToggle",e=>{const n=document.getElementById("eventcatalog-header"),t=document.getElementById("eventcatalog-vertical-nav"),s=document.querySelectorAll('aside[class*="fixed"][class*="z-10"]');e.detail.isOpen?(n&&n.classList.remove("backdrop-blur-sm"),t&&(t.style.zIndex="-100"),s.forEach(i=>{i.style.zIndex="-100"})):(n&&n.classList.add("backdrop-blur-sm"),t&&(t.style.zIndex="10"),s.forEach(i=>{i.style.zIndex="10"}))});o();document.addEventListener("astro:page-load",o);</script> </div>  </div> <div class="hidden md:block w-3/12" data-astro-cid-3ef6ksr2>  <div class="flex items-center space-x-4 justify-end pr-2" data-astro-cid-3ef6ksr2>   <astro-island uid="ZJ9VN" prefix="r17" component-url="/link-cloud/_astro/ThemeToggle.DdB7ng5z.js" component-export="default" renderer-url="/link-cloud/_astro/client.D2YREm5k.js" props="{&quot;data-astro-cid-3ef6ksr2&quot;:[0,true]}" ssr client="idle" opts="{&quot;name&quot;:&quot;ThemeToggle&quot;,&quot;value&quot;:true}" await-children><button class="p-2 rounded-md text-[rgb(var(--ec-icon-color))] hover:text-[rgb(var(--ec-icon-hover))] hover:bg-[rgb(var(--ec-dropdown-hover))] transition-colors" aria-label="Toggle theme" title="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon w-5 h-5"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></button><!--astro:end--></astro-island>  <ul class="flex space-x-4" data-astro-cid-3ef6ksr2> <li data-astro-cid-3ef6ksr2> <a href="https://github.com/event-catalog/eventcatalog" class="block p-1.5 rounded-lg hover:bg-[rgb(var(--ec-dropdown-hover))] transition-colors focus:outline-hidden" aria-label="View repository on GitHub" data-astro-cid-3ef6ksr2> <img src="/link-cloud/icons/github.svg" alt="" class="h-6 w-6 opacity-70 hover:opacity-100 transition-opacity ec-themed-icon" aria-hidden="true" data-astro-cid-3ef6ksr2> </a> </li> </ul> </div>  </div> <div class="md:hidden" data-astro-cid-3ef6ksr2> <button id="menu-toggle" type="button" class="text-[rgb(var(--ec-icon-color))] hover:text-[rgb(var(--ec-icon-hover))] focus:outline-hidden focus:text-[rgb(var(--ec-icon-hover))]" aria-label="Toggle menu" data-astro-cid-3ef6ksr2> <svg viewBox="0 0 24 24" class="h-6 w-6 fill-current" data-astro-cid-3ef6ksr2> <path fill-rule="evenodd" d="M4 5h16a1 1 0 0 1 0 2H4a1 1 0 1 1 0-2zm0 6h16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2zm0 6h16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2z" data-astro-cid-3ef6ksr2></path> </svg> </button> </div> </div> <div id="mobile-menu" class="md:hidden ec-hidden mt-4" data-astro-cid-3ef6ksr2> <ul class="flex flex-col space-y-8 my-4 mb-8" data-astro-cid-3ef6ksr2> <!-- {
-          navItems.map((item) => {
-            const isActive = currentPath.includes(item.href);
-            return (
-              <li class={`font-light ${isActive ? 'font-bold text-primary' : ''}`}>
-                <a href={item.href}>{item.label}</a>
-              </li>
-            );
-          })
-        } --> </ul> </div> </div> </nav> <div id="eventcatalog-header-spacer" class="h-header" data-astro-cid-3ef6ksr2></div> <!-- Spacer to prevent content from being hidden under the fixed header --> <script type="module">async function c(i){const{callbackUrl:o=window.location.href,prefix:e="/api/auth"}={},n=await fetch(`${e}/csrf`),{csrfToken:t}=await n.json(),a=(await(await fetch(`${e}/signout`,{method:"post",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Auth-Return-Redirect":"1"},body:new URLSearchParams({csrfToken:t,callbackUrl:o})})).json()).url??o;window.location.href=a,a.includes("#")&&window.location.reload()}function s(){const i=document.getElementById("menu-toggle"),o=document.getElementById("mobile-menu");i&&o&&i.addEventListener("click",()=>{o.classList.toggle("ec-hidden")});const e=document.getElementById("profile-menu-button"),n=document.getElementById("profile-dropdown");e&&n&&(e.addEventListener("click",t=>{t.stopPropagation(),n.classList.toggle("ec-hidden"),e.setAttribute("aria-expanded",n.classList.contains("ec-hidden")?"false":"true")}),document.addEventListener("click",t=>{!e.contains(t.target)&&!n.contains(t.target)&&(n.classList.add("ec-hidden"),e.setAttribute("aria-expanded","false"))}),document.addEventListener("keydown",t=>{t.key==="Escape"&&!n.classList.contains("ec-hidden")&&(n.classList.add("ec-hidden"),e.setAttribute("aria-expanded","false"),e.focus())}),document.getElementById("signout-btn")?.addEventListener("click",async()=>{try{await c()}catch(t){console.error("Sign out failed:",t),alert("Sign out failed. Please check your AUTH_TRUST_HOST configuration if running behind a reverse proxy.")}}))}s();document.addEventListener("astro:page-load",s);</script> </div> <div class="flex"> <aside class="flex" id="eventcatalog-vertical-nav"> <div class="fixed flex flex-col items-center w-14 h-screen py-3 bg-[rgb(var(--ec-sidebar-bg))] bg-gradient-to-t from-[rgb(var(--ec-accent)/0.08)] to-[rgb(var(--ec-sidebar-bg))] border-r border-[rgb(var(--ec-sidebar-border))] z-20 shadow-md justify-between"> <nav class="flex flex-col h-[calc(100vh-70px)] justify-between"> <div class="flex flex-col items-center flex-1 space-y-6"> <a id="/" data-role="nav-item" href="/link-cloud/" aria-label="Documentation" class="p-1.5 inline-block transition-colors duration-200 rounded-lg hover:bg-[rgb(var(--ec-sidebar-hover-bg))] hover:text-[rgb(var(--ec-sidebar-active-text))] text-[rgb(var(--ec-sidebar-text))]"> <div class="has-tooltip"> <span class="tooltip rounded shadow-lg p-1 text-xs bg-gray-900 text-white ml-10 whitespace-nowrap" aria-hidden="true"> Documentation </span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open h-6 w-6" aria-hidden="true"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg> </div> </a><a id="/discover" data-role="nav-item" href="/link-cloud/discover/domains" aria-label="Explore" class="p-1.5 inline-block transition-colors duration-200 rounded-lg hover:bg-[rgb(var(--ec-sidebar-hover-bg))] hover:text-[rgb(var(--ec-sidebar-active-text))] text-[rgb(var(--ec-sidebar-text))]"> <div class="has-tooltip"> <span class="tooltip rounded shadow-lg p-1 text-xs bg-gray-900 text-white ml-10 whitespace-nowrap" aria-hidden="true"> Explore </span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-table-properties h-6 w-6" aria-hidden="true"><path d="M15 3v18"></path><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M21 9H3"></path><path d="M21 15H3"></path></svg> </div> </a><a id="/schemas/explorer" data-role="nav-item" href="/link-cloud/schemas/explorer" aria-label="Schema Explorer" class="p-1.5 inline-block transition-colors duration-200 rounded-lg hover:bg-[rgb(var(--ec-sidebar-hover-bg))] hover:text-[rgb(var(--ec-sidebar-active-text))] text-[rgb(var(--ec-sidebar-text))]"> <div class="has-tooltip"> <span class="tooltip rounded shadow-lg p-1 text-xs bg-gray-900 text-white ml-10 whitespace-nowrap" aria-hidden="true"> Schema Explorer </span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-braces h-6 w-6" aria-hidden="true"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"></path><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"></path></svg> </div> </a><a id="/directory" data-role="nav-item" href="/link-cloud/directory/users" aria-label="Users &#38; Teams" class="p-1.5 inline-block transition-colors duration-200 rounded-lg hover:bg-[rgb(var(--ec-sidebar-hover-bg))] hover:text-[rgb(var(--ec-sidebar-active-text))] text-[rgb(var(--ec-sidebar-text))]"> <div class="has-tooltip"> <span class="tooltip rounded shadow-lg p-1 text-xs bg-gray-900 text-white ml-10 whitespace-nowrap" aria-hidden="true"> Users &amp; Teams </span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users h-6 w-6" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> </div> </a> <hr class="w-8 border-t border-[rgb(var(--ec-sidebar-border))]"> <a id="/docs/custom" data-role="nav-item" href="/link-cloud/docs/custom/deploy_use" aria-label="Custom Documentation" class="p-1.5 inline-block transition-colors duration-200 rounded-lg mb-8 relative hover:bg-[rgb(var(--ec-sidebar-hover-bg))] hover:text-[rgb(var(--ec-sidebar-active-text))] text-[rgb(var(--ec-sidebar-text))]"> <div class="has-tooltip"> <span class="tooltip rounded shadow-lg p-1 text-xs bg-gray-900 text-white ml-10 flex items-center gap-1 whitespace-nowrap" aria-hidden="true"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles h-3 w-3" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg> Custom Documentation </span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg> <div class="absolute -top-1 -right-1 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full p-0.5 shadow-lg" aria-hidden="true"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles h-2 w-2 text-white" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg> </div> </div> </a> </div>  </nav> </div> <div id="sidebar" class="sidebar-transition h-content bg-[rgb(var(--ec-sidebar-bg))] bg-gradient-to-bl from-[rgb(var(--ec-sidebar-bg))] via-[rgb(var(--ec-sidebar-bg))] to-[rgb(var(--ec-accent)/0.08)] border-r border-[rgb(var(--ec-sidebar-border))] w-[320px] ml-14"> <meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/link-cloud/_astro/ClientRouter.astro_astro_type_script_index_0_lang.j56hQv-j.js"></script> <script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).only=e;window.dispatchEvent(new Event("astro:only"));})();</script><astro-island uid="1d1dvW" component-url="/link-cloud/_astro/index.BhQ_phl3.js" component-export="default" renderer-url="/link-cloud/_astro/client.D2YREm5k.js" props="{}" ssr client="only" opts="{&quot;name&quot;:&quot;NestedSideBar&quot;,&quot;value&quot;:&quot;react&quot;}"></astro-island> </div> </aside> <main class="sidebar-transition w-full max-h-content overflow-y-auto bg-[rgb(var(--ec-page-bg))] ml-0" id="content"> <main class="flex sm:px-8 docs-layout h-full"><div class="flex docs-layout w-full"><div class="w-full lg:mr-2 pr-8 overflow-y-auto py-8"><div class="w-full max-w-none!"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"> <div class="text-center mb-12"> <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
-Link Event Catalog
-</h1> <p class="mt-3 max-w-md mx-auto text-base text-gray-500 dark:text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-This is the central documentation portal for all domains, services, and events in the Link platform. 
-      Use this catalog to discover existing contracts, understand dependencies, and explore our event-driven architecture.
-</p> <div class="mt-8 flex justify-center"> <a href="assets/link-ec.pdf" target="_new">Download PDF</a> </div> </div> <div class="grid grid-cols-1 gap-8 md:grid-cols-3 mb-16"> <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100"> <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center no-dark-override"> <span class="bg-blue-100 text-blue-600 p-2 rounded-md mr-3"> <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path> </svg> </span>
-Domains
-</h2> <p class="text-gray-600 mb-4">
-Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.
-</p> <a href="/discover/domains" class="text-blue-600 hover:text-blue-800 font-medium !no-underline no-dark-override">Browse Domains &rarr;</a> </div> <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100"> <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center no-dark-override"> <span class="bg-green-100 text-green-600 p-2 rounded-md mr-3"> <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path> </svg> </span>
-Services
-</h2> <p class="text-gray-600 mb-4">
-Discover the services that power the Link platform, their APIs, and the messages they produce and consume.
-</p> <a href="/discover/services" class="text-green-600 hover:text-green-800 font-medium !no-underline no-dark-override">Explore Services &rarr;</a> </div> <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100"> <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center no-dark-override"> <span class="bg-purple-100 text-purple-600 p-2 rounded-md mr-3"> <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path> </svg> </span>
-Messages
-</h2> <p class="text-gray-600 mb-4">
-Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.
-</p> <a href="/discover/events" class="text-purple-600 hover:text-purple-800 font-medium !no-underline no-dark-override">View Messages &rarr;</a> </div> </div> <section class="prose prose-lg max-w-none mb-16"> <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Core Services</h2> <p class="text-gray-600 dark:text-gray-400 mb-8">
-The Link platform is built on a suite of core services that work together to automate reporting workflows, 
-      from data acquisition through to submission.
-</p> <ul class="text-gray-600 dark:text-gray-400 mb-8 list-disc pl-6"> <li><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li> <li><strong>Micro services:</strong> for scalability in cloud environments.</li> <li><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li> </ul> <div class="grid grid-cols-1 md:grid-cols-2 gap-6 not-prose"> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/DataAcquisitionService/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Data Acquisition Service</a></h3> <p class="text-gray-600">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/CensusService/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Census Service</a></h3> <p class="text-gray-600">Manages patient population data and scoping for reporting periods and facilities.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/NormalizationService/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Normalization Service</a></h3> <p class="text-gray-600">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/MeasureEvalService/0.7.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Measure Evaluation Service</a></h3> <p class="text-gray-600">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/ValidationService/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Validation Service</a></h3> <p class="text-gray-600">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/SubmissionService/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Submission Service</a></h3> <p class="text-gray-600">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p> </div> <div class="border border-gray-200 p-6 rounded-lg hover:shadow-md transition-shadow bg-white"> <h3 class="text-xl font-bold mb-2 no-dark-override"><a href="/link-cloud/docs/services/AdminUI/0.6.0" class="text-[rgb(var(--ec-accent))] hover:text-[rgb(var(--ec-accent-hover))]">Admin UI (front-end)</a></h3> <p class="text-gray-600">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p> </div> </div> </section> <section class="prose prose-lg max-w-none mb-16"> <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Primary Use Cases</h2> <div class="bg-blue-50 p-8 rounded-xl border border-blue-100 not-prose"> <h3 class="text-2xl font-bold text-gray-900 mb-4 no-dark-override">NHSN Reporting</h3> <p class="text-gray-700 text-lg mb-6">
-Our primary use case involves the automated generation and submission of healthcare-associated infection reports 
-        to the National Healthcare Safety Network (NHSN). This workflow utilizes the entire Link stack to increase reporting reliability 
-        and reduce the administrative burden on facilities by submitting granular, patient-level data directly to NHSN.
-</p> <a href="/docs/custom/design/use_cases/nhsn" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md !text-white !no-underline bg-blue-600 hover:bg-blue-700 transition-colors no-dark-override">
-Read the NHSN Use Case Deep Dive &rarr;
-</a> </div> </section> <section class="prose prose-lg max-w-none"> <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">How to navigate this catalog</h2> <ul class="dark:text-gray-400"> <li><strong>Sidebars:</strong> Use the left sidebar to navigate through specific domains and services.</li> <li><strong>Visualizer:</strong> Click on "Visualizer" in the sidebar to see interactive diagrams of our system architecture.</li> <li><strong>Search:</strong> Use the search bar (Cmd/Ctrl + K) to quickly find any service, event, or team.</li> <li><strong>Custom Docs:</strong> The "Design", "Deployment & Use", and "Development" sections contain deep-dive guides and patterns.</li> </ul> </section> </div></div><footer data-astro-transition-persist="site-footer" class="relative py-4 space-y-8 border-t border-[rgb(var(--ec-page-border))] undefined">  </footer></div></div></main> </main> <!-- Create a overlay that tells people to purchase backstage plugin if they want to embed the page --> <div class="absolute inset-0 bg-black items-center justify-center z-50 hidden" id="embed-overlay"> <div class="text-white text-center space-y-4"> <div> <h1 class="text-2xl font-bold">EventCatalog Backstage Integration</h1> <p class="text-md text-red-500">Missing license key for backstage integration.</p> </div> <div> <p class="text-sm text-gray-500">Please configure the backstage plugin to embed this page into Backstage.</p> <a href="https://www.eventcatalog.dev/integrations/backstage" class="text-blue-500 text-xs">Configure backstage plugin &rarr;</a> </div> </div> </div> </div> </main>   </body></html> <meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"> <script>(function(){const navigationItems = [{"id":"/","label":"Documentation","icon":{"displayName":"BookOpen"},"href":"/link-cloud/","current":false},{"id":"/discover","label":"Explore","icon":{"displayName":"TableProperties"},"href":"/link-cloud/discover/domains","current":false},{"id":"/schemas/explorer","label":"Schema Explorer","icon":{"displayName":"Braces"},"href":"/link-cloud/schemas/explorer","current":false},{"id":"/directory","label":"Users & Teams","icon":{"displayName":"Users"},"href":"/link-cloud/directory/users","current":false}];
-const currentNavigationItem = undefined;
-const canPageBeEmbedded = false;
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
 
-  // Listen for Astro transititions
-  document.addEventListener('astro:page-load', () => {
-    document.dispatchEvent(new CustomEvent('contentLoaded'));
-  });
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
 
-  // Listen for DOM loaded
-  document.addEventListener('DOMContentLoaded', () => {
-    document.dispatchEvent(new CustomEvent('contentLoaded'));
-  });
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
 
-  document.addEventListener('contentLoaded', () => {
-    // Users can add ?embed=true to the URL to hide the navigation
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const params = Object.fromEntries(urlSearchParams.entries());
-    const embeded = params.embed === 'true' ? true : false;
-    const content = document.getElementById('content');
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
 
-    if (embeded && !canPageBeEmbedded) {
-      const overlay = document.getElementById('embed-overlay');
-      overlay.style.display = 'flex';
-      return;
-    }
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
 
-    if (embeded) {
-      const elementsToHide = [
-        'eventcatalog-vertical-nav',
-        'eventcatalog-header',
-        'eventcatalog-header-spacer',
-        'visualiser-footer',
-        // /discover page elements
-        'discover-collection-tabs',
-        'discover-title',
-      ];
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
 
-      elementsToHide.forEach((id) => {
-        const element = document.getElementById(id);
-        if (element) element.style.display = 'none';
-      });
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
 
-      content.classList.remove('ml-14');
-      content.classList.remove('max-h-content');
-      return;
-    }
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
 
-    const navItems = document.querySelectorAll('[data-role="nav-item"]');
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
 
-    // Navigation items simply navigate to their href - no toggle logic
-    navItems.forEach((item) => {
-      item.addEventListener('click', (e) => {
-        const id = item.getAttribute('id');
-        const navItem = navigationItems.find((navItem) => navItem.id === id);
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
 
-        if (navItem && navItem.href) {
-          window.location.href = navItem.href;
-        }
-      });
-    });
-  });
-})();</script>
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
+<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    <div class="col">
+        <div class="card h-100 shadow-sm border-0 bg-light">
+            <div class="card-body text-center">
+                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
+                <h5 class="card-title content-heading">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
+                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm border-0 bg-light">
+            <div class="card-body text-center">
+                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
+                <h5 class="card-title content-heading">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
+                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm border-0 bg-light">
+            <div class="card-body text-center">
+                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
+                <h5 class="card-title content-heading">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
+                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Section 2: Core Services Overview -->
+<div class="mb-5">
+    <h2 class="border-bottom pb-2 mb-3 content-heading">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
+    <ul class="list-group list-group-flush">
+        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
+        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
+        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
+    </ul>
+</div>
+<!-- Section 3: Service Cards (3 Column Grid) -->
+<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
+                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
+                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
+                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
+                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
+                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
+                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title content-heading">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
+                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
+                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
+            </div>
+        </div>
+    </div>
+</div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

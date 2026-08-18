@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -199,6 +200,7 @@ public class ReadyToAcquireListenerTests
             : base(
                 new Mock<ILogger<AcquisitionProcessorBackgroundService>>().Object,
                 new ServiceCollection().BuildServiceProvider(),
+                new Mock<IProducer<ResourceKey, ResourcesAcquired>>().Object,
                 Options.Create(new LantanaGroup.Link.DataAcquisition.Domain.Settings.AcquisitionWorkerProcessorSettings()))
         {
         }

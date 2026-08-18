@@ -43,6 +43,25 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-navbar .nav-link:hover { color: var(--au-accent) !important; }
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
 
+.au-navbar .au-nav-dropdown-menu {
+  background: var(--au-dark);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--au-radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  padding: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item {
+  color: #fff;
+  border-radius: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item:hover,
+.au-navbar .au-nav-dropdown-menu .dropdown-item:focus {
+  background: var(--au-dark-soft);
+  color: #fff;
+}
+
 /* ===================================================================
    Cards — the core container
    =================================================================== */
@@ -90,7 +109,9 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-badge-success  { background: var(--au-success) !important; }
 .au-badge-danger   { background: var(--au-danger)  !important; }
 .au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.au-badge-active   { background: var(--au-accent)  !important; }
 .au-badge-muted    { background: var(--au-muted)   !important; }
+.au-badge-skip     { background: #6c757d !important; color: #fff !important; }
 
 /* ===================================================================
    Tables
@@ -171,6 +192,27 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 .au-cohort-card .card-body { padding: .75rem 1rem; }
 
+.au-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.au-cohort-table {
+  min-width: 1080px;
+}
+
+.au-imported-table {
+  min-width: 860px;
+}
+
+.au-cohort-table td .form-control,
+.au-cohort-table td .form-select,
+.au-imported-table td .form-control,
+.au-imported-table td .form-select {
+  max-width: 100%;
+}
+
 /* ===================================================================
    Scenario header bar (inside the form)
    =================================================================== */
@@ -180,6 +222,10 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   border-radius: var(--au-radius);
   padding: .75rem 1rem;
   margin-bottom: 1rem;
+}
+
+.au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
 }
 
 /* ===================================================================
@@ -275,6 +321,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   .au-card .card-body { padding: .75rem; }
   .au-table { font-size: .8rem; }
   .au-summary-item { font-size: .8rem; }
+  .au-scenario-modal-dialog { max-width: 96vw; }
 }
 
 /* ===================================================================

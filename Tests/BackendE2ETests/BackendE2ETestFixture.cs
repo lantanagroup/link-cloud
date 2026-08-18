@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link;
+﻿using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
@@ -62,9 +62,19 @@ public sealed class BackendE2ETestFixture : IDisposable
 
         // LinkSdk clients (IFacilityServiceClient, IReportServiceClient, etc.)
         builder.Services.AddLinkSdk();
+        builder.Services.AddHttpClient();
+        builder.Services.AddHttpClient<LokiScraper>((sp, client) =>
+        {
+            var cfg = sp.GetRequiredService<AutomationConfig>();
+            var configuredBaseUrl = string.IsNullOrWhiteSpace(cfg.LokiBaseUrl)
+                ? "http://localhost:3100"
+                : cfg.LokiBaseUrl;
+
+            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri))
+                client.BaseAddress = baseUri;
+        });
 
         // Automation infrastructure
-        builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => {
             var cfg = sp.GetRequiredService<AutomationConfig>();
             return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);

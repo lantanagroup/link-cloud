@@ -1,11 +1,10 @@
+﻿using Flurl.Http;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
 using Task = System.Threading.Tasks.Task;
 
@@ -30,6 +29,7 @@ public class MeasureLoader
 
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;
+    private string? _measureDefinitionId;
 
     public MeasureLoader(
         IMeasureEvalServiceClient measureEvalClient,
@@ -89,6 +89,7 @@ public class MeasureLoader
 
         Measure measure = originalBundle.Entry.FirstOrDefault(e => e.Resource?.TypeName == "Measure")?.Resource as Measure ?? throw new InvalidOperationException("Measure not found in bundle.");
         this.MeasureId = measure.Id;
+        this._measureDefinitionId = originalBundle.Id;
 
         this._evaluationBundle = new Bundle
         {
@@ -120,9 +121,12 @@ public class MeasureLoader
         // validator + evaluator cache + Mongo upsert and one will come back
         // as HTTP 500. We serialize PUTs per measure id across *processes*
         // via a file lock so parallel test runs can share the stack safely.
-        await WithCrossProcessMeasureIdLockAsync(this.MeasureId!, async () =>
+        var lockId = this._measureDefinitionId ?? this.MeasureId
+            ?? throw new InvalidOperationException("Measure bundle did not include a Bundle.id or Measure.id.");
+
+        await WithCrossProcessMeasureIdLockAsync(lockId, async () =>
         {
-            await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+            await PutMeasureDefinitionWithRetryAsync();
         });
 
         await VerifyMeasureDefinitionAsync();
@@ -195,8 +199,15 @@ public class MeasureLoader
     {
         try
         {
-            var content = await _measureEvalClient.GetMeasureDefinitionAsync(MeasureId!);
-            var json = Newtonsoft.Json.Linq.JObject.Parse(content);
+            var definitionId = _measureDefinitionId ?? MeasureId;
+            if (string.IsNullOrWhiteSpace(definitionId))
+                return;
+
+            var content = await _measureEvalClient.GetMeasureDefinitionAsync(definitionId);
+            if (!content.IsSuccessStatusCode || string.IsNullOrWhiteSpace(content.Body))
+                throw new InvalidOperationException($"Measure definition '{definitionId}' was not found after load.");
+
+            var json = Newtonsoft.Json.Linq.JObject.Parse(content.Body);
             var id = json["id"]?.ToString() ?? "(unknown)";
             var bundle = json["bundle"];
             var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
@@ -213,7 +224,53 @@ public class MeasureLoader
         catch (Exception ex)
         {
             _output.WriteLine($"  WARNING: Measure definition verification failed: {ex.Message}");
+            throw;
         }
+    }
+
+    private async Task PutMeasureDefinitionWithRetryAsync()
+    {
+        const int maxAttempts = 5;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var response = await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+
+            if (response.IsSuccessStatusCode)
+                return;
+
+            if (response.StatusCode is 500 or 502 or 503 or 504)
+            {
+                if (await MeasureDefinitionExistsAsync())
+                {
+                    _output.WriteLine($"  Measure definition PUT returned {response.StatusCode}, but definition already exists. Continuing.");
+                    return;
+                }
+
+                if (attempt == maxAttempts)
+                    throw new InvalidOperationException(
+                        $"Measure definition PUT failed after {maxAttempts} attempts. HTTP {response.StatusCode}: {response.RawBody ?? "(no body)"}");
+
+                var delay = TimeSpan.FromMilliseconds(Math.Min(4000, 250 * (1 << (attempt - 1))));
+                _output.WriteLine($"  Measure definition PUT attempt {attempt}/{maxAttempts} failed with status {response.StatusCode}. Retrying in {delay.TotalMilliseconds:0} ms...");
+                await Task.Delay(delay);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Measure definition PUT failed with HTTP {response.StatusCode}: {response.RawBody ?? "(no body)"}");
+            }
+        }
+    }
+
+    private async Task<bool> MeasureDefinitionExistsAsync()
+    {
+        var definitionId = _measureDefinitionId ?? MeasureId;
+        if (string.IsNullOrWhiteSpace(definitionId))
+            return false;
+
+        var content = await _measureEvalClient.GetMeasureDefinitionAsync(definitionId);
+        return content.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(content.Body);
     }
 
 

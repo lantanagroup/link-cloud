@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 public class DataAcquisitionLogStatusStatistics
 {

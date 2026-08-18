@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Helpers;
+﻿namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
 /// Generic interface for monitoring a message bus (e.g., Kafka, RabbitMQ, Azure Service Bus)

@@ -13,6 +13,7 @@ public class Headers {
     public static final String EXCEPTION_MESSAGE = "X-Exception-Message";
     public static final String EXCEPTION_SERVICE = "X-Exception-Service";
     public static final String RETRY_COUNT = "X-Retry-Count";
+    public static final String QUERY_TYPE = "X-Query-Type";
 
     public static String getString(byte[] bytes) {
         return new String(bytes, CHARSET);
@@ -24,6 +25,11 @@ public class Headers {
 
     public static String getCorrelationId(org.apache.kafka.common.header.Headers headers) {
         Header header = headers.lastHeader(CORRELATION_ID);
+        return header == null ? null : getString(header.value());
+    }
+
+    public static String getQueryType(org.apache.kafka.common.header.Headers headers) {
+        Header header = headers.lastHeader(QUERY_TYPE);
         return header == null ? null : getString(header.value());
     }
 }

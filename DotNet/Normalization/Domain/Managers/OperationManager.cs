@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -398,7 +398,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             foreach (var sequence in sequences)
-            {
+            {   
                 var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
                 var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
@@ -415,7 +415,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 FacilityId = model.FacilityId,
                 ResourceType = model.ResourceType
-            });
+            },false);
         }
 
         public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model)

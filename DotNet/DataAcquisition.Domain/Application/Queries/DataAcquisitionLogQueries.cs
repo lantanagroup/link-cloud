@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -7,6 +7,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -15,9 +17,9 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -78,6 +80,9 @@ public interface IDataAcquisitionLogQueries
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
         CancellationToken cancellationToken = default);
 
+    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string? reportTrackingId, string resourceType,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// For each resource type in <paramref name="resourceTypes"/>, returns the ones that still
     /// have at least one non-terminal DataAcquisitionLog for the given correlation + facility.
@@ -100,21 +105,35 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
+    private readonly IResourceCache _resourceCache;
 
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
-        ILogger<DataAcquisitionLogQueries> logger)
+        ILogger<DataAcquisitionLogQueries> logger, IResourceCache resourceCache)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
         string resourceType, CancellationToken cancellationToken = default)
     {
+        return await GetResourceIdsForReportPatient(
+            correlationId,
+            facilityId,
+            reportTrackingId: null,
+            resourceType,
+            cancellationToken);
+    }
+
+    public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
+        string? reportTrackingId, string resourceType, CancellationToken cancellationToken = default)
+    {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetResourceIdsForReportPatient");
         activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType);
 
         if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
@@ -123,11 +142,24 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             return new List<string>();
         }
 
+        Guid? reportTrackingGuid = null;
+        if (!string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            if (!Guid.TryParse(reportTrackingId, out var parsedReportTrackingGuid))
+            {
+                _logger.LogWarning("Failed to parse report tracking id: {ReportTrackingId}", reportTrackingId.SanitizeForLog());
+                return new List<string>();
+            }
+
+            reportTrackingGuid = parsedReportTrackingGuid;
+        }
+
         var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
                                        join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
                                        join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
                                        where query.FacilityId == facilityId
                                              && log.CorrelationId == correlationId
+                                             && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
                                              && resourceTypeEntry.ResourceType == parsedResourceType
                                        select log.ResourceIds.Select(r => r.ResourceId).ToList()).ToListAsync(cancellationToken);
 
@@ -139,15 +171,37 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             if (resourceReferences != null)
             {
                 var filteredIds = resourceReferences
-                    .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
-                    .Select(r => r.Substring(resourceTypePrefix.Length))
+                    .Select(r => NormalizeResourceId(r, resourceTypePrefix))
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Select(r => r!)
                     .ToList();
 
                 result.AddRange(filteredIds);
             }
         }
 
-        return result;
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static string? NormalizeResourceId(string? resourceId, string resourceTypePrefix)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            return null;
+        }
+
+        if (resourceId.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return resourceId[resourceTypePrefix.Length..];
+        }
+
+        if (!resourceId.Contains('/', StringComparison.Ordinal))
+        {
+            return resourceId;
+        }
+
+        var segments = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length > 0 ? segments[^1] : null;
     }
 
     public async Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,
@@ -163,10 +217,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             return [];
         }
 
-        var terminalStatuses = new[]
-        {
-            RequestStatus.Completed, RequestStatus.Skipped, RequestStatus.MaxRetriesReached, RequestStatus.Cancelled
-        };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         // Parse supplied strings to the ResourceType enum. Anything that doesn't parse is skipped.
         var parsed = new List<(string Original, ResourceType Parsed)>();
@@ -195,7 +246,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
             where log.FacilityId == facilityId
                   && log.CorrelationId == correlationId
-                  && parsedTypes.Contains(resourceTypeEntry.ResourceType)
+                  && parsedTypes.Contains(resourceTypeEntry.ResourceType.HasValue ? resourceTypeEntry.ResourceType.Value : default)
             select new { resourceTypeEntry.ResourceType, log.Status })
             .ToListAsync(cancellationToken);
 
@@ -208,7 +259,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var hasNonTerminal = grouping.Any(g =>
                 g.Status is null || !terminalStatuses.Contains(g.Status.Value));
             if (hasNonTerminal)
-                blocking.Add(grouping.Key);
+                blocking.Add(grouping.Key.HasValue ? grouping.Key.Value : default);
         }
 
         return parsed
@@ -220,7 +271,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, id);
 
         return await ProjectLogById(id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -239,7 +290,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => new DataAcquisitionLogModel
             {
                 Id = l.Id,
-                Priority = l.Priority,
+                Priority = l.Priority.HasValue ? l.Priority.Value : default,
                 FacilityId = l.FacilityId,
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
@@ -256,8 +307,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     FacilityId = q.FacilityId,
                     MeasureId = q.MeasureId,
                     IsReference = q.IsReference,
-                    QueryType = q.QueryType,
-                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
+                    QueryType = q.QueryType.HasValue ? q.QueryType.Value : default,
+                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType.HasValue ? r.ResourceType.Value : default).ToList(),
                     QueryParameters = q.QueryParameters,
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
@@ -268,7 +319,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     {
                         Id = rt.Id,
                         FacilityId = rt.FacilityId,
-                        QueryPhase = rt.QueryPhase,
+                        QueryPhase = rt.QueryPhase.HasValue ? rt.QueryPhase.Value : default,
                         ResourceType = rt.ResourceType,
                         FhirQueryId = rt.FhirQueryId,
                         CreateDate = rt.CreateDate,
@@ -280,7 +331,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CreateDate = l.CreateDate,
                 TraceId = l.TraceId,
                 RetryAttempts = l.RetryAttempts,
-                CompletionDate = l.CompletionDate,
+                CompletionDate = l.CompletionDate ?? (l.Status == RequestStatus.Completed ? l.ModifyDate : null),
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredIds = l.ResourceIds.Select(r => r.ResourceId).ToList(),
                 ReferenceResourceCount = l.ReferenceResources.Count(),
@@ -288,7 +339,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
                     ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                    Frequency = l.ScheduledReportEntity.Frequency,
+                    Frequency = l.ScheduledReportEntity.Frequency.HasValue ? l.ScheduledReportEntity.Frequency.Value : default,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                     ReportTypes = l.ScheduledReportEntity.ReportTypes != null
@@ -302,8 +353,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(
         CancellationToken cancellationToken = default)
     {
-        var completedOrFailedStatuses = new[]
-            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         try
         {
@@ -320,7 +370,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
-                    log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) &&
+                    log.Status != null && terminalStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null)
                 .GroupBy(log => new
@@ -356,7 +406,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         log.CorrelationId == group.CorrelationId &&
                         log.ReportTrackingId == group.ReportTrackingId &&
                         log.QueryPhase == group.QueryPhase &&
-                        (log.Status == null || !completedOrFailedStatuses.Contains(log.Status.Value)),
+                        (log.Status == null || !terminalStatuses.Contains(log.Status.Value)),
                     cancellationToken);
 
                 if (hasIncomplete)
@@ -379,7 +429,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
                             ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                            Frequency = log.ScheduledReportEntity.Frequency,
+                            Frequency = log.ScheduledReportEntity.Frequency.HasValue ? log.ScheduledReportEntity.Frequency.Value : default,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                             ReportTypes = log.ScheduledReportEntity.ReportTypes != null
@@ -394,22 +444,39 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 var first = groupLogs.First();
 
+                // Only include cache keys for resource types that had at least one resource actually acquired.
+                // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
+                // is the substring before the first '/'.
+                var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
+                    .Join(_dbContext.DataAcquisitionLogs,
+                        rid => rid.DataAcquisitionLogId,
+                        l => l.Id,
+                        (rid, l) => new { rid, l })
+                    .Where(x => x.l.FacilityId == group.FacilityId
+                        && x.l.CorrelationId == group.CorrelationId
+                        && x.l.QueryPhase == group.QueryPhase)
+                    .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
                 results.Add(new TailingMessageModel
                 {
                     FacilityId = group.FacilityId ?? string.Empty,
                     CorrelationId = group.CorrelationId ?? string.Empty,
                     LogIds = groupLogs.Select(x => x.Id).ToList(),
                     TraceParentId = groupLogs.FirstOrDefault(x => x.TraceId != null)?.TraceId ?? string.Empty,
-                    ResourceAcquired = new ResourceAcquired
+                    ResourcesAcquired = new ResourcesAcquired
                     {
-                        PatientId = first.PatientId ?? string.Empty,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
-                        AcquisitionComplete = true,
-                        ScheduledReports = new List<ScheduledReport>
-                        {
-                            first.ScheduledReport
-                        }
+                        ScheduledReports = first.ScheduledReport != null
+                            ? new List<ScheduledReport> { first.ScheduledReport }
+                            : new List<ScheduledReport>(),
+                        CacheType = _resourceCache.GetCacheTypeForCorrelationId(group.CorrelationId ?? string.Empty),
+                        CacheKeys = acquiredResourceTypes
+                            .Select(rt => $"{group.CorrelationId}:{rt}")
+                            .Distinct()
+                            .ToList()
                     }
                 });
 
@@ -471,6 +538,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.QueryPhase,
                     log.ExecutionDate,
                     log.CreateDate,
+                    CompletionDate = log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null),
                     log.RetryAttempts,
                     log.Status,
                     log.IsDeleted
@@ -552,7 +620,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     return new QueryLogSummaryModel
                     {
                         Id = log.Id,
-                        Priority = log.Priority,
+                        Priority = log.Priority.HasValue ? log.Priority.Value : default,
                         FacilityId = log.FacilityId,
                         PatientId = log.PatientId,
                         ResourceTypes = resourceTypes,
@@ -562,6 +630,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         QueryPhase = log.QueryPhase,
                         ExecutionDate = log.ExecutionDate,
                         CreateDate = log.CreateDate,
+                        CompletionDate = log.CompletionDate,
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
@@ -596,7 +665,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => new DataAcquisitionLogSummaryModel
             {
                 Id = l.Id,
-                Priority = l.Priority,
+                Priority = l.Priority.HasValue ? l.Priority.Value : default,
                 FacilityId = l.FacilityId,
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
@@ -611,7 +680,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CreateDate = l.CreateDate,
                 TraceId = l.TraceId,
                 RetryAttempts = l.RetryAttempts,
-                CompletionDate = l.CompletionDate,
+                CompletionDate = l.CompletionDate ?? (l.Status == RequestStatus.Completed ? l.ModifyDate : null),
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredCount = l.ResourceIds.Count,
                 Notes = null,
@@ -636,7 +705,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportId);
 
         if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
         {
@@ -696,87 +765,99 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total. Reference logs are first-class
-        // log rows in the same QueryPhase as their primary; their fetched ids are
-        // recorded in DataAcquisitionLogResourceIds just like any primary log, so
-        // walking ResourceIds across all completed logs counts every resource —
-        // primary and reference — exactly once.
-        var completedResourceIds = await baseQuery
-            .Where(l => l.Status == RequestStatus.Completed)
-            .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
+        // Resource type counts + total.
+        var resourceTypeCounts = await _dbContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(r =>
+                r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
+                && !r.DataAcquisitionLog.IsDeleted
+                && r.DataAcquisitionLog.Status == RequestStatus.Completed
+                && r.ResourceId != null
+                && r.ResourceId != "")
+            .GroupBy(r => r.ResourceId.IndexOf("/") > 0
+                ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
+                : r.ResourceId)
+            .Select(g => new { ResourceType = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        foreach (var resource in completedResourceIds)
+        foreach (var rt in resourceTypeCounts)
         {
-            if (string.IsNullOrWhiteSpace(resource)) continue;
-            var slashIdx = resource.IndexOf('/');
-            var resourceType = slashIdx > 0 ? resource[..slashIdx] : resource;
-            if (string.IsNullOrEmpty(resourceType)) continue;
-
-            statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val);
-            statistics.ResourceTypeCounts[resourceType] = val + 1;
+            if (!string.IsNullOrEmpty(rt.ResourceType))
+                statistics.ResourceTypeCounts[rt.ResourceType] = rt.Count;
         }
 
         statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
 
         // Distinct patients where ALL logs are terminal (Completed, MaxRetriesReached, Skipped, Cancelled)
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         statistics.TotalCompletedPatients = await baseQuery
             .Where(l => l.PatientId != null)
             .GroupBy(l => l.PatientId)
-            .Where(g => g.All(l => l.Status != null && terminalStatuses.Contains(l.Status.Value)))
+            .Where(g => g.Count(l => l.Status == null || !terminalStatuses.Contains(l.Status.Value)) == 0)
             .CountAsync(cancellationToken);
 
         // Fastest / slowest completion times
-        var fastest = await baseQuery
+        var fastestLog = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderBy(l => l.CompletionTimeMilliseconds)
-            .Select(l => new
-            {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
+            .Select(l => new { l.Id, l.CompletionTimeMilliseconds })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (fastest != null)
+        if (fastestLog != null)
         {
+            var fastestResourceTypes = await (
+                from fq in _dbContext.FhirQueries.AsNoTracking()
+                join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+                where fq.DataAcquisitionLogId == fastestLog.Id
+                select fqrt.ResourceType
+            ).ToListAsync(cancellationToken);
+
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastest.ResourceTypes),
-                fastest.CompletionTimeMilliseconds!.Value);
+                string.Join(",", fastestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
+                fastestLog.CompletionTimeMilliseconds!.Value);
         }
 
-        var slowest = await baseQuery
+        var slowestLog = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderByDescending(l => l.CompletionTimeMilliseconds)
-            .Select(l => new
-            {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
+            .Select(l => new { l.Id, l.CompletionTimeMilliseconds })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (slowest != null)
+        if (slowestLog != null)
         {
+            var slowestResourceTypes = await (
+                from fq in _dbContext.FhirQueries.AsNoTracking()
+                join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+                where fq.DataAcquisitionLogId == slowestLog.Id
+                select fqrt.ResourceType
+            ).ToListAsync(cancellationToken);
+
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowest.ResourceTypes),
-                slowest.CompletionTimeMilliseconds!.Value);
+                string.Join(",", slowestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
+                slowestLog.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation lightweight projection
-        var completionTimes = await baseQuery
-            .Where(l => l.CompletionTimeMilliseconds != null)
-            .Select(l => new
+        // Per-resource-type completion time aggregation.
+        var completionTimeRows = await (
+            from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
+            join fq in _dbContext.FhirQueries on log.Id equals fq.DataAcquisitionLogId
+            join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+            where log.ReportTrackingId == reportTrackingIdGuid
+                  && !log.IsDeleted
+                  && log.CompletionTimeMilliseconds != null
+            select new
             {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
-            .ToListAsync(cancellationToken);
+                log.Id,
+                log.CompletionTimeMilliseconds,
+                fqrt.ResourceType
+            }
+        ).ToListAsync(cancellationToken);
 
-        foreach (var ct in completionTimes)
+        foreach (var logGroup in completionTimeRows.GroupBy(x => x.Id))
         {
-            var key = string.Join(",", ct.ResourceTypes);
+            var key = string.Join(",", logGroup.Select(x => x.ResourceType.ToString()).Distinct().OrderBy(r => r));
             statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(key, out var existing);
-            statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + ct.CompletionTimeMilliseconds!.Value;
+            statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + logGroup.First().CompletionTimeMilliseconds!.Value;
         }
 
         return statistics;
@@ -954,10 +1035,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     private static IQueryable<DataAcquisitionLog> ApplySort(IQueryable<DataAcquisitionLog> query, string? sortBy,
-        LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder)
+        SortOrder sortOrder)
     {
         var normalizedSortBy = sortBy?.Trim().ToLowerInvariant();
-        var descending = sortOrder == LantanaGroup.Link.Shared.Application.Enums.SortOrder.Descending;
+        var descending = sortOrder == SortOrder.Descending;
 
         return normalizedSortBy switch
         {
@@ -970,6 +1051,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             "status" => descending ? query.OrderByDescending(log => log.Status) : query.OrderBy(log => log.Status),
             "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
             "retryattempts" => descending ? query.OrderByDescending(log => log.RetryAttempts) : query.OrderBy(log => log.RetryAttempts),
+            "completiondate" => descending
+                ? query.OrderByDescending(log => log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null))
+                : query.OrderBy(log => log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null)),
             "isdeleted" => descending ? query.OrderByDescending(log => log.IsDeleted) : query.OrderBy(log => log.IsDeleted),
             "reporttrackingid" => descending ? query.OrderByDescending(log => log.ReportTrackingId) : query.OrderBy(log => log.ReportTrackingId),
             _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
@@ -981,21 +1065,38 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
-        var terminalStatuses = new[]
-        {
-            RequestStatus.Completed,
-            RequestStatus.MaxRetriesReached,
-            RequestStatus.Skipped,
-            RequestStatus.Cancelled,
-            RequestStatus.ConfigurationMissing,
-        };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
                     where log.FacilityId == facilityId
                           && (lastId == null || log.Id > lastId)
                           && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                           && (log.Status == null || statuses.Contains(log.Status.Value))
+                          && (log.ReferenceResourceType != null
+                              || log.QueryPhase != QueryPhase.Initial
+                              || !_dbContext.LocationConfigurations.Any(config =>
+                                  config.FacilityId == log.FacilityId
+                                  && config.IsActive)
+                              || log.FhirQueries.Any(query => query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                     resourceTypeEntry.ResourceType == ResourceType.Patient
+                                  || resourceTypeEntry.ResourceType == ResourceType.Encounter
+                                  || resourceTypeEntry.ResourceType == ResourceType.Location))
+                              || !_dbContext.DataAcquisitionLogs.Any(sibling =>
+                                  sibling.FacilityId == log.FacilityId
+                                  && sibling.CorrelationId == log.CorrelationId
+                                  && sibling.QueryPhase == log.QueryPhase
+                                  && (sibling.Status == null || !terminalStatuses.Contains(sibling.Status.Value))
+                                  && (sibling.ReferenceResourceType == ResourceType.Location.ToString()
+                                      || sibling.FhirQueries.Any(query => query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                          resourceTypeEntry.ResourceType == ResourceType.Patient
+                                          || resourceTypeEntry.ResourceType == ResourceType.Encounter
+                                          || resourceTypeEntry.ResourceType == ResourceType.Location)))))
                           && (log.ReferenceResourceType == null
+                              || (log.ReferenceResourceType == ResourceType.Location.ToString()
+                                  && log.QueryPhase == QueryPhase.Initial
+                                  && _dbContext.LocationConfigurations.Any(config =>
+                                      config.FacilityId == log.FacilityId
+                                      && config.IsActive))
                               || (log.CorrelationId != null
                                   && log.QueryPhase != null
                                   && !_dbContext.DataAcquisitionLogs.Any(sibling =>
@@ -1008,7 +1109,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,
-                        Priority = log.Priority,
+                        Priority = log.Priority.HasValue ? log.Priority.Value : default,
                         FacilityId = log.FacilityId,
                         IsCensus = log.IsCensus,
                         PatientId = log.PatientId,
@@ -1030,7 +1131,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
                             ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                            Frequency = log.ScheduledReportEntity.Frequency,
+                            Frequency = log.ScheduledReportEntity.Frequency.HasValue ? log.ScheduledReportEntity.Frequency.Value : default,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                             ReportTypes = log.ScheduledReportEntity.ReportTypes != null
@@ -1046,7 +1147,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)
     {
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         var cutoff = DateTime.UtcNow.Subtract(minAge);
 
         // Find groups where:

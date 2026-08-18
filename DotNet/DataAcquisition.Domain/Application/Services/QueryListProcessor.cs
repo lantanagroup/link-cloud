@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -15,15 +15,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -98,7 +97,7 @@ public class QueryListProcessor : IQueryListProcessor
         using var activity = ServiceActivitySource.Instance.StartActivity("QueryListProcessor.ExecuteFacilityValidationRequest");
         activity?.SetTag(DiagnosticNames.FacilityId, request.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, request.CorrelationId);
-        activity?.SetTag(DiagnosticNames.QueryType, queryPlanType);
+        activity?.SetTag(DiagnosticNames.Phase, queryPlanType);
 
         var resources = new List<Resource>();
         List<ResourceReference> referenceResources = new List<ResourceReference>();
@@ -160,7 +159,7 @@ public class QueryListProcessor : IQueryListProcessor
             var fhirQuery = new CreateFhirQueryModel
             {
                 FacilityId = request.FacilityId,
-                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase.GetValueOrDefault(), ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 
@@ -198,7 +197,7 @@ public class QueryListProcessor : IQueryListProcessor
                     var pagedFhirQuery = new CreateFhirQueryModel
                     {
                         FacilityId = request.FacilityId,
-                        ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                        ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase.GetValueOrDefault(), ResourceType = x.ResourceType }).ToList(),
                         MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
                         ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) },
                         QueryParameters = searchParams.Select(x => $"{x.Key}={x.Value}").ToList(),

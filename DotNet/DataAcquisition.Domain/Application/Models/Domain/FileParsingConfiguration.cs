@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
 /// <summary>
 /// Configuration for parsing delimited or structured files.

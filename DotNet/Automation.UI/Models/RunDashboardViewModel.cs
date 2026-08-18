@@ -1,4 +1,4 @@
-namespace Automation.UI.Models;
+﻿namespace Automation.UI.Models;
 
 /// <summary>
 /// ViewModel for the Runs dashboard page.

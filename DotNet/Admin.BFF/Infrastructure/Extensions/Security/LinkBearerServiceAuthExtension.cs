@@ -20,9 +20,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             services.AddAuthentication().AddJwtBearer(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken, options =>
             {
-                options.Authority = linkBearerServiceOptions.Authority;
+                options.Authority = linkBearerServiceOptions.Authority;                             
                 options.Audience = linkBearerServiceOptions.Audience;
-                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
+
+                var authorityIsHttps = Uri.TryCreate(linkBearerServiceOptions.Authority, UriKind.Absolute, out var authorityUri)
+                    && string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment() && authorityIsHttps;
                 options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()

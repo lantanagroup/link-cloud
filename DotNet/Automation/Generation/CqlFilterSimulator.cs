@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Simulates measure-specific CQL SDE <c>where</c>-clause filtering at the individual-resource level.
@@ -23,7 +23,10 @@ public static class CqlFilterSimulator
         new HypoMedicationAdministrationFilterProfile(),
         new AchHypoCoverageFilterProfile(),
         new AchHypoServiceRequestFilterProfile(),
-        new AchEncounterFilterProfile()
+        new AchEncounterFilterProfile(),
+        new AchMonthlySpecimenFilterProfile(),
+        new AchDailySpecimenFilterProfile(),
+        new HypoglycemicSpecimenFilterProfile()
     ];
 
     /// <summary>
@@ -122,6 +125,7 @@ public static class CqlFilterSimulator
         public IReadOnlyList<MedicationAdministrationContext> MedicationAdministrations { get; init; } = Array.Empty<MedicationAdministrationContext>();
         public IReadOnlyList<CoverageContext> Coverages { get; init; } = Array.Empty<CoverageContext>();
         public IReadOnlyList<ServiceRequestContext> ServiceRequests { get; init; } = Array.Empty<ServiceRequestContext>();
+        public IReadOnlyList<SpecimenContext> Specimens { get; init; } = Array.Empty<SpecimenContext>();
         public IReadOnlyList<EncounterContext> Encounters { get; init; } = Array.Empty<EncounterContext>();
         public DateTime MeasurementPeriodStart { get; init; } = DateTime.MinValue;
         public DateTime MeasurementPeriodEnd { get; init; } = DateTime.MaxValue;
@@ -253,6 +257,9 @@ public static class CqlFilterSimulator
         DateTime EffectiveStart,
         DateTime EffectiveEnd)
     {
+        public string Status { get; init; } = string.Empty;
+        public string SpecimenReference { get; init; } = string.Empty;
+
         public bool HasCategory(string code) =>
             CategoryCodes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
 
@@ -411,6 +418,21 @@ public static class CqlFilterSimulator
         string ResourceId,
         DateTime AuthoredOn,
         string EncounterReference);
+
+    /// <summary>
+    /// CQL-relevant attributes of a Specimen. <c>collection.collected</c> normalizes both
+    /// DateTime and Period shapes.
+    /// </summary>
+    public sealed record SpecimenContext(
+        string ResourceId,
+        DateTime CollectionStart,
+        DateTime CollectionEnd)
+    {
+        public string SubjectReference { get; init; } = string.Empty;
+
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            CollectionStart <= periodEnd && CollectionEnd >= periodStart;
+    }
 
     // ----- Procedure profiles -----
 
@@ -628,5 +650,97 @@ public static class CqlFilterSimulator
 
         protected override bool IncludeEncounter(EncounterContext enc, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
             ipWindows.AnyOverlaps(enc.PeriodStart, enc.PeriodEnd);
+    }
+
+    // ----- Specimen profiles -----
+
+    private abstract class SpecimenFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "Specimen";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeSpecimen(SpecimenContext s, PatientCqlInput input);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in input.Specimens)
+            {
+                if (!IncludeSpecimen(s, input))
+                    excluded.Add($"Specimen/{s.ResourceId}");
+            }
+            return excluded;
+        }
+
+        protected static string ReferenceId(string? reference)
+        {
+            if (string.IsNullOrWhiteSpace(reference)) return string.Empty;
+            var slash = reference.IndexOf('/');
+            return slash >= 0 ? reference[(slash + 1)..] : reference;
+        }
+
+        protected static bool ReferencesPatient(string? reference, string patientId) =>
+            !string.IsNullOrWhiteSpace(patientId)
+            && string.Equals(ReferenceId(reference), patientId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// ACH Monthly SDE Specimen: <c>Specimens.collection.collected overlaps IP.period</c>.
+    /// </summary>
+    private sealed class AchMonthlySpecimenFilterProfile : SpecimenFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
+
+        protected override bool IncludeSpecimen(SpecimenContext s, PatientCqlInput input) =>
+            ReferencesPatient(s.SubjectReference, input.PatientId)
+            && input.IpWindows.AnyOverlaps(s.CollectionStart, s.CollectionEnd);
+    }
+
+    /// <summary>
+    /// ACH Daily returns only specimens reached through respiratory pathogen lab observations
+    /// (COVID-19, influenza, or RSV value sets), not every generated or acquired Specimen.
+    /// </summary>
+    private sealed class AchDailySpecimenFilterProfile : SpecimenFilterProfileBase
+    {
+        private static readonly HashSet<string> RespiratoryPathogenObservationLoincCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "100343-3", "100344-1", "22825-4", "22827-0", "23769-3", "23781-8", "23782-6", "24015-0", "30075-6", "30076-4", "31858-4", "31859-2", "31860-0", "31863-4", "31864-2", "31949-1", "31950-9", "32040-8", "33045-6", "33535-6", "34487-9", "38270-5", "38271-3", "38272-1", "38381-0", "39025-2", "39102-9", "39103-7", "40982-1", "40987-0", "40988-8", "43874-7", "43895-2", "44263-2", "44264-0", "44265-7", "44266-5", "44558-5", "44559-3", "44560-1", "44561-9", "44562-7", "44563-5", "44564-3", "44566-8", "44567-6", "44571-8", "44572-6", "44573-4", "44574-2", "44575-9", "44576-7", "44577-5", "44795-3", "46082-4", "46083-2", "48509-4", "49521-8", "49524-2", "49528-3", "50329-2", "50700-4", "53250-7", "53251-5", "54240-7", "54243-1", "55463-4", "55464-2", "55465-9", "56024-3", "57985-4", "5860-2", "5861-0", "5862-8", "5863-6", "5864-4", "5865-1", "5866-9", "5867-7", "5874-3", "5875-0", "5876-8", "5877-6", "59423-4", "60538-6", "61101-2", "61102-0", "62462-7", "6435-2", "6436-0", "6437-8", "6438-6", "68966-1", "68986-9", "68987-7", "72356-9", "72365-0", "72366-8", "72367-6", "72885-7", "74038-1", "74039-9", "74040-7", "74784-0", "74785-7", "74786-5", "76077-7", "76078-5", "76079-3", "76080-1", "76088-4", "76089-2", "77022-2", "77023-0", "77026-3", "77027-1", "77028-9", "77383-8", "77384-6", "77389-5", "77390-3", "77605-4", "80382-5", "80383-3", "80588-7", "80589-5", "80590-3", "80591-1", "80597-8", "80598-6", "81305-5", "81307-1", "81308-9", "81309-7", "81320-4", "81321-2", "81325-3", "81327-9", "81428-5", "82166-0", "82167-8", "82168-6", "82169-4", "82170-2", "82176-9", "82461-5", "85477-8", "85478-6", "85479-4", "86317-5", "86565-9", "86568-3", "86569-1", "86571-7", "86572-5", "88187-0", "88193-8", "88194-6", "88195-3", "88202-7", "88204-3", "88528-5", "88592-1", "88595-4", "88596-2", "88597-0", "88599-6", "88600-2", "88835-4", "88904-8", "88905-5", "88909-7", "90886-3", "91072-9", "91133-9", "91771-6", "91794-8", "91795-5", "92131-2", "92141-1", "92142-9", "92808-5", "92809-3", "92957-0", "92976-0", "92977-8", "94307-6", "94308-4", "94309-2", "94310-0", "94311-8", "94312-6", "94313-4", "94314-2", "94315-9", "94316-7", "94394-4", "94395-1", "94396-9", "94500-6", "94502-2", "94509-7", "94510-5", "94511-3", "94532-9", "94533-7", "94534-5", "94558-4", "94559-2", "94565-9", "94639-2", "94640-0", "94641-8", "94642-6", "94643-4", "94644-2", "94645-9", "94646-7", "94647-5", "94660-8", "94745-7", "94746-5", "94756-4", "94757-2", "94758-0", "94759-8", "94760-6", "94765-5", "94766-3", "94767-1", "94819-0", "94822-4", "94845-5", "95209-3", "95406-5", "95409-9", "95424-8", "95425-5", "95521-1", "95522-9", "95608-6", "95609-4", "95658-1", "95823-1", "95824-9", "95970-0", "96091-4", "96119-3", "96120-1", "96121-9", "96122-7", "96123-5", "96448-6", "96756-2", "96757-0", "96763-8", "96764-6", "96765-3", "96797-6", "96898-2", "96899-0", "96900-6", "96957-6", "96958-4", "96986-5", "97097-0", "97098-8", "97104-4", "99623-1"
+        };
+
+        private static readonly HashSet<string> AllowedObservationStatuses = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "final", "registered", "preliminary", "partial"
+        };
+
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+
+        protected override bool IncludeSpecimen(SpecimenContext s, PatientCqlInput input)
+        {
+            if (input.IpWindows.Count == 0)
+                return false;
+
+            if (!ReferencesPatient(s.SubjectReference, input.PatientId))
+                return false;
+
+            return input.Observations.Any(o =>
+                string.Equals(ReferenceId(o.SpecimenReference), s.ResourceId, StringComparison.OrdinalIgnoreCase)
+                && o.HasCategory("laboratory")
+                && AllowedObservationStatuses.Contains(o.Status)
+                && RespiratoryPathogenObservationLoincCodes.Contains(o.LoincCode));
+        }
+    }
+
+    /// <summary>
+    /// Hypoglycemic SDE Specimen: <c>Specimens.collection.collected during IP.period</c>.
+    /// </summary>
+    private sealed class HypoglycemicSpecimenFilterProfile : SpecimenFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeSpecimen(SpecimenContext s, PatientCqlInput input) =>
+            ReferencesPatient(s.SubjectReference, input.PatientId)
+            && input.IpWindows.AnyContains(s.CollectionStart, s.CollectionEnd);
     }
 }

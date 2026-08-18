@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Configuration;
+﻿namespace LantanaGroup.Automation.Configuration;
 
 /// <summary>
 /// OAuth configuration for token-based authentication.

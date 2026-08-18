@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Measure Evaluation Service</h1>
+<div class="row">
+    <div class="col-md-8">
+        <div class="mb-3"><strong>Produces:</strong> <a href="event-measurereportgenerated.html">Measure Report Generated [event]</a>, <a href="command-dataacquisitionrequested.html">Data Acquisition Requested [command]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-resources-normalized.html">Resources Normalized [event]</a></div>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the CQF framework to perform the measure evaluations.</p>
+<div class="mermaid-container"><pre class="mermaid">
+flowchart LR
+nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
+  nMeasureEvalService_67DBAC12 -->|produces| nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"]
+  nresources_normalized_28215193["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_67DBAC12
+  nMeasureEvalService_67DBAC12 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nMeasureReportGenerated_38AFFB54
+    nresources_normalized_28215193
+  end
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_4BBEB8F8
+  end
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nMeasureEvalService_67DBAC12
+  end
+</pre></div>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li><a href="Entities/Details?type=design&amp;id=java#azure-app-config">Azure App Config</a></li>
+<li><a href="Entities/Details?type=design&amp;id=java#telemetry">Telemetry</a></li>
+<li><a href="Entities/Details?type=design&amp;id=java#swagger">Swagger</a></li>
+<li><a href="Entities/Details?type=design&amp;id=java#mongo-db">Mongo DB</a></li>
+<li><a href="Entities/Details?type=design&amp;id=java#kafka">Kafka</a></li>
+<li><a href="Entities/Details?type=design&amp;id=java#service-authentication">Service Authentication</a></li>
+</ul>
+<h2 id="service-configurations" class="content-heading">Service Configurations <a id="service-configurations" href="#service-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Property Name</th>
+<th>Description</th>
+<th>Type/Value</th>
+<th>Required</th>
+<th>Secret?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>link.reportability-predicate</td>
+<td>Predicate to determine if a patient is reportable</td>
+<td>&quot;...IsInInitialPopulation&quot;<br/>(default)</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>/resource-cache/blob-storage/connection-string</td>
+<td>Connection string to access the deployed Azure Blob Storage environment</td>
+<td></td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>/resource-cache/blob-storage/blob-container-name</td>
+<td>The Azure Blob Storage container name where cached resources will be stored</td>
+<td></td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>/resource-cache/blob-storage/blob-root</td>
+<td>Root Azure Blob Storage directory the cached resources will be located</td>
+<td></td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>/spring/data/redis/host</td>
+<td>Host Connection string to access the deployed Redis environment.</td>
+<td></td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>/spring/data/redis/password</td>
+<td>The access key to the deployed Redis environment.</td>
+<td></td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>/spring/data/redis/port</td>
+<td>The port of the deployed Redis environment</td>
+<td></td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reportability-predicates" class="content-heading">Reportability Predicates <a id="reportability-predicates" href="#reportability-predicates" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reportability Predicates"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The <code>link.reportability-predicate</code> property is used to determine if a patient is reportable. The default value is &quot;com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation&quot;, whichi s a class that implements <code>Predicate&lt;MeasureReport&gt;</code>. Other predicate implementations may be built over time in the same package and should be listed here.</p>
+<p>Package <code>com.lantanagroup.link.measureeval.reportability</code>:</p>
+<ul>
+<li><code>IsInInitialPopulation</code>: Determines if a patient is reportable if they are in the initial population (a count of 1 or more for the &quot;InitialPopulation&quot; population of the patient's MeasureReport).</li>
+</ul>
+<h2 id="azure-cosmosdb-for-mongodb" class="content-heading">Azure CosmosDB for MongoDB <a id="azure-cosmosdb-for-mongodb" href="#azure-cosmosdb-for-mongodb" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure CosmosDB for MongoDB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The <code>resource</code> collection in the database needs to be created in the Azure portal and configured to shard based on the <code>correlationId</code> property</p>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p><strong>Measure Evaluation</strong> is a critical process in assessing clinical data against FHIR digital quality measures. It ensures that healthcare data is analyzed consistently and accurately using standardized logic and definitions.</p>
+<h3 id="key-concepts" class="content-heading">Key Concepts <a id="key-concepts" href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>FHIR Digital Quality Measures</strong>: Defined standards that outline how clinical data is measured for quality reporting and compliance.</li>
+<li><strong>Measure Package</strong>: A comprehensive bundle (in FHIR JSON Bundle format) required for evaluation, including:
+<ul>
+<li>Measure definitions.</li>
+<li>CQL logic in FHIR Library resources.</li>
+<li>Terminology, such as pre-expanded value sets and optimized code systems.</li>
+</ul>
+</li>
+</ul>
+<h3 id="evaluation-process" class="content-heading">Evaluation Process <a id="evaluation-process" href="#evaluation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ol>
+<li><strong>Pre-preparation</strong>:</li>
+</ol>
+<ul>
+<li>Data is collected and normalized to align with FHIR standards.</li>
+<li>Measure packages are prepared, containing all artifacts necessary for evaluation.</li>
+</ul>
+<ol start="2">
+<li><strong>Execution</strong>: Measures are executed systematically against the acquired data for each patient, including multiple evaluations during <strong>progressive querying</strong> as described in <a href="docs/services/DataAcquisitionService">Progressive Querying</a>.</li>
+<li><strong>Results</strong>: Each measure produces results indicating compliance or performance, which can be consumed by reporting or downstream systems. These results are in the form of a MeasureReport resource specific to the individual patient that the measure was executed against.</li>
+</ol>
+<h3 id="role-in-progressive-querying" class="content-heading">Role in Progressive Querying <a id="role-in-progressive-querying" href="#role-in-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Role in Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Measure evaluation is performed multiple times for each patient during <strong>progressive querying</strong> to support an efficient and focused reporting pipeline:</p>
+<ul>
+<li>Determines whether the patient from the census meets the initial criteria for submission.</li>
+<li>Identifies what data should be submitted for the reporting scenario if the patient is relevant.</li>
+<li>Includes &quot;FHIR Profile&quot; assertion statements in the resulting data to support the validation service in determining which profiles to validate the data against.</li>
+</ul>
+<h3 id="resource-caching" class="content-heading">Resource Caching <a id="resource-caching" href="#resource-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The <code>CacheType</code> value on consumed <code>ResourcesNormalized</code> events will inform the Measure Eval service whether patient FHIR resources are stored on Redis or Azure Blob Storage. The event contains a CacheKey that details which collection of FHIR resources are needed for measure evaluation.</p>
+<h3 id="integration" class="content-heading">Integration <a id="integration" href="#integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Measure evaluation is often part of a broader workflow:</p>
+<ul>
+<li><strong>Data Acquisition</strong>: Data is collected and normalized to a standard format.</li>
+<li><strong>Measure Execution</strong>: Evaluations are run against pre-configured measures as data becomes available.</li>
+<li><strong>Result Propagation</strong>: Evaluated results are consumed by the report service.</li>
+</ul>
+<p>This approach ensures consistent, reliable evaluation of healthcare quality measures, supporting improved care outcomes and regulatory adherence.</p>
+<h3 id="testing" class="content-heading">Testing <a id="testing" href="#testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The measure engine may be tested against arbitrary data using the $evaluate operation (which is custom-built for this purpose in the measure evaluation service) or using the <code>measureeval-cli.jar</code> that can be built separately from the service; see <a href="https://github.com/lantanagroup/link-cloud/blob/dev/Java/measureeval/README.md" target="new">measureeval/README.md</a> for more information.</p>
+<h3 id="upload-storage" class="content-heading">Upload &amp; Storage <a id="upload-amp-storage" href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Bundles are uploaded via: <code>PUT /api/measureeval/measureDefinition</code></li>
+<li>The uploaded bundle is a FHIR JSON Bundle and typically includes: <code>Measure</code>, <code>Library</code>, <code>StructureDefinition</code> (Profile), <code>ValueSet</code>, <code>CodeSystem</code></li>
+<li>Bundles are stored <strong>as-is</strong> in the measureeval service's database.</li>
+</ul>
+<Admonition type="info">
+  Measure definition bundles that are generated by CQF Tooling do not include StructureDefinition resources that are necessary for validation.
+</Admonition>
+<h3 id="evaluation-execution" class="content-heading">Evaluation Execution <a id="evaluation-execution" href="#evaluation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When a request is made to evaluate a measure:</p>
+<ol>
+<li>The service checks if a <code>MeasureEvaluator</code> instance has already been compiled and cached.</li>
+<li>If not, it:</li>
+</ol>
+<ul>
+<li>Retrieves the corresponding bundle from the database.</li>
+<li>Compiles a <code>MeasureEvaluator</code> instance.</li>
+<li>Stores the compiled instance in memory/cache for future use.</li>
+</ul>
+<p><strong>Terminology Handling:</strong></p>
+<ul>
+<li>Currently, the bundle must include all required <code>ValueSet</code> and <code>CodeSystem</code> resources for evaluation to succeed.</li>
+<li>There are future plans to integrate a FHIR Terminology (TX) Service, which would offload terminology expansion (e.g., <code>$expand</code>) and eliminate the need for local terminology resources in the bundle.</li>
+<li>Note: At this time, value sets and code systems must be pre-expanded, or enumerate all of the codes that should be included in a value set's intensional definition. A terminology service is being explored to address this.</li>
+</ul>
+<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a id="known-deficiencies" href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>No version tracking</strong>: Only a single bundle per <code>:id</code> is retained.</li>
+<li><strong>Overwrites are destructive</strong>: Uploading a new bundle overwrites the existing one.</li>
+<li><strong>No version selection</strong>: There is no support for evaluating a measure against a specific version of the bundle.</li>
+</ul>
+
+        
+<h3 class="mt-4">Database Schema</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-measureevalservice-0" aria-expanded="false"><strong>Resource</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-measureevalservice-0" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">_id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">facilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">correlationId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">patientId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">resourceType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">resourceId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">resource</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">createdDate</span></td><td>string</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-measureevalservice-1" aria-expanded="false"><strong>PatientReportingEvaluationStatus</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-measureevalservice-1" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">_id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">facilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">patientId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">reports</span></td><td>array</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-measureevalservice-2" aria-expanded="false"><strong>BlobStorage</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-measureevalservice-2" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">ContainerName</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">BlobName</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Content</span></td><td>string</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<h3 class="mt-4">OpenAPI Operations</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-measure-definition" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/measure-definition</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-measure-definition" class="card-body export-collapsible">
+    <p class="text-muted">Get all measure definitions</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-put-api-measureeval-measure-definition" aria-expanded="false"><strong>PUT</strong> <code>/api/measureeval/measure-definition</code></a></div>
+  <div id="openapi-card-measureevalservice-put-api-measureeval-measure-definition" class="card-body export-collapsible">
+    <p class="text-muted">Put (create or update) a measure definition</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-post-api-measureeval-measure-definition-id-evaluate" aria-expanded="false"><strong>POST</strong> <code>/api/measureeval/measure-definition/{id}/$evaluate</code></a></div>
+  <div id="openapi-card-measureevalservice-post-api-measureeval-measure-definition-id-evaluate" class="card-body export-collapsible">
+    <p class="text-muted">Evaluate a measure against data in request body</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td>The ID of the measure definition</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>debug</td><td>boolean</td><td>No</td><td>Whether to log CQL debugging information during evaluation</td></tr><tr><td>parameters</td><td></td><td>Yes</td><td>The parameters to use in the evaluation</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-patient-facilityid-reportid-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/patient/{facilityId}/{reportId}/{patientId}</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-patient-facilityid-reportid-patientid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td>string</td><td>Yes</td><td></td></tr><tr><td>reportId</td><td>string</td><td>Yes</td><td></td></tr><tr><td>patientId</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/measure-definition/{id}</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id" class="card-body export-collapsible">
+    <p class="text-muted">Get a measure definition</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id-library-id-cql" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/measure-definition/{id}/{library-id}/$cql</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id-library-id-cql" class="card-body export-collapsible">
+    <p class="text-muted">Get the CQL for a measure definition&#39;s library</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td>The ID of the measure definition</td></tr><tr><td>library-id</td><td>string</td><td>Yes</td><td>The ID of the library in the measure definition</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>range</td><td>string</td><td>No</td><td>The range of the CQL to return (e.g. 37:1-38:22)</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id-relatedartifact" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/measure-definition/{id}/relatedArtifact</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-measure-definition-id-relatedartifact" class="card-body export-collapsible">
+    <p class="text-muted">Get related artifacts for a measure definition</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td>The ID of the measure definition</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-get-api-measureeval-info" aria-expanded="false"><strong>GET</strong> <code>/api/measureeval/info</code></a></div>
+  <div id="openapi-card-measureevalservice-get-api-measureeval-info" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
+  nMeasureEvalService_67DBAC12 -->|produces| nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"]
+  nresources_normalized_28215193["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_67DBAC12
+  nMeasureEvalService_67DBAC12 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nMeasureReportGenerated_38AFFB54
+    nresources_normalized_28215193
+  end
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_4BBEB8F8
+  end
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nMeasureEvalService_67DBAC12
+  end</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

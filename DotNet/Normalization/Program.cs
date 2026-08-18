@@ -1,5 +1,8 @@
-﻿using Confluent.Kafka;
+using System.Reflection;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Model.CdsHooks;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -13,6 +16,8 @@ using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
@@ -21,7 +26,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -37,7 +41,6 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -64,24 +67,26 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
+    builder.Services.Configure<ResourceCacheBlobStorageSettings>(builder.Configuration.GetSection(ResourceCacheBlobStorageSettings.Key));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.AddResourceCache(builder.Configuration);
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>>();
 
-    builder.Services.RegisterKafkaProducer<ResourceKey, ResourceNormalizedMessage>(
+    builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedValue>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
@@ -175,7 +180,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
 
     //Managers
-    builder.Services.AddScoped<IDatabase, Database>();
+    builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, Database>();
     builder.Services.AddScoped<IOperationManager, OperationManager>();
     builder.Services.AddScoped<IResourceManager, ResourceManager>();
     builder.Services.AddScoped<IVendorManager, VendorManager>();
@@ -197,15 +202,17 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeMapOperationService>();
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
     builder.Services.AddSingleton<CopyLocationOperationService>();
+    builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
+    builder.Services.AddSingleton<RemoveExtensionsOperationService>();
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<ResourceAcquiredListener>();
+        builder.Services.AddHostedService<ResourcesAcquiredListener>();
     }
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourcesAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
@@ -217,6 +224,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<ResourceCacheHealthCheck>(HealthCheckType.Cache.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();
@@ -274,6 +282,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
     });
 
+    builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<INormalizationServiceMetrics, NormalizationServiceMetrics>();
 }
 

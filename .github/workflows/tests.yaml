@@ -47,7 +47,7 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    # All five test categories run in parallel against a SINGLE shared
+    # PR-safe Backend E2E categories run in parallel against a SINGLE shared
     # docker compose stack (one build, one up). Each `dotnet test`
     # invocation writes to its own log file and is then rendered as its own
     # collapsible ::group:: in the Actions UI so logs are segmented per
@@ -82,6 +82,62 @@ jobs:
       - name: Start services
         run: docker compose up --no-build -d
 
+      - name: Report logs for services that failed to start
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set +e
+          echo "::group::Docker compose status"
+          docker compose ps --all
+          echo "::endgroup::"
+
+          FAILED_SERVICES=""
+
+          # Evaluate each compose container using inspect data so we can:
+          # - ignore successful one-shot init containers (exited with code 0)
+          # - detect unhealthy running services (like link-admin-bff)
+          for container_id in $(docker compose ps -q); do
+            service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container_id" 2>/dev/null)
+            state=$(docker inspect --format '{{ .State.Status }}' "$container_id" 2>/dev/null)
+            exit_code=$(docker inspect --format '{{ .State.ExitCode }}' "$container_id" 2>/dev/null)
+            health=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}none{{ end }}' "$container_id" 2>/dev/null)
+
+            echo "service=${service} state=${state} exitCode=${exit_code} health=${health}"
+
+            should_report=false
+
+            # Failed container states (ignore exited=0 which is valid for init jobs)
+            if [[ "$state" != "running" ]]; then
+              if [[ "$exit_code" != "0" ]]; then
+                should_report=true
+              fi
+            fi
+
+            # Unhealthy running service
+            if [[ "$state" == "running" && "$health" == "unhealthy" ]]; then
+              should_report=true
+            fi
+
+            if [[ "$should_report" == "true" ]]; then
+              FAILED_SERVICES+="${service} "
+            fi
+          done
+
+          # De-duplicate service names
+          FAILED_SERVICES=$(echo "$FAILED_SERVICES" | xargs -n1 | sort -u | xargs)
+
+          if [[ -z "$FAILED_SERVICES" ]]; then
+            echo "No unhealthy/failed services detected immediately after startup."
+            exit 0
+          fi
+
+          echo "Detected unhealthy/failed services: $FAILED_SERVICES"
+          for service in $FAILED_SERVICES; do
+            echo "::group::Logs for unhealthy/failed service: ${service}"
+            docker compose logs --no-color --tail=300 "$service" || true
+            echo "::endgroup::"
+          done
+
       - name: Wait for services to start
         run: sleep 10
 
@@ -104,7 +160,7 @@ jobs:
             --configuration Debug \
             --no-restore
 
-      # ---- All 5 test categories run CONCURRENTLY against the SAME stack. ----
+      # ---- PR-safe Backend E2E categories run CONCURRENTLY against the SAME stack. ----
       # Each `dotnet test` is launched in the background with its stdout/stderr
       # redirected to a dedicated log file. After they all finish we emit each
       # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
@@ -114,6 +170,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          export ADHOC_REPORT_TEST_DOWNLOAD_PATH=adhoc-report
           mkdir -p ./Tests/BackendE2ETests/TestResults
           mkdir -p ./test-logs
 
@@ -121,6 +178,7 @@ jobs:
           TESTS=(
             "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
             "API Stability|ApiStabilityTest|api-stability-test-results.trx"
+            "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
             "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
@@ -205,7 +263,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
-          path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
+          path: ./Tests/BackendE2ETests/bin/**/adhoc-report-test-submission.zip
           if-no-files-found: ignore
 
       - name: Tear down services
@@ -226,6 +284,8 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
       - name: Cache NuGet packages
         uses: actions/cache@v4

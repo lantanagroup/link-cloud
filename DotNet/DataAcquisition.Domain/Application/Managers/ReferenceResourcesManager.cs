@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -43,49 +43,55 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             var resourceType = group.Key.ResourceType;
             var batch = group.ToList();
 
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-            await AcquireLockAsync($"ReferenceResources:{facilityId}:{resourceType}", cancellationToken);
-
-            try
+            var strategy = _dbContext.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async (ct) =>
             {
-                var now = DateTime.UtcNow;
-                var resourceIds = batch.Select(m => m.ResourceId).Distinct().ToList();
-
-                var existingKeys = await GetExistingResourceIdsAsync(facilityId, resourceType, resourceIds, cancellationToken);
-
-                var toInsert = batch
-                    .Where(m => !existingKeys.Contains(m.ResourceId))
-                    .Select(m => new ReferenceResources
-                    {
-                        FacilityId = m.FacilityId,
-                        ResourceId = m.ResourceId,
-                        ResourceType = m.ResourceType,
-                        ReferenceResource = m.ReferenceResource,
-                        QueryPhase = m.QueryPhase,
-                        CreateDate = now,
-                        ModifyDate = now
-                    })
-                    .ToList();
-
-                if (toInsert.Count > 0)
-                {
-                    foreach (var chunk in Chunk(toInsert, InsertChunkSize))
-                    {
-                        _dbContext.ReferenceResources.AddRange(chunk);
-                        await _dbContext.SaveChangesAsync(cancellationToken);
-                    }
-                }
-
                 _dbContext.ChangeTracker.Clear();
 
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+                await AcquireLockAsync($"ReferenceResources:{facilityId}:{resourceType}", ct);
+
+                try
+                {
+                    var now = DateTime.UtcNow;
+                    var resourceIds = batch.Select(m => m.ResourceId).Distinct().ToList();
+
+                    var existingKeys = await GetExistingResourceIdsAsync(facilityId, resourceType, resourceIds, ct);
+
+                    var toInsert = batch
+                        .Where(m => !existingKeys.Contains(m.ResourceId))
+                        .Select(m => new ReferenceResources
+                        {
+                            FacilityId = m.FacilityId,
+                            ResourceId = m.ResourceId,
+                            ResourceType = m.ResourceType,
+                            ReferenceResource = m.ReferenceResource,
+                            QueryPhase = m.QueryPhase,
+                            CreateDate = now,
+                            ModifyDate = now
+                        })
+                        .ToList();
+
+                    if (toInsert.Count > 0)
+                    {
+                        foreach (var chunk in Chunk(toInsert, InsertChunkSize))
+                        {
+                            _dbContext.ReferenceResources.AddRange(chunk);
+                            await _dbContext.SaveChangesAsync(ct);
+                        }
+                    }
+
+                    _dbContext.ChangeTracker.Clear();
+
+                    await transaction.CommitAsync(ct);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            }, cancellationToken);
         }
     }
 

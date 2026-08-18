@@ -85,7 +85,7 @@
                             <div class="fw-semibold">@run.RunName</div>
                             <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
-                                <span class="badge au-badge-muted">@run.Status</span>
+                                <span class="badge @(run.Status == AutomationRunStatus.Running ? "au-badge-active" : "au-badge-muted")">@run.Status</span>
                                 <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")">@elapsed.ToString(@"mm\:ss") elapsed</span>
                             </div>
                             <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
@@ -117,13 +117,13 @@
                 <div class="col-md-2">
                     <form asp-action="Start" method="post" id="quickLaunchForm">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="ScenarioId" id="qlScenarioId" value="" />
                         <input type="hidden" name="Scenario" value="@AutomationScenarioKind.Custom" />
                         <input type="hidden" name="ScenarioName" id="qlScenarioName" value="" />
                         <input type="hidden" name="RunConfigurationJson" id="qlRunConfigJson" value="" />
                         <input type="hidden" name="ReportMethod" id="qlReportMethod" value="Adhoc" />
                         <input type="hidden" name="Seed" id="qlSeed" value="20260329" />
                         <input type="hidden" name="PatientCount" id="qlPatientCount" value="10" />
-                        <input type="hidden" name="ResourcesPerPatient" id="qlResourcesPerPatient" value="250" />
                         <input type="hidden" name="CleanupFhirData" id="qlCleanupFhirData" value="true" />
                         <input type="hidden" name="CleanupServiceData" id="qlCleanupServiceData" value="false" />
                         <input type="hidden" name="QueryPlanTemplateId" id="qlQueryPlanTemplateId" value="" />
@@ -174,7 +174,6 @@
     var detailsBaseUrl = '@Url.Action("Details", "Runs", new { id = "__ID__" })';
     var dashboardStatsUrl = '@Url.Action("DashboardStats", "Runs")';
     var recentRunsPartialUrl = '@Url.Action("RecentRunsPartial", "Runs")';
-    var scenarioJsonUrl = '@Url.Action("GetJson", "Scenarios")';
     var cancelUrl = '@Url.Action("CancelJson", "Runs")';
     var deleteUrl = '@Url.Action("DeleteJson", "Runs")';
 
@@ -265,6 +264,7 @@
         if (s === 'succeeded' || s === '3') return 'au-badge-success';
         if (s === 'failed' || s === '4') return 'au-badge-danger';
         if (s === 'cancelled' || s === '2') return 'au-badge-warning';
+        if (s === 'running' || s === '1') return 'au-badge-active';
         return 'au-badge-muted';
     }
 
@@ -422,7 +422,7 @@
                 '<div class="fw-semibold">' + escapeHtml(run.runName) + '</div>' +
                 '<div class="small text-muted">' + (run.patientCount || 0) + ' patients &middot; seed ' + (run.seed || 0) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
-                '<span class="badge au-badge-muted">' + escapeHtml(String(run.status)) + '</span>' +
+                '<span class="badge ' + statusBadgeClass(run.status) + '">' + escapeHtml(String(run.status)) + '</span>' +
                 '<span class="small text-muted js-elapsed" data-created-at="' + escapeHtml(String(run.createdAt)) + '">' + elapsedStr + ' elapsed</span>' +
                 '</div>' +
                 '<a href="' + url + '" class="btn btn-sm btn-au-action mt-2 w-100"><i class="bi bi-box-arrow-up-right me-1"></i>View Details</a>' +
@@ -484,27 +484,11 @@
     selector.addEventListener('change', function () {
         var id = selector.value;
         runBtn.disabled = !id;
-        if (!id) return;
 
-        fetch(scenarioJsonUrl + '?id=' + encodeURIComponent(id))
-            .then(function (r) { return r.json(); })
-            .then(function (s) {
-                document.getElementById('qlScenarioName').value = s.name || 'Scenario';
-                document.getElementById('qlReportMethod').value = s.reportMethod || 'Adhoc';
-                document.getElementById('qlSeed').value = s.seed || 20260329;
-                document.getElementById('qlPatientCount').value = (typeof s.patientCount === 'number') ? s.patientCount : 10;
-                document.getElementById('qlResourcesPerPatient').value = s.resourcesPerPatientMax || 250;
-                document.getElementById('qlQueryPlanTemplateId').value = s.queryPlanTemplateId || '';
-                document.getElementById('qlReportPeriodStart').value = s.reportPeriodStart || '';
-                document.getElementById('qlReportPeriodEnd').value = s.reportPeriodEnd || '';
-                // Mirror the scenario's saved cleanup preferences into the form so the
-                // Quick Launch run honours them. Without this, the static defaults
-                // (CleanupFhirData=true, CleanupServiceData=false) silently override
-                // whatever the user saved on the scenario.
-                document.getElementById('qlCleanupFhirData').value = (s.cleanupFhirData === false) ? 'false' : 'true';
-                document.getElementById('qlCleanupServiceData').value = (s.cleanupServiceData === true) ? 'true' : 'false';
-                document.getElementById('qlRunConfigJson').value = JSON.stringify(s);
-            });
+        document.getElementById('qlScenarioId').value = id || '';
+        var selected = selector.options[selector.selectedIndex];
+        var label = selected ? (selected.textContent || '') : '';
+        document.getElementById('qlScenarioName').value = label.replace(/\s\[System\]$/, '').trim() || 'Scenario';
     });
 
     // --- AJAX Cancel ---

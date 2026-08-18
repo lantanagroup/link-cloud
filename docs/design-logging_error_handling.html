@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Logging & Error Handling</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h2 id="setting-up-serilog" class="content-heading">Setting up SeriLog <a id="setting-up-serilog" href="#setting-up-serilog" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up SeriLog"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>To set up SeriLog to capture the desired logging information you will need to have the following NuGet packages installed:</p>
+<ul>
+<li><a href="https://www.nuget.org/packages/Serilog.AspNetCore">Serilog AspNetCore</a>
+<ul>
+<li><code>dotnet add package Serilog.AspNetCore</code></li>
+</ul>
+</li>
+<li><a href="https://www.nuget.org/packages/Serilog.Sinks.Grafana.Loki">Serilog Loki</a>
+<ul>
+<li><code>dotnet add package Serilog.Sinks.Grafana.Loki</code></li>
+</ul>
+</li>
+<li><a href="https://www.nuget.org/packages/Serilog.Exceptions/">Serilog Exceptions</a>
+<ul>
+<li><code>dotnet add package Serilog.Exceptions</code></li>
+</ul>
+</li>
+<li><a href="https://www.nuget.org/packages/Serilog.Enrichers.Span">Serilog Encrichers Span</a>
+<ul>
+<li><code>dotnet add package Serilog.Enrichers.Span</code></li>
+</ul>
+</li>
+<li><a href="https://www.nuget.org/packages/serilog.expressions">Serilog Expressions</a>
+<ul>
+<li><code>dotnet add package Serilog.Expressions</code></li>
+</ul>
+</li>
+</ul>
+<p>To configure SeriLog, in the RegisterServices method in the service startup (Program.cs) add the following:</p>
+<pre><code class="language-csharp">// Logging using Serilog
+builder.Logging.AddSerilog();
+var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };    
+Log.Logger = new LoggerConfiguration()
+                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                .Filter.ByExcluding(&quot;RequestPath like '/health%'&quot;)
+                .Enrich.WithExceptionDetails()
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()                  
+                .Enrich.With&lt;ActivityEnricher&gt;()
+                .CreateLogger();
+
+//Serilog.Debugging.SelfLog.Enable(Console.Error); 
+</code></pre>
+<p>You can add additional filters to exclude certain request paths you don’t want captured in logging (swagger for example).</p>
+<p>Next add the following to appsettings.json</p>
+<pre><code class="language-json">&quot;Link:Audit:Logging:Serilog&quot;: {
+  &quot;Using&quot;: [ &quot;Serilog.Sinks.Console&quot;, &quot;Serilog.Sinks.Grafana.Loki&quot; ],
+  &quot;MinimumLevel&quot;: {
+    &quot;Default&quot;: &quot;Information&quot;,
+    &quot;Override&quot;: {
+      &quot;Microsoft&quot;: &quot;Warning&quot;,
+      &quot;System&quot;: &quot;Warning&quot;
+    }
+  },
+  &quot;WriteTo&quot;: [
+    { &quot;Name&quot;: &quot;Console&quot; },
+    {
+      &quot;Name&quot;: &quot;GrafanaLoki&quot;,
+      &quot;Args&quot;: {
+        &quot;uri&quot;: &quot;http://localhost:3100&quot;,
+        &quot;labels&quot;: [
+          {
+            &quot;key&quot;: &quot;app&quot;,
+            &quot;value&quot;: &quot;Link-BoTW&quot;
+          },
+          {
+            &quot;key&quot;: &quot;component&quot;,
+            &quot;value&quot;: &quot;Audit&quot;
+          }
+        ],
+        &quot;propertiesAsLabels&quot;: [ &quot;app&quot;, &quot;component&quot; ]
+      }
+    }
+  ]
+}
+</code></pre>
+<p>Additionally you can add the following to enhance the format of the console:</p>
+<pre><code class="language-json">&quot;Logging&quot;: {
+    &quot;LogLevel&quot;: {
+      &quot;Default&quot;: &quot;Information&quot;,
+      &quot;Microsoft&quot;: &quot;Warning&quot;,
+      &quot;System&quot;: &quot;Warning&quot;
+    },
+    &quot;Console&quot;: {
+      &quot;FormatterName&quot;: &quot;json&quot;,
+      &quot;FormatterOptions&quot;: {
+        &quot;SingleLine&quot;: true,
+        &quot;IncludeScopes&quot;: true,
+        &quot;TimestampFormat&quot;: &quot;HH:mm:ss &quot;,
+        &quot;UseUtcTimestamp&quot;: true,
+        &quot;JsonWriterOptions&quot;: {
+          &quot;Indented&quot;: true
+        }
+      }
+    }
+  }
+</code></pre>
+<h2 id="adding-problem-details" class="content-heading">Adding Problem Details <a id="adding-problem-details" href="#adding-problem-details" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding Problem Details"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Problem details is an attempt at an industry standard to carry machine readable details of errors in a HTTP response to avoid the need to define new error response formats for HTTP APIs.</p>
+<p><a href="https://datatracker.ietf.org/doc/html/rfc7807">RFC-7807</a></p>
+<p>This can be accomplished by using the .NET <a href="https://learn.microsoft.com/en-us/aspnet/core/web-api/handle-errors?view=aspnetcore-7.0#problem-details-service">problem details service</a>.</p>
+<p>To enable to sending of Problem Details add the following in the RegisterServices method in the service startup (Program.cs):</p>
+<pre><code class="language-csharp">//Add problem details
+builder.Services.AddProblemDetails(options =&gt; {
+    options.CustomizeProblemDetails = ctx =&gt;
+    {            
+        ctx.ProblemDetails.Detail = &quot;An error occured in our API. Please use the trace id when requesting assistence.&quot;;
+        if (!ctx.ProblemDetails.Extensions.ContainsKey(&quot;traceId&quot;))
+        {
+            string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+            ctx.ProblemDetails.Extensions.Add(new KeyValuePair&lt;string, object?&gt;(&quot;traceId&quot;, traceId));
+        }      
+
+        if (builder.Environment.IsDevelopment())
+        {
+            ctx.ProblemDetails.Extensions.Add(&quot;service&quot;, &quot;Audit&quot;);
+        }
+        else 
+        {
+            ctx.ProblemDetails.Extensions.Remove(&quot;exception&quot;);
+        }
+        
+    };                        
+});
+</code></pre>
+<p>Add the following to the SetupMiddleware method in the service startup (Program.cs):</p>
+<pre><code class="language-csharp">if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals(&quot;Local&quot;, StringComparison.InvariantCultureIgnoreCase))
+{
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler();
+}
+</code></pre>
+<p>This will consume any 500 error returned by the API and turn it into a ProblemDetails model that is returned to the user. It will appear as follows:</p>
+<pre><code class="language-json">{
+    &quot;type&quot;: &quot;https://httpstatuses.io/500&quot;,
+    &quot;title&quot;: &quot;Internal Server Error&quot;,
+    &quot;status&quot;: 500,
+    &quot;detail&quot;: &quot;An error occured in our API. Please use the trace id when requesting assistence.&quot;,
+    &quot;traceId&quot;: &quot;00-09f4ab47f959288745f3ef337ac773b7-fac718cf545d0a9d-01&quot;
+}
+</code></pre>
+<p>We can use the Trace Id to find relevant logs pertaining to the issue.</p>
+<p>For this to work correctly you will need to return a 500 response type along with the exception in your API.</p>
+<pre><code class="language-csharp">catch (Exception ex)
+{
+    _logger.LogError(new EventId(LoggingIds.GetItem, &quot;Get Audit Event&quot;), ex, &quot;An exception occurred while attempting to retrieve an audit event with an id of {id}&quot;, id);
+    throw;
+}
+</code></pre>
+<h2 id="logging-ids" class="content-heading">Logging Ids <a id="logging-ids" href="#logging-ids" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging Ids"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The AuditLoggingIds.GetItem in the above _logger.LogError method is a new option in .NET that allows you to assign a Logging Id to log types. In the example above it will give the log an id of 1002 from the following static class.</p>
+<pre><code class="language-csharp">public static class AuditLoggingIds 
+{
+    public const int GenerateItems = 1000;
+    public const int ListItems = 1001;
+    public const int GetItem = 1002;
+    public const int InsertItem = 1003;
+    public const int UpdateItem = 1004;
+    public const int DeleteItem = 1005;      
+    public const int GetItemNotFound = 1006;
+    public const int UpdateItemNotFound = 1007;
+    public const int EventConsumer = 2000;
+    public const int EventProducer = 2001;
+    public const int HealthCheck = 9000;
+}
+</code></pre>
+<p>This can allow for finding specific log types by the id and will show up in logs as follows:</p>
+<p><img src="/images/find_log_types_by_id.png" alt="" /></p>
+<h2 id="userscope-middleware" class="content-heading">UserScope Middleware <a id="userscope-middleware" href="#userscope-middleware" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UserScope Middleware"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The LantanaGroup.Link.Shared.Application.Middleware middleware has been added to the shared project. This middleware will capture the username as well as the id of the user if an authenticated user is present in the .NET HttpContext.User.Identity object. This object will be populated based on if/how you have authentication enabled. For more information about enabled authentication see TBD.</p>
+<p>This scoped user information will automatically be added to any logs created. To add the middleware simply add the following in the SetupMiddleware method in the service startup (Program.cs):</p>
+<pre><code class="language-csharp">app.UseRouting();
+app.UseCors(&quot;CorsPolicy&quot;);
+app.UseAuthentication();
+app.UseMiddleware&lt;UserScopeMiddleware&gt;();
+app.UseAuthorization();    
+app.UseEndpoints(endpoints =&gt; endpoints.MapControllers());   
+</code></pre>
+<p>This middlware should come after app.UseAuthentication(). When this is added the following will be included in a scope within your logs.</p>
+<p><img src="/images/scope_message_in_logs.png" alt="" /></p>
+<h2 id="adding-data-to-exceptions" class="content-heading">Adding data to exceptions <a id="adding-data-to-exceptions" href="#adding-data-to-exceptions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding data to exceptions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>For additional context, you may add some additional data about the issue that caused the exception to be thrown as follows:</p>
+<pre><code class="language-csharp">catch (NullReferenceException ex)
+{
+    _logger.LogDebug(new EventId(LoggingIds.GetItem, &quot;Get Audit Event&quot;), ex, &quot;Failed to get audit event with an id of {id}.&quot;, id);
+    var queryEx = new ApplicationException(&quot;Failed to get audit event&quot;, ex);
+    queryEx.Data.Add(&quot;Id&quot;, id);
+    throw queryEx;
+}
+</code></pre>
+<p>The <code>exception.Data.Add()</code> method will add this information in the following locations:</p>
+<p><img src="/images/extra_data_in_exception.png" alt="" /></p>
+<p>Additional information about .NET logging can be found <a href="https://learn.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-7.0">here</a>.</p>
+<h2 id="loggermessage-attribute" class="content-heading">LoggerMessage Attribute <a id="loggermessage-attribute" href="#loggermessage-attribute" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: LoggerMessage Attribute"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Introduced in .NET 6, the <a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/logger-message-generator">LoggerMessage</a> allows for performant logging.</p>
+<pre><code class="language-csharp">public static partial class Logging
+{
+    [LoggerMessage(
+      AuditLoggingIds.GenerateItems, 
+      LogLevel.Information, 
+      &quot;New audit event created&quot;)]
+    public static partial void LogAuditEventCreation(this ILogger logger, 
+      [LogProperties]AuditEntity auditEvent);
+}
+</code></pre>
+<p>The <code>LogProperties</code> attribute, requires .NET 8, will include all of the properties of the object in your log.</p>
+<p><img src="/images/log_extra_audit_event_properties.png" alt="" /></p>
+<h2 id="kafka-consumer-error-handling" class="content-heading">Kafka Consumer Error Handling <a id="kafka-consumer-error-handling" href="#kafka-consumer-error-handling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Error Handling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>When consuming an event that cannot be deserialized, the consumer should catch the error through a ConsumeException. In the catch, the service should do the following:</p>
+<ul>
+<li>Create an audit event to trace that an error occurred.</li>
+<li>Produce an error event to the Error topic. Storing improperly structured events in an separate topic will allow for further investigate</li>
+<li>Commit the consumer result to acknowledge back to the Kafka broker that the consumed event was processed.</li>
+</ul>
+<pre class="mermaid">flowchart LR
+  SourceTopic["SOURCE TOPIC"] --> KafkaApp["KAFKA&lt;br>APP"]
+  KafkaApp -->|1| TargetTopic["TARGET TOPIC"]
+  KafkaApp -->|2| ErrorTopic["ERROR TOPIC"]
+
+  classDef source fill:#e6f4fa,stroke:#aaa;
+  classDef target fill:#e6f4fa,stroke:#aaa;
+  classDef error fill:#f8d7da,stroke:#c00,color:#000;
+
+  class SourceTopic source;
+  class TargetTopic target;
+  class ErrorTopic error;
+</pre>
+<p>Example:</p>
+<pre><code class="language-csharp">ConsumeResult&lt;ReportScheduledKey, ReportScheduledValue&gt; consumeResult;
+try 
+{
+    consumeResult = _reportScheduledConsumer.Consume(cancellationToken);
+}
+catch (ConsumeException e)
+{
+    _logger.LogError($&quot;Consume failure, potentially schema related: {e.Error.Reason}&quot;);
+    var potentialFacilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
+    var potentialValue = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value);
+
+    ProduceErrorEvent(potentialFacilityId, potentialValue);
+
+    var auditValue = new AuditEventMessage
+    {
+        FacilityId = potentialFacilityId,
+        Action = AuditEventType.Query,
+        ServiceName = &quot;QueryDispatch&quot;,
+        EventDate = DateTime.UtcNow,
+        Notes = $&quot;Kafka ReportScheduled consume failure, potentially schema related \nException Message: {e.Error}&quot;,
+    };
+
+    ProduceAuditEvent(auditValue, e.ConsumerRecord.Message.Headers);
+
+    _reportScheduledConsumer.Commit();
+
+    continue;
+}
+</code></pre>
+<pre><code class="language-csharp">private void ProduceErrorEvent(string key, string value) {
+  var config = new ProducerConfig()
+  {
+      ClientId = &quot;Error-QueryDispatch-ReportScheduled&quot;
+  };
+
+  using (var producer = _errorProducerFactory.CreateProducer(config)) 
+  {
+      var headers = new Headers
+      {
+          new Header(&quot;X-Consumer&quot;, Encoding.UTF8.GetBytes(&quot;QueryDispatch&quot;)),
+          new Header(&quot;X-Topic&quot;, Encoding.UTF8.GetBytes(&quot;ReportScheduledEvent&quot;))
+      };
+
+      producer.Produce(&quot;Error&quot;, new Message&lt;string, string&gt; 
+      { 
+          Key = key,
+          Value = value,
+          Headers = headers
+      });
+
+      producer.Flush();
+  }
+}
+</code></pre>
+<p>Kafka Consumer Retry Handling</p>
+<p>When a problem occurs while processing a consumed event (Facility not properly configured, API connection could not be established, could not connect to database, etc), we will want to attempt to perform retries to ensure that BotW processes each event successfully. When an exception is caught during the processing of an event, the service should do the following:</p>
+<ul>
+<li>Create an audit event to trace that an error occurred.</li>
+<li>Produce a retry event to the services Retry topic.</li>
+<li>Commit the consumer result to acknowledge back to the Kafka broker that the consumed event was processed.</li>
+</ul>
+<pre class="mermaid">flowchart LR
+  ReportScheduled --> QueryDispatch
+  QueryDispatch --> Error
+  QueryDispatch --> Retry
+  QueryDispatch --> ConsumeSuccess
+  Retry --> QueryDispatchRetry
+  QueryDispatchRetry --> Retry
+  QueryDispatchRetry --> ConsumeSuccess
+  ConsumeSuccess:::final -->|Success or Retry| Retry
+
+  classDef final fill:#d4af37,stroke:#333,color:white;
+</pre>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nlogging_error_handling_384115D7["Design: Logging & Error Handling"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>
