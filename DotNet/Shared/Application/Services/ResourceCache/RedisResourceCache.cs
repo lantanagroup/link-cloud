@@ -2,8 +2,10 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Text.Json;
@@ -15,11 +17,25 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly IRedisDatabase _redisDatabase;
         private readonly ILogger<RedisResourceCache> _logger;
+        private readonly TimeSpan _cacheEntryTtl;
 
-        public RedisResourceCache(IRedisDatabase redisDatabase, ILogger<RedisResourceCache> logger)
+        public RedisResourceCache(
+            IRedisDatabase redisDatabase,
+            IOptions<ResourceCacheSettings> settings,
+            ILogger<RedisResourceCache> logger)
         {
             _redisDatabase = redisDatabase;
             _logger = logger;
+
+            var cacheEntryTtlDays = settings.Value.Redis.CacheEntryTtlDays;
+            if (cacheEntryTtlDays <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:Redis:CacheEntryTtlDays must be greater than zero.");
+            }
+
+            _cacheEntryTtl = TimeSpan.FromDays(cacheEntryTtlDays);
         }
 
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
@@ -83,6 +99,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
 
             await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
