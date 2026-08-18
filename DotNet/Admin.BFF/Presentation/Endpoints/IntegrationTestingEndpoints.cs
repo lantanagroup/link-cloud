@@ -1,12 +1,10 @@
-﻿using Azure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
@@ -152,15 +150,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         }
 
-        public Task CreateConsumersRequested(HttpContext context, Correlation correlation)
+        public async Task CreateConsumersRequested(HttpContext context, Correlation correlation)
         {
-            _kafkaConsumerManager.CreateAllConsumers(correlation.CorrelationId);
-            return Task.CompletedTask;
+            await _kafkaConsumerManager.CreateAllConsumers(correlation.CorrelationId, context.RequestAborted);
         }
 
         public async Task<IResult> ReadConsumersRequested(HttpContext context, Correlation correlation)
         {
-            Dictionary<string, string> list = _kafkaConsumerManager.readAllConsumers(correlation.CorrelationId);
+            Dictionary<string, string> list = await _kafkaConsumerManager.readAllConsumers(correlation.CorrelationId, context.RequestAborted);
             return Results.Ok(list);
         }
         public async Task<IResult> DeleteConsumersRequested(HttpContext context, Correlation correlation)
@@ -168,7 +165,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             // Stop consumers asynchronously
             try
             {
-                await _kafkaConsumerManager.StopAllConsumers(correlation.CorrelationId);
+                await _kafkaConsumerManager.StopAllConsumers(correlation.CorrelationId, context.RequestAborted);
                 var response = new { message = "Consumers stopped successfully.", facilityId = correlation.CorrelationId };
                 return Results.Ok(response); // This returns a 200 OK status along with the message
             }

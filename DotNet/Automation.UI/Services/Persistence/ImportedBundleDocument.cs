@@ -1,5 +1,4 @@
 ﻿using MongoDB.Bson;
-using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -52,14 +51,28 @@ public sealed class ImportedBundleDocument
     [BsonRepresentation(BsonType.String)]
     public List<Guid> ScenarioIds { get; set; } = [];
 
+    [BsonRepresentation(BsonType.String)]
+    public Guid? CanonicalBundleId { get; set; }
+
+    public string? DeletionClaimToken { get; set; }
+    public DateTimeOffset? DeletionClaimedAt { get; set; }
+
     /// <summary>FHIR Patient.id this bundle represents (display + lookup convenience).</summary>
     public string PatientId { get; set; } = string.Empty;
 
     /// <summary>Original upload filename, when known. Display only.</summary>
     public string? FileName { get; set; }
 
-    /// <summary>Raw FHIR transaction bundle JSON.</summary>
-    public string BundleJson { get; set; } = string.Empty;
+    /// <summary>
+    /// Raw FHIR transaction bundle JSON (legacy/back-compat only).
+    /// New writes store content in Azure Blob Storage and leave this null.
+    /// </summary>
+    public string? BundleJson { get; set; }
+
+    /// <summary>
+    /// Blob path (within the configured container) for the externalized bundle JSON.
+    /// </summary>
+    public string? BundleBlobName { get; set; }
 
     /// <summary>Cached UTF-8 byte length of <see cref="BundleJson"/> for list views.</summary>
     public long ByteCount { get; set; }

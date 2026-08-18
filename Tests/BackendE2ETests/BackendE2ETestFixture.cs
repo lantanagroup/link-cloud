@@ -35,9 +35,6 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton<ConsoleAutomationOutput>();
         builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<ConsoleAutomationOutput>());
 
-        // Infrastructure
-        builder.Services.AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
-
         // ServiceRegistry — point each service directly at its host
         builder.Services.Configure<ServiceRegistry>(opts =>
         {
@@ -62,9 +59,17 @@ public sealed class BackendE2ETestFixture : IDisposable
 
         // LinkSdk clients (IFacilityServiceClient, IReportServiceClient, etc.)
         builder.Services.AddLinkSdk();
+        builder.Services.AddHttpClient();
+        builder.Services.AddHttpClient<LokiScraper>((sp, client) =>
+        {
+            var cfg = sp.GetRequiredService<AutomationConfig>();
+            if (!Uri.TryCreate(cfg.LokiBaseUrl, UriKind.Absolute, out var baseUri))
+                throw new InvalidOperationException("Loki__Url must be an absolute URI.");
+
+            client.BaseAddress = baseUri;
+        });
 
         // Automation infrastructure
-        builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => {
             var cfg = sp.GetRequiredService<AutomationConfig>();
             return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);

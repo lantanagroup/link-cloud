@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+﻿using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -21,21 +21,28 @@ public class AzureAppConfigurationRefreshService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            foreach (var refresher in _refreshers)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                try
+                foreach (var refresher in _refreshers)
                 {
-                    await refresher.TryRefreshAsync(stoppingToken);
+                    try
+                    {
+                        await refresher.TryRefreshAsync(stoppingToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to refresh Azure App Configuration.");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Failed to refresh Azure App Configuration.");
-                }
-            }
 
-            await Task.Delay(RefreshInterval, stoppingToken);
+                await Task.Delay(RefreshInterval, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("Azure App Configuration refresh service is stopping.");
         }
     }
 }

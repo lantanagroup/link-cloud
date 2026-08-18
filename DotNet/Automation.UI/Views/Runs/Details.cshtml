@@ -7,7 +7,9 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
             <h3 class="fw-bold mb-0" id="runName">@Model.RunName</h3>
-            <code class="text-muted small">@Model.RunId</code>
+            <div class="small text-muted">
+                Report ID: <code id="headerReportId">@(string.IsNullOrWhiteSpace(Model.ReportId) ? "-" : Model.ReportId)</code>
+            </div>
         </div>
         <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
             @if (Model.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
@@ -31,6 +33,7 @@
             <div class="row g-3" id="runSummaryGrid">
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">-</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
@@ -84,7 +87,7 @@
                                 <div class="small text-muted mb-2">Report Schedule</div>
                                 <div class="row g-2">
                                     <div class="col-md-12"><strong>Facility ID:</strong> <code id="scheduleFacilityId">@(Model.FacilityId ?? "-")</code></div>
-                                    <div class="col-md-6"><strong>Test:</strong> <span id="scheduleReportName">-</span></div>
+                                    <div class="col-md-6"><strong>Report ID:</strong> <code id="scheduleReportName">@(string.IsNullOrWhiteSpace(Model.ReportId) ? "-" : Model.ReportId)</code></div>
                                     <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
                                     <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
                                     <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
@@ -404,6 +407,9 @@
         const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
         const manifestUrl = '@Url.Action("ManifestData", "Runs")';
+        const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
+        const normalizationSuiteGetJsonUrl = '@Url.Action("GetSuiteJson", "Normalizations")';
+        const orgResourceMapGetJsonUrl = '@Url.Action("GetJson", "OrganizationResourceMaps")';
         const logBox = document.getElementById('logBox');
         let dataAcqErrors = [];
         let measureErrors = [];
@@ -422,6 +428,32 @@
         let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
         let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
         let snapshotTimer = null;
+        const templateNameCache = new Map();
+
+        async function resolveTemplateName(endpointUrl, id) {
+            const normalized = String(id || '').trim();
+            if (!normalized) return '';
+
+            const cacheKey = `${endpointUrl}|${normalized}`;
+            if (templateNameCache.has(cacheKey))
+                return templateNameCache.get(cacheKey) || '';
+
+            try {
+                const response = await fetch(`${endpointUrl}?id=${encodeURIComponent(normalized)}`);
+                if (!response.ok) {
+                    templateNameCache.set(cacheKey, '');
+                    return '';
+                }
+
+                const body = await response.json();
+                const name = (body?.name || body?.Name || '').toString().trim();
+                templateNameCache.set(cacheKey, name);
+                return name;
+            } catch {
+                templateNameCache.set(cacheKey, '');
+                return '';
+            }
+        }
 
         function antiforgeryToken() {
             var token = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -565,10 +597,38 @@
             NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
         };
 
-        function renderConfigProperties(rawJson) {
+        const scheduledPatternShortNames = {
+            AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → Remains after',
+            AdmittedBeforePeriodDischargedDuringPeriod: 'Before → Discharged during',
+            AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → Remains after',
+            AdmittedDuringPeriodDischargedDuringPeriod: 'During → Discharged during',
+            AdmittedAndDischargedBeforePeriod: 'Before → Before',
+            AdmittedAndDischargedAfterPeriod: 'After → After'
+        };
+        const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
+
+        function formatScheduledPattern(value) {
+            if (value === null || value === undefined || value === '')
+                return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            const key = String(value).trim();
+            if (!key) return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            if (scheduledPatternShortNames[key]) return escapeHtml(scheduledPatternShortNames[key]);
+            if (/^\d+$/.test(key)) {
+                const index = Number.parseInt(key, 10);
+                const keys = Object.keys(scheduledPatternShortNames);
+                if (index >= 0 && index < keys.length)
+                    return escapeHtml(scheduledPatternShortNames[keys[index]]);
+            }
+            return escapeHtml(toLabel(key));
+        }
+
+        async function renderConfigProperties(rawJson) {
             const container = document.getElementById('runConfigProps');
             if (!container) return;
             container.innerHTML = '';
+
+            const summaryOrgIdEl = document.getElementById('nhsnOrganizationIdSummary');
+            if (summaryOrgIdEl) summaryOrgIdEl.textContent = '-';
 
             const cohortCard = document.getElementById('cohortSummaryCard');
             const cohortBody = document.getElementById('cohortSummaryBody');
@@ -583,6 +643,23 @@
             let parsed;
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+            const queryPlanTemplateId = (parsed.queryPlanTemplateId ?? parsed.QueryPlanTemplateId ?? '').toString().trim();
+            if (queryPlanTemplateId && !parsed.queryPlanTemplateName)
+                parsed.queryPlanTemplateName = await resolveTemplateName(queryPlanGetJsonUrl, queryPlanTemplateId);
+
+            const normalizationSuiteId = (parsed.normalizationSuiteId ?? parsed.NormalizationSuiteId ?? '').toString().trim();
+            if (normalizationSuiteId && !parsed.normalizationSuiteName)
+                parsed.normalizationSuiteName = await resolveTemplateName(normalizationSuiteGetJsonUrl, normalizationSuiteId);
+
+            const organizationResourceMapTemplateId = (parsed.organizationResourceMapTemplateId ?? parsed.OrganizationResourceMapTemplateId ?? '').toString().trim();
+            if (organizationResourceMapTemplateId && !parsed.organizationResourceMapTemplateName)
+                parsed.organizationResourceMapTemplateName = await resolveTemplateName(orgResourceMapGetJsonUrl, organizationResourceMapTemplateId);
+
+            if (summaryOrgIdEl) {
+                const orgId = (parsed.nhsnOrganizationId ?? parsed.NhsnOrganizationId ?? '').toString().trim();
+                summaryOrgIdEl.textContent = orgId || '-';
+            }
 
             const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
             const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
@@ -621,7 +698,10 @@
                 'id', 'isSystemScenario',
                 'patientCohorts',
                 'resourcesPerPatientMin', 'resourcesPerPatientMax',
-                'queryPlanTemplateId', 'updatedAt'
+                'queryPlanTemplateId', 'QueryPlanTemplateId',
+                'normalizationSuiteId', 'NormalizationSuiteId',
+                'organizationResourceMapTemplateId', 'OrganizationResourceMapTemplateId',
+                'updatedAt'
             ]);
 
             const labels = {
@@ -633,7 +713,10 @@
                 patientCount: 'Patients',
                 importedPatientIds: 'Imported Patient IDs',
                 importedPatientBundles: 'Imported Patient Bundles',
+                nhsnOrganizationId: 'NHSN Organization ID',
                 queryPlanTemplateName: 'Query Plan',
+                normalizationSuiteName: 'Normalization Suite',
+                organizationResourceMapTemplateName: 'Org Resource Map',
                 cleanupServiceData: 'Cleanup Service Data',
                 cleanupFhirData: 'Cleanup FHIR Data'
             };
@@ -692,11 +775,12 @@
                     }).join('');
                     const min = c?.resourcesPerPatientMin ?? '-';
                     const max = c?.resourcesPerPatientMax ?? '-';
-                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td>${eligCells}</tr>`;
+                    const inpatientPattern = formatScheduledPattern(c?.scheduledInpatientPattern);
+                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td><td>${inpatientPattern}</td>${eligCells}</tr>`;
                 }).join('');
 
                 cohortBody.innerHTML =
-                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
+                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th><th>Inpatient Pattern</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
                 cohortCard.style.display = '';
             }
         }
@@ -1228,9 +1312,11 @@
                 renderValidatorResults(snapshot.validatorResults || []);
 
                 const schedule = snapshot.report?.schedule;
-                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || schedule?.reportName || '-';
+                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || '-';
+                const effectiveReportId = snapshot.reportId || snapshot.ReportId || '-';
                 document.getElementById('scheduleFacilityId').textContent = effectiveFacilityId;
-                document.getElementById('scheduleReportName').textContent = schedule?.reportName || '-';
+                document.getElementById('scheduleReportName').textContent = effectiveReportId;
+                document.getElementById('headerReportId').textContent = effectiveReportId;
                 document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
                 document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
                 document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
@@ -1361,6 +1447,9 @@
             document.getElementById('runName').textContent = run.runName;
             document.getElementById('facilityId').textContent = run.facilityId || '-';
             document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
+            const reportIdFromStatus = run.reportId || '-';
+            document.getElementById('scheduleReportName').textContent = reportIdFromStatus;
+            document.getElementById('headerReportId').textContent = reportIdFromStatus;
             document.getElementById('status').textContent = run.status;
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';

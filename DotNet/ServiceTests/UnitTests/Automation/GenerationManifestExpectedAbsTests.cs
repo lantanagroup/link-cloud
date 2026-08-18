@@ -166,4 +166,117 @@ public class GenerationManifestExpectedAbsTests
 
         keys.Should().BeEquivalentTo(["Patient/p-q", "Encounter/Esim"]);
     }
+
+    [Fact]
+    public void Empty_simulated_acquired_set_does_not_fallback_to_generated_keys()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Egen", "Condition/Cgen" },
+            },
+            SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase)
+            },
+        };
+
+        var keys = manifest.GetExpectedAbsKeysForPatient("p-q");
+
+        keys.Should().BeEquivalentTo(["Patient/p-q"]);
+    }
+
+    [Fact]
+    public void Expected_abs_counts_do_not_include_organization_when_include_setting_is_false()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Eq" },
+            },
+            IncludePatientAggregatorOrganizationResource = false,
+        };
+
+        var counts = manifest.GetExpectedAbsCountsForPatient("p-q");
+
+        counts.Should().NotBeNull();
+        counts!.Should().NotContainKey("Organization");
+    }
+
+    [Fact]
+    public void Expected_abs_counts_include_one_organization_when_include_setting_is_true()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Eq" },
+            },
+            IncludePatientAggregatorOrganizationResource = true,
+        };
+
+        var counts = manifest.GetExpectedAbsCountsForPatient("p-q");
+
+        counts.Should().NotBeNull();
+        counts!.Should().ContainKey("Organization");
+        counts["Organization"].Should().Be(1);
+    }
+
+    [Fact]
+    public void Pattern_excluded_patient_is_not_predicted_in_abs_even_if_measure_qualifying()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-pattern-out"],
+            Profiles =
+            [
+                new PatientProfile(
+                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.Qualifying },
+                    ScheduledInpatientPattern: ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod)
+            ],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-pattern-out"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/E1", "Condition/C1" }
+            }
+        };
+
+        manifest.GetExpectedAbsKeysForPatient("p-pattern-out").Should().BeEmpty();
+        manifest.ExpectedSubmittedPatientIds().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Cohort_non_qualifying_designation_excludes_patient_from_predictions()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-cohort-nq"],
+            Profiles =
+            [
+                new PatientProfile(
+                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.Qualifying },
+                    CohortQualification: MeasureEligibility.NonQualifying)
+            ],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-cohort-nq"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/E2", "Condition/C2" }
+            }
+        };
+
+        manifest.GetExpectedAbsKeysForPatient("p-cohort-nq").Should().BeEmpty();
+        manifest.ExpectedSubmittedPatientIds().Should().BeEmpty();
+        manifest.QualifyingPatientCount("any").Should().Be(0);
+    }
 }

@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
 public class EpicAuth : IAuth
 {
-    private const string PemSecretSuffix = "-pem";
+    private const string PemSuffix = "-pem";
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
@@ -48,9 +48,9 @@ public class EpicAuth : IAuth
     /// <param name="httpClient"></param>
     /// <param name="authSettings"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
-        var cachedToken = _cacheService.Get<string>(facilityId);
+        var cachedToken = await _cacheService.GetAsync<string>(facilityId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
@@ -74,7 +74,7 @@ public class EpicAuth : IAuth
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
+                    await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
                     return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
                 }
             }
@@ -157,12 +157,12 @@ public class EpicAuth : IAuth
             return authSettings.Key;
         }
 
-        var pemSecretName = $"{facilityId}{PemSecretSuffix}";
-        var resolvedPem = await _secretManager.GetSecretAsync(pemSecretName, CancellationToken.None);
+        var pemName = $"{facilityId}{PemSuffix}";
+        var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
             throw new InvalidOperationException(
-                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemSecretName}').");
+                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
 
         return resolvedPem;
     }

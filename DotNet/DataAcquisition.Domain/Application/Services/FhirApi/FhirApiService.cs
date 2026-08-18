@@ -46,6 +46,7 @@ public class FhirApiService : IFhirApiService
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
+    private readonly ILocationMappingService _locationMappingService;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -53,7 +54,8 @@ public class FhirApiService : IFhirApiService
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        ILocationMappingService locationMappingService)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -61,6 +63,7 @@ public class FhirApiService : IFhirApiService
         _readFhirCommand = readFhirCommand;
         _logger = logger;
         _resourceCache = resourceCache;
+        _locationMappingService = locationMappingService;
     }
 
     #region Interface Implementation
@@ -74,7 +77,7 @@ public class FhirApiService : IFhirApiService
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         var resourceIds = new List<string>();
-        List<string> resourceIdsToAcquire =
+        var resourceIdsToAcquire =
             fhirQuery.IsReference.GetValueOrDefault()
             ? fhirQuery.IdQueryParameterValues.ToList()
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
@@ -110,6 +113,18 @@ public class FhirApiService : IFhirApiService
                                                 log.ReportTrackingId),
                                             cancellationToken);
 
+            var filteredResources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                log.FacilityId,
+                [resource],
+                cancellationToken);
+
+            if (filteredResources.Count == 0)
+            {
+                string filterNote = $"[{DateTime.UtcNow}] Filtered out {resourceType}/{resource.Id} because it is not associated with the reporting organization.";
+                addNoteToLog(log, filterNote);
+                return resourceIds;
+            }
+
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
             InsertDateExtension(resource);
@@ -120,17 +135,25 @@ public class FhirApiService : IFhirApiService
             // batched reference-fetch DataAcquisitionLog per (correlation, type) for
             // cache misses (executed inline, retried by the AcquisitionProcessingJob on
             // failure) and a separate audit-only Completed log for cache hits.
-            //
-            // Skip when this log IS itself a reference fetch (`IsReference`) — its
-            // results are already canonical and re-extracting would chain-discover
-            // refs of refs.
-            if (!fhirQuery.IsReference.GetValueOrDefault() && referenceAccumulator != null)
+            if (referenceAccumulator != null)
             {
-                var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+                var validResourceTypes = fhirQuery.ResourceReferenceTypes
+                    .Select(x => x.ResourceType)
+                    .Where(resourceReferenceType => !string.IsNullOrWhiteSpace(resourceReferenceType))
+                    .Select(resourceReferenceType => resourceReferenceType!)
+                    .ToList();
+
+                var refResources = ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes);
+                if(refResources.Count > 0)
+                {
+                    addNoteToLog(log, $"[{DateTime.UtcNow}] Discovered {refResources.Count} reference(s) in read resource.");
+                }
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            AddResourceToCache(new ResourceAcquired
+            await UpdateResourceMappingsAsync(log, [resource], cancellationToken);
+
+            await AddResourceToCacheAsync(new ResourceAcquired
             {
                 Resource = resource,
                 ResourceType = resource.TypeName,
@@ -138,7 +161,7 @@ public class FhirApiService : IFhirApiService
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-            }, log.CorrelationId);
+            }, log.CorrelationId, cancellationToken);
 
             return resourceIds;
         }
@@ -157,8 +180,7 @@ public class FhirApiService : IFhirApiService
             {
                 string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
 
-                log.Notes ??= new List<string>();
-                log.Notes.Add(note);
+                addNoteToLog(log, note);
                 _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
@@ -233,16 +255,6 @@ public class FhirApiService : IFhirApiService
                             log.ReportTrackingId),
                             cancellationToken))
             {
-                // Reference discovery: collect ref ids from this bundle into the per-
-                // execution accumulator. Drained at end of primary log execution by
-                // ReferenceResourceService.FetchAndPersistAsync. Reference-fetch logs
-                // skip extraction so we don't chain-discover refs of refs.
-                if (!isReferenceLog && referenceAccumulator != null)
-                {
-                    var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-                    AccumulateDiscoveredReferences(refResources, referenceAccumulator);
-                }
-
                 var resources = bundle.Entry
                     .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
                     .Select(e => e.Resource)
@@ -255,14 +267,46 @@ public class FhirApiService : IFhirApiService
 
                 if (outcomes.Any())
                 {
-                    log.Notes ??= new List<string>();
                     string searchOutcomeNote = $"[{DateTime.UtcNow}] OperationOutcome(s) found in search bundle. See application logs for details.";
-                    log.Notes.Add(searchOutcomeNote);
+                    addNoteToLog(log, searchOutcomeNote);
                     foreach (var outcome in outcomes)
                     {
                         string outcomeDetail = JsonSerializer.Serialize(outcome, _options);
                         _logger.LogInformation("OperationOutcome found in successful search bundle for log {LogId}: {outcomeDetail}", log.Id, outcomeDetail);
                     }
+                }
+
+                var originalCount = resources.Count;
+                resources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                    log.FacilityId,
+                    resources,
+                    cancellationToken);
+                var filteredCount = resources.Count;
+                if (originalCount != filteredCount)
+                {
+                    string filterNote = $"[{DateTime.UtcNow}] Filtered out {originalCount - filteredCount} of {originalCount} resource(s) because they are not associated with the reporting organization.";
+                    addNoteToLog(log, filterNote);
+                }
+
+                // Reference discovery: collect ref ids from filtered resources into the per-
+                // execution accumulator. Drained at end of primary log execution by
+                // ReferenceResourceService.FetchAndPersistAsync.
+                if (referenceAccumulator != null)
+                {
+                    var validResourceTypes = fhirQuery.ResourceReferenceTypes
+                        .Select(x => x.ResourceType)
+                        .Where(resourceReferenceType => !string.IsNullOrWhiteSpace(resourceReferenceType))
+                        .Select(resourceReferenceType => resourceReferenceType!)
+                        .ToList();
+
+                    var refResources = resources
+                        .SelectMany(resource => ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes))
+                        .ToList();
+                    if(refResources.Count > 0)
+                    {
+                        addNoteToLog(log, $"[{DateTime.UtcNow}] Discovered {refResources.Count} reference(s) in search bundle.");
+                    }
+                    AccumulateDiscoveredReferences(refResources, referenceAccumulator);
                 }
 
                 resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
@@ -278,8 +322,13 @@ public class FhirApiService : IFhirApiService
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
+                }
 
-                    AddResourceToCache(new ResourceAcquired
+                await UpdateResourceMappingsAsync(log, resources, cancellationToken);
+
+                foreach (var resource in resources)
+                {
+                    await AddResourceToCacheAsync(new ResourceAcquired
                     {
                         Resource = resource,
                         ResourceType = resource.TypeName,
@@ -287,7 +336,7 @@ public class FhirApiService : IFhirApiService
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-                    }, log.CorrelationId);
+                    }, log.CorrelationId, cancellationToken);
                 }
             }
 
@@ -302,13 +351,28 @@ public class FhirApiService : IFhirApiService
             if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
                 string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
-
-                log.Notes ??= new List<string>();
-                log.Notes.Add(note);
+                addNoteToLog(log, note);
                 _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
             throw;
+        }
+    }
+
+    private async Task UpdateResourceMappingsAsync(
+        DataAcquisitionLogModel log,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        var mappingResults = await _locationMappingService.UpdateResourceMappingsAsync(
+            log.FacilityId,
+            resources,
+            cancellationToken);
+
+        foreach (var mappingResult in mappingResults)
+        {
+            addNoteToLog(log,
+                $"[{DateTime.UtcNow}] Location mapping updated for Location/{mappingResult.LocationId}. Part of reporting organization: {mappingResult.IsOrgLocation}");
         }
     }
 
@@ -369,13 +433,13 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)
+    private async Task AddResourceToCacheAsync(ResourceAcquired resourceAcquired, string correlationId, CancellationToken cancellationToken)
     {
         if (resourceAcquired.Resource is DomainResource domainResource
             && !string.IsNullOrWhiteSpace(resourceAcquired.ResourceType)
             && Enum.TryParse<ResourceType>(resourceAcquired.ResourceType, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+            await _resourceCache.UpdateCorrelationCacheAsync($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
         }
     }
 
@@ -420,6 +484,15 @@ public class FhirApiService : IFhirApiService
 
             accumulator.Add(identity.ResourceType, identity.Id);
         }
+    }
+
+    private void addNoteToLog(DataAcquisitionLogModel log, string note)
+    {
+        if (log.Notes == null)
+        {
+            log.Notes = new List<string>();
+        }
+        log.Notes.Add(note);
     }
     #endregion
 }

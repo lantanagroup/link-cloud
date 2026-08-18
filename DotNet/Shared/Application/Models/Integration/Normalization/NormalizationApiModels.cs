@@ -18,7 +18,7 @@ public class CreateNormalizationOperationRequestApiModel
     public string? FacilityId { get; set; }
     public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
     public string? Description { get; set; }
-    public List<string> VendorIds { get; set; } = [];
+    public List<Guid> VendorVersionIds { get; set; } = [];
 }
 
 public class CreateNormalizationOperationDetailsApiModel
@@ -26,8 +26,45 @@ public class CreateNormalizationOperationDetailsApiModel
     public string OperationType { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+
+    // CopyProperty
     public string SourceFhirPath { get; set; } = string.Empty;
     public string TargetFhirPath { get; set; } = string.Empty;
+
+    // ConditionalTransform
+    public object? TargetValue { get; set; }
+    public List<CreateNormalizationConditionApiModel>? Conditions { get; set; }
+
+    // CodeMap
+    public string? FhirPath { get; set; }
+    public List<CreateNormalizationCodeSystemMapApiModel>? CodeSystemMaps { get; set; }
+
+    // RemoveExtensions
+    public List<string>? ExtensionUrls { get; set; }
+
+    // CopyLocationAliasToTypeIteratively
+    public int? MaxIterations { get; set; }
+    public bool? SplitOnComma { get; set; }
+}
+
+public class CreateNormalizationConditionApiModel
+{
+    public string FhirPathSource { get; set; } = string.Empty;
+    public string Operator { get; set; } = "Equal";
+    public object? Value { get; set; }
+}
+
+public class CreateNormalizationCodeSystemMapApiModel
+{
+    public string SourceSystem { get; set; } = string.Empty;
+    public string TargetSystem { get; set; } = string.Empty;
+    public Dictionary<string, CreateNormalizationCodeMapEntryApiModel> CodeMaps { get; set; } = new();
+}
+
+public class CreateNormalizationCodeMapEntryApiModel
+{
+    public string Code { get; set; } = string.Empty;
+    public string Display { get; set; } = string.Empty;
 }
 
 public class NormalizationOperationResourceTypeApiModel
@@ -63,27 +100,13 @@ public class CreateNormalizationOperationSequenceApiModel
     public int? Sequence { get; set; }
 }
 
-public class NormalizationVendorApiModel
+public class CreateNormalizationVendorVersionOperationPresetRequestApiModel
 {
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public List<NormalizationVendorVersionApiModel> Versions { get; set; } = [];
-}
-
-public class NormalizationVendorVersionApiModel
-{
-    public Guid Id { get; set; }
-    public Guid VendorId { get; set; }
-    public string Version { get; set; } = string.Empty;
-}
-
-public class CreateNormalizationVendorPresetRequestApiModel
-{
-    public Guid? VendorId { get; set; }
+    public Guid? VendorVersionId { get; set; }
     public Guid? OperationResourceTypeId { get; set; }
 }
 
-public class NormalizationVendorPresetApiModel
+public class NormalizationVendorVersionOperationPresetApiModel
 {
     public Guid Id { get; set; }
     public Guid VendorVersionId { get; set; }

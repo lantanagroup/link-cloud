@@ -3,7 +3,9 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Terminology.Application.Extensions;
 using LantanaGroup.Link.Terminology.Application.Formatters;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -50,7 +52,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
         options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
     });
+
+    builder.Services.AddTerminologyProblemDetails(
+        builder.Environment,
+        builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails"));
 
     builder.Services.AddHealthChecks();
 
@@ -116,6 +123,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<CodeGroupCacheService>();
+    builder.Services.AddSingleton<ICodeGroupCacheService>(sp => sp.GetRequiredService<CodeGroupCacheService>());
     builder.Services.AddSingleton<FhirService>();
 
     builder.Services.AddOptions<TerminologyConfig>()
@@ -155,6 +163,17 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+
+    app.UseStatusCodePages();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

@@ -1,6 +1,7 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
@@ -24,6 +25,73 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.Notes = $"New facility configuration ({facility.Id}) created for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
             return auditEvent;
+        }
+
+        public static AuditEventMessage CreateVendorAuditEvent(Vendor vendor)
+        {
+            AuditEventMessage auditEvent = VendorAuditEvent(vendor, AuditEventType.Create);
+            auditEvent.Notes = $"New vendor ({vendor.Id}) created for '{vendor.Name}'";
+            return auditEvent;
+        }
+
+        public static AuditEventMessage DeleteVendorAuditEvent(Vendor vendor)
+        {
+            AuditEventMessage auditEvent = VendorAuditEvent(vendor, AuditEventType.Delete);
+            auditEvent.Notes = $"Deleted vendor ({vendor.Id}) '{vendor.Name}'";
+            return auditEvent;
+        }
+
+        /// <summary>
+        /// Returns null when nothing changed, so an update that alters neither the name nor the
+        /// signing key does not raise an audit event.
+        /// </summary>
+        public static AuditEventMessage? UpdateVendorAuditEvent(Vendor updatedVendor, string? existingName, string? existingSigningKeySecretId)
+        {
+            List<PropertyChangeModel> changes = new();
+
+            if (updatedVendor.Name != existingName)
+            {
+                changes.Add(new PropertyChangeModel
+                {
+                    PropertyName = nameof(Vendor.Name),
+                    InitialPropertyValue = existingName,
+                    NewPropertyValue = updatedVendor.Name
+                });
+            }
+
+            string? updatedSigningKeySecretId = updatedVendor.Authentication?.SigningKeySecretId;
+            if (updatedSigningKeySecretId != existingSigningKeySecretId)
+            {
+                changes.Add(new PropertyChangeModel
+                {
+                    PropertyName = nameof(VendorAuthenticationSettings.SigningKeySecretId),
+                    InitialPropertyValue = existingSigningKeySecretId,
+                    NewPropertyValue = updatedSigningKeySecretId
+                });
+            }
+
+            if (changes.Count == 0)
+            {
+                return null;
+            }
+
+            AuditEventMessage auditEvent = VendorAuditEvent(updatedVendor, AuditEventType.Update);
+            auditEvent.PropertyChanges = changes;
+            auditEvent.Notes = $"Updated vendor ({updatedVendor.Id}) '{updatedVendor.Name}'";
+            return auditEvent;
+        }
+
+        private static AuditEventMessage VendorAuditEvent(Vendor vendor, AuditEventType action)
+        {
+            return new AuditEventMessage
+            {
+                ServiceName = TenantConstants.ServiceName,
+                EventDate = DateTime.UtcNow,
+                User = "SystemUser",
+                Action = action,
+                Resource = typeof(Vendor).Name,
+                CorrelationId = Guid.NewGuid().ToString()
+            };
         }
 
         public static AuditEventMessage UpdateFacilityAuditEvent(Facility updatedfacility, Facility existingFacility)

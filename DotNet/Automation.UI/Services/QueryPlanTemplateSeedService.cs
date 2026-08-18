@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 
 namespace Automation.UI.Services;
@@ -35,7 +34,8 @@ public sealed class QueryPlanTemplateSeedService : IHostedService
                           "and Condition, Coverage, DiagnosticReport, Observation, Procedure, " +
                           "ServiceRequest, Device, Specimen (supplemental).",
             IsSystem = true,
-            IsDefault = true,
+            // Default selection is reconciled below so we never end up with multiple defaults.
+            IsDefault = false,
             EhrDescription = defaultInput.EhrDescription ?? "Epic",
             LookBack = defaultInput.LookBack ?? "P0D",
             InitialQueries = defaultInput.InitialQueries.Select(ToQueryEntry).ToList(),
@@ -56,6 +56,21 @@ public sealed class QueryPlanTemplateSeedService : IHostedService
             await _store.UpsertAsync(template, cancellationToken);
             _logger.LogDebug("Refreshed system default query plan template: {Id}", SystemDefaultId);
         }
+
+        // Enforce single-default invariant.
+        var allTemplates = await _store.GetAllAsync(cancellationToken);
+        var selectedDefaultId = allTemplates
+            .Where(t => t.IsDefault)
+            // Prefer explicit user defaults over system template when duplicates exist.
+            .OrderBy(t => t.IsSystem)
+            .ThenByDescending(t => t.UpdatedAt)
+            .Select(t => t.Id)
+            .FirstOrDefault();
+
+        if (selectedDefaultId == Guid.Empty)
+            selectedDefaultId = SystemDefaultId;
+
+        await _store.SetDefaultAsync(selectedDefaultId, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

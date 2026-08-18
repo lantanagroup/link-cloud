@@ -22,8 +22,4 @@ public partial class VendorVersionOperationPreset
     [ForeignKey("OperationResourceTypeId")]
     [InverseProperty("VendorVersionOperationPresets")]
     public virtual OperationResourceType OperationResourceType { get; set; }
-
-    [ForeignKey("VendorVersionId")]
-    [InverseProperty("VendorVersionOperationPresets")]
-    public virtual VendorVersion VendorVersion { get; set; }
 }

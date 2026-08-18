@@ -1,20 +1,31 @@
-﻿using System.Net;
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using Newtonsoft.Json.Linq;
-using RestSharp;
+using System.Net;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public class LokiScraper
 {
     private readonly IAutomationOutput _output;
-    private readonly RestClient _lokiClient;
+    private readonly HttpClient _lokiClient;
+    private readonly string _lokiAppLabel;
     private DateTime _lastQueryTime = DateTime.UtcNow;
 
-    public LokiScraper(IAutomationOutput output, AutomationConfig config)
+    public LokiScraper(HttpClient lokiClient, IAutomationOutput output, AutomationConfig config)
     {
+        if (lokiClient.BaseAddress == null)
+        {
+            if (!Uri.TryCreate(config.LokiBaseUrl, UriKind.Absolute, out var lokiBaseUri))
+                throw new InvalidOperationException("LokiBaseUrl must be an absolute URI.");
+
+            lokiClient.BaseAddress = lokiBaseUri;
+        }
+
         _output = output;
-        _lokiClient = new RestClient(config.LokiBaseUrl);
+        _lokiClient = lokiClient;
+        _lokiAppLabel = string.IsNullOrWhiteSpace(config.LokiAppLabel)
+            ? throw new InvalidOperationException("LokiAppLabel is required.")
+            : config.LokiAppLabel.Trim();
     }
 
     public static class Components
@@ -43,7 +54,7 @@ public class LokiScraper
         Components.Tenant
     ];
 
-    private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException";
+    private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException|UQ_LocationMapping_Facility_Location|Cannot insert duplicate key row in object 'dbo.OrganizationLocationMapping'";
 
     public async Task ScrapeErrorsAsync(string? facilityId = null, string? reportId = null)
     {
@@ -54,7 +65,7 @@ public class LokiScraper
             ? $" |= \"{facilityId}\""
             : "";
         await ScrapeQueryAsync(
-            $"{{app=\"link-cloud\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
+            $"{{app=\"{_lokiAppLabel}\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
             "LOKI ERROR");
     }
 
@@ -81,21 +92,15 @@ public class LokiScraper
                 var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
                     ? $" |= \"{facilityId}\""
                     : "";
-                var query = $"{{app=\"link-cloud\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
-                var request = new RestRequest("/loki/api/v1/query_range");
-                request.AddParameter("query", query);
-                request.AddParameter("start", startUnix.ToString());
-                request.AddParameter("end", endUnix.ToString());
-                request.AddParameter("limit", "5");
-
-                var response = await _lokiClient.ExecuteAsync(request);
-                if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                var query = $"{{app=\"{_lokiAppLabel}\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
+                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 5);
+                if (statusCode != HttpStatusCode.OK || content == null)
                 {
                     cleanServices.Add($"{component}(?)");
                     continue;
                 }
 
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
 
                 var lines = new List<string>();
@@ -127,7 +132,6 @@ public class LokiScraper
                     _output.WriteLine($"[DIAG]   {component}: {lines.Count} issue(s)");
                     foreach (var line in lines)
                     {
-                        // Split summary from detail for clean log output.
                         var dIdx = line.IndexOf("|||", StringComparison.Ordinal);
                         var summaryPart = dIdx >= 0 ? line[..dIdx].TrimEnd() : line;
 
@@ -155,6 +159,141 @@ public class LokiScraper
         _output.WriteLine("[DIAG] === End error summary ===");
     }
 
+    public async Task<List<string>> QueryServiceLogsAsync(
+        string componentName,
+        string includePattern,
+        TimeSpan lookback,
+        IReadOnlyCollection<string>? additionalContainsFilters = null,
+        int limit = 2000,
+        int maxPages = 10)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var escapedIncludePattern = includePattern.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        var containsFilter = string.Empty;
+        if (additionalContainsFilters != null)
+        {
+            foreach (var filter in additionalContainsFilters)
+            {
+                if (string.IsNullOrWhiteSpace(filter))
+                    continue;
+
+                var escapedFilter = filter.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                containsFilter += $" |= \"{escapedFilter}\"";
+            }
+        }
+
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |= \"{escapedIncludePattern}\"{containsFilter}";
+
+        var lines = new List<string>();
+        var pageSize = Math.Max(1, limit);
+        var pageCount = 0;
+        var currentEndUnix = endUnix;
+
+        try
+        {
+            var seenEntries = new HashSet<string>(StringComparer.Ordinal);
+            var overlapAttemptsByTimestamp = new Dictionary<long, int>();
+
+            while (pageCount < Math.Max(1, maxPages))
+            {
+                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, currentEndUnix, pageSize, "backward");
+                if (statusCode != HttpStatusCode.OK || content == null)
+                    return lines;
+
+                var jsonResponse = JObject.Parse(content);
+                var results = jsonResponse["data"]?["result"] as JArray;
+                if (results == null)
+                    return lines;
+
+                var pageEntries = new List<(long? Timestamp, string Line)>();
+                var malformedTimestampCount = 0;
+
+                foreach (var result in results)
+                {
+                    var values = result["values"] as JArray;
+                    if (values == null) continue;
+
+                    foreach (var value in values)
+                    {
+                        var timestampToken = value[0]?.ToString();
+                        var logLine = value[1]?.ToString();
+                        if (string.IsNullOrWhiteSpace(logLine))
+                            continue;
+
+                        if (!long.TryParse(timestampToken, out var timestamp))
+                        {
+                            malformedTimestampCount++;
+                            pageEntries.Add((null, logLine));
+                            continue;
+                        }
+
+                        pageEntries.Add((timestamp, logLine));
+                    }
+                }
+
+                if (malformedTimestampCount > 0)
+                {
+                    _output.WriteLine($"[DIAG][Loki] Encountered {malformedTimestampCount} malformed timestamp token(s) in query_range response; preserving lines and continuing pagination using valid timestamps only.");
+                }
+
+                if (pageEntries.Count == 0)
+                    break;
+
+                foreach (var entry in pageEntries)
+                {
+                    var dedupeKey = $"{entry.Timestamp?.ToString() ?? "(null)"}|{entry.Line}";
+                    if (seenEntries.Add(dedupeKey))
+                        lines.Add(entry.Line);
+                }
+
+                pageCount++;
+
+                if (pageEntries.Count < pageSize)
+                    break;
+
+                var validTimestamps = pageEntries
+                    .Where(e => e.Timestamp.HasValue)
+                    .Select(e => e.Timestamp!.Value)
+                    .ToList();
+
+                if (validTimestamps.Count == 0)
+                    break;
+
+                var oldestTimestamp = validTimestamps.Min();
+                if (oldestTimestamp <= startUnix)
+                    break;
+
+                overlapAttemptsByTimestamp.TryGetValue(oldestTimestamp, out var overlapAttempts);
+                if (overlapAttempts == 0)
+                {
+                    // Overlap once at the oldest timestamp so entries sharing the boundary
+                    // timestamp have a chance to appear on the next page.
+                    overlapAttemptsByTimestamp[oldestTimestamp] = 1;
+                    currentEndUnix = oldestTimestamp;
+                    continue;
+                }
+
+                var nextEndUnix = Math.Max(startUnix, oldestTimestamp - 1);
+                if (nextEndUnix >= currentEndUnix)
+                    break;
+
+                currentEndUnix = nextEndUnix;
+            }
+        }
+        catch
+        {
+            return lines;
+        }
+
+        return lines;
+    }
+
     /// <summary>
     /// One-time scrape of a larger time window for a specific service -- useful for
     /// post-test diagnostics to capture the full evaluation/validation lifecycle.
@@ -167,19 +306,13 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(error|warn|exception|fail|timeout|duration|evaluated|validated|submitted|generated|measure.?report)\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "100");
-
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(error|warn|exception|fail|timeout|duration|evaluated|validated|submitted|generated|measure.?report)\" !~ \"(?i)({HarmlessPatterns})\"";
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 100);
+            if (statusCode == HttpStatusCode.OK && content != null)
             {
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
                 if (results != null)
                 {
@@ -224,19 +357,12 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        if (limit.HasValue)
-            request.AddParameter("limit", limit.Value.ToString());
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit);
+            if (statusCode == HttpStatusCode.OK && content != null)
             {
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
                 if (results != null)
                 {
@@ -280,9 +406,9 @@ public class LokiScraper
                     }
                 }
             }
-            else if (response.StatusCode != 0 && response.StatusCode != HttpStatusCode.OK)
+            else if (statusCode != HttpStatusCode.OK)
             {
-                _output.WriteLine($"Warning: Failed to scrape Loki: {response.StatusCode} {response.Content}");
+                _output.WriteLine($"Warning: Failed to scrape Loki: {statusCode} {content}");
             }
         }
         catch (Exception ex)
@@ -378,19 +504,13 @@ public class LokiScraper
 
         // Query for all MeasureEval consuming lines (these are DEBUG level)
         var query = $"{{app=\"link-cloud\", component=\"{Components.MeasureEval}\"}} |= \"Consuming\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null) return null;
 
@@ -471,23 +591,17 @@ public class LokiScraper
         var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
             ? $" |= \"{facilityId}\""
             : "";
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
-
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", limit.ToString());
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
         var lines = new List<string>();
 
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return lines;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return lines;
@@ -524,20 +638,14 @@ public class LokiScraper
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
         // Focus on ReadyForValidation processing lines emitted by the consumer.
-        var query = $"{{app=\"link-cloud\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return null;
@@ -594,20 +702,14 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return null;
@@ -668,5 +770,26 @@ public class LokiScraper
         {
             return null;
         }
+    }
+
+    private async Task<(HttpStatusCode StatusCode, string? Content)> ExecuteQueryRangeAsync(
+        string query,
+        long startUnix,
+        long endUnix,
+        int? limit = null,
+        string? direction = null)
+    {
+        var queryString =
+            $"query={Uri.EscapeDataString(query)}&start={startUnix}&end={endUnix}";
+
+        if (limit.HasValue)
+            queryString += $"&limit={limit.Value}";
+
+        if (!string.IsNullOrWhiteSpace(direction))
+            queryString += $"&direction={Uri.EscapeDataString(direction)}";
+
+        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}");
+        var content = await response.Content.ReadAsStringAsync();
+        return (response.StatusCode, string.IsNullOrWhiteSpace(content) ? null : content);
     }
 }

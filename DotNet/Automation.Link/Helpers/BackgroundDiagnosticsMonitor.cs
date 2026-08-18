@@ -1,6 +1,7 @@
 ﻿using System.Threading.Channels;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Validation;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -76,6 +77,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         IAutomationOutput output,
         LokiScraper lokiScraper,
         AutomationConfig config,
+        KafkaConnection kafkaConnection,
         int expectedPatientCount = 0,
         TimeSpan? pollInterval = null,
         bool forwardInternalLogsToOutput = true,
@@ -97,7 +99,10 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         var reader = pipelineReader ?? BuildPipelineReader(config);
 
-        _kafkaMonitor = new KafkaErrorMonitor(eventingOutput, config);
+        _kafkaMonitor = new KafkaErrorMonitor(
+            eventingOutput,
+            config,
+            kafkaConnection);
         var progressMonitor = new ProgressMonitor(eventingOutput, expectedPatientCount, lokiScraper, reader, expectsDataAcquisition);
         _milestoneOrchestrator = new MilestoneValidationOrchestrator(eventingOutput, reader, expectedPatientCount, expectsDataAcquisition);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);

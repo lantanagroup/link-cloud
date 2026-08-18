@@ -12,7 +12,9 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
+using LantanaGroup.Link.Normalization.Domain.Services;
 using LantanaGroup.Link.Normalization.Listeners;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -104,6 +106,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     builder.Services.AddHttpClient();
+    builder.Services.AddLinkSdk();
     builder.Services.AddProblemDetails();
 
     builder.Services.AddMemoryCache();
@@ -161,8 +164,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
     builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
     builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-    builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
-    builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
     builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
@@ -183,10 +184,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, Database>();
     builder.Services.AddScoped<IOperationManager, OperationManager>();
     builder.Services.AddScoped<IResourceManager, ResourceManager>();
-    builder.Services.AddScoped<IVendorManager, VendorManager>();
+    builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
     builder.Services.AddScoped<IOperationQueries, OperationQueries>();
     builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
-    builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+    builder.Services.AddScoped<IVendorVersionOperationPresetQueries, VendorVersionOperationPresetQueries>();
+    builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
 
     builder.Services.AddControllers()
@@ -202,6 +204,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeMapOperationService>();
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
     builder.Services.AddSingleton<CopyLocationOperationService>();
+    builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
     builder.Services.AddSingleton<RemoveExtensionsOperationService>();
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
