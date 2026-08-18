@@ -24,6 +24,10 @@ import urllib.request
 
 REPO_COMMITS_API_ROOT = 'https://api.github.com/repos/lantanagroup/link-cloud/commits/'
 
+# urlopen blocks indefinitely by default, which would hang the pipeline job rather than
+# fail it. Bound every HTTP call to the same budget.
+HTTP_TIMEOUT_SECONDS = 30
+
 def fail(msg: str):
     print(f"ERROR: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -78,7 +82,7 @@ def main():
             info_url,
             headers={'Accept': 'application/json'}
         )
-        with urllib.request.urlopen(request) as response:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
             body = response.read().decode("utf-8")
     except Exception as e:
         fail(f"Failed to GET {info_url}: {e}")
@@ -109,7 +113,7 @@ def main():
                 f"{REPO_COMMITS_API_ROOT}{commit}",
                 headers={'Accept': 'application/vnd.github.sha'}
             )
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
                 full_commit = response.read().decode("utf-8").strip()
 
             if len(full_commit) == 40:
