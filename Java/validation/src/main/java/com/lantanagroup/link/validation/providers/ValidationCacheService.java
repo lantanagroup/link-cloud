@@ -14,7 +14,7 @@ public class ValidationCacheService {
      */
     @Cacheable(
             value = "validateCodeCache",
-            key = "T(java.util.Objects).hash(#codeSystem, #code, #display, #valueSetUrl)",
+            key = "#root.target.validateCodeCacheKey(#codeSystem, #code, #display, #valueSetUrl)",
             unless = "#result == null"
     )
     public IValidationSupport.CodeValidationResult cachedValidateCode(
@@ -25,6 +25,22 @@ public class ValidationCacheService {
             String valueSetUrl
     ) {
         return delegate.invokeRemoteValidateCode(codeSystem, code, display, valueSetUrl, (IBaseResource) null);
+    }
+
+    public String validateCodeCacheKey(
+            String codeSystem,
+            String code,
+            String display,
+            String valueSetUrl
+    ) {
+        return encodeKeyComponent(codeSystem)
+                + encodeKeyComponent(code)
+                + encodeKeyComponent(display)
+                + encodeKeyComponent(valueSetUrl);
+    }
+
+    private static String encodeKeyComponent(String value) {
+        return value == null ? "N;" : "V" + value.length() + ":" + value;
     }
 
     /**
