@@ -6,10 +6,10 @@ Usage:
     python3 scripts/get_deployed_commit.py <environment>
 
 Arguments:
-    environment: One of dev-scale | scale-test | scale-qa
+    environment: One of dev-scale | scale-test | scale-qa | scale-qa2
 
 Environment variables expected:
-    DEV_BASE_URL, TEST_BASE_URL, QA_BASE_URL  (from your Azure DevOps variable group)
+    DEV_BASE_URL, TEST_BASE_URL, QA_BASE_URL, QA2_BASE_URL  (from your Azure DevOps variable group)
 
 Purpose:
     - Determines the correct BASE_URL from the environment.
@@ -43,6 +43,7 @@ def main():
     dev_url = os.getenv("DEV_BASE_URL", "")
     test_url = os.getenv("TEST_BASE_URL", "")
     qa_url = os.getenv("QA_BASE_URL", "")
+    qa2_url = os.getenv("QA2_BASE_URL", "")
 
     base_url = ""
     if input_value.startswith("https://"):
@@ -56,12 +57,14 @@ def main():
             base_url = test_url
         elif environment == "scale-qa":
             base_url = qa_url
+        elif environment == "scale-qa2":
+            base_url = qa2_url
         else:
-            fail(f"Unknown environment '{environment}'. Expected one of: dev-scale | scale-test | scale-qa, or a direct https:// URL")
+            fail(f"Unknown environment '{environment}'. Expected one of: dev-scale | scale-test | scale-qa | scale-qa2, or a direct https:// URL")
 
     if not base_url:
         fail(f"BASE_URL is empty for environment '{environment}'. "
-             f"Ensure DEV_BASE_URL / TEST_BASE_URL / QA_BASE_URL are defined.")
+             f"Ensure DEV_BASE_URL / TEST_BASE_URL / QA_BASE_URL / QA2_BASE_URL are defined.")
 
     print(f"Environment: {environment}")
     print(f"BASE_URL: {base_url}")

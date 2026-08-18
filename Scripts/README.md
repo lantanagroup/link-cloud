@@ -34,7 +34,7 @@ subfolder and is summarised at the end.
 | `set_kubernetes_services.bat <namespace> <registry> <image>` | Points a Kubernetes namespace at a registry and image. |
 | `aca-container-statuses.ps1` | Lists Azure Container App running state and replica bounds. |
 | `aca-logs.bat <container> rep\|rev <id>` | Tails Container App logs for a replica or revision. |
-| `get_deployed_commit.py <environment>` | Reports the commit currently deployed to `dev-scale`, `scale-test` or `scale-qa`. |
+| `get_deployed_commit.py <environment>` | Reports the commit currently deployed to `dev-scale`, `scale-test`, `scale-qa` or `scale-qa2`. |
 | `list-deploy-changes.py <from> <to>` | Lists the deployment-relevant changes between two git refs. |
 | `upload_to_share.py` | Uploads a directory to an Azure File Share. |
 
