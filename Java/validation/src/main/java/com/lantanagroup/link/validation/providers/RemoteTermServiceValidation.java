@@ -15,6 +15,7 @@ import ca.uhn.fhir.util.BundleUtil;
 import ca.uhn.fhir.util.ParametersUtil;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.common.hapi.validation.support.BaseValidationSupport;
@@ -58,6 +59,21 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, theValueSetUrl);
     }
 
+    /**
+     * HAPI calls this (rather than {@link #validateCode}) once it has resolved the bound ValueSet to a resource,
+     * which is the common case for loaded profiles. Delegating to the remote terminology service here ensures the
+     * inactive-code detection in {@link #invokeRemoteValidateCode} runs for value-set-bound codes instead of falling
+     * through to the in-memory support. When the ValueSet carries a canonical URL we route through the same cache as
+     * {@link #validateCode}; otherwise we send the ValueSet resource inline.
+     */
+    public IValidationSupport.CodeValidationResult validateCodeInValueSet(ValidationSupportContext theValidationSupportContext, ConceptValidationOptions theOptions, String theCodeSystem, String theCode, String theDisplay, IBaseResource theValueSet) {
+        String valueSetUrl = theValueSet instanceof org.hl7.fhir.r4.model.ValueSet valueSet ? valueSet.getUrl() : null;
+        if (StringUtils.isNotBlank(valueSetUrl)) {
+            return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, valueSetUrl);
+        }
+        return invokeRemoteValidateCode(theCodeSystem, theCode, theDisplay, null, theValueSet);
+    }
+
     @Nullable
     private IBaseResource fetchCodeSystem(String theSystem, @Nullable SummaryEnum theSummaryParam) {
         IGenericClient client = this.provideClient();
@@ -74,13 +90,22 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
 
     public IValidationSupport.LookupCodeResult lookupCode(ValidationSupportContext theValidationSupportContext, @Nonnull LookupCodeRequest theLookupCodeRequest) {
         String code = theLookupCodeRequest.getCode();
-        String system = theLookupCodeRequest.getSystem();
-        String displayLanguage = theLookupCodeRequest.getDisplayLanguage();
         Validate.notBlank(code, "theCode must be provided", new Object[0]);
+        return validationCacheService.cachedLookupCode(this, code, theLookupCodeRequest.getSystem(), theLookupCodeRequest.getDisplayLanguage(), String.join(",", theLookupCodeRequest.getPropertyNames()));
+    }
+
+    /**
+     * Remote lookup for {@link #lookupCode}, extracted so the result can be cached at the
+     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
+     * delegate reference passed into the {@code @Cacheable} method.
+     */
+    IValidationSupport.LookupCodeResult invokeLookupCode(String code, String system, String displayLanguage, String propertyNames) {
         IGenericClient client = this.provideClient();
         FhirContext fhirContext = client.getFhirContext();
         FhirVersionEnum fhirVersion = fhirContext.getVersion().getVersion();
         if (!fhirVersion.isNewerThan(FhirVersionEnum.R4) && !fhirVersion.isOlderThan(FhirVersionEnum.DSTU3)) {
+            ourLog.debug("Invoking remote lookup on CodeSystem for code system {} and code {} (properties: '{}')", LogUtils.sanitize(system), LogUtils.sanitize(code), LogUtils.sanitize(propertyNames));
+
             IBaseParameters params = ParametersUtil.newInstance(fhirContext);
             ParametersUtil.addParameterToParametersString(fhirContext, params, "code", code);
             if (!StringUtils.isEmpty(system)) {
@@ -91,8 +116,10 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 ParametersUtil.addParameterToParametersString(fhirContext, params, "language", displayLanguage);
             }
 
-            for(String propertyName : theLookupCodeRequest.getPropertyNames()) {
-                ParametersUtil.addParameterToParametersCode(fhirContext, params, "property", propertyName);
+            if (!StringUtils.isEmpty(propertyNames)) {
+                for (String propertyName : propertyNames.split(",")) {
+                    ParametersUtil.addParameterToParametersCode(fhirContext, params, "property", propertyName);
+                }
             }
 
             Class<? extends IBaseResource> codeSystemClass = this.myCtx.getResourceDefinition("CodeSystem").getImplementingClass();
@@ -101,9 +128,9 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             try {
                 outcome = (IBaseParameters)((IOperationUnnamed)client.operation().onType(codeSystemClass)).named("$lookup").withParameters(params).useHttpGet().execute();
             } catch (InvalidRequestException | ResourceNotFoundException e) {
-                ourLog.error(((BaseServerResponseException)e).getMessage(), e);
+                ourLog.debug("Failed to lookup code {} in system {}: {}", LogUtils.sanitize(code), LogUtils.sanitize(system), LogUtils.sanitize(e.getMessage()));
                 IValidationSupport.LookupCodeResult result = LookupCodeResult.notFound(system, code);
-                result.setErrorMessage(this.getErrorMessage("unknownCodeInSystem", system, code, client.getServerBase(), ((BaseServerResponseException)e).getMessage()));
+                result.setErrorMessage(this.getErrorMessage("unknownCodeInSystem", system, code, client.getServerBase(), e.getMessage()));
                 return result;
             }
 
@@ -234,9 +261,26 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return conceptDesignation;
     }
 
+    /**
+     * Summary mode used when HAPI asks us to resolve a bound ValueSet.
+     * <p>
+     * Deliberately {@link SummaryEnum#TRUE}: {@code _summary=false} is the condition that makes the Link
+     * terminology service enumerate every code of the value set into {@code ValueSet.expansion.contains}
+     * (see {@code Terminology/Services/FhirService.cs}), which for large value sets is the client-side
+     * trigger for terminology-service memory exhaustion. The expansion is not read by this class -- when
+     * the resolved ValueSet carries a canonical URL, {@link #validateCodeInValueSet} uses only that URL and
+     * routes validation through {@code $validate-code}. The Link terminology service's summary handling is
+     * bespoke rather than element-filtering: at {@code _summary=true} it still returns the stored ValueSet
+     * with its {@code compose} intact, so downstream chain members (e.g. HAPI's in-memory terminology
+     * support) can still expand it in-process.
+     * <p>
+     * Change this only with before/after comparison of validation results -- see
+     * {@code RemoteTermServiceValidationTest#fetchValueSet_requestsSummaryModeTrue}.
+     */
+    static final SummaryEnum FETCH_VALUE_SET_SUMMARY_MODE = SummaryEnum.TRUE;
+
     public IBaseResource fetchValueSet(String theValueSetUrl) {
-        SummaryEnum summaryParam = SummaryEnum.FALSE;
-        return this.fetchValueSet(theValueSetUrl, summaryParam);
+        return this.fetchValueSet(theValueSetUrl, FETCH_VALUE_SET_SUMMARY_MODE);
     }
 
     @Nullable
@@ -264,8 +308,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             }
         }
 
-        IBaseResource codeSystem = this.fetchCodeSystem(theSystem, SummaryEnum.TRUE);
-        return codeSystem != null;
+        return validationCacheService.cachedIsCodeSystemSupported(this, theSystem);
     }
 
     public boolean isValueSetSupported(ValidationSupportContext theValidationSupportContext, String theValueSetUrl) {
@@ -279,8 +322,24 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             }
         }
 
-        IBaseResource valueSet = this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE);
-        return valueSet != null;
+        return validationCacheService.cachedIsValueSetSupported(this, theValueSetUrl);
+    }
+
+    /**
+     * Remote lookup for {@link #isCodeSystemSupported}, extracted so the result can be cached at the
+     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
+     * delegate reference passed into the {@code @Cacheable} method.
+     */
+    boolean invokeIsCodeSystemSupported(String theSystem) {
+        return this.fetchCodeSystem(theSystem, SummaryEnum.TRUE) != null;
+    }
+
+    /**
+     * Remote lookup for {@link #isValueSetSupported}, extracted for the same reason as
+     * {@link #invokeIsCodeSystemSupported}.
+     */
+    boolean invokeIsValueSetSupported(String theValueSetUrl) {
+        return this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE) != null;
     }
 
     public TranslateConceptResults translateConcept(IValidationSupport.TranslateCodeRequest theRequest) {
@@ -291,7 +350,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return RemoteTerminologyUtil.translateOutcomeToResults(fhirContext, outcome);
     }
 
-    private IGenericClient provideClient() {
+    protected IGenericClient provideClient() {
         IGenericClient retVal = this.myCtx.newRestfulGenericClient(this.myBaseUrl);
 
         for(Object next : this.myClientInterceptors) {
@@ -314,13 +373,16 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             String resourceType = "ValueSet";
             if (theValueSet == null && theValueSetUrl == null) {
                 resourceType = "CodeSystem";
+                ourLog.debug("Invoking remote validate-code on CodeSystem for code system {} and code {}", LogUtils.sanitize(theCodeSystem), LogUtils.sanitize(theCode));
+            } else {
+                ourLog.debug("Invoking remote validate-code on ValueSet for value set {} and code {}", LogUtils.sanitize(theValueSetUrl), LogUtils.sanitize(theCode));
             }
 
             IBaseParameters output;
             try {
                 output = (IBaseParameters)((IOperationUnnamed)client.operation().onType(resourceType)).named("validate-code").withParameters(input).execute();
             } catch (InvalidRequestException | ResourceNotFoundException ex) {
-                ourLog.error(((BaseServerResponseException)ex).getMessage(), ex);
+                ourLog.error("{}", LogUtils.sanitize(((BaseServerResponseException)ex).getMessage()), ex);
                 IValidationSupport.CodeValidationResult result = new IValidationSupport.CodeValidationResult();
                 result.setSeverity(IssueSeverity.ERROR);
                 String errorMessage = this.buildErrorMessage(theCodeSystem, theCode, theValueSetUrl, theValueSet, client.getServerBase(), ((BaseServerResponseException)ex).getMessage());
@@ -328,31 +390,98 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 return result;
             }
 
-            List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
-            if (!resultValues.isEmpty() && !StringUtils.isBlank((CharSequence)resultValues.get(0))) {
-                Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
-                boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
-                IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
-                if (success) {
-                    retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
-                    retVal.setCode(theCode);
-                    List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
-                    if (!displayValues.isEmpty()) {
-                        retVal.setDisplay((String)displayValues.get(0));
-                    }
-                } else {
-                    retVal.setSeverity(IssueSeverity.ERROR);
-                    List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
-                    if (!messageValues.isEmpty()) {
-                        retVal.setMessage((String)messageValues.get(0));
-                    }
-                }
+            CodeValidationResult codeResult = getCodeResult(output, theCode);
 
-                return retVal;
-            } else {
+            if (codeResult == null) {
                 return null;
             }
+
+            if (codeResult.getSeverity() != IssueSeverity.INFORMATION) {
+                // Invalid code
+                return codeResult;
+            } 
+
+            if (isInactiveIssue(output)) {
+                codeResult.setSeverity(IssueSeverity.WARNING);
+                codeResult.setMessage(String.format("The concept '%s' has a status of inactive and its use should be reviewed.", theCode));
+            }
+
+            return codeResult;
         }
+    }
+
+    /**
+     * Checks if the output contains an issue indicating that the code is inactive.
+     *
+     * @param output the operation output
+     * 
+     * @return true if the code is inactive, false otherwise
+     */
+    protected boolean isInactiveIssue(IBaseParameters output) {
+
+        if (!(output instanceof org.hl7.fhir.r4.model.Parameters parameters)) {
+            // Output is not an R4 Parameters resource, cannot evaluate for inactive code
+            return false;
+        }
+
+        org.hl7.fhir.r4.model.OperationOutcome outcome = parameters.getParameter().stream()
+                .filter(parameter -> "issues".equals(parameter.getName()))
+                .map(parameter -> parameter.getResource())              
+                .filter(org.hl7.fhir.r4.model.OperationOutcome.class::isInstance)
+                .map(org.hl7.fhir.r4.model.OperationOutcome.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (outcome == null) {
+            // no issues parameter
+            return false;   
+        }        
+
+        org.hl7.fhir.r4.model.OperationOutcome.OperationOutcomeIssueComponent issue = outcome.getIssueFirstRep();
+
+        String message = issue.getDetails() != null ? issue.getDetails().getText() : issue.getDiagnostics();
+
+        if (issue.getCode() == org.hl7.fhir.r4.model.OperationOutcome.IssueType.BUSINESSRULE && 
+            issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.WARNING &&
+            "code is inactive.".equalsIgnoreCase(message)) {
+                return true;
+            }
+
+        return false;
+    }
+
+    /**
+     * Parses the response of a $validate-code operation into a {@link IValidationSupport.CodeValidationResult}.
+     * The result parameter is true if the code is valid, otherwise false. If the code is not valid, the message
+     * parameter will contain a human-readable error message.
+     *
+     * @return the parsed validation result, or {@code null} if the response contained no usable 'result' value
+     */
+    protected IValidationSupport.CodeValidationResult getCodeResult(IBaseParameters output, String theCode) {
+        List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
+        if (resultValues.isEmpty() || StringUtils.isBlank((CharSequence)resultValues.get(0))) {
+            return null;
+        }
+
+        Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
+        boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
+        IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
+        if (success) {
+            retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
+            retVal.setCode(theCode);
+            List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
+            if (!displayValues.isEmpty()) {
+                retVal.setDisplay((String)displayValues.get(0));
+            }
+        } else {
+            retVal.setSeverity(IssueSeverity.ERROR);
+            List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
+            if (!messageValues.isEmpty()) {
+                retVal.setMessage((String)messageValues.get(0));
+            }
+        }
+
+        return retVal;
     }
 
     private String buildErrorMessage(String theCodeSystem, String theCode, String theValueSetUrl, IBaseResource theValueSet, String theServerUrl, String theServerMessage) {

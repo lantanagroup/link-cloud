@@ -399,10 +399,14 @@ public class QueryTests
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
         var patientEncounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
-        // Clear existing data from patient encounters table and related tables
+        // Clear existing data from patient encounters table and related tables.
+        // PatientEvents must be cleared too: RebuildPatientEncounterTable rebuilds from EVERY
+        // event in the table, so foreign events left by other tests in the shared collection DB
+        // would otherwise pollute the rebuild and the FirstOrDefaultAsync() sample below.
         dbContext.PatientIdentifiers.RemoveRange(dbContext.PatientIdentifiers);
         dbContext.PatientVisitIdentifiers.RemoveRange(dbContext.PatientVisitIdentifiers);
         dbContext.PatientEncounters.RemoveRange(dbContext.PatientEncounters);
+        dbContext.PatientEvents.RemoveRange(dbContext.PatientEvents);
         await dbContext.SaveChangesAsync();
 
         // Seed the database with patient events

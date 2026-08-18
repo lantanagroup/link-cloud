@@ -2,10 +2,12 @@
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -43,13 +45,14 @@ public interface IReferenceResourceService
         string queryPlanType,
         CancellationToken cancellationToken = default);
 
-    Task FetchAndPersistAsync(
+    Task<int> FetchAndPersistAsync(
         DataAcquisitionLogModel primaryLog,
         DiscoveredReferenceAccumulator accumulator,
         CancellationToken cancellationToken = default);
 
     Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
         DataAcquisitionLogModel log,
+        DiscoveredReferenceAccumulator? accumulator = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -62,6 +65,7 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IResourceCache _resourceCache;
+    private readonly ILocationMappingService _locationMappingService;
 
     private const int LockTimeoutMs = 30000;
 
@@ -72,7 +76,8 @@ public class ReferenceResourceService : IReferenceResourceService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IQueryPlanQueries queryPlanQueries,
         DataAcquisitionDbContext dbContext,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        ILocationMappingService locationMappingService)
     {
         _logger = logger;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -81,6 +86,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _queryPlanQueries = queryPlanQueries;
         _dbContext = dbContext;
         _resourceCache = resourceCache;
+        _locationMappingService = locationMappingService;
     }
 
     public async Task<List<Resource>> FetchReferenceResources(
@@ -98,8 +104,7 @@ public class ReferenceResourceService : IReferenceResourceService
         }
 
         var validReferenceResources =
-            referenceQueryFactoryResult
-            .ReferenceIds
+            (referenceQueryFactoryResult.ReferenceIds ?? Enumerable.Empty<ResourceReference>())
             .Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
@@ -116,7 +121,7 @@ public class ReferenceResourceService : IReferenceResourceService
         return resources;
     }
 
-    public async Task FetchAndPersistAsync(
+    public async Task<int> FetchAndPersistAsync(
         DataAcquisitionLogModel primaryLog,
         DiscoveredReferenceAccumulator accumulator,
         CancellationToken cancellationToken = default)
@@ -135,7 +140,7 @@ public class ReferenceResourceService : IReferenceResourceService
             throw new ArgumentException("Primary log is missing a ReportableEvent.", nameof(primaryLog));
 
         if (!accumulator.HasAny)
-            return;
+            return 0;
 
         activity?.SetTag(DiagnosticNames.FacilityId, primaryLog.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, primaryLog.CorrelationId);
@@ -154,7 +159,7 @@ public class ReferenceResourceService : IReferenceResourceService
             _logger.LogWarning(ex,
                 "FetchAndPersistAsync: cannot map ReportableEvent {ReportableEvent} to a Frequency for facility {FacilityId} correlation {CorrelationId}; dropping {Count} discovered reference type(s).",
                 primaryLog.ReportableEvent.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
-            return;
+            return 0;
         }
 
         var queryPlan = await _queryPlanQueries.GetAsync(primaryLog.FacilityId, planFrequency, cancellationToken);
@@ -163,8 +168,10 @@ public class ReferenceResourceService : IReferenceResourceService
             _logger.LogWarning(
                 "FetchAndPersistAsync: no query plan found for facility {FacilityId} frequency {Frequency}; dropping {Count} discovered reference type(s).",
                 primaryLog.FacilityId.SanitizeForLog(), planFrequency.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
-            return;
+            return 0;
         }
+
+        var pendingReferenceIdsAdded = 0;
 
         foreach (var (resourceType, idSet) in accumulator.ByType)
         {
@@ -199,17 +206,29 @@ public class ReferenceResourceService : IReferenceResourceService
             if (requestedIds.Count == 0)
                 continue;
 
-            await GetOrCreateAndAppendAsync(
+            pendingReferenceIdsAdded += await GetOrCreateAndAppendAsync(
                 primaryLog,
                 parsedResourceType,
                 refConfig,
                 requestedIds,
+                new List<CreateResourceReferenceTypeModel>
+                {
+                    new CreateResourceReferenceTypeModel
+                    {
+                        FacilityId = primaryLog.FacilityId,
+                        QueryPhase = primaryLog.QueryPhase.GetValueOrDefault(),
+                        ResourceType = resourceType,
+                    }
+                },
                 cancellationToken);
         }
+
+        return pendingReferenceIdsAdded;
     }
 
     public async Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
         DataAcquisitionLogModel log,
+        DiscoveredReferenceAccumulator? accumulator = null,
         CancellationToken cancellationToken = default)
     {
         if (log == null) throw new ArgumentNullException(nameof(log));
@@ -277,6 +296,7 @@ public class ReferenceResourceService : IReferenceResourceService
         // Reference logs surface their own resources via ResourceAcquiredIds; the
         // junction is reserved for primary logs that depend on them.
         var resourceIds = new HashSet<string>(acquiredIds, StringComparer.Ordinal);
+        var cachedResources = new List<Resource>();
         foreach (var cached in cachedRows)
         {
             Resource? resource;
@@ -296,7 +316,31 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
-            AddResourceToCache(log, resource);
+            await AddResourceToCacheAsync(log, resource, cancellationToken);
+            cachedResources.Add(resource);
+
+            // Extract and accumulate nested references from cached resources
+            if (accumulator != null && log.FhirQuery.Any())
+            {
+                var referenceTypes = log.FhirQuery
+                    .SelectMany(q => q.ResourceReferenceTypes.Select(rt => rt.ResourceType))
+                    .Distinct()
+                    .ToList();
+                var refResources = ReferenceResourceBundleExtractor.Extract(resource, referenceTypes);
+                if (refResources.Any())
+                {
+                    AccumulateDiscoveredReferences(refResources, accumulator);
+                }
+            }
+        }
+
+        if (string.Equals(resourceType, ResourceType.Location.ToString(), StringComparison.Ordinal)
+            && cachedResources.Count > 0)
+        {
+            await _locationMappingService.UpdateResourceMappingsAsync(
+                log.FacilityId,
+                cachedResources,
+                cancellationToken);
         }
 
         var missingIds = outstandingIds.Where(id => !cachedById.ContainsKey(id)).ToList();
@@ -328,21 +372,24 @@ public class ReferenceResourceService : IReferenceResourceService
         };
     }
 
-    private async Task GetOrCreateAndAppendAsync(
+    private async Task<int> GetOrCreateAndAppendAsync(
         DataAcquisitionLogModel primaryLog,
         ResourceType resourceType,
         ReferenceQueryConfig refConfig,
         List<string> resourceIds,
+        List<CreateResourceReferenceTypeModel> resourceReferenceTypes,
         CancellationToken cancellationToken)
     {
         bool created = false;
         long referenceLogId = 0;
+        var pendingReferenceIdsAdded = 0;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async (ct) =>
         {
             _dbContext.ChangeTracker.Clear();
             created = false;
+            pendingReferenceIdsAdded = 0;
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
             await AcquireLockAsync(primaryLog, resourceType, ct);
@@ -395,7 +442,8 @@ public class ReferenceResourceService : IReferenceResourceService
                                 QueryType = fhirQueryType,
                                 Paged = pageSize,
                                 ResourceTypes = new List<ResourceType> { resourceType },
-                                QueryParameters = new List<string>()
+                                QueryParameters = new List<string>(),
+                                ResourceReferenceTypes = resourceReferenceTypes ?? new List<CreateResourceReferenceTypeModel>()
                             }
                         }
                     }, ct);
@@ -464,6 +512,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 {
                     _dbContext.PendingReferenceIds.AddRange(toInsert);
                     await _dbContext.SaveChangesAsync(ct);
+                    pendingReferenceIdsAdded = toInsert.Count;
                 }
 
                 await transaction.CommitAsync(ct);
@@ -481,17 +530,20 @@ public class ReferenceResourceService : IReferenceResourceService
                 "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
                 referenceLogId.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), primaryLog.QueryPhase.SanitizeForLog(), resourceType.SanitizeForLog());
         }
+
+        return pendingReferenceIdsAdded;
     }
 
-    private void AddResourceToCache(
+    private async Task AddResourceToCacheAsync(
         DataAcquisitionLogModel primaryLog,
-        Resource resource)
+        Resource resource,
+        CancellationToken cancellationToken)
     {
         if (resource is DomainResource domainResource
             && !string.IsNullOrWhiteSpace(resource.TypeName)
             && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+            await _resourceCache.UpdateCorrelationCacheAsync($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
         }
     }
 
@@ -607,6 +659,26 @@ public class ReferenceResourceService : IReferenceResourceService
         }
 
         return null;
+    }
+
+    private void AccumulateDiscoveredReferences(
+        IReadOnlyList<ResourceReference> refResources,
+        DiscoveredReferenceAccumulator accumulator)
+    {
+        if (refResources == null || refResources.Count == 0)
+            return;
+
+        foreach (var rr in refResources)
+        {
+            if (string.IsNullOrWhiteSpace(rr?.Reference))
+                continue;
+
+            var identity = new ResourceIdentity(rr.Reference);
+            if (string.IsNullOrWhiteSpace(identity.ResourceType) || string.IsNullOrWhiteSpace(identity.Id))
+                continue;
+
+            accumulator.Add(identity.ResourceType, identity.Id);
+        }
     }
 
     private static bool TryFindReferenceConfig(

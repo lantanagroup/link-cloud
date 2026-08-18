@@ -42,6 +42,7 @@ reviews:
         Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates,
         and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must include information on what 
         testing was performed in the description of the PR. If it does not, ask the author to provide details on what testing was performed.
+        If a service REST controller is changed, ensure the `LinkSdk` is updated to reflect the controller changes.
         When reviewing code, suggest unit tests using XUnit in the following scenarios:
         - If/Else or Switch/Case blocks are introduced or modified — ensure each branch has a corresponding unit test.
         - Logic that depends on service or interface configuration — suggest tests to validate different implementations are correctly resolved.
@@ -49,7 +50,14 @@ reviews:
         Large unit tests should be avoided; keeping unit tests small and focused on targeted business logic (i.e. string sanitization)
         All logging message arguments must be sanitized before they are passed to logger methods to avoid static code scanning security/vulnerability findings.
         
-        **App Config Check**: 
-        If new required configuration keys (that don't have default values) are introduced, verify if new configuration keys have been added. If new required configuration keys are introduced, ensure that the 
-        root-level `/app-config.yaml` file has been updated to include these new keys with appropriate descriptions. If `/app-config.yaml` is not updated 
+        **App Config Check**:
+        If new required configuration keys (that don't have default values) are introduced, verify if new configuration keys have been added. If new required configuration keys are introduced, ensure that the
+        root-level `/app-config.yaml` file has been updated to include these new keys with appropriate descriptions. If `/app-config.yaml` is not updated
         when new configuration is added, flag this as a required change and recommend blocking the PR until the configuration is documented in `/app-config.yaml`.
+        The catalog is curated, not exhaustive: a key belongs in it only if it is provisioned per environment, has no safe default, or is a documented
+        operational knob. A key with a working default in `appsettings.json` or `application.yml` should be `required: false` with that value recorded in
+        `defaultValue`, because `required: true` obligates a row in all three environment stores. The exhaustive list of every key the code reads is the
+        generated `docs/config-key-inventory.md`, not this catalog.
+        Schema conformance and required-key presence are enforced mechanically by
+        `.github/workflows/appconfig-catalog-check.yml`, so review effort here is better spent on whether an entry's `required` flag and description are
+        right than on whether the key is present.

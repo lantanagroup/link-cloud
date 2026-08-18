@@ -2,6 +2,7 @@
 using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -19,8 +20,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
 {
     private readonly string _kafkaBootstrapServers;
     private readonly string _kafkaRestProxyBase;
-    private readonly string _kafkaUser;
-    private readonly string _kafkaPassword;
+    private readonly KafkaConnection _kafkaConnection;
 
     private readonly IAutomationOutput _output;
     private IConsumer<string, string>? _consumer;
@@ -76,13 +76,12 @@ public class KafkaErrorMonitor : IAsyncDisposable
     private const int ResourceNormalizedValuePreviewLength = 4000;
     private const int ResourceNormalizedHeaderPreviewLength = 2000;
 
-    public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config)
+    public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config, KafkaConnection kafkaConnection)
     {
         _output = output;
-        _kafkaBootstrapServers = config.Kafka.BootstrapServers;
+        _kafkaConnection = kafkaConnection;
+        _kafkaBootstrapServers = string.Join(", ", kafkaConnection.BootstrapServers);
         _kafkaRestProxyBase = config.Kafka.RestProxyBaseUrl;
-        _kafkaUser = config.Kafka.User;
-        _kafkaPassword = config.Kafka.Password;
     }
 
     /// <summary>
@@ -132,13 +131,17 @@ public class KafkaErrorMonitor : IAsyncDisposable
                 GroupId = $"e2e-diag-{Guid.NewGuid():N}",
                 AutoOffsetReset = AutoOffsetReset.Latest,
                 EnableAutoCommit = true,
-                SecurityProtocol = SecurityProtocol.SaslPlaintext,
-                SaslMechanism = SaslMechanism.Plain,
-                SaslUsername = _kafkaUser,
-                SaslPassword = _kafkaPassword,
                 SessionTimeoutMs = 10000,
                 SocketTimeoutMs = 5000,
             };
+
+            if (_kafkaConnection.SaslProtocolEnabled)
+            {
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
+            }
 
             _consumer = new ConsumerBuilder<string, string>(config)
                 .SetErrorHandler((_, e) =>

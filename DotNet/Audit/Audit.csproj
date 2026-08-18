@@ -7,7 +7,7 @@
     <UserSecretsId>89e2822a-1e90-4904-9d40-8dc0fbea1ed4</UserSecretsId>
 	<RootNamespace>LantanaGroup.Link.Audit</RootNamespace>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 

@@ -37,15 +37,12 @@ public static class TestConfig
     public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
     public static string SubmissionServiceBase => Environment.GetEnvironmentVariable("SUBMISSION_SERVICE_BASE_URL") ?? "http://localhost:8073";
 
-    // AdminBFF — only for operations that have no direct service endpoint
-    public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
-
     // Automation.UI — used by AutomationUiApiSmokeTest to exercise the /api/runs endpoints.
     // Host port 5256 matches the docker-compose mapping (5256:5257).
     public static string AutomationUiBase => Environment.GetEnvironmentVariable("AUTOMATION_UI_BASE_URL") ?? "http://localhost:5256";
 
     // Infrastructure
-    public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
+    public static string LokiBaseUrl => Environment.GetEnvironmentVariable("Loki__Url") ?? "http://localhost:3100";
     public static string? AdhocReportTestDownloadPath =>
         Environment.GetEnvironmentVariable("ADHOC_REPORT_TEST_DOWNLOAD_PATH");
     public static bool CleanupAdhocReportTestData => bool.Parse(
@@ -59,10 +56,8 @@ public static class TestConfig
     {
         FhirServerBase = FhirServerBase,
         FacilityFhirServerBase = FacilityFhirServerBase,
-        AdminBffBase = AdminBffBase,
         LokiBaseUrl = LokiBaseUrl,
         DownloadPath = AdhocReportTestDownloadPath,
-        AdminBffOAuth = BuildOAuthConfig("ADMINBFF"),
         FhirServerOAuth = BuildOAuthConfig("FHIRSERVER"),
         FhirServerBasicAuth = BuildBasicAuthConfig("FHIRSERVER"),
         FhirQuery = new AutomationConfig.FhirQuerySettings
@@ -72,24 +67,11 @@ public static class TestConfig
             MaxAcquisitionPullTime = null,
             TimeZone = null
         },
-        Database = new AutomationConfig.DatabaseConfig
-        {
-            Server = Environment.GetEnvironmentVariable("E2E_SQL_SERVER") ?? "localhost,1433",
-            UserId = Environment.GetEnvironmentVariable("E2E_SQL_USER") ?? "sa",
-            Password = Environment.GetEnvironmentVariable("E2E_SQL_PASSWORD")
-                ?? Environment.GetEnvironmentVariable("LINK_DB_PASS")
-                ?? string.Empty
-        },
         Kafka = new AutomationConfig.KafkaConfig
         {
-            BootstrapServers = Environment.GetEnvironmentVariable("E2E_KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9094",
-            RestProxyBaseUrl = Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL") ?? "http://localhost:8082",
-            User = Environment.GetEnvironmentVariable("E2E_KAFKA_USER")
-                ?? Environment.GetEnvironmentVariable("KAFKA_SASL_CLIENT_USER")
-                ?? "user",
-            Password = Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD")
-                ?? Environment.GetEnvironmentVariable("KAFKA_SASL_CLIENT_PASSWORD")
-                ?? "password"
+            RestProxyBaseUrl = Environment.GetEnvironmentVariable("Automation__Kafka__RestProxyBaseUrl")
+                ?? Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL")
+                ?? "http://localhost:8082"
         }
     };
 

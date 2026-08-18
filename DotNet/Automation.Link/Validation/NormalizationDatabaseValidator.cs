@@ -104,8 +104,25 @@ public class NormalizationDatabaseValidator
                 AddError(errors, $"OperationSequence {seq.Id} ResourceType is null.");
         }
 
-        var sequenceNumbers = sequences.Where(s => s.Sequence.HasValue).Select(s => s.Sequence!.Value).ToList();
-        if (sequenceNumbers.Distinct().Count() != sequenceNumbers.Count)
-            AddError(errors, "OperationSequence values are not unique.");
+        foreach (var seq in sequences)
+        {
+            if (!seq.Sequence.HasValue)
+                AddError(errors, $"OperationSequence {seq.Id} Sequence is null.");
+        }
+
+        var sequencesWithNumber = sequences.Where(s => s.Sequence.HasValue).ToList();
+
+        var sequenceGroups = sequencesWithNumber
+            .GroupBy(s => s.ResourceType ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in sequenceGroups)
+        {
+            var sequenceNumbers = group.Select(s => s.Sequence!.Value).ToList();
+            if (sequenceNumbers.Distinct().Count() != sequenceNumbers.Count)
+            {
+                var resourceType = string.IsNullOrWhiteSpace(group.Key) ? "(unknown)" : group.Key;
+                AddError(errors, $"OperationSequence values are not unique for resource type '{resourceType}'.");
+            }
+        }
     }
 }

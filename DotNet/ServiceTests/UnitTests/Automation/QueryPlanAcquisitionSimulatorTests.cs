@@ -198,6 +198,77 @@ public class QueryPlanAcquisitionSimulatorTests
         Assert.Contains("Observation/O3", acquired);
     }
 
+    [Fact]
+    public void Observation_EffectiveInstant_StillWorks()
+    {
+        var entry = Entry("Observation", "O4", """
+            { "resourceType":"Observation","id":"O4",
+              "category":[{"coding":[{"code":"vital-signs"}]}],
+              "effectiveInstant":"2024-06-01T12:00:00Z" }
+            """);
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1", new[] { entry }, null, PlanWithEncounterAndObservation(), PeriodStart, PeriodEnd);
+
+        Assert.Contains("Observation/O4", acquired);
+    }
+
+    [Fact]
+    public void Observation_EffectiveTiming_EventRange_OverlapsPeriod_IsAcquired()
+    {
+        var entry = Entry("Observation", "O5", """
+            { "resourceType":"Observation","id":"O5",
+              "category":[{"coding":[{"code":"laboratory"}]}],
+              "effectiveTiming": {
+                "event": ["2024-03-15T08:00:00Z", "2024-03-15T09:00:00Z"]
+              } }
+            """);
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1", new[] { entry }, null, PlanWithEncounterAndObservation(), PeriodStart, PeriodEnd);
+
+        Assert.Contains("Observation/O5", acquired);
+    }
+
+    [Fact]
+    public void Observation_EffectiveTiming_BoundsPeriod_OverlapsPeriod_IsAcquired()
+    {
+        var entry = Entry("Observation", "O6", """
+            { "resourceType":"Observation","id":"O6",
+              "category":[{"coding":[{"code":"laboratory"}]}],
+              "effectiveTiming": {
+                "repeat": {
+                  "boundsPeriod": { "start":"2024-04-01T08:00:00Z", "end":"2024-04-01T09:00:00Z" }
+                }
+              } }
+            """);
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1", new[] { entry }, null, PlanWithEncounterAndObservation(), PeriodStart, PeriodEnd);
+
+        Assert.Contains("Observation/O6", acquired);
+    }
+
+    [Fact]
+    public void Observation_EffectiveTiming_NoUsableDates_IsExcludedAndWarns()
+    {
+        var entry = Entry("Observation", "O-TimingNoDate", """
+            { "resourceType":"Observation","id":"O-TimingNoDate",
+              "category":[{"coding":[{"code":"laboratory"}]}],
+              "effectiveTiming": {
+                "event": ["not-a-date"],
+                "repeat": { "boundsPeriod": { } }
+              } }
+            """);
+        var output = new CapturingOutput();
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1", new[] { entry }, null, PlanWithEncounterAndObservation(), PeriodStart, PeriodEnd, output);
+
+        Assert.DoesNotContain("Observation/O-TimingNoDate", acquired);
+        Assert.Contains(output.Lines, l => l.Contains("Observation/O-TimingNoDate") && l.Contains("fail-closed"));
+    }
+
     // ---------- Procedure performedPeriod ----------
 
     [Fact]

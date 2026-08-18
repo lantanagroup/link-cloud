@@ -37,12 +37,10 @@ public class AutomationConfig
     /// </summary>
     public string FacilityFhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
 
-    public string AdminBffBase { get; set; } = "http://localhost:8063/api";
-    public string LokiBaseUrl { get; set; } = "http://localhost:3100";
-    public string GrafanaBaseUrl { get; set; } = "http://localhost:3000";
+    public string LokiBaseUrl { get; set; } = string.Empty;
+    public string LokiAppLabel { get; set; } = string.Empty;
     public string? DownloadPath { get; set; }
 
-    public OAuthConfig AdminBffOAuth { get; set; } = new();
     public OAuthConfig FhirServerOAuth { get; set; } = new();
     public BasicAuthConfig FhirServerBasicAuth { get; set; } = new();
 
@@ -53,8 +51,6 @@ public class AutomationConfig
     /// <c>LantanaGroup.Automation.Generation.FhirGenerationConfig</c> at runtime.
     /// </summary>
     public FhirGenerationSettings FhirGeneration { get; set; } = new();
-
-    public DatabaseConfig Database { get; set; } = new();
 
     public KafkaConfig Kafka { get; set; } = new();
 
@@ -68,6 +64,14 @@ public class AutomationConfig
 
     public class FhirGenerationSettings
     {
+        /// <summary>
+        /// Maximum number of patients processed concurrently by the streaming
+        /// generation/upload pipeline. Lower values reduce memory pressure.
+        /// Defaults to 4 to align with direct pipeline callers that rely on
+        /// the pipeline's built-in fallback.
+        /// </summary>
+        public int MaxConcurrentPatients { get; set; } = 4;
+
         /// <summary>
         /// Controls low-value optional cross-resource references in generated FHIR
         /// (e.g., Provenance.target, ImagingStudy.basedOn, MedicationAdministration.request).
@@ -92,18 +96,8 @@ public class AutomationConfig
         };
     }
 
-    public class DatabaseConfig
-    {
-        public string Server { get; set; } = string.Empty;
-        public string UserId { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
-
     public class KafkaConfig
     {
-        public string BootstrapServers { get; set; } = string.Empty;
         public string RestProxyBaseUrl { get; set; } = string.Empty;
-        public string User { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
     }
 }

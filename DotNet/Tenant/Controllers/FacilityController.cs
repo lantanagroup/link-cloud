@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? timeZone, Vendor? vendor, string? sortBy, SortOrder? sortOrder,
+            string? facilityName, string? timeZone, VendorModel? vendor, string? sortBy, SortOrder? sortOrder,
             int pageSize = 10, int pageNumber = 1, bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {
@@ -219,11 +219,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest();
             }
 
-            if (newFacility.Vendor == null)
-            {
-                return BadRequest("Vendor must be provided.");
-            }
-
             try
             {
                 await _facilityManager.CreateAsync(facilityEntity, cancellationToken);
@@ -322,11 +317,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (existingModel == null)
             {
                 return NotFound();
-            }
-
-            if (facilityConfig.Vendor == null)
-            {
-                return BadRequest("Vendor must be provided.");
             }
 
             var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);

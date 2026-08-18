@@ -26,15 +26,18 @@ public class QueryPlanManager : IQueryPlanManager
     private readonly IDatabase _database;
     private readonly ILogger<QueryPlanManager> _logger;
     private readonly IQueryPlanValidator _validator;
+    private readonly ILocationResolutionValidator _locationResolutionValidator;
 
     public QueryPlanManager(
         IDatabase database,
         ILogger<QueryPlanManager> logger,
-        IQueryPlanValidator validator)
+        IQueryPlanValidator validator,
+        ILocationResolutionValidator locationResolutionValidator)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _locationResolutionValidator = locationResolutionValidator ?? throw new ArgumentNullException(nameof(locationResolutionValidator));
     }
 
     /// <summary>
@@ -95,6 +98,11 @@ public class QueryPlanManager : IQueryPlanManager
                 string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
 
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
+
         var date = DateTime.UtcNow;
 
         var entity = new QueryPlan
@@ -149,6 +157,11 @@ public class QueryPlanManager : IQueryPlanManager
                 model.FacilityId.SanitizeForLog(),
                 string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
+
+        // Enforce parent-organization location resolution consistency: while location resolution
+        // is active for the facility, the initial queries must include Encounter and Location.
+        await _locationResolutionValidator.ValidateQueryPlanSaveAsync(
+            model.FacilityId, model.Type, model.InitialQueries, cancellationToken);
 
         var existingQueryPlan = await _database.QueryPlanRepository.FirstOrDefaultAsync(
             q => q.FacilityId == model.FacilityId && q.Type == model.Type);

@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
+        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default)
         {
             var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
 
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 : OperationServiceHelper.GetValueReflectively(resource, sourceFhirPath);
 
             if (sourceValue == null)
-                return OperationResult.Failure($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.", resource);
+                return OperationResult.NoAction($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.", resource);
 
             if (sourceValue is string or int or bool or decimal or DateTime ||
                 sourceValue is IList valueList && valueList.Cast<object>().All(v => v is string or int or bool or decimal or DateTime))

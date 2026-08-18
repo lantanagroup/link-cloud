@@ -13,31 +13,36 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
             _cache = cache;
         }
 
-        public T Get<T>(string key)
+        public Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (_cache.TryGetValue(key, out T value))
-                return value;
+                return Task.FromResult(value!);
 
-            return default(T);
+            return Task.FromResult(default(T)!);
         }
 
-        public void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding)
+        public Task SetAsync<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            cancellationToken.ThrowIfCancellationRequested();
 
             var options = expirationType == ExpirationType.Sliding
                 ? new MemoryCacheEntryOptions().SetSlidingExpiration(expiration).SetSize(1)
                 : new MemoryCacheEntryOptions().SetAbsoluteExpiration(expiration).SetSize(1);
 
             _cache.Set(key, value, options);
+            return Task.CompletedTask;
         }
 
-        public void Remove(string key)
+        public Task RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            cancellationToken.ThrowIfCancellationRequested();
             _cache.Remove(key);
+            return Task.CompletedTask;
         }
     }
 }

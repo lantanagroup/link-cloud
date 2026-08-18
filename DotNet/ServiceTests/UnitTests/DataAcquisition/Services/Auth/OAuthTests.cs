@@ -61,7 +61,7 @@ public class OAuthTests
     public async Task SetAuthentication_ReturnsCachedToken_WhenTokenExistsInCache()
     {
         const string cachedToken = "cached-token";
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns(cachedToken);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync(cachedToken);
 
         var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
 
@@ -72,14 +72,14 @@ public class OAuthTests
         Assert.Equal(DataAcquisitionConstants.Auth.Bearer, header.Scheme);
         Assert.Equal(cachedToken, header.Parameter);
         _mockCacheService.Verify(
-            x => x.Set(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()),
+            x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
     public async Task SetAuthentication_FetchesAndCachesNewToken_WhenNoCachedToken()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         var responseBody = BuildTokenResponse("new-token", expiresIn: 1800);
         var sut = BuildSut(new MockHttpMessageHandler(_ => OkJsonResponse(responseBody)));
@@ -91,14 +91,14 @@ public class OAuthTests
         Assert.Equal(DataAcquisitionConstants.Auth.Bearer, header.Scheme);
         Assert.Equal("new-token", header.Parameter);
         _mockCacheService.Verify(
-            x => x.Set(FacilityId, "new-token", TimeSpan.FromSeconds(1800), ExpirationType.Absolute),
+            x => x.SetAsync(FacilityId, "new-token", TimeSpan.FromSeconds(1800), ExpirationType.Absolute, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
     public async Task SetAuthentication_IncludesScopeInRequest_WhenScopeIsProvided()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         HttpRequestMessage? captured = null;
         var sut = BuildSut(new MockHttpMessageHandler(req =>
@@ -118,7 +118,7 @@ public class OAuthTests
     [Fact]
     public async Task SetAuthentication_OmitsScopeFromRequest_WhenScopeIsNotProvided()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         HttpRequestMessage? captured = null;
         var sut = BuildSut(new MockHttpMessageHandler(req =>
@@ -138,7 +138,7 @@ public class OAuthTests
     [Fact]
     public async Task SetAuthentication_SendsCorrectBasicAuthorizationHeader()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         HttpRequestMessage? captured = null;
         var sut = BuildSut(new MockHttpMessageHandler(req =>
@@ -159,7 +159,7 @@ public class OAuthTests
     [Fact]
     public async Task SetAuthentication_ReturnsNull_WhenAccessTokenIsEmptyInResponse()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         var responseBody = BuildTokenResponse(accessToken: "");
         var sut = BuildSut(new MockHttpMessageHandler(_ => OkJsonResponse(responseBody)));
@@ -169,14 +169,14 @@ public class OAuthTests
         Assert.False(isQueryParam);
         Assert.Null(authHeaderValue);
         _mockCacheService.Verify(
-            x => x.Set(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()),
+            x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
     public async Task SetAuthentication_ReturnsNull_AndLogsError_WhenHttpClientThrows()
     {
-        _mockCacheService.Setup(x => x.Get<string>(FacilityId)).Returns((string)null!);
+        _mockCacheService.Setup(x => x.GetAsync<string>(FacilityId, It.IsAny<CancellationToken>())).ReturnsAsync((string)null!);
 
         var sut = BuildSut(new MockHttpMessageHandler(_ => throw new HttpRequestException("Connection refused")));
 

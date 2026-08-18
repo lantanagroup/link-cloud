@@ -4,5 +4,6 @@ export enum OperationType {
   ConditionalTransform = "ConditionalTransform",
   CodeMap = "CodeMap",
   CopyLocation = "CopyLocation",
+  CopyLocationAliasToTypeIteratively = "CopyLocationAliasToTypeIteratively",
   RemoveExtensions = "RemoveExtensions"
 }

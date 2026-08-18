@@ -26,4 +26,13 @@ public class CsvValueSetRecord
     /// </summary>
     [Index(2)]
     public required string Display { get; set; }
+
+    /// <summary>
+    /// Indicates the value set membership status of the code, Active or Inactive.
+    /// This column is optional; files without it are treated as having no membership status.
+    /// </summary>
+    [Index(3)]
+    [Default(CodeStatus.Active)]
+    [EnumIgnoreCase]
+    public CodeStatus Status { get; set; } = CodeStatus.Active;
 }

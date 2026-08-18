@@ -12,6 +12,8 @@ public class RunsController(
     ISnapshotStore snapshotStore,
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
+    INormalizationStore normalizationStore,
+    IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
@@ -24,10 +26,7 @@ public class RunsController(
         string sortDir = "desc",
         CancellationToken cancellationToken = default)
     {
-        // Normalize: accept "asc"/"desc" only, default to descending. Server-side
-        // store-level whitelisting also clamps unknown sortBy values, so this is
-        // belt-and-suspenders against URL tampering.
-        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
@@ -36,26 +35,12 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var statusActiveRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
-
-        var activeRuns = activeRunSummaries
-            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
-            .Select(r => r!)
-            .Concat(statusActiveRuns)
-            .GroupBy(r => r.RunId)
-            .Select(g => g.First())
-            .OrderByDescending(r => r.CreatedAt)
-            .ToList();
+        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
+        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -89,7 +74,7 @@ public class RunsController(
         // page navigation. The view model matches the partial's @model so the
         // partial is reused by both this action and the initial server render
         // in Index.cshtml — there's no divergence between the two templates.
-        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var descending = IsDescending(sortDir);
         var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
         return PartialView("_RecentRunsTable", page);
     }
@@ -102,28 +87,12 @@ public class RunsController(
         string sortDir = "desc",
         CancellationToken cancellationToken = default)
     {
-        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var statusActiveRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
-
-        var activeRuns = activeRunSummaries
-            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
-            .Select(r => r!)
-            .Concat(statusActiveRuns)
-            .GroupBy(r => r.RunId)
-            .Select(g => g.First())
-            .OrderByDescending(r => r.CreatedAt)
-            .ToList();
+        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
 
         return Json(new
         {
@@ -148,14 +117,22 @@ public class RunsController(
     {
         if (request.Scenario == AutomationScenarioKind.Custom && request.ScenarioId is Guid scenarioId)
         {
-            var scenario = await scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+            var scenario = await scenarioStore.GetByIdAsync(
+                scenarioId,
+                cancellationToken);
+
             if (scenario == null)
             {
-                TempData["RunStartError"] = "Unable to start test: selected scenario was not found.";
+                TempData["RunStartError"] =
+                    "Unable to start test: selected scenario was not found.";
+
                 return RedirectToAction(nameof(Index));
             }
 
+            // Build the run request from the complete persisted scenario rather than
+            // relying on the default hidden values submitted by the Quick Launch form.
             await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -522,5 +499,29 @@ public class RunsController(
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
             return NotFound();
         }
+    }
+
+    private static bool IsDescending(string sortDir)
+        => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(
+        AutomationRunIndexViewModel recentPage,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+        var activeRunsSource = recentPage.PageNumber == 1
+            ? recentPage.Runs
+            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+
+        return activeRunSummaries
+            .Where(r => r is { Status: AutomationRunStatus.Queued or AutomationRunStatus.Running })
+            .Select(r => r!)
+            .Concat(activeRunsSource.Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
+            .ToList();
     }
 }

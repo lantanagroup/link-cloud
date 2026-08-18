@@ -50,6 +50,10 @@
                   <mat-icon>transform</mat-icon>
                   <span>Add Vendor Copy Location</span>
                 </button>
+                <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocationAliasToTypeIteratively)">
+                  <mat-icon>account_tree</mat-icon>
+                  <span>Add Vendor Copy Location Alias to Type Iteratively</span>
+                </button>
                 <button mat-menu-item (click)="showOperationDialog(OperationType.RemoveExtensions)">
                   <mat-icon>filter_list_off</mat-icon>
                   <span>Add Vendor Remove Extensions</span>
@@ -353,6 +357,28 @@
                             </div>
                           </div>
                         }
+                        @if (op.operationType === OperationType.CopyLocationAliasToTypeIteratively) {
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Name
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Max Iterations
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.MaxIterations }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Split On Comma
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.SplitOnComma ? 'Yes' : 'No' }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        }
                         @if (op.operationType === OperationType.RemoveExtensions) {
                           <div class="operations-details-row">
                             <div class="data-label">Name</div>
@@ -365,7 +391,7 @@
                             </div>
                           }
                         }
-                        @if (op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.CopyLocation && op.operationType !== OperationType.RemoveExtensions) {
+                        @if (op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.CopyLocation && op.operationType !== OperationType.CopyLocationAliasToTypeIteratively && op.operationType !== OperationType.RemoveExtensions) {
                           <p class="no-results-subtext">
                             Unknown operation type: {{ op.operationType }}. No additional details
                             available.

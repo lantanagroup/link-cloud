@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
@@ -8,6 +9,8 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
 using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.DataAcquisitionSteps;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using System.Diagnostics;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;
 
@@ -22,18 +25,27 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
     private readonly IFacilityServiceClient _facilityClient;
     private readonly IApiHealthSeedContextAccessor _seedContext;
     private readonly IOptions<AutomationConfig> _automationConfig;
+    private readonly IOrganizationResourceMapTemplateStore _organizationResourceMapTemplateStore;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
     public override string ServiceName => "DataAcquisition";
     public DataAcquisitionTestSuite(
         IDataAcquisitionServiceClient client,
         IFacilityServiceClient facilityClient,
         IApiHealthSeedContextAccessor seedContext,
-        IOptions<AutomationConfig> automationConfig)
+        IOptions<AutomationConfig> automationConfig,
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+        IHttpClientFactory httpClientFactory,
+        IOptions<ServiceRegistry> serviceRegistry)
     {
         _client = client;
         _facilityClient = facilityClient;
         _seedContext = seedContext;
         _automationConfig = automationConfig;
+        _organizationResourceMapTemplateStore = organizationResourceMapTemplateStore;
+        _httpClientFactory = httpClientFactory;
+        _serviceRegistry = serviceRegistry;
     }
 
     public override IReadOnlyList<ApiHealthSeedRequirement> GetSeedRequirements() =>
@@ -47,6 +59,50 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
     {
         var results = new List<ApiTestRunResult>();
+
+        var baseUrl = _serviceRegistry.Value.DataAcquisitionServiceUrl?.TrimEnd('/');
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            const string error =
+                "ServiceRegistry:DataAcquisitionServiceUrl is not configured.";
+
+            foreach (var endpointName in new[]
+            {
+                StepNames.InfoGet200,
+                StepNames.RootHealthGet200
+            })
+            {
+                results.Add(new ApiTestRunResult
+                {
+                    EndpointKey = $"{ServiceName}::{endpointName}",
+                    ServiceName = ServiceName,
+                    EndpointName = endpointName,
+                    Passed = false,
+                    ExpectedStatusCode = 200,
+                    ErrorMessage = error,
+                    RequestBody =
+                        "Request was not sent because the Data Acquisition service URL is missing.",
+                    ResponseBody =
+                        "Response was not received because the Data Acquisition service URL is missing.",
+                    ExecutedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
+        else
+        {
+            results.Add(await CallRawGetAsync(
+                StepNames.InfoGet200,
+                baseUrl,
+                "/api/data/info",
+                ct));
+
+            results.Add(await CallRawGetAsync(
+                StepNames.RootHealthGet200,
+                baseUrl,
+                "/health",
+                ct));
+        }
 
         async Task AddSeededOrSkipAsync(
             bool canRun,
@@ -78,6 +134,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         var facilityCreated = false;
         var queryConfigCreated = false;
         var dischargePlanCreated = false;
+        var fhirListCreated = false;
 
         try
         {
@@ -166,6 +223,45 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             await CreateFacilityAsync(facilityId, ct);
             facilityCreated = true;
 
+            // Org-location configuration lifecycle checks
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            var defaultOrgMap = await _organizationResourceMapTemplateStore.GetDefaultAsync(ct);
+            var mapConditions = defaultOrgMap?.Conditions
+                .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                .OrderBy(c => c.Priority)
+                .Select(c => new CreateOrganizationLocationConditionApiModel
+                {
+                    FhirPath = c.FhirPath,
+                    Priority = c.Priority
+                })
+                .ToList()
+                ?? [];
+
+            if (mapConditions.Count == 0)
+                throw new InvalidOperationException("Default Organization Resource Map template is missing or has no conditions.");
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigPost201, 201, async () =>
+                await _client.CreateOrganizationLocationConfigurationAsync(
+                    facilityId,
+                    new CreateOrganizationLocationConfigurationApiModel
+                    {
+                        Description = defaultOrgMap?.Description ?? "ApiHealth org-location config",
+                        IsActive = true,
+                        Conditions = mapConditions
+                    },
+                    ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200AfterPost, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationMappingsGet200, 200, async () =>
+                await _client.GetOrganizationLocationMappingsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.EncounterMappingsGet200, 200, async () =>
+                await _client.GetEncounterMappingsAsync(facilityId, ct), ct: ct));
+
             // CREATE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigPost201, 201, async () =>
             {
@@ -224,7 +320,37 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.FhirConfigGet404, 404, async () =>
                 await _client.GetFhirQueryConfigurationAsync(facilityId, ct), ct: ct));
 
-            // --- Read-only operations (non-existent resources � prove reachability) ---
+            // --- FHIR List Configuration CRUD ---
+
+            // POST FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost200, 200, async () =>
+            {
+                var resp = await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = true;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet200, 200, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // POST FHIR List Config → 409 (duplicate)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost409, 409, async () =>
+                await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct), ct: ct));
+
+            // DELETE FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigDelete200, 200, async () =>
+            {
+                var resp = await _client.DeleteFhirListConfigurationAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = false;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 404 (after delete)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet404, 404, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // --- Read-only operations (non-existent resources — prove reachability) ---
             var fakeReportId = Guid.NewGuid().ToString();
 
             results.Add(await RunStepAsync(StepNames.AcquisitionLogsGet200, 200, async () =>
@@ -336,6 +462,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         {
             if (dischargePlanCreated) await TryCleanupAsync(() => _client.DeleteQueryPlanAsync(facilityId, "Discharge", ct));
             if (queryConfigCreated) await TryCleanupAsync(() => _client.DeleteFhirQueryConfigurationAsync(facilityId, ct));
+            if (fhirListCreated) await TryCleanupAsync(() => _client.DeleteFhirListConfigurationAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 
@@ -349,7 +476,10 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Name = "Epic"
+            },
             ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
         };
         await _facilityClient.CreateAsync(model, ct);
@@ -372,11 +502,116 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         Type = "Discharge",
         InitialQueries = new Dictionary<string, object>
         {
-            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } }
+            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } },
+            ["1"] = new { QueryConfigType = "Parameter", ResourceType = "Encounter", Parameters = new[] { new { ParameterType = "Variable", Name = "subject", Variable = 0 } } },
+            ["2"] = new { QueryConfigType = "Parameter", ResourceType = "Location", Parameters = new[] { new { ParameterType = "ResourceIds", Name = "_id", Resource = "Encounter", Paged = "100" } } }
         },
         SupplementalQueries = new Dictionary<string, object>
         {
             ["0"] = new { QueryConfigType = "Reference", ResourceType = "Condition", OperationType = 2, Paged = 100 }
         }
     };
+
+    private object BuildFhirListConfigRequest(string facilityId)
+    {
+        var listConfigs = new[]
+        {
+            new { Status = "Admit", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-admit-lt24" },
+            new { Status = "Admit", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-admit-24to48" },
+            new { Status = "Admit", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-admit-gt48" },
+            new { Status = "Discharge", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-discharge-lt24" },
+            new { Status = "Discharge", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-discharge-24to48" },
+            new { Status = "Discharge", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-discharge-gt48" }
+        };
+
+        return new
+        {
+            FacilityId = facilityId,
+            FhirBaseServerUrl = _automationConfig.Value.FacilityFhirServerBase,
+            EHRPatientLists = listConfigs.Select(c => new
+            {
+                c.Status,
+                c.TimeFrame,
+                c.FhirId
+            }).ToList()
+        };
+    }
+
+    private async Task<ApiTestRunResult> CallRawGetAsync(
+        string endpointName,
+        string baseUrl,
+        string relativePath,
+        CancellationToken ct)
+    {
+        var result = new ApiTestRunResult
+        {
+            EndpointKey = $"{ServiceName}::{endpointName}",
+            ServiceName = ServiceName,
+            EndpointName = endpointName,
+            ExpectedStatusCode = 200,
+            ExecutedAt = DateTimeOffset.UtcNow,
+            RequestMethod = "GET",
+            RequestUrl = $"{baseUrl}{relativePath}",
+            RequestBody = "No request body was sent (GET)."
+        };
+
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var httpClient =
+                _httpClientFactory.CreateClient("ApiHealthTest");
+
+            using var response = await httpClient.GetAsync(
+                $"{baseUrl}{relativePath}",
+                ct);
+
+            var responseBody =
+                await response.Content.ReadAsStringAsync(ct);
+
+            sw.Stop();
+
+            result.ActualStatusCode = (int)response.StatusCode;
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = result.ActualStatusCode == 200;
+
+            result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
+                ? $"No response body was returned (HTTP {result.ActualStatusCode})."
+                : responseBody.Length > 500
+                    ? responseBody[..500]
+                    : responseBody;
+
+            if (!result.Passed)
+            {
+                result.ErrorMessage =
+                    $"Expected HTTP 200 but got {result.ActualStatusCode}.";
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TaskCanceledException)
+        {
+            sw.Stop();
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = false;
+            result.ErrorMessage = "Request timed out.";
+            result.ResponseBody =
+                "No response body was received because the request timed out.";
+        }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = false;
+            result.ErrorMessage = $"HTTP error: {ex.Message}";
+            result.ResponseBody =
+                "No response body was received because the HTTP request failed.";
+        }
+
+        return result;
+    }
 }

@@ -31,3 +31,4 @@ kubectl set -n %namespace% image -n %namespace% deployment submission-deploy sub
 kubectl set -n %namespace% image -n %namespace% deployment tenant-deploy tenant=%container-registry%/link-tenant:%image%
 kubectl set -n %namespace% image -n %namespace% deployment terminology-deploy terminology=%container-registry%/link-terminology:%image%
 kubectl set -n %namespace% image -n %namespace% deployment validation-deploy validation=%container-registry%/link-validation:%image%
+kubectl set -n %namespace% image -n %namespace% deployment mock-dmrp-deploy mock-dmrp=%container-registry%/link-mock-dmrp:%image%

@@ -1,23 +1,32 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Automation.UI.Controllers;
 
 public class ScenariosController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
+    INormalizationStore normalizationStore,
+    IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IOptions<AutomationConfig> automationConfig,
-    IMongoDatabase database) : Controller
+    IMongoDatabase database,
+    IImportedBundleContentStore bundleContentStore,
+    PatientReplacementManager patientReplacementManager,
+    ILogger<ScenariosController> logger) : Controller
 {
-    private const long MaxImportedBundleUploadBytes = 12 * 1024 * 1024;
+    private static readonly JsonSerializerOptions FhirJsonOptions = LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation();
+    private const long LargeImportedBundleThresholdBytes = 5 * 1024 * 1024;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
 
     [HttpGet]
@@ -25,6 +34,8 @@ public class ScenariosController(
     {
         var scenarios = await scenarioStore.GetAllAsync(ct);
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
+        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
+        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -48,15 +59,34 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
-        model.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
-            model.ResourcesPerPatientMax = model.ResourcesPerPatientMin;
+        foreach (var cohort in model.PatientCohorts)
+        {
+            if (cohort.ResourcesPerPatientMin < 1)
+                cohort.ResourcesPerPatientMin = 1;
+            if (cohort.ResourcesPerPatientMax < cohort.ResourcesPerPatientMin)
+                cohort.ResourcesPerPatientMax = cohort.ResourcesPerPatientMin;
+
+            cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
+            var allNonQualifying = model.SelectedMeasures.Count > 0
+                && model.SelectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
+
+            // Back-compat normalization for payloads that do not yet send cohortQualification.
+            if (allNonQualifying)
+                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+        }
 
         // ----- Imported-patient validation (fail save on bad input) -----
         var importValidation = await ValidateImportedPatientsAsync(model, ct);
         if (importValidation != null)
             return BadRequest(importValidation);
+
+        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
+            ? GenerateRandomNhsnOrganizationId()
+            : model.NhsnOrganizationId.Trim();
+        
+        model.UpdatedAt = DateTimeOffset.UtcNow;
 
         await scenarioStore.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
@@ -99,8 +129,13 @@ public class ScenariosController(
                 var existing = await _bundles.Find(b => b.Id == p.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
                 if (existing == null)
                     return $"Imported bundle '{p.FileName ?? p.PatientId}' was not found. Please re-upload the file.";
-                bundleJson = existing.BundleJson;
+                bundleJson = await bundleContentStore.ReadAsync(existing, ct);
+                if (string.IsNullOrWhiteSpace(bundleJson))
+                    return $"Imported bundle '{p.FileName ?? p.PatientId}' content is missing. Please re-upload the file.";
             }
+
+            if (string.IsNullOrWhiteSpace(bundleJson))
+                return $"Imported bundle '{p.FileName ?? p.PatientId}' is missing its uploaded reference.";
 
             Bundle? bundle;
             try
@@ -160,12 +195,16 @@ public class ScenariosController(
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
     public async Task<IActionResult> UploadImportedBundle([FromForm] UploadImportedBundleRequest request, CancellationToken ct)
     {
         if (request.File == null || request.File.Length == 0)
             return BadRequest("Bundle file is required.");
-        if (request.File.Length > MaxImportedBundleUploadBytes)
-            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
+
+        var sanitizedFileName = request.File.FileName.SanitizeAndRemove();
+
+        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", sanitizedFileName, request.File.Length);
 
         string json;
         using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
@@ -176,12 +215,13 @@ public class ScenariosController(
         Bundle? bundle;
         try
         {
-            bundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(
+            bundle = JsonSerializer.Deserialize<Bundle>(
                 json,
-                LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation());
+                FhirJsonOptions);
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", sanitizedFileName);
             return BadRequest($"Bundle '{request.File.FileName}' could not be parsed as FHIR: {ex.Message}");
         }
 
@@ -195,17 +235,49 @@ public class ScenariosController(
         if (patientResource == null || string.IsNullOrWhiteSpace(patientResource.Id))
             return BadRequest($"Bundle '{request.File.FileName}' must contain a Patient resource with an id.");
 
+        var effectiveBundle = bundle;
+        var effectiveBundleJson = json;
+        string? uploadWarning = null;
+        var replaceAvailable = false;
+        var canUseServerData = false;
+        var patientExistsOnServer = false;
+        var requiresReplaceForLargePatient = false;
+
+        var existence = await TryCheckPatientExistsAsync(patientResource.Id, request.File.FileName, ct);
+        patientExistsOnServer = existence.Exists == true;
+        if (!string.IsNullOrWhiteSpace(existence.WarningMessage))
+            uploadWarning = existence.WarningMessage;
+
+        if (patientExistsOnServer)
+        {
+            replaceAvailable = true;
+            requiresReplaceForLargePatient = request.File.Length >= LargeImportedBundleThresholdBytes;
+            canUseServerData = !requiresReplaceForLargePatient;
+
+            if (requiresReplaceForLargePatient)
+            {
+                uploadWarning =
+                    $"Patient '{patientResource.Id}' already exists on the FHIR server and the uploaded bundle is large ({request.File.Length:N0} bytes). " +
+                    "For large patients, use purge-and-replace to avoid partial server retrieval issues.";
+            }
+        }
+
+        var organizationIds = (effectiveBundle.Entry ?? [])
+            .Select(e => e?.Resource)
+            .OfType<Organization>()
+            .Select(o => o.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var now = DateTimeOffset.UtcNow;
-        var hash = ComputeContentHash(json);
-        var byteCount = Encoding.UTF8.GetByteCount(json);
-        if (byteCount > MaxImportedBundleUploadBytes)
-            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
+        var hash = ComputeContentHash(effectiveBundleJson);
 
         var update = Builders<ImportedBundleDocument>.Update
             .SetOnInsert(b => b.Id, Guid.NewGuid())
             .SetOnInsert(b => b.ContentHash, hash)
-            .SetOnInsert(b => b.BundleJson, json)
-            .SetOnInsert(b => b.ByteCount, byteCount)
+            .SetOnInsert(b => b.ByteCount, 0)
             .SetOnInsert(b => b.CreatedAt, now)
             .SetOnInsert(b => b.IsLibraryEntry, false)
             .Set(b => b.PatientId, patientResource.Id)
@@ -218,13 +290,126 @@ public class ScenariosController(
             new FindOneAndUpdateOptions<ImportedBundleDocument> { IsUpsert = true, ReturnDocument = ReturnDocument.After },
             ct);
 
+        var stored = await bundleContentStore.StoreAsync(doc.Id, doc.ContentHash, effectiveBundleJson, ct);
+        await _bundles.UpdateOneAsync(
+            b => b.Id == doc.Id,
+            Builders<ImportedBundleDocument>.Update
+                .Set(b => b.BundleBlobName, stored.BlobName)
+                .Set(b => b.ByteCount, stored.ByteCount)
+                .Set(b => b.BundleJson, null)
+                .Set(b => b.UpdatedAt, now),
+            cancellationToken: ct);
+
+        logger.LogInformation(
+            "Stored imported bundle '{FileName}' for patient '{PatientId}' in ABS blob '{BlobName}' ({ByteCount} bytes).",
+            request.File.FileName,
+            patientResource.Id,
+            stored.BlobName,
+            stored.ByteCount);
+
         return Json(new
         {
             bundleId = doc.Id,
             patientId = patientResource.Id,
             fileName = request.File.FileName,
-            byteCount
+            byteCount = stored.ByteCount,
+            warningMessage = uploadWarning,
+            replaceAvailable,
+            patientExistsOnServer,
+            canUseServerData,
+            requiresReplaceForLargePatient,
+            organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
+            organizationIds
         });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReplacePatientOnFhirServer([FromBody] ReplacePatientOnFhirServerRequest request, CancellationToken ct)
+    {
+        if (request.UploadedBundleId == Guid.Empty)
+            return BadRequest("UploadedBundleId is required.");
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest("PatientId is required.");
+
+        var doc = await _bundles.Find(b => b.Id == request.UploadedBundleId).FirstOrDefaultAsync(ct);
+        if (doc == null)
+            return NotFound("Uploaded bundle not found.");
+
+        var bundleJson = await bundleContentStore.ReadAsync(doc, ct);
+        if (string.IsNullOrWhiteSpace(bundleJson))
+            return BadRequest("Uploaded bundle content is missing.");
+
+        var patientId = request.PatientId.Trim();
+        List<Bundle.EntryComponent> entries;
+        try
+        {
+            entries = ImportedPatientLoader.ParseBundleEntries(bundleJson, patientId);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Failed to parse uploaded bundle for replay: {ex.Message}");
+        }
+
+        var resourcesToDelete = entries
+            .Select(e => e.Request?.Url)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(url => url!.StartsWith("Patient/", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .Cast<string>()
+            .ToList();
+
+        var patientIdForLog = request.PatientId.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        var replayBundles = BuildReplayBundles(entries, patientId);
+        var operationId = patientReplacementManager.Start(patientId, resourcesToDelete, replayBundles, ct);
+
+        logger.LogInformation(
+            "Queued FHIR-server replacement {OperationId} for patient '{PatientId}' using uploaded bundle '{BundleId}'. Deleting {DeleteCount} resource path(s) first.",
+            operationId,
+            patientIdForLog,
+            request.UploadedBundleId,
+            resourcesToDelete.Count);
+
+        return Json(new
+        {
+            operationId,
+            statusUrl = Url.Action(nameof(GetPatientReplacementStatus), new { operationId })
+        });
+    }
+
+    [HttpGet]
+    public IActionResult GetPatientReplacementStatus(Guid operationId)
+    {
+        var status = patientReplacementManager.GetStatus(operationId);
+        return status == null ? NotFound("Patient replacement operation not found.") : Json(status);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DiscardUploadedBundle([FromBody] DiscardUploadedBundleRequest request, CancellationToken ct)
+    {
+        if (request.UploadedBundleId == Guid.Empty)
+            return BadRequest("UploadedBundleId is required.");
+
+        var doc = await _bundles.Find(b => b.Id == request.UploadedBundleId).FirstOrDefaultAsync(ct);
+        if (doc == null)
+            return Json(new { success = true, deleted = false, message = "Bundle not found; nothing to discard." });
+
+        if (doc.IsLibraryEntry || (doc.ScenarioIds?.Count ?? 0) > 0)
+        {
+            return Json(new
+            {
+                success = true,
+                deleted = false,
+                message = "Bundle was retained because it is already referenced."
+            });
+        }
+
+        await bundleContentStore.DeleteAsync(doc, ct);
+        await _bundles.DeleteOneAsync(b => b.Id == doc.Id, ct);
+
+        logger.LogInformation("Discarded uploaded bundle '{BundleId}' (unreferenced).", doc.Id);
+        return Json(new { success = true, deleted = true });
     }
 
     [HttpPost]
@@ -259,7 +444,9 @@ public class ScenariosController(
                     var existing = await _bundles.Find(b => b.Id == request.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
                     if (existing == null)
                         return BadRequest("Uploaded bundle was not found. Please re-upload.");
-                    bundleJson = existing.BundleJson;
+                    bundleJson = await bundleContentStore.ReadAsync(existing, ct) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(bundleJson))
+                        return BadRequest("Uploaded bundle content is missing. Please re-upload.");
                 }
                 else
                 {
@@ -309,6 +496,15 @@ public class ScenariosController(
             if (e.HasValue && (encEnd == null || e.Value > encEnd.Value)) encEnd = e;
         }
 
+        var organizationIds = entries
+            .Select(e => e.Resource)
+            .OfType<Organization>()
+            .Select(o => o.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         return Json(new
         {
             patientId = resolvedPatientId,
@@ -316,7 +512,33 @@ public class ScenariosController(
                 .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.ToString()),
             detectedClinicalScenarioId = classification.DetectedClinicalScenarioId,
             encounterStart = encStart?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            encounterEnd = encEnd?.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            encounterEnd = encEnd?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
+            organizationIds
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetQuickLaunchMetadata(
+    Guid id,
+    CancellationToken ct)
+    {
+        var scenario = await scenarioStore.GetByIdAsync(id, ct);
+
+        if (scenario == null)
+            return NotFound();
+
+        return Json(new
+        {
+            id = scenario.Id,
+            name = scenario.Name,
+            description = scenario.Description ?? string.Empty,
+            method = scenario.ReportMethod.ToString(),
+            type = scenario.IsSystemScenario ? "System" : "Custom",
+            measures = scenario.SelectedMeasures
+                .Select(ProfiledMeasureCatalog.GetDisplayName)
+                .ToList(),
+            updatedAt = scenario.UpdatedAt.ToUnixTimeMilliseconds()
         });
     }
 
@@ -334,10 +556,24 @@ public class ScenariosController(
         public IFormFile? File { get; set; }
     }
 
+    public sealed class ReplacePatientOnFhirServerRequest
+    {
+        public Guid UploadedBundleId { get; set; }
+        public string PatientId { get; set; } = string.Empty;
+    }
+
+    public sealed class DiscardUploadedBundleRequest
+    {
+        public Guid UploadedBundleId { get; set; }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var scenario = await scenarioStore.GetByIdAsync(request.Id, ct);
         if (scenario == null) return NotFound();
         if (scenario.IsSystemScenario) return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be deleted.");
@@ -350,6 +586,9 @@ public class ScenariosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneInline([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await scenarioStore.GetByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -363,19 +602,22 @@ public class ScenariosController(
             SelectedMeasures = [.. source.SelectedMeasures],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            ResourcesPerPatientMin = source.ResourcesPerPatientMin,
-            ResourcesPerPatientMax = source.ResourcesPerPatientMax,
+            NhsnOrganizationId = source.NhsnOrganizationId,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
                     PatientCount = c.PatientCount,
+                    CohortQualification = c.CohortQualification,
                     MeasureEligibilities = new(c.MeasureEligibilities),
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
-                    ResourcesPerPatientMax = c.ResourcesPerPatientMax
+                    ResourcesPerPatientMax = c.ResourcesPerPatientMax,
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,
+            NormalizationSuiteId = source.NormalizationSuiteId,
+            OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,
             CleanupServiceData = source.CleanupServiceData,
             CleanupFhirData = source.CleanupFhirData,
             ReportPeriodStart = source.ReportPeriodStart,
@@ -413,15 +655,70 @@ public class ScenariosController(
         return Json(new { id = clone.Id });
     }
 
-    public sealed class IdRequest
-    {
-        public Guid Id { get; set; }
-    }
-
     private static string ComputeContentHash(string json)
     {
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
     }
+
+    private static string GenerateRandomNhsnOrganizationId()
+    {
+        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async Task<(bool? Exists, string? WarningMessage)> TryCheckPatientExistsAsync(
+        string patientId,
+        string fileName,
+        CancellationToken ct)
+    {
+        var cfg = automationConfig.Value;
+        var loader = new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+
+        try
+        {
+            var exists = await loader.PatientExistsAsync(patientId, ct);
+            return (exists, null);
+        }
+        catch (Exception ex)
+        {
+            var sanitizedFileName = fileName.SanitizeAndRemove();
+            logger.LogWarning(
+                ex,
+                "Failed checking if uploaded patient '{PatientId}' from file '{FileName}' exists on FHIR server.",
+                patientId,
+                sanitizedFileName);
+
+            var warning =
+                $"Automation UI could not check whether patient '{patientId}' exists on the FHIR server. " +
+                "The uploaded bundle will be used as provided.";
+
+            return (null, warning);
+        }
+    }
+
+    private static IReadOnlyList<(string Name, string Json)> BuildReplayBundles(
+        IReadOnlyList<Bundle.EntryComponent> entries,
+        string patientId)
+    {
+        const int maxEntriesPerBundle = 500;
+        var bundles = new List<(string Name, string Json)>();
+        var chunkIndex = 0;
+
+        for (var offset = 0; offset < entries.Count; offset += maxEntriesPerBundle)
+        {
+            var chunk = entries.Skip(offset).Take(maxEntriesPerBundle).ToList();
+            var replay = new Bundle
+            {
+                Type = Bundle.BundleType.Batch,
+                Entry = chunk
+            };
+
+            var json = JsonSerializer.Serialize(replay, FhirJsonOptions);
+            bundles.Add(($"{patientId}_replace_chunk{++chunkIndex:00}", json));
+        }
+
+        return bundles;
+    }
+
 }

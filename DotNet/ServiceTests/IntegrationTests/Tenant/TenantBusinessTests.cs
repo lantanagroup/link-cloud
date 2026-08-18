@@ -13,10 +13,11 @@ namespace IntegrationTests.Tenant
 {
     [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class TenantBusinessTests
+    public class TenantBusinessTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly TenantIntegrationTestFixture _fixture;
+        private readonly IServiceScope _scope;
         private readonly IFacilityManager _manager;
         private readonly IFacilityQueries _queries;
         private readonly IEntityRepository<Facility> _repo;
@@ -27,11 +28,18 @@ namespace IntegrationTests.Tenant
             _fixture = fixture;
             _output = output;
 
-            _manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
-            _queries = _fixture.ServiceProvider.GetRequiredService<IFacilityQueries>();
-            _repo = _fixture.ServiceProvider.GetRequiredService<IEntityRepository<Facility>>();
-            _mapper = _fixture.ServiceProvider.GetRequiredService<IMapper>();
+            // Resolve scoped services from a per-test scope rather than the root provider, so the
+            // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
+            _scope = fixture.ServiceProvider.CreateScope();
+            var sp = _scope.ServiceProvider;
+
+            _manager = sp.GetRequiredService<IFacilityManager>();
+            _queries = sp.GetRequiredService<IFacilityQueries>();
+            _repo = sp.GetRequiredService<IEntityRepository<Facility>>();
+            _mapper = sp.GetRequiredService<IMapper>();
         }
+
+        public void Dispose() => _scope.Dispose();
 
         [Fact]
         public async Task CreateFacility_Success()

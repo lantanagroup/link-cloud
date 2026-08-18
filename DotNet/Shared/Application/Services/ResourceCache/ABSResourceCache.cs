@@ -3,14 +3,14 @@ using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCompress.Common;
 using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private string GetBlobIdsKey(string key) =>
             GetBlobKey(key) + "_ids";
 
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             string blobName = GetBlobKey(correlationId);
             string idsBlobName = GetBlobIdsKey(correlationId);
@@ -44,14 +44,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             // resources of the same type in the same batch.
             HashSet<string> existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var readBlobClient = _containerClient.GetBlobClient(idsBlobName);
-            if(readBlobClient.Exists())
+            if ((await readBlobClient.ExistsAsync(cancellationToken)).Value)
             {
-                using (Stream read_stream = readBlobClient.OpenRead())
-                using (StreamReader reader = new StreamReader(read_stream))
+                await using (Stream readStream = await readBlobClient.OpenReadAsync(cancellationToken: cancellationToken))
+                using (StreamReader reader = new StreamReader(readStream))
                 {
-                    while (reader.Peek() >= 0)
+                    while (true)
                     {
-                        string? id = reader.ReadLine();
+                        string? id = await reader.ReadLineAsync(cancellationToken);
+                        if (id == null)
+                        {
+                            break;
+                        }
+
                         if(!string.IsNullOrEmpty(id))
                         {
                             existingIds.Add(id);
@@ -75,30 +80,30 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
             AppendBlobClient writeIdsBlobClient = _containerClient.GetAppendBlobClient(idsBlobName);
-            writeBlobClient.CreateIfNotExists();
-            writeIdsBlobClient.CreateIfNotExists();
+            await writeBlobClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            await writeIdsBlobClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
-            using (Stream write_stream = writeBlobClient.OpenWrite(false))
-            using (StreamWriter writer = new StreamWriter(write_stream)) 
+            await using (Stream writeStream = await writeBlobClient.OpenWriteAsync(false, cancellationToken: cancellationToken))
+            await using (StreamWriter writer = new StreamWriter(writeStream))
             {
                 foreach (var resourceToWrite in resourcesToWrite)
                 {
-                    writer.WriteLine(resourceToWrite.Key);
-                    writer.WriteLine(resourceToWrite.Value.ToJson());
+                    await writer.WriteLineAsync(resourceToWrite.Key.AsMemory(), cancellationToken);
+                    await writer.WriteLineAsync(resourceToWrite.Value.ToJson().AsMemory(), cancellationToken);
                 }
             }
 
-            using (Stream ids_write_stream = writeIdsBlobClient.OpenWrite(false))
-            using (StreamWriter ids_writer = new StreamWriter(ids_write_stream))
+            await using (Stream idsWriteStream = await writeIdsBlobClient.OpenWriteAsync(false, cancellationToken: cancellationToken))
+            await using (StreamWriter idsWriter = new StreamWriter(idsWriteStream))
             {
                 foreach(var id in resourcesToWrite.Keys)
                 {
-                    ids_writer.WriteLine(id);
+                    await idsWriter.WriteLineAsync(id.AsMemory(), cancellationToken);
                 }
             }
         }
 
-        public List<DomainResource> Get(string cacheKey)
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
@@ -109,21 +114,32 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(cacheKey));
 
-            if (!readBlobClient.Exists())
+            if (!(await readBlobClient.ExistsAsync(cancellationToken)).Value)
             {
                 _logger.LogWarning("ABS blob not found for Get. CacheKey='{CacheKey}', BlobPath='{BlobPath}', Container='{Container}'",
-                    cacheKey, GetBlobKey(cacheKey), _settings.BlobContainerName);
+                    cacheKey.SanitizeForLog(),
+                    GetBlobKey(cacheKey).SanitizeForLog(),
+                    _settings.BlobContainerName.SanitizeForLog());
                 return resources;
             }
 
-            using (Stream read_stream = readBlobClient.OpenRead(true))
-            using (StreamReader reader = new StreamReader(read_stream))
+            await using (Stream readStream = await readBlobClient.OpenReadAsync(true, cancellationToken: cancellationToken))
+            using (StreamReader reader = new StreamReader(readStream))
             {
-                while (reader.Peek() >= 0)
+                while (true)
                 {
                     //Skip first line. It's the reference of the resource, not the resource itself
-                    string resourceReference = reader.ReadLine();
-                    string resourceString = reader.ReadLine();
+                    string? resourceReference = await reader.ReadLineAsync(cancellationToken);
+                    if (resourceReference == null)
+                    {
+                        break;
+                    }
+
+                    string? resourceString = await reader.ReadLineAsync(cancellationToken);
+                    if (resourceString == null)
+                    {
+                        break;
+                    }
 
                     try
                     {
@@ -172,40 +188,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return this;
         }
 
-        public void Skipped(string sourceCache, string destinationCache)
-        {
-            BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
-
-            if (!sourceBlobClient.Exists())
-            {
-                _logger.LogWarning("ABS blob not found for Skipped. SourceKey='{SourceKey}', BlobPath='{BlobPath}', Container='{Container}', DestinationKey='{DestinationKey}'",
-                    sourceCache, GetBlobKey(sourceCache), _settings.BlobContainerName, destinationCache);
-                return;
-            }
-
-            AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
-            destinationBlobClient.CreateIfNotExists();
-
-            try
-            {
-                using (Stream sourceStream = sourceBlobClient.OpenRead(true))
-                using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
-                {
-                    sourceStream.CopyTo(destinationStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error when reading skipped ABS blob: Source Cache = {source}, Destination Cache = {destination}", sourceCache, destinationCache);
-            }
-        }
-
-        public void Delete(List<string> cacheKeys)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
             foreach (var cacheKey in cacheKeys)
             {
-                _containerClient.DeleteBlobIfExists(GetBlobKey(cacheKey));
-                _containerClient.DeleteBlobIfExists(GetBlobIdsKey(cacheKey));
+                await _containerClient.DeleteBlobIfExistsAsync(GetBlobKey(cacheKey), cancellationToken: cancellationToken);
+                await _containerClient.DeleteBlobIfExistsAsync(GetBlobIdsKey(cacheKey), cancellationToken: cancellationToken);
             }
         }
     }

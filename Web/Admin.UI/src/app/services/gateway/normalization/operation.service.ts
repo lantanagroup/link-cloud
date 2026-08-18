@@ -13,11 +13,14 @@ import {
 } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {IOperationModel, IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
-import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {IVendor, IVendorVersion} from "../../../interfaces/tenant/vendor-interface";
 import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
 import {IOperation} from "../../../interfaces/normalization/operation.interface";
 import {RemoveExtensionsOperation} from "../../../interfaces/normalization/remove-extensions-operation-interface";
+import {
+    CopyLocationAliasToTypeIterativelyOperation
+} from "../../../interfaces/normalization/copy-location-alias-to-type-iteratively-operation-interface";
 
 
 @Injectable({
@@ -62,7 +65,11 @@ export class OperationService {
     }
 
     getVendors(): Observable<IVendor[]> {
-        return this.http.get<IVendor[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/vendor/vendors`);
+        return this.http.get<IVendor[]>(`${this.appConfigService.config?.baseApiUrl}/vendor`);
+    }
+
+    getVendorVersions(): Observable<IVendorVersion[]> {
+        return this.http.get<IVendorVersion[]>(`${this.appConfigService.config?.baseApiUrl}/VendorVersion`);
     }
 
     deleteOperationByFacility(facilityId: string, operationId: string): Observable<any> {
@@ -277,6 +284,9 @@ export class OperationService {
                         break;
                     case OperationType.CopyLocation:
                         record.parsedOperationJson = parsedJson as IOperation;
+                        break;
+                    case OperationType.CopyLocationAliasToTypeIteratively:
+                        record.parsedOperationJson = parsedJson as CopyLocationAliasToTypeIterativelyOperation;
                         break;
                     case OperationType.RemoveExtensions:
                         record.parsedOperationJson = parsedJson as RemoveExtensionsOperation;

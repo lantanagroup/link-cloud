@@ -19,6 +19,8 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly ISnapshotStore _snapshotStore;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
+    private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
@@ -31,7 +33,12 @@ public class AutomationRunManager : IAutomationRunManager
         IConfiguration configuration,
         RunSnapshotOrchestrator orchestrator,
         ISnapshotStore snapshotStore,
-        IQueryPlanTemplateStore queryPlanTemplateStore)
+        IQueryPlanTemplateStore queryPlanTemplateStore,
+        INormalizationStore normalizationStore,
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -40,6 +47,8 @@ public class AutomationRunManager : IAutomationRunManager
         _orchestrator = orchestrator;
         _snapshotStore = snapshotStore;
         _queryPlanResolver = new QueryPlanTemplateResolver(queryPlanTemplateStore);
+        _normalizationSuiteResolver = new NormalizationSuiteResolver(normalizationStore);
+        _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _runExecutor = new RunExecutor(
             _automationConfig,
@@ -47,6 +56,11 @@ public class AutomationRunManager : IAutomationRunManager
             _snapshotStore,
             _orchestrator,
             _queryPlanResolver,
+            _normalizationSuiteResolver,
+            _organizationResourceMapResolver,
+            importedBundleResolver,
+            generatedTemplateCache,
+            generatedTemplateVersionStore,
             configuration,
             _logger);
     }
@@ -57,7 +71,7 @@ public class AutomationRunManager : IAutomationRunManager
         var options = StartScenarioRequestResolver.Resolve(request);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
+        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
         await PersistRunInputAsync(runId, request);
@@ -548,6 +562,10 @@ public class AutomationRunManager : IAutomationRunManager
                 Error = state.Error,
                 FacilityId = state.FacilityId,
                 ReportId = state.ReportId,
+                GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
+                GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
+                GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
+                GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
                 Logs = state.Logs.ToList()
             };
         }

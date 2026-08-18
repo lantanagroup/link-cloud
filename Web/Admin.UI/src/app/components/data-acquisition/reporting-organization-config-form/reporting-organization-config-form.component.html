@@ -1,0 +1,193 @@
+<form [formGroup]="configForm" class="dialog-form">
+
+  @if (saveError) {
+    <div class="save-error" role="alert">{{ saveError }}</div>
+  }
+
+  @if (activationPrerequisiteError) {
+    <div class="save-error" role="alert">{{ activationPrerequisiteError }}</div>
+  }
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="form-input">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="form-input">
+      <mat-label>Description</mat-label>
+      <input matInput formControlName="description" [readonly]="viewOnly"
+             placeholder="Reporting organization description">
+      <mat-hint>Optional description for this reporting organization configuration</mat-hint>
+    </mat-form-field>
+  </div>
+
+  <div class="form-row">
+    <div class="toggle-container">
+      <mat-slide-toggle formControlName="isActive" [disabled]="viewOnly">
+        Active
+      </mat-slide-toggle>
+    </div>
+  </div>
+
+  <div class="conditions-section">
+    <div class="section-header">
+      <h4>Matches</h4>
+      @if (!viewOnly && setupMethodControl.value !== 'manual') {
+        <button mat-stroked-button type="button" (click)="addMatch()">
+          <mat-icon>add</mat-icon>
+          Add match
+        </button>
+      }
+    </div>
+    <!-- Method: a vendor-specific builder, or Custom FHIRPath to type the expression. -->
+    <mat-radio-group formControlName="setupMethod" class="setup-method-group">
+      @if (isCerner) {
+        <mat-radio-button value="managingOrg">Managing Organization</mat-radio-button>
+        <mat-radio-button value="locationType">Location Type</mat-radio-button>
+      }
+      @if (isEpic) {
+        <mat-radio-button value="identifier">Identifier</mat-radio-button>
+      }
+      <mat-radio-button value="manual">Custom FHIRPath</mat-radio-button>
+    </mat-radio-group>
+
+    @if (vendorMismatch) {
+      <div class="vendor-mismatch-warning" role="alert">
+        This configuration's matching rules were built for a different EHR vendor than this
+        facility's current vendor ({{ vendor?.name }}). They are shown as Custom FHIRPath and still
+        apply as written — update them here to fit {{ vendor?.name }}, or close this dialog and use
+        the Delete button on the Reporting Organization tab to remove the configuration.
+        (Clearing the rules won't save — a configuration must have a matching expression.)
+      </div>
+    }
+
+    @if (setupMethodControl.value !== 'manual') {
+    <p class="section-hint">A location is included if it matches <strong>any</strong> of the following.</p>
+
+    @for (condition of conditionsArray.controls; track condition; let i = $index) {
+      <div class="condition-card" [formGroup]="$any(condition)">
+        <div class="condition-header">
+          <span class="condition-title">Match {{ i + 1 }}</span>
+          @if (!viewOnly && conditionsArray.length > 1) {
+            <button mat-icon-button color="warn" type="button" aria-label="Remove match"
+                    matTooltip="Remove match" (click)="removeMatch(i)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </div>
+
+        <!-- Location Identifier (Epic, or config method = identifier) -->
+        @if (setupMethodControl.value === 'identifier') {
+          <div class="builder-fields">
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Identifier System</mat-label>
+              <input matInput formControlName="identifierSystem" [readonly]="viewOnly"
+                     placeholder="https://example.org/location-ids">
+              @if (!viewOnly && $any(condition).get('identifierSystem')?.hasError('required')) {
+                <mat-error>Identifier System is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The FHIR Location.identifier.system value</mat-hint>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Identifier Code</mat-label>
+              <input matInput formControlName="identifierCode" [readonly]="viewOnly"
+                     placeholder="Location code/value">
+              @if (!viewOnly && $any(condition).get('identifierCode')?.hasError('required')) {
+                <mat-error>Identifier Code is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The FHIR Location.identifier.value value</mat-hint>
+              }
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Cerner: Managing Organization -->
+        @if (setupMethodControl.value === 'managingOrg') {
+          <div class="builder-fields">
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Organization Id</mat-label>
+              <input matInput formControlName="organizationId" [readonly]="viewOnly"
+                     placeholder="Managing organization id">
+              @if (!viewOnly && $any(condition).get('organizationId')?.hasError('required')) {
+                <mat-error>Organization Id is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>Matches Location.managingOrganization.reference = Organization/&lt;id&gt;</mat-hint>
+              }
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Cerner: Location Type -->
+        @if (setupMethodControl.value === 'locationType') {
+          <div class="builder-fields">
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Location Type Code</mat-label>
+              <input matInput formControlName="locationTypeCode" [readonly]="viewOnly"
+                     placeholder="783">
+              @if (!viewOnly && $any(condition).get('locationTypeCode')?.hasError('required')) {
+                <mat-error>Location Type Code is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The Location.type.coding.code value (default 783)</mat-hint>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Location Alias</mat-label>
+              <input matInput formControlName="locationAlias" [readonly]="viewOnly"
+                     placeholder="Optional location alias">
+              <mat-hint>Optional. When set, adds a Location.alias match</mat-hint>
+            </mat-form-field>
+          </div>
+        }
+
+      </div>
+    }
+    }
+
+    <!-- Single combined FHIRPath: editable in Custom mode, read-only preview otherwise. -->
+    <div class="fhirpath-section">
+      @if (setupMethodControl.value === 'manual') {
+        <mat-form-field appearance="outline" class="form-input">
+          <mat-label>FHIRPath</mat-label>
+          <textarea matInput formControlName="fhirPath" rows="3" [readonly]="viewOnly"
+                    spellcheck="false" autocapitalize="off" autocomplete="off"
+                    placeholder="Location.identifier.exists(...) or ..."></textarea>
+          @if (!viewOnly && fhirPathControl.hasError('required')) {
+            <mat-error>FHIRPath is <strong>required</strong></mat-error>
+          }
+        </mat-form-field>
+      } @else {
+        <mat-form-field appearance="outline" class="form-input fhirpath-preview">
+          <mat-label>Generated FHIRPath</mat-label>
+          <textarea matInput [value]="fhirPathControl.value" [disabled]="true" readonly
+                    spellcheck="false" rows="3" placeholder="FHIRPath preview"></textarea>
+        </mat-form-field>
+      }
+
+      <!-- Live server-side validation findings (MeasureEval). Errors block save; warnings advise. -->
+      @if (!viewOnly && validatingFhirPath) {
+        <p class="fhirpath-validating">Validating FHIRPath…</p>
+      }
+      @if (!viewOnly && fhirPathErrors.length > 0) {
+        <div class="fhirpath-errors" role="alert">
+          @for (error of fhirPathErrors; track error) {
+            <div class="fhirpath-finding">{{ error }}</div>
+          }
+        </div>
+      }
+      @if (!viewOnly && fhirPathWarnings.length > 0) {
+        <div class="fhirpath-warnings">
+          @for (warning of fhirPathWarnings; track warning) {
+            <div class="fhirpath-finding">{{ warning }}</div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+</form>

@@ -1,4 +1,4 @@
-using Flurl.Http;
+﻿using Flurl.Http;
 using Flurl.Http;
 using Flurl.Http.Configuration;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -35,8 +35,12 @@ public abstract class LinkApiClientBase : IDisposable
 
         if (bearerOptions.Value?.AllowAnonymous != true)
         {
-            _signingKey = tokenServiceSettings.Value?.SigningKey;
-            _tokenService = tokenService;
+            var key = tokenServiceSettings.Value?.SigningKey;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                _signingKey = key;
+                _tokenService = tokenService;
+            }
         }
     }
 
@@ -59,7 +63,7 @@ public abstract class LinkApiClientBase : IDisposable
 
     /// <summary>
     /// Executes a request and returns the full response (status code + deserialized body).
-    /// Does NOT swallow any status codes � the caller decides how to handle each response.
+    /// Does NOT swallow any status codes — the caller decides how to handle each response.
     /// </summary>
     protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action)
     {
@@ -74,6 +78,11 @@ public abstract class LinkApiClientBase : IDisposable
 
             if (statusCode is >= 200 and < 300)
             {
+                if (statusCode == 204 || response.ResponseMessage.Content?.Headers.ContentLength == 0)
+                {
+                    return new LinkApiResponse<T> { StatusCode = statusCode, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+                }
+
                 var body = await response.GetJsonAsync<T>();
                 string? rawBody = null;
                 if (body is not null)

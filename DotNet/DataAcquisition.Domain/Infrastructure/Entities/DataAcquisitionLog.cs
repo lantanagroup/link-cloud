@@ -18,7 +18,7 @@ public class DataAcquisitionLog
     public string FacilityId { get; set; }
 
     [Required]
-    public AcquisitionPriority Priority { get; set; } = AcquisitionPriority.Normal;
+    public AcquisitionPriority? Priority { get; set; } = AcquisitionPriority.Normal;
 
     public string? PatientId { get; set; }
 

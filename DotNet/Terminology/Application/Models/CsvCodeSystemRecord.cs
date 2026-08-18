@@ -1,4 +1,4 @@
-﻿using CsvHelper.Configuration.Attributes;
+using CsvHelper.Configuration.Attributes;
 
 namespace LantanaGroup.Link.Terminology.Application.Models;
 
@@ -31,10 +31,15 @@ public class CsvCodeSystemRecord
     public required string Display { get; set; }
 
     /// <summary>
-    /// Indicates the status of the code item, Active or Inactive
+    /// The raw status cell, expected to read "Active" or "Inactive" in any casing. Empty in a
+    /// two-column file, which has no status column at all.
     /// </summary>
+    /// <remarks>
+    /// Deliberately a string rather than a <see cref="CodeStatus"/>: CsvHelper's enum converter throws a
+    /// <c>TypeConverterException</c> on any other value, and because the records are enumerated lazily that
+    /// throw escapes the read loop and costs the entire code system, not the one bad row. Interpreting the
+    /// cell is left to the loader, which defaults it and logs what it saw.
+    /// </remarks>
     [Index(2)]
-    [Default(CodeStatus.Active)]
-    [EnumIgnoreCase]
-    public CodeStatus Status { get; set; } = CodeStatus.Active;
+    public string? Status { get; set; }
 }
