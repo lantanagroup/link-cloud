@@ -13,13 +13,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services;
 /// needs its cached resources when it is redelivered, so purging on a transient failure would
 /// guarantee the retry fails too.
 /// <para>
-/// Only the per-resource-type acquisition keys (<c>{correlationId}:{ResourceType}</c>) are ever
-/// deleted — they are Normalization's input, consumed by this message alone. The
-/// <c>{correlationId}</c> key is Normalization's output and belongs to its reader: Measure Eval
-/// deletes it after evaluation, and the cache expiration policy reclaims it if no reader ever
-/// comes (e.g. the failure occurred before <c>ResourcesNormalized</c> was published). Normalization
-/// never deletes it, on any path — it cannot know whether an earlier attempt already published, or
-/// whether the key still holds kept INITIAL-phase data a SUPPLEMENTAL evaluation needs.
+/// Unlike the success path — which deletes only the per-resource-type acquisition keys
+/// (<c>{correlationId}:{ResourceType}</c>) and leaves <c>{correlationId}</c> in place for Measure
+/// Eval to read — a terminal failure also removes the correlation key, because nothing downstream
+/// will ever consume it.
 /// </para>
 /// </remarks>
 public interface IResourceCachePurger
@@ -52,18 +49,27 @@ public class ResourceCachePurger : IResourceCachePurger
             return;
         }
 
+        // Acquisition keys are "{correlationId}:{ResourceType}"; the correlation key itself holds
+        // whatever normalization managed to write before it failed, so it goes too.
+        var keysToDelete = new List<string>(cacheKeys);
+        keysToDelete.AddRange(cacheKeys
+            .Select(ExtractCorrelationId)
+            .Where(correlationId => !string.IsNullOrWhiteSpace(correlationId))
+            .Distinct()
+            .Where(correlationId => !keysToDelete.Contains(correlationId)));
+
         try
         {
             await _resourceCache
                 .GetImplementation(value!.CacheType)
-                .DeleteAsync(cacheKeys, cancellationToken);
+                .DeleteAsync(keysToDelete, cancellationToken);
 
             _logger.LogInformation(
                 "Purged {KeyCount} resource cache entries after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
-                cacheKeys.Count,
+                keysToDelete.Count,
                 reason.SanitizeForLog(),
                 value.CacheType,
-                string.Join(", ", cacheKeys).SanitizeForLog());
+                string.Join(", ", keysToDelete).SanitizeForLog());
         }
         catch (Exception ex)
         {
@@ -73,7 +79,14 @@ public class ResourceCachePurger : IResourceCachePurger
                 "Failed to purge resource cache after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
                 reason.SanitizeForLog(),
                 value!.CacheType,
-                string.Join(", ", cacheKeys).SanitizeForLog());
+                string.Join(", ", keysToDelete).SanitizeForLog());
         }
+    }
+
+    /// <remarks>Mirrors <c>HybridResourceCache.ExtractCorrelationId</c>.</remarks>
+    private static string ExtractCorrelationId(string cacheKey)
+    {
+        var idx = cacheKey.IndexOf(':');
+        return idx > 0 ? cacheKey[..idx] : cacheKey;
     }
 }

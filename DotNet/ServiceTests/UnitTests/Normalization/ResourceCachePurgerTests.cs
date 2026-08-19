@@ -14,11 +14,11 @@ public class ResourceCachePurgerTests
     private const string CorrelationId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
 
     [Fact]
-    public async Task PurgeAsync_DeletesOnlyTheAcquisitionKeys_NeverTheCorrelationKey()
+    public async Task PurgeAsync_DeletesAcquisitionKeysAndCorrelationKey()
     {
-        // Normalization only ever deletes its own input, the {correlationId}:{ResourceType}
-        // acquisition keys. The {correlationId} key belongs to its reader: Measure Eval deletes it
-        // after evaluation, and the cache expiration policy reclaims it if no reader ever comes.
+        // A terminal failure means nothing downstream will ever consume this message's cache
+        // entries, so the purge removes the {correlationId}:{ResourceType} acquisition keys AND
+        // the {correlationId} key normalization was writing when it failed.
         var (purger, cache, implementation) = BuildPurger(ResourceCacheType.Redis);
 
         List<string>? deletedKeys = null;
@@ -32,9 +32,28 @@ public class ResourceCachePurgerTests
         cache.Verify(item => item.GetImplementation(ResourceCacheType.Redis), Times.Once);
         Assert.NotNull(deletedKeys);
         Assert.Equal(
-            new List<string> { $"{CorrelationId}:Patient", $"{CorrelationId}:Encounter" },
+            new List<string> { $"{CorrelationId}:Patient", $"{CorrelationId}:Encounter", CorrelationId },
             deletedKeys);
-        Assert.DoesNotContain(CorrelationId, deletedKeys!);
+    }
+
+    [Fact]
+    public async Task PurgeAsync_DoesNotDeleteTwiceWhenTheCorrelationKeyIsAlreadyPresent()
+    {
+        var (purger, _, implementation) = BuildPurger(ResourceCacheType.Redis);
+
+        List<string>? deletedKeys = null;
+        implementation
+            .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<List<string>, CancellationToken>((keys, _) => deletedKeys = keys)
+            .Returns(Task.CompletedTask);
+
+        var value = BuildValue(ResourceCacheType.Redis);
+        value.CacheKeys.Add(CorrelationId);
+
+        await purger.PurgeAsync(value, "test");
+
+        Assert.NotNull(deletedKeys);
+        Assert.Equal(deletedKeys!.Count, deletedKeys.Distinct().Count());
     }
 
     [Fact]
