@@ -380,9 +380,11 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
 
         // Act
-        var ids = await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }, ResourceType.Patient);
+        var ids = await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }, ResourceType.Patient, cancellationToken: cancellationToken);
 
         // Assert
         Assert.Single(ids);
@@ -391,15 +393,17 @@ public class FhirApiServiceTests
         Assert.Contains(log.Notes, n => n.Contains("OperationOutcome(s) found in search bundle"));
 
         // Ensure only Patient was added to cache (not OperationOutcome)
-        resourceCache.Verify(x => x.UpdateCorrelationCache(
+        resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
             It.Is<string>(k => k.Contains(":Patient")),
             It.IsAny<List<DomainResource>>(),
-            It.IsAny<ResourceType>()), Times.Once);
+            It.IsAny<ResourceType>(),
+            cancellationToken), Times.Once);
 
-        resourceCache.Verify(x => x.UpdateCorrelationCache(
+        resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
             It.Is<string>(k => k.Contains(":OperationOutcome")),
             It.IsAny<List<DomainResource>>(),
-            It.IsAny<ResourceType>()), Times.Never);
+            It.IsAny<ResourceType>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -476,10 +480,11 @@ public class FhirApiServiceTests
 
         // Assert
         Assert.Equal(["Observation/obs-kept"], ids);
-        resourceCache.Verify(x => x.UpdateCorrelationCache(
+        resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
             It.IsAny<string>(),
             It.Is<List<DomainResource>>(resources => resources.Single().Id == "obs-removed"),
-            ResourceType.Observation), Times.Never);
+            ResourceType.Observation,
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -610,10 +615,11 @@ public class FhirApiServiceTests
 
            // Assert
            Assert.Empty(ids);
-           resourceCache.Verify(x => x.UpdateCorrelationCache(
+           resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
                It.IsAny<string>(),
                It.IsAny<List<DomainResource>>(),
-               It.IsAny<ResourceType>()), Times.Never);
+               It.IsAny<ResourceType>(),
+               It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private async IAsyncEnumerable<Bundle> GetExceptionBundleAsync(Exception ex)
@@ -666,14 +672,16 @@ public class FhirApiServiceTests
         // Capture the cache key used when storing the resource
         string? capturedCacheKey = null;
         resourceCache
-            .Setup(x => x.UpdateCorrelationCache(
+            .Setup(x => x.UpdateCorrelationCacheAsync(
                 It.IsAny<string>(),
                 It.IsAny<List<DomainResource>>(),
-                It.IsAny<ResourceType>()))
-            .Callback<string, List<DomainResource>, ResourceType>((key, resources, type) =>
+                It.IsAny<ResourceType>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, List<DomainResource>, ResourceType, CancellationToken>((key, resources, type, _) =>
             {
                 capturedCacheKey = key;
-            });
+            })
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
 
         var service = new FhirApiService(
             referenceResourceManager.Object,

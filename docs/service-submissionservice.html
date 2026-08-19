@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -186,7 +495,7 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-payloadsubmitted.html">Payload Submitted [event]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-submitpayload.html">Submit Payload [event]</a></div>
-        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Submission service is responsible for submitting a tenant's generated reporting content to a configured destination. Currently, the service submits reports to a configured Azure Blob Storage destination. For local testing, the Azurite Docker image (<a href="https://hub.docker.com/r/microsoft/azure-storage-azurite">Link Here</a>) can be used as a local instance of Azure Blob Storage.</p>
 <table>
 <thead>
@@ -236,16 +545,16 @@
 </table>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nSubmissionService_1C035A38["Service: Submission Service"]
-  nSubmissionService_1C035A38 -->|produces| nPayloadSubmitted_32B09A26["Event: PayloadSubmitted"]
-  nSubmitPayload_3C7A5BA5["Event: SubmitPayload"] -->|consumed by| nSubmissionService_1C035A38
-  subgraph nReport_623174B2_domain["Domain: Report"]
-    nPayloadSubmitted_32B09A26
-    nSubmissionService_1C035A38
-    nSubmitPayload_3C7A5BA5
+nSubmissionService_8367A27["Service: Submission Service"]
+  nSubmissionService_8367A27 -->|produces| nPayloadSubmitted_2E346CAB["Event: PayloadSubmitted"]
+  nSubmitPayload_2F556666["Event: SubmitPayload"] -->|consumed by| nSubmissionService_8367A27
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPayloadSubmitted_2E346CAB
+    nSubmissionService_8367A27
+    nSubmitPayload_2F556666
   end
 </pre></div>
-<h2 id="common-configurations">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -257,7 +566,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
 </ul>
-<h2 id="custom-configurations">Custom Configurations <a id="custom-configurations" href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="custom-configurations" class="content-heading">Custom Configurations <a id="custom-configurations" href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -306,9 +615,9 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="functionality">Functionality <a id="functionality" href="#functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="functionality" class="content-heading">Functionality <a id="functionality" href="#functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Link Submission service is responsible for securely transmitting compiled measure reports and their associated clinical data to an external Blob Storage container. The payload consists of Newline-Delimited JSON (.ndjson) files representing FHIR resources.</p>
-<h3 id="structure-and-timing">Structure and Timing <a id="structure-and-timing" href="#structure-and-timing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Structure and Timing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="structure-and-timing" class="content-heading">Structure and Timing <a id="structure-and-timing" href="#structure-and-timing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Structure and Timing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The transmission process is triggered asynchronously by the SubmitPayload Kafka topic. When a payload is ready for submission:</p>
 <ol>
 <li>The Submission service's <code>SubmitPayloadListener</code> picks up the message. The <code>PayloadType</code> on the value of the event will determine whether a patient report or a facility summary manifest file is being sent to the external endpoint. Patient report submissions are immediately submitted when a patient has been evaluated and validated for all measures within a reporting period.</li>
@@ -317,9 +626,9 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 <li>The service emits a <code>PayloadSubmitted</code> Kafka event upon successful transfer, and logs an Audit Event for traceability.</li>
 </ol>
 <p>This mechanism allows the system to scale and asynchronously write large files without holding up upstream measure evaluation processes or creating excessive memory pressure.</p>
-<h3 id="file-hierarchy-and-naming-conventions">File Hierarchy and Naming Conventions <a id="file-hierarchy-and-naming-conventions" href="#file-hierarchy-and-naming-conventions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Hierarchy and Naming Conventions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="file-hierarchy-and-naming-conventions" class="content-heading">File Hierarchy and Naming Conventions <a id="file-hierarchy-and-naming-conventions" href="#file-hierarchy-and-naming-conventions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Hierarchy and Naming Conventions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data submitted to the external blob storage is organized hierarchically. A &quot;folder&quot; (blob prefix) is created per report schedule, and the related <code>.ndjson</code> files are placed within it.</p>
-<h3 id="folder-naming-convention">Folder Naming Convention <a id="folder-naming-convention" href="#folder-naming-convention" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Folder Naming Convention"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="folder-naming-convention" class="content-heading">Folder Naming Convention <a id="folder-naming-convention" href="#folder-naming-convention" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Folder Naming Convention"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The folder path is constructed dynamically and follows this naming pattern: <code>\{BlobRoot}/\{facilityId}_\{dqms}_\{reportingStartDate}_\{scheduleId}/</code></p>
 <ul>
 <li><strong>facilityId</strong>: The submitting organization's Facility ID (lowercase).</li>
@@ -328,7 +637,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 <li><strong>scheduleId</strong>: A sanitized, URL-safe version of the Report Schedule GUID.</li>
 </ul>
 <p><em>Example Folder</em>: <code>98234_ach+hypo_20240101_e6a8d3..._/</code></p>
-<h3 id="file-naming-conventions">File Naming Conventions <a id="file-naming-conventions" href="#file-naming-conventions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Naming Conventions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="file-naming-conventions" class="content-heading">File Naming Conventions <a id="file-naming-conventions" href="#file-naming-conventions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Naming Conventions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Inside the submission folder, the structured files are named as follows:</p>
 <ul>
 <li><strong>Aggregate Data</strong>: manifest.ndjson</li>
@@ -353,7 +662,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 <li><strong>Clinical Data</strong>: The remainder of the .ndjson lines consist of the evaluated clinical resources, such as <code>Observation</code>, <code>Condition</code>, <code>Encounter</code>, <code>MedicationRequest</code>, etc., that were pulled from the EHR and factored into the measure calculation.</li>
 <li><strong>OperationOutcome</strong>: This resource would show in the patient file if they fail validation.</li>
 </ol>
-<h3 id="submission-storage-hierarchy">Submission Storage Hierarchy <a id="submission-storage-hierarchy" href="#submission-storage-hierarchy" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Storage Hierarchy"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="submission-storage-hierarchy" class="content-heading">Submission Storage Hierarchy <a id="submission-storage-hierarchy" href="#submission-storage-hierarchy" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Storage Hierarchy"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Below is an example of the hierarchical structure of a facility's Azure Blob Storage submission for a facility NSHN ACH Monthly report:</p>
 <pre><code>98234_achm_20260201_a1322b82-37b4-4cb2-91b0-bcad0a703086
 ├── manifest.ndjson
@@ -379,7 +688,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
     └── DiagnoticReport
     └── OperationOutcome
 </code></pre>
-<h3 id="manifest.ndjson-example">Manifest.ndjson Example <a id="manifest-ndjson-example" href="#manifest-ndjson-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Manifest.ndjson Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="manifest.ndjson-example" class="content-heading">Manifest.ndjson Example <a id="manifest-ndjson-example" href="#manifest-ndjson-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Manifest.ndjson Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Below is an example of the FHIR resources that are added to the manifest.ndjson file:</p>
 <pre><code>{&quot;resourceType&quot;:&quot;Organization&quot;,&quot;id&quot;:&quot;af0e74a6-24ca-4d22-abe3-12c3bf96744c&quot;,&quot;meta&quot;:{&quot;profile&quot;:[&quot;https://www.cdc.gov/nhsn/nhsn-measures/StructureDefinition/nhsn-submitting-organization&quot;]},&quot;identifier&quot;:[{&quot;system&quot;:&quot;https://www.cdc.gov/nhsn/OrgID&quot;,&quot;value&quot;:&quot;MyFacility-1775588582125&quot;}],&quot;active&quot;:true,&quot;type&quot;:[{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/organization-type&quot;,&quot;code&quot;:&quot;prov&quot;,&quot;display&quot;:&quot;Healthcare Provider&quot;}]}],&quot;name&quot;:&quot;MyFacility-1775588582125&quot;,&quot;telecom&quot;:[{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/StructureDefinition/data-absent-reason&quot;,&quot;valueCode&quot;:&quot;unknown&quot;}]}],&quot;address&quot;:[{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/StructureDefinition/data-absent-reason&quot;,&quot;valueCode&quot;:&quot;unknown&quot;}]}]}
 {&quot;resourceType&quot;:&quot;Device&quot;,&quot;id&quot;:&quot;d5be3f1e-c031-4ebb-b202-92ba87e3f1ee&quot;,&quot;deviceName&quot;:[{&quot;name&quot;:&quot;NHSNLink&quot;}],&quot;version&quot;:[{&quot;value&quot;:&quot;&quot;}]}
@@ -387,7 +696,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 {&quot;resourceType&quot;:&quot;MeasureReport&quot;,&quot;id&quot;:&quot;0f751f54-f405-4060-94d5-a6cb7038b3e5&quot;,&quot;meta&quot;:{&quot;profile&quot;:[&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/subjectlist-measurereport&quot;]},&quot;contained&quot;:[{&quot;resourceType&quot;:&quot;List&quot;,&quot;id&quot;:&quot;initial-population-list&quot;,&quot;status&quot;:&quot;current&quot;,&quot;mode&quot;:&quot;snapshot&quot;,&quot;entry&quot;:[{&quot;item&quot;:{&quot;reference&quot;:&quot;MeasureReport/a775db5f-f00a-4a05-aa1e-b979cad13a19&quot;}},{&quot;item&quot;:{&quot;reference&quot;:&quot;MeasureReport/f2ec24e5-2342-4eb1-9c94-1c2096d37d87&quot;}}]}],&quot;status&quot;:&quot;complete&quot;,&quot;type&quot;:&quot;subject-list&quot;,&quot;measure&quot;:&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation|1.0.0-dev&quot;,&quot;date&quot;:&quot;2026-04-24T14:17:18.9758292+00:00&quot;,&quot;reporter&quot;:{&quot;reference&quot;:&quot;Organization/af0e74a6-24ca-4d22-abe3-12c3bf96744c&quot;},&quot;period&quot;:{&quot;start&quot;:&quot;2025-11-01T05:00:00+00:00&quot;,&quot;end&quot;:&quot;2025-12-01T05:59:59+00:00&quot;},&quot;group&quot;:[{&quot;population&quot;:[{&quot;code&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/measure-population&quot;,&quot;code&quot;:&quot;initial-population&quot;,&quot;display&quot;:&quot;Initial Population&quot;}]},&quot;count&quot;:221,&quot;subjectResults&quot;:{&quot;reference&quot;:&quot;#initial-population-list&quot;}}]}]}
 {&quot;resourceType&quot;:&quot;OperationOutcome&quot;,&quot;id&quot;:&quot;e18b348c-2cd9-4431-b3b9-5fba3550dc0b&quot;,&quot;issue&quot;:[{&quot;severity&quot;:&quot;error&quot;,&quot;code&quot;:&quot;invalid&quot;,&quot;diagnostics&quot;:&quot;Validation failed for patient jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;},{&quot;severity&quot;:&quot;error&quot;,&quot;code&quot;:&quot;invalid&quot;,&quot;diagnostics&quot;:&quot;Validation failed for patient PfN97mRomyKGqn9vgGDXpp5u97fiE9v6iXxeyNdXNtn6J&quot;}]}
 </code></pre>
-<h3 id="patient.ndjson-example">Patient.ndjson Example <a id="patient-ndjson-example" href="#patient-ndjson-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient.ndjson Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="patient.ndjson-example" class="content-heading">Patient.ndjson Example <a id="patient-ndjson-example" href="#patient-ndjson-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient.ndjson Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Below is an example of a submitted patient.ndjson file for a patient in the manifest.ndjson file shown above:</p>
 <pre><code>{&quot;resourceType&quot;:&quot;MeasureReport&quot;,&quot;id&quot;:&quot;a775db5f-f00a-4a05-aa1e-b979cad13a19&quot;,&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description&quot;,&quot;valueString&quot;:&quot;The Acute Care Hospital Monthly Initial Population includes all encounters for patients of any age in an ED, observation, or inpatient location or all encounters for patients of any age with an ED, observation, inpatient, or short stay status during the measurement period.&quot;},{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference&quot;,&quot;valueReference&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference&quot;,&quot;valueString&quot;:&quot;sde-minimal-patient&quot;}],&quot;reference&quot;:&quot;Patient/jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;}},{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference&quot;,&quot;valueReference&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference&quot;,&quot;valueString&quot;:&quot;sde-location&quot;}],&quot;reference&quot;:&quot;Location/RsRPNHzwjNuhj3mxTniehTWT9iZHMJ3jAPux90m01D6PT&quot;}},{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference&quot;,&quot;valueReference&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference&quot;,&quot;valueString&quot;:&quot;sde-ip-encounters&quot;}],&quot;reference&quot;:&quot;Encounter/A1H45ixVFdCepcwv99pl1ebIvjJVOIcErTugl8CDMNm7w&quot;}},{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference&quot;,&quot;valueReference&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference&quot;,&quot;valueString&quot;:&quot;sde-procedure&quot;}],&quot;reference&quot;:&quot;Procedure/R0O12KSwXrdfIGU9uTiX9KGgHaPoTRM2vT4XzbNbvBEik&quot;}}],&quot;status&quot;:&quot;complete&quot;,&quot;type&quot;:&quot;individual&quot;,&quot;measure&quot;:&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation|1.0.0-dev&quot;,&quot;subject&quot;:{&quot;reference&quot;:&quot;Patient/jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;},&quot;date&quot;:&quot;2026-04-24T14:15:51+00:00&quot;,&quot;period&quot;:{&quot;start&quot;:&quot;2025-11-01T05:00:00+00:00&quot;,&quot;end&quot;:&quot;2025-12-01T05:59:59+00:00&quot;},&quot;group&quot;:[{&quot;population&quot;:[{&quot;id&quot;:&quot;initial-population&quot;,&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description&quot;,&quot;valueString&quot;:&quot;All encounters for patients of any age in an ED, observation, or inpatient location or all encounters for patients of any age with an ED, observation, inpatient, or short stay status during the measurement period.&quot;}],&quot;code&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/measure-population&quot;,&quot;code&quot;:&quot;initial-population&quot;,&quot;display&quot;:&quot;Initial Population&quot;}]},&quot;count&quot;:1}]}],&quot;evaluatedResource&quot;:[{&quot;reference&quot;:&quot;ServiceRequest/eTAnk3yEdxxBU759Ufioxn8sNcnZuHAC454Dpo7u2u88u&quot;},{&quot;reference&quot;:&quot;Patient/jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;},{&quot;reference&quot;:&quot;Location/RsRPNHzwjNuhj3mxTniehTWT9iZHMJ3jAPux90m01D6PT&quot;},{&quot;reference&quot;:&quot;Procedure/R0O12KSwXrdfIGU9uTiX9KGgHaPoTRM2vT4XzbNbvBEik&quot;},{&quot;reference&quot;:&quot;Encounter/A1H45ixVFdCepcwv99pl1ebIvjJVOIcErTugl8CDMNm7w&quot;}]}
 {&quot;resourceType&quot;:&quot;Patient&quot;,&quot;id&quot;:&quot;jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;,&quot;meta&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension&quot;,&quot;valueDateTime&quot;:&quot;2026-04-24T13:54:11Z&quot;}],&quot;versionId&quot;:&quot;1&quot;,&quot;lastUpdated&quot;:&quot;2026-01-28T19:17:08.756+00:00&quot;,&quot;profile&quot;:[&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/cross-measure-patient&quot;]},&quot;extension&quot;:[{&quot;url&quot;:&quot;http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity&quot;,&quot;extension&quot;:[{&quot;url&quot;:&quot;ombCategory&quot;,&quot;valueCoding&quot;:{&quot;system&quot;:&quot;urn:oid:2.16.840.1.113883.6.238&quot;,&quot;code&quot;:&quot;2135-2&quot;,&quot;display&quot;:&quot;Hispanic or Latino&quot;}}]},{&quot;url&quot;:&quot;http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex&quot;,&quot;valueCode&quot;:&quot;M&quot;},{&quot;url&quot;:&quot;http://hl7.org/fhir/us/core/StructureDefinition/us-core-race&quot;,&quot;valueCoding&quot;:{&quot;system&quot;:&quot;urn:oid:2.16.840.1.113883.6.238&quot;,&quot;code&quot;:&quot;2106-3&quot;,&quot;display&quot;:&quot;White&quot;}}],&quot;identifier&quot;:[{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;CEID&quot;},&quot;system&quot;:&quot;urn:oid:1.2.840.114350.1.13.93.3.7.3.688884.100&quot;,&quot;value&quot;:&quot;XXXNHSCHACPG8YM&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;EPI&quot;},&quot;system&quot;:&quot;urn:oid:1.2.840.114350.1.13.93.3.7.5.737384.0&quot;,&quot;value&quot;:&quot;E38171&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;EXTERNAL&quot;},&quot;system&quot;:&quot;urn:oid:1.2.840.114350.1.13.93.3.7.2.698084&quot;,&quot;value&quot;:&quot;Z02445&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;FHIR&quot;},&quot;system&quot;:&quot;http://open.epic.com/FHIR/StructureDefinition/patient-dstu2-fhir-id&quot;,&quot;value&quot;:&quot;jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;FHIR STU3&quot;},&quot;system&quot;:&quot;http://open.epic.com/FHIR/StructureDefinition/patient-fhir-id&quot;,&quot;value&quot;:&quot;eoYMSVqleH50WfN2HlgKJh40eOryKLuH6hysGq8jUoA8C&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;INTERNAL&quot;},&quot;system&quot;:&quot;urn:oid:1.2.840.114350.1.13.93.3.7.2.698084&quot;,&quot;value&quot;:&quot;Z91553&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;type&quot;:{&quot;text&quot;:&quot;MRN&quot;},&quot;system&quot;:&quot;urn:oid:2.16.840.1.113883.3.16.100.1&quot;,&quot;value&quot;:&quot;488950597&quot;},{&quot;use&quot;:&quot;usual&quot;,&quot;system&quot;:&quot;https://open.epic.com/FHIR/StructureDefinition/PayerMemberId&quot;,&quot;value&quot;:&quot;2113399039&quot;}],&quot;active&quot;:false,&quot;name&quot;:[{&quot;text&quot;:&quot;Eric014 Daniel084 Murillo042&quot;,&quot;family&quot;:&quot;Murillo042&quot;,&quot;given&quot;:[&quot;Eric014&quot;,&quot;Daniel084&quot;]}],&quot;telecom&quot;:[{&quot;system&quot;:&quot;phone&quot;,&quot;value&quot;:&quot;+1 254-555-4939&quot;}],&quot;gender&quot;:&quot;female&quot;,&quot;birthDate&quot;:&quot;2008-09-11&quot;,&quot;deceasedBoolean&quot;:false,&quot;address&quot;:[{&quot;use&quot;:&quot;home&quot;,&quot;line&quot;:[&quot;15331 Mays Plains Suite 849081&quot;],&quot;city&quot;:&quot;Littlechester&quot;,&quot;state&quot;:&quot;MO&quot;,&quot;postalCode&quot;:&quot;72321&quot;}],&quot;contact&quot;:[{&quot;name&quot;:{&quot;use&quot;:&quot;usual&quot;,&quot;text&quot;:&quot;White030, Samantha033&quot;}}],&quot;communication&quot;:[{&quot;language&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;urn:ietf:bcp:47&quot;,&quot;code&quot;:&quot;en&quot;,&quot;display&quot;:&quot;English&quot;}],&quot;text&quot;:&quot;English&quot;},&quot;preferred&quot;:true}]}
@@ -396,7 +705,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 {&quot;resourceType&quot;:&quot;Encounter&quot;,&quot;id&quot;:&quot;A1H45ixVFdCepcwv99pl1ebIvjJVOIcErTugl8CDMNm7w&quot;,&quot;meta&quot;:{&quot;extension&quot;:[{&quot;url&quot;:&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension&quot;,&quot;valueDateTime&quot;:&quot;2026-04-24T13:54:11Z&quot;}],&quot;versionId&quot;:&quot;1&quot;,&quot;lastUpdated&quot;:&quot;2026-01-28T19:17:08.97+00:00&quot;,&quot;profile&quot;:[&quot;http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/ach-monthly-encounter&quot;]},&quot;extension&quot;:[{&quot;url&quot;:&quot;http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated&quot;,&quot;valueBoolean&quot;:false},{&quot;url&quot;:&quot;https://www.lantanagroup.com/fhir/StructureDefinition/nhsn-encounter-original-status&quot;,&quot;valueCoding&quot;:{&quot;code&quot;:&quot;TRIAGED&quot;}}],&quot;status&quot;:&quot;finished&quot;,&quot;class&quot;:{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/v3-ActCode&quot;,&quot;code&quot;:&quot;IMP&quot;,&quot;display&quot;:&quot;inpatient encounter&quot;},&quot;type&quot;:[{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://snomed.info/sct&quot;,&quot;code&quot;:&quot;183452005&quot;,&quot;display&quot;:&quot;Emergency hospital admission (procedure)&quot;}],&quot;text&quot;:&quot;Emergency hospital admission (procedure)&quot;}],&quot;serviceType&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/service-type&quot;,&quot;code&quot;:&quot;319&quot;,&quot;display&quot;:&quot;Diaphragm Fitting&quot;}],&quot;text&quot;:&quot;Diaphragm Fitting&quot;},&quot;subject&quot;:{&quot;reference&quot;:&quot;Patient/jEY0jhwcYACCAMEZwhEmUytjgNiWXrPfueFL6kJzIqRUN&quot;,&quot;display&quot;:&quot;Eric014 Daniel084 Murillo042&quot;},&quot;period&quot;:{&quot;start&quot;:&quot;2025-11-29T00:47:51Z&quot;,&quot;end&quot;:&quot;2025-11-29T17:49:57Z&quot;},&quot;reasonCode&quot;:[{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://snomed.info/sct&quot;,&quot;code&quot;:&quot;423590009&quot;,&quot;display&quot;:&quot;Clostridium difficile colitis (disorder)&quot;}],&quot;text&quot;:&quot;C. difficile colitis&quot;},{&quot;coding&quot;:[{&quot;system&quot;:&quot;urn:oid:1.2.840.114350.1.13.277.3.7.2.728286&quot;,&quot;code&quot;:&quot;35&quot;,&quot;display&quot;:&quot;Diarrhea&quot;}],&quot;text&quot;:&quot;Diarrhea&quot;}],&quot;diagnosis&quot;:[{&quot;condition&quot;:{&quot;reference&quot;:&quot;Condition/IGSvNitj&quot;},&quot;use&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/diagnosis-role&quot;,&quot;code&quot;:&quot;AD&quot;,&quot;display&quot;:&quot;Admission diagnosis&quot;}]}}],&quot;hospitalization&quot;:{&quot;admitSource&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/admit-source&quot;,&quot;code&quot;:&quot;psych&quot;,&quot;display&quot;:&quot;From psychiatric hospital&quot;}],&quot;text&quot;:&quot;From psychiatric hospital&quot;},&quot;dischargeDisposition&quot;:{&quot;coding&quot;:[{&quot;system&quot;:&quot;http://terminology.hl7.org/CodeSystem/discharge-disposition&quot;,&quot;code&quot;:&quot;psy&quot;,&quot;display&quot;:&quot;Psychiatric hospital&quot;}],&quot;text&quot;:&quot;Psychiatric hospital&quot;}},&quot;location&quot;:[{&quot;location&quot;:{&quot;reference&quot;:&quot;Location/RsRPNHzwjNuhj3mxTniehTWT9iZHMJ3jAPux90m01D6PT&quot;,&quot;display&quot;:&quot;Pediatric Burn Ward&quot;},&quot;period&quot;:{&quot;start&quot;:&quot;2025-11-29T09:52:54Z&quot;,&quot;end&quot;:&quot;2025-11-29T17:49:57Z&quot;}}]}
 {&quot;resourceType&quot;:&quot;OperationOutcome&quot;,&quot;id&quot;:&quot;cd751f88-e03c-4ee6-a518-37a4f5158a02&quot;,&quot;issue&quot;:[{&quot;severity&quot;:&quot;error&quot;,&quot;code&quot;:&quot;invalid&quot;,&quot;diagnostics&quot;:&quot;Patient has failed Validation&quot;}]}
 </code></pre>
-<h3 id="how-to-associate-patient-submissions-to-the-manifest">How To Associate Patient Submissions to the Manifest <a id="how-to-associate-patient-submissions-to-the-manifest" href="#how-to-associate-patient-submissions-to-the-manifest" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How To Associate Patient Submissions to the Manifest"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="how-to-associate-patient-submissions-to-the-manifest" class="content-heading">How To Associate Patient Submissions to the Manifest <a id="how-to-associate-patient-submissions-to-the-manifest" href="#how-to-associate-patient-submissions-to-the-manifest" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How To Associate Patient Submissions to the Manifest"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Each submitted patient .ndjson file will contain a single FHIR Patient resource and at least one MeasureReport. If a user needs to cross check that a patient's submission is in the manifest or vice versa, the following can be done:</p>
 <ul>
 <li><p>To ensure a patient's submission is in the manifest:</p>
@@ -411,7 +720,7 @@ nSubmissionService_1C035A38["Service: Submission Service"]
 </ul>
 </li>
 </ul>
-<h2 id="comparisons-between-link-mvp-and-link-cloud-submissions">Comparisons Between Link MVP and Link Cloud Submissions <a id="comparisons-between-link-mvp-and-link-cloud-submissions" href="#comparisons-between-link-mvp-and-link-cloud-submissions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Comparisons Between Link MVP and Link Cloud Submissions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="comparisons-between-link-mvp-and-link-cloud-submissions" class="content-heading">Comparisons Between Link MVP and Link Cloud Submissions <a id="comparisons-between-link-mvp-and-link-cloud-submissions" href="#comparisons-between-link-mvp-and-link-cloud-submissions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Comparisons Between Link MVP and Link Cloud Submissions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -520,20 +829,34 @@ nSubmissionService_1C035A38["Service: Submission Service"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nSubmissionService_1C035A38["Service: Submission Service"]
-  nSubmissionService_1C035A38 -->|produces| nPayloadSubmitted_32B09A26["Event: PayloadSubmitted"]
-  nSubmitPayload_3C7A5BA5["Event: SubmitPayload"] -->|consumed by| nSubmissionService_1C035A38
-  subgraph nReport_623174B2_domain["Domain: Report"]
-    nPayloadSubmitted_32B09A26
-    nSubmissionService_1C035A38
-    nSubmitPayload_3C7A5BA5
+nSubmissionService_8367A27["Service: Submission Service"]
+  nSubmissionService_8367A27 -->|produces| nPayloadSubmitted_2E346CAB["Event: PayloadSubmitted"]
+  nSubmitPayload_2F556666["Event: SubmitPayload"] -->|consumed by| nSubmissionService_8367A27
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPayloadSubmitted_2E346CAB
+    nSubmissionService_8367A27
+    nSubmitPayload_2F556666
   end</pre>
-            <div class="mermaid-actions no-print">
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>

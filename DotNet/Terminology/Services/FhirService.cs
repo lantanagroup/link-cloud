@@ -4,6 +4,7 @@ using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
+using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -182,7 +183,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             throw new KeyNotFoundException($"Code system not found with ID {id}");
         }
 
-        return codeGroup.Resource as CodeSystem;
+        var codeSystem = codeGroup.Resource as CodeSystem;
+        if(codeSystem != null && codeSystem.Content == CodeSystemContentMode.NotPresent && codeGroup.Codes.Values.Any(c => c.Count > 0))
+            codeSystem.Content = CodeSystemContentMode.Complete;
+
+        return codeSystem;
     }
 
     public Bundle GetCodeSystems(string? url, SummaryType? summary)
@@ -211,12 +216,20 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                 }
 
                 CodeSystem clone = (CodeSystem)codeGroup.Resource.DeepCopy();
+                if (clone.Content == CodeSystemContentMode.NotPresent && codeGroup.Codes.Values.Any(c => c.Count > 0))
+                    clone.Content = CodeSystemContentMode.Complete;
 
                 if (summary != SummaryType.True)
                 {
                     logger.LogDebug("Search performed without summary mode for code system {Url}", url.SanitizeAndRemove());
 
-                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
+                    // A CSV may list the same code more than once; emit each code once, keeping the
+                    // last occurrence's display so the read agrees with last-one-wins (LEGLINK-814).
+                    var lastByValue = codeGroup.Codes[codeGroup.Codes.Keys.First()]
+                        .GroupBy(c => c.Value)
+                        .Select(g => g.Last());
+
+                    foreach (var codeGroupCode in lastByValue)
                     {
                         clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
                         {
@@ -346,6 +359,19 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         var systemComponent = parameters?.Get("system").FirstOrDefault();
         var codeComponent = parameters?.Get("code").FirstOrDefault();
         var displayComponent = parameters?.Get("display").FirstOrDefault();
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
+
+        // Every client-supplied system is normalized here, ahead of the merges below and of the value set
+        // lookup. The merges treat an empty string as "not supplied", so a blank reaching them would be
+        // silently overwritten and never rejected; validating up front also keeps the answer for a
+        // malformed codeableConcept independent of which coding happens to match first (LEGLINK-888).
+        system = NormalizeSystem(system, "system");
+        var bodySystem = NormalizeSystem(systemComponent?.Value?.ToString(), "system");
+        var codingSystem = coding == null ? null : NormalizeSystem(coding.System, "coding.system");
+        var conceptSystems = (codeableConcept?.Coding ?? [])
+            .Select(conceptCoding => NormalizeSystem(conceptCoding.System, "codeableConcept.coding.system"))
+            .ToList();
 
         if (urlComponent?.Value != null && string.IsNullOrEmpty(url))
         {
@@ -359,14 +385,16 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
             url = codeGroup?.Url;
         }
+        else if (!string.IsNullOrEmpty(url))
+        {
+            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+        }
         else
         {
-            if (url == null)
-            {
-                return CreateValidationParameters(false, "url parameter is required");
-            }
-
-            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+            // A request that identifies no value set is malformed, not a failed validation. Throwing
+            // surfaces it as a 400 and matches ValidateCodeInCodeSystem; returning result=false here
+            // reported a well-formed "this code is invalid" answer to a question never asked (LEGLINK-887).
+            throw new ArgumentException("No id or url parameter specified");
         }
 
         if (codeGroup == null)
@@ -377,6 +405,13 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
         {
+            // A normalized system is either null or a real value, so "not supplied" is a null check.
+            // string.IsNullOrEmpty here would fold a blank back into the absent case (LEGLINK-888).
+            if (bodySystem != null && system == null)
+            {
+                system = bodySystem;
+            }
+
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
             {
                 display = displayComponent.Value.ToString();
@@ -388,9 +423,9 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         // Priority 2: Parameters.code and Parameters.system
         if (codeComponent?.Value != null)
         {
-            if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+            if (bodySystem != null && system == null)
             {
-                system = systemComponent.Value.ToString();
+                system = bodySystem;
             }
 
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
@@ -402,19 +437,17 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         // Priority 3: Parameters.coding
-        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
         if (coding != null)
         {
-            return ValidateCodeInCodeGroup(codeGroup, coding.Code, coding.System, coding.Display);
+            return ValidateCodeInCodeGroup(codeGroup, coding.Code, codingSystem, coding.Display);
         }
 
         // Priority 4: Parameters.codeableConcept
-        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
         if (codeableConcept?.Coding != null)
         {
-            foreach (var conceptCoding in codeableConcept.Coding)
+            foreach (var (conceptCoding, conceptSystem) in codeableConcept.Coding.Zip(conceptSystems))
             {
-                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, conceptCoding.System, conceptCoding.Display);
+                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, conceptSystem, conceptCoding.Display);
                 var resultBoolean = result.GetSingleValue<FhirBoolean>("result");
                 if (resultBoolean?.Value == true)
                 {
@@ -424,6 +457,65 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         return CreateValidationParameters(false, "No valid code found in parameters");
+    }
+
+    public Parameters LookupCodeInCodeSystem(string? url, string? id, string? system, string? code, string? version, Parameters? parameters)
+    {
+        var codeComponent = parameters?.Get("code").FirstOrDefault()?.Value?.ToString();
+        var systemComponent = parameters?.Get("system").FirstOrDefault()?.Value?.ToString();
+        var versionComponent = parameters?.Get("version").FirstOrDefault()?.Value?.ToString();
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+
+        code ??= codeComponent;
+        system ??= systemComponent;
+        version ??= versionComponent;
+
+        var hasCodeAndSystem = !string.IsNullOrWhiteSpace(code) && !string.IsNullOrWhiteSpace(system);
+        var hasCoding = coding != null;
+
+        if (hasCodeAndSystem == hasCoding)
+        {
+            throw new ArgumentException("Specify either code+system, or coding (in Parameters), but not both");
+        }
+
+        string codeToLookup;
+        string systemIdentifier;
+
+        if (hasCoding)
+        {
+            codeToLookup = coding!.Code;
+            systemIdentifier = coding.System;
+
+            if (string.IsNullOrWhiteSpace(codeToLookup) || string.IsNullOrWhiteSpace(systemIdentifier))
+            {
+                throw new ArgumentException("Parameters.coding must include both code and system");
+            }
+        }
+        else
+        {
+            codeToLookup = code!;
+            systemIdentifier = system!;
+        }
+
+        var codeGroup = ResolveCodeSystemForLookup(id, systemIdentifier, version);
+
+        if (!codeGroup.Codes.TryGetValue(systemIdentifier, out var codes))
+        {
+            throw new KeyNotFoundException($"Code system '{systemIdentifier}' was not found in the requested code system");
+        }
+
+        var matchedCode = codes.LastOrDefault(c => c.Value == codeToLookup);
+        if (matchedCode == null)
+        {
+            throw new KeyNotFoundException($"Code '{codeToLookup}' was not found in code system '{systemIdentifier}'");
+        }
+
+        var response = new Parameters();
+        response.Add("name", new FhirString(codeGroup.Name ?? string.Empty));
+        response.Add("version", new FhirString(codeGroup.Version ?? string.Empty));
+        response.Add("display", new FhirString(matchedCode.Display ?? string.Empty));
+
+        return response;
     }
 
     public CapabilityStatement GetMetaData()
@@ -446,6 +538,12 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                     Name = "validate-code",
                     Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-validate-code",
                     Documentation = "Validate a code in a code system"
+                },
+                new()
+                {
+                    Name = "lookup",
+                    Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
+                    Documentation = "Lookup a code in a code system"
                 }
             }
         };
@@ -547,11 +645,92 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         return parameters;
     }
 
+    /// <summary>
+    /// Placeholders a client produces by interpolating an unset variable into a request rather than
+    /// omitting the parameter — JavaScript renders null and undefined this way. They are accepted as
+    /// meaning "no system supplied".
+    /// </summary>
+    private static readonly string[] SystemPlaceholders = ["null", "undefined"];
+
+    /// <summary>
+    /// Validates and normalizes a client-supplied <c>system</c> for a ValueSet $validate-code request,
+    /// mapping it onto the two states the validator understands: a real system to look up, or null
+    /// meaning "search every system in the value set".
+    /// </summary>
+    /// <remarks>
+    /// An absent system is legitimate FHIR and keeps its search-all-systems meaning. A blank one is not:
+    /// no FHIR primitive may be an empty string, so the request is malformed and is rejected rather than
+    /// reinterpreted. Folding a blank into the absent case answered a broader question than the caller
+    /// asked and reported result=true without disclosing which system matched (LEGLINK-888).
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the value is present but blank, which the caller surfaces as a 400.
+    /// </exception>
+    private static string? NormalizeSystem(string? system, string parameterName)
+    {
+        if (system == null)
+        {
+            return null;
+        }
+
+        // FHIR requires at least one character of non-whitespace content, so "   " is as malformed as "".
+        // Checked before trimming, so a whitespace-only value is rejected rather than trimmed to empty.
+        if (string.IsNullOrWhiteSpace(system))
+        {
+            throw new ArgumentException($"The '{parameterName}' parameter cannot be blank");
+        }
+
+        // Surrounding whitespace is not significant, but the lookup in ValidateCodeInSystem is an exact
+        // dictionary match, so an untrimmed " http://x " reports "Code system not found" for a system
+        // that is present -- the same confidently-wrong answer to a malformed request this method exists
+        // to prevent. Trimming also lets a padded placeholder resolve to null.
+        var trimmed = system.Trim();
+
+        return SystemPlaceholders.Contains(trimmed, StringComparer.OrdinalIgnoreCase) ? null : trimmed;
+    }
+
     private Parameters ValidateCodeInCodeGroup(CodeGroup codeGroup, string code, string? system, string? display)
     {
+        // string.IsNullOrEmpty rather than a null check: this is shared with ValidateCodeInCodeSystem,
+        // which passes the code group's own Url here. That is cache content, not client input, so an
+        // empty one must keep falling back to a search rather than being blamed on the caller.
+        // ValueSet input reaching this point has already been through NormalizeSystem.
         return string.IsNullOrEmpty(system)
             ? ValidateCodeAcrossSystems(codeGroup, code, display)
             : ValidateCodeInSystem(codeGroup, code, system, display);
+    }
+
+    private CodeGroup ResolveCodeSystemForLookup(string? id, string system, string? version)
+    {
+        if (!string.IsNullOrEmpty(id))
+        {
+            var byId = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id, version);
+
+            if (byId == null)
+            {
+                if (!string.IsNullOrEmpty(version))
+                {
+                    throw new KeyNotFoundException($"Code system version '{version}' could not be found");
+                }
+
+                throw new KeyNotFoundException($"Code system with id '{id}' was not found");
+            }
+
+            return byId;
+        }
+
+        var bySystem = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, version);
+        if (bySystem == null || (!string.IsNullOrEmpty(version) && !string.Equals(bySystem.Version, version, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            if (!string.IsNullOrEmpty(version))
+            {
+                throw new KeyNotFoundException($"Code system version '{version}' could not be found");
+            }
+
+            throw new KeyNotFoundException($"Code system '{system}' was not found");
+        }
+
+        return bySystem;
     }
 
     /// <summary>
@@ -589,14 +768,17 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             }
         }
 
-        return CreateValidationParameters(false);
+        // Carry the same message as the single-system path. Omitting it left callers with a bare
+        // result=false — the Java validation support reads the "message" parameter to populate its
+        // CodeValidationResult, so the failure reached the report with no explanation (LEGLINK-886).
+        return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
     }
 
     /// <summary>
     /// Builds the validation result for a set of codes that share the requested value, applying the
     /// display check and surfacing an inactive-code warning when the matched code is inactive.
     /// </summary>
-    private Parameters BuildMatchResult(List<Application.Models.Code> matches, string? system, string? display)
+    private Parameters BuildMatchResult(List<Code> matches, string? system, string? display)
     {
         if (!string.IsNullOrEmpty(display) && matches.All(c => c.Display != display))
         {
@@ -608,34 +790,49 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             ? matches.Last(c => c.Display == display)
             : matches[matches.Count - 1];
 
-        var isActive = ResolveIsActive(codeObject, system);
+        var isActive = ResolveCodeStatus(codeObject, system) == CodeStatus.Active;
 
         return CreateValidationParameters(true, isActive: isActive);
     }
 
     /// <summary>
-    /// Determines whether a matched code is active. CodeSystem members carry their own status; ValueSet members
-    /// are plain codes with no status, so their status is rejoined from the CodeSystem identified by <paramref name="system"/>.
+    /// Resolves the effective status of a matched code. CodeSystem members carry their own status. ValueSet members
+    /// that carry a membership status (loaded as a <see cref="ValueSetCode"/>) are authoritative and override the
+    /// code system. ValueSet members with no membership status (plain <see cref="Application.Models.Code"/>) have
+    /// their status rejoined from the CodeSystem identified by <paramref name="system"/>.
     /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
     /// </summary>
-    private bool ResolveIsActive(Application.Models.Code codeObject, string? system)
+    /// <remarks>
+    /// Public so <c>ConfigController</c>'s cached-code lookups report the same status the corresponding
+    /// <c>$validate-code</c> call would. The two disagreeing about one code is what LEGLINK-889 was raised over,
+    /// so there is deliberately one implementation rather than two.
+    /// </remarks>
+    public CodeStatus ResolveCodeStatus(Code codeObject, string? system)
     {
         if (codeObject is CodeSystemCode codeSystemCode)
         {
-            return codeSystemCode.Status == CodeStatus.Active;
+            return codeSystemCode.Status;
+        }
+
+        // Value set membership status, when present, is authoritative and overrides the code system.
+        if (codeObject is ValueSetCode valueSetCode)
+        {
+            return valueSetCode.Status;
         }
 
         if (string.IsNullOrEmpty(system))
         {
-            return true;
+            return CodeStatus.Active;
         }
 
         var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
+        // When the CodeSystem lists the code more than once with differing status, the last
+        // occurrence wins (LEGLINK-599/814), matching BuildMatchResult's last-match selection.
         var match = codeSystemGroup?.Codes.Values
             .SelectMany(codes => codes)
             .OfType<CodeSystemCode>()
-            .FirstOrDefault(c => c.Value == codeObject.Value);
+            .LastOrDefault(c => c.Value == codeObject.Value);
 
-        return match == null || match.Status == CodeStatus.Active;
+        return match?.Status ?? CodeStatus.Active;
     }
 }

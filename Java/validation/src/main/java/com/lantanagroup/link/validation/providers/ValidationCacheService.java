@@ -5,16 +5,16 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+
 @Service
 public class ValidationCacheService {
     /**
      * Cache wrapper for RemoteTermServiceValidation.invokeRemoteValidateCode().
-     *
      * NOTE: This assumes `RemoteTermServiceValidation` is stateless for this call (safe to inject or pass).
      */
     @Cacheable(
             value = "validateCodeCache",
-            key = "T(java.util.Objects).hash(#codeSystem, #code, #display, #valueSetUrl)",
+            key = "#root.target.validateCodeCacheKey(#codeSystem, #code, #display, #valueSetUrl)",
             unless = "#result == null"
     )
     public IValidationSupport.CodeValidationResult cachedValidateCode(
@@ -25,6 +25,22 @@ public class ValidationCacheService {
             String valueSetUrl
     ) {
         return delegate.invokeRemoteValidateCode(codeSystem, code, display, valueSetUrl, (IBaseResource) null);
+    }
+
+    public String validateCodeCacheKey(
+            String codeSystem,
+            String code,
+            String display,
+            String valueSetUrl
+    ) {
+        return encodeKeyComponent(codeSystem)
+                + encodeKeyComponent(code)
+                + encodeKeyComponent(display)
+                + encodeKeyComponent(valueSetUrl);
+    }
+
+    private static String encodeKeyComponent(String value) {
+        return value == null ? "N;" : "V" + value.length() + ":" + value;
     }
 
     /**
@@ -45,5 +61,25 @@ public class ValidationCacheService {
     @Cacheable(value = "isValueSetSupportedCache", key = "#valueSetUrl")
     public boolean cachedIsValueSetSupported(RemoteTermServiceValidation delegate, String valueSetUrl) {
         return delegate.invokeIsValueSetSupported(valueSetUrl);
+    }
+
+    /**
+     * Cache wrapper for {@link RemoteTermServiceValidation#invokeLookupCode(String, String, String, String)}.
+     * Lookup results are stable for a given code/system/language/properties combination and are expensive
+     * network calls, so caching prevents redundant remote round-trips during validation.
+     */
+    @Cacheable(
+            value = "lookupCodeCache",
+            key = "#root.target.validateCodeCacheKey(#code, #system, #displayLanguage, #propertyNames)",
+            unless = "#result == null"
+    )
+    public IValidationSupport.LookupCodeResult cachedLookupCode(
+            RemoteTermServiceValidation delegate,
+            String code,
+            String system,
+            String displayLanguage,
+            String propertyNames
+    ) {
+        return delegate.invokeLookupCode(code, system, displayLanguage, propertyNames);
     }
 }

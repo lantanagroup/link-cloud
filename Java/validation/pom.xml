@@ -40,6 +40,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Embedded database for JPA slice tests (see CategoryInitializationJpaTest) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Caffeine Cache -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

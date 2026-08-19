@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -186,48 +495,82 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.json</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
-<h2 id="when-to-add-a-setting-to-app-config.json">When to Add a Setting to <code>/app-config.json</code> <a id="when-to-add-a-setting-to-app-config-json" href="#when-to-add-a-setting-to-app-config-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Developers MUST add a configuration key to <code>/app-config.json</code> if:</p>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.yaml</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
+<h2 id="when-to-add-a-setting-to-app-config-yaml" class="content-heading">When to Add a Setting to <code>/app-config.yaml</code> <a href="#when-to-add-a-setting-to-app-config-yaml" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.yaml"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Developers MUST add a configuration key to <code>/app-config.yaml</code> if:</p>
 <ol>
 <li><strong>The setting is required</strong> for the service to start or perform its core functions.</li>
 <li><strong>The setting is environment-specific</strong> (e.g., URLs, connection strings, API keys) and does not have a &quot;one-size-fits-all&quot; default.</li>
 <li><strong>The setting is an override</strong> of a default value that is expected to change in most production or production-like environments.</li>
 <li><strong>The setting is security-sensitive</strong> (e.g., Auth Authority, Secret Keys). Note: only the <em>key</em> and <em>description</em> are added; never the <em>value</em>.</li>
 </ol>
-<h2 id="when-to-exclude-a-setting">When to Exclude a Setting <a id="when-to-exclude-a-setting" href="#when-to-exclude-a-setting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Exclude a Setting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="when-to-exclude-a-setting" class="content-heading">When to Exclude a Setting <a href="#when-to-exclude-a-setting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Exclude a Setting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>It is acceptable to exclude a setting if:</p>
 <ol>
 <li><strong>It has a sufficient default value</strong> that is unlikely to require an override in any deployed environment (e.g., internal cache timeouts, logging levels).</li>
 <li><strong>The setting is strictly for local development</strong> and has no relevance in deployed environments.</li>
 </ol>
-<h2 id="integration-into-workflow">Integration into Workflow <a id="integration-into-workflow" href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="pull-requests-prs">Pull Requests (PRs) <a id="pull-requests-prs" href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="integration-into-workflow" class="content-heading">Integration into Workflow <a href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="pull-requests-prs" class="content-heading">Pull Requests (PRs) <a href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.json</code>.</li>
+<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.yaml</code>.</li>
 <li>PR reviewers should verify that the description for any new setting is clear and that no sensitive values or environment-specific defaults are included.</li>
-<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.json</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
+<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.yaml</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
 </ul>
-<h3 id="devops-release-notes">DevOps &amp; Release Notes <a id="devops-amp-release-notes" href="#devops-amp-release-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DevOps &amp;amp; Release Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="devops-release-notes" class="content-heading">DevOps &amp; Release Notes <a id="devops-amp-release-notes" href="#devops-amp-release-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DevOps &amp;amp; Release Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li><code>/app-config.json</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
-<li>Release notes should highlight changes to <code>/app-config.json</code> to ensure transparency across teams.</li>
+<li><code>/app-config.yaml</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
+<li>Release notes should highlight changes to <code>/app-config.yaml</code> to ensure transparency across teams.</li>
 </ul>
-<h2 id="file-format-and-schema">File Format and Schema <a id="file-format-and-schema" href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>The <code>/app-config.json</code> follows a structured schema:</p>
-<h3 id="global-array"><code>global</code> Array <a id="global-array" href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="file-format-and-schema" class="content-heading">File Format and Schema <a href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The <code>/app-config.yaml</code> follows a structured schema:</p>
+<h3 id="global-array" class="content-heading"><code>global</code> Array <a href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains settings shared across most or all services (e.g., Kafka connection, Database provider).</p>
-<h3 id="services-object"><code>services</code> Object <a id="services-object" href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="services-object" class="content-heading"><code>services</code> Object <a href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains service-specific settings, keyed by the service name.</p>
-<h3 id="configuration-entry-fields">Configuration Entry Fields: <a id="configuration-entry-fields" href="#configuration-entry-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Entry Fields:"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration-entry-fields" class="content-heading">Configuration Entry Fields: <a href="#configuration-entry-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Entry Fields:"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li><code>key</code>: The dot-delimited or colon-delimited path to the configuration setting as it appears in <code>appsettings.json</code> or environment variables.</li>
+<li><code>key</code>: The path to the configuration setting, in the notation of the runtime that reads it. See <a href="#key-notation-by-runtime">Key Notation by Runtime</a>.</li>
 <li><code>description</code>: A brief explanation of the setting's purpose and its impact on the system.</li>
-<li><code>required</code>: (Optional, default: true) A boolean indicating if the setting is strictly required for the service to function.</li>
+<li><code>required</code>: (Optional, default: true) <strong>A row for this key must exist in every environment store.</strong> This is narrower than "the service needs it to run": a setting with a working default in <code>appsettings.json</code> or <code>application.yml</code> should be <code>required: false</code> with that value recorded in <code>defaultValue</code>, because requiring it would mean provisioning one identical value into three stores. Reserve <code>required: true</code> for values that genuinely differ per environment, or that have no safe default. Enforced by <code>Scripts/AzureAppConfig/check_required_config.py</code>. Note that the schema default is documentation only &mdash; JSON Schema defaults are annotation and are never applied during validation, so entries should state <code>required</code> explicitly.</li>
+<li><code>label</code>: (Optional) The App Configuration label the entry is expected to carry.</li>
+<li><code>sensitive</code>: (Optional, default: false) Whether the setting holds a secret. A sensitive entry must never also set <code>defaultValue</code>; this is enforced.</li>
+<li><code>defaultValue</code>: (Optional) A default value, for settings that ship with a working fallback in <code>appsettings.json</code> or <code>application.yml</code>.</li>
+<li><code>runtime</code>: (Optional, <code>dotnet</code> or <code>java</code>) Overrides the runtime inferred from the owning service. Needed only for Java-notation keys listed under <code>global</code>, which has no owning service.</li>
+<li><code>consumers</code>: (Optional) The services that read this key, derived from the code inventory. Documentation only &mdash; it plays no part in resolution.</li>
 </ul>
-<h2 id="security-warning">Security Warning <a id="security-warning" href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.json</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
+<h3 id="servicemeta-object" class="content-heading"><code>serviceMeta</code> Object <a href="#servicemeta-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: serviceMeta Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Maps each service to two deployment facts: the App Configuration <code>label</code> the running service selects, and its <code>runtime</code>. Tooling reads this rather than hardcoding the mapping, so the label vocabulary lives in one place.</p>
+<p>Label values are compiled into the services and must match exactly, including case and spaces. In .NET they are constants passed to <code>AddExternalConfiguration()</code>; in Java they are the <code>label-filter</code> in <code>bootstrap.yml</code>. Three are not simply the service name: <code>AdminBFF</code> uses <code>LinkAdminBFF</code>, <code>AutomationUI</code> uses <code>Link Automation UI</code>, and <code>DataAcquisitionWorker</code> is a distinct label from <code>DataAcquisition</code>.</p>
+<h2 id="how-services-resolve-keys" class="content-heading">How Services Resolve Keys <a href="#how-services-resolve-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How Services Resolve Keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="label-resolution" class="content-heading">Label Resolution <a href="#label-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Label Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Every service selects <strong>unlabeled keys first, then its own label</strong>. Both sets merge into one flat dictionary keyed by name alone &mdash; the label is a filter, not part of the resulting key &mdash; so a labeled row <strong>overrides</strong> the unlabeled row of the same name, for that service only. Other services, which do not select that label, continue to see the unlabeled value.</p>
+<p>Two consequences follow, and they are asymmetric:</p>
+<ul>
+<li><strong>Adding a labeled row on top of an unlabeled one is safe.</strong> This is the existing pattern for <code>AutoMigrate</code>, the <code>CORS:*</code> family and the Serilog <code>component</code> label.</li>
+<li><strong>Moving a key from unlabeled to labeled is not.</strong> Deleting the unlabeled row breaks every service that does not select that exact label. Only do this when precisely one service consumes the key.</li>
+</ul>
+<p>Because labels are compiled in, a running service cannot be re-pointed at a different label without a redeploy.</p>
+<h3 id="key-notation-by-runtime" class="content-heading">Key Notation by Runtime <a href="#key-notation-by-runtime" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Notation by Runtime"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The two runtimes read different rows from the same store, in different notations. This is by design, not drift.</p>
+<ul>
+<li><strong>.NET</strong> reads colon-delimited rows such as <code>KafkaConnection:BootstrapServers:0</code>, matching <code>appsettings.json</code> section paths.</li>
+<li><strong>Java</strong> reads slash-prefixed rows such as <code>/spring/datasource/url</code>. The Spring Cloud Azure provider appends <code>*</code> to the configured <code>key-filter</code> of <code>/</code>, giving a server-side filter of <code>/*</code>; it then strips the leading slash and converts remaining slashes to dots. So <code>/spring/datasource/url</code> becomes the Spring property <code>spring.datasource.url</code>. The colon-delimited .NET rows are structurally invisible to Java services.</li>
+</ul>
+<p>The catalog records Java keys in the dotted Spring form (<code>spring.datasource.url</code>) while the store holds the slash form. These are two representations of one key; the transform between them is total and mechanical.</p>
+<p>Values whose <code>content_type</code> is <code>application/json</code> are <strong>flattened</strong> by both providers. A single row <code>/authentication</code> holding <code>{"anonymous": false, "authority": "..."}</code> therefore supplies the properties <code>authentication.anonymous</code> and <code>authentication.authority</code>. Key Vault references are resolved automatically in both runtimes.</p>
+<h3 id="precedence-over-environment-variables" class="content-heading">Precedence Over Environment Variables <a href="#precedence-over-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Precedence Over Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p><strong>A key present in App Configuration beats a container environment variable.</strong> This is the opposite of the usual expectation and is worth knowing before debugging a deployed service.</p>
+<ul>
+<li><strong>Java</strong>: the Spring Cloud bootstrap property source defaults to <code>overrideSystemProperties=true</code>, and nothing in this repository overrides it.</li>
+<li><strong>.NET</strong>: <code>AddAzureAppConfiguration</code> is called after the host builder has already registered the environment-variable source, so the App Configuration source is appended last and wins.</li>
+</ul>
+<p>Setting an environment variable on a pod will therefore be silently ignored for any key the store defines. Change the store instead.</p>
+<h3 id="java-enablement" class="content-heading">Java Enablement <a href="#java-enablement" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Java Enablement"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The checked-in <code>bootstrap.yml</code> for both Java services sets <code>spring.cloud.azure.appconfiguration.enabled: false</code>. That is the correct default for local and Docker runs, which take configuration from YAML and environment variables. <strong>Deployed environments set <code>SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED=true</code> on the pods</strong>, so App Configuration is live in dev, test and qa. The endpoint and credentials are likewise supplied at deploy time and do not appear in this repository.</p>
+<h2 id="security-warning" class="content-heading">Security Warning <a href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.yaml</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
 
         
     </div>
@@ -235,13 +578,27 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nappconfig_5D89486D["Design: Application Configuration Management Process"]</pre>
-            <div class="mermaid-actions no-print">
+nappconfig_1F4C6005["Design: Application Configuration Management Process"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>

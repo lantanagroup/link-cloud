@@ -316,7 +316,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
-            AddResourceToCache(log, resource);
+            await AddResourceToCacheAsync(log, resource, cancellationToken);
             cachedResources.Add(resource);
 
             // Extract and accumulate nested references from cached resources
@@ -534,15 +534,16 @@ public class ReferenceResourceService : IReferenceResourceService
         return pendingReferenceIdsAdded;
     }
 
-    private void AddResourceToCache(
+    private async Task AddResourceToCacheAsync(
         DataAcquisitionLogModel primaryLog,
-        Resource resource)
+        Resource resource,
+        CancellationToken cancellationToken)
     {
         if (resource is DomainResource domainResource
             && !string.IsNullOrWhiteSpace(resource.TypeName)
             && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+            await _resourceCache.UpdateCorrelationCacheAsync($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
         }
     }
 

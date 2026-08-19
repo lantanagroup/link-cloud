@@ -18,15 +18,15 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public bool IsDisabled { get; set; } = false;
         [DataMember]
         public string? FacilityId { get; set; }
-        public List<Guid>? VendorIds { get; set; }
-        public PutOperationModel(Guid? id, List<string> resourceTypes, IOperation operation, bool isDisabled, string? facilityId, List<Guid>? vendorIds)
+        public List<Guid>? VendorVersionIds { get; set; }
+        public PutOperationModel(Guid? id, List<string> resourceTypes, IOperation operation, bool isDisabled, string? facilityId, List<Guid>? vendorVersionIds)
         {
             Id = id;
             ResourceTypes = resourceTypes ?? new List<string>();
             Operation = operation;
             IsDisabled = isDisabled;
             FacilityId = facilityId;
-            VendorIds = vendorIds;
+            VendorVersionIds = vendorVersionIds;
 
             if ((this.Operation.OperationType == OperationType.CopyLocation ||
                 this.Operation.OperationType == OperationType.CopyLocationAliasToTypeIteratively) &&

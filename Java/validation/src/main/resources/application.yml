@@ -108,6 +108,7 @@ secret-management:
 authentication:
   anonymous: false
   authority: 'https://localhost:7004'
+  signing-key: ''
 
 link:
   info-route: /api/validation/info

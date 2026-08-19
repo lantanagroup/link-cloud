@@ -1,0 +1,331 @@
+openapi: 3.0.3
+
+info:
+  title: DMRP API
+  version: 0.3.0-provisional
+  description: |
+    ##########################################################################
+    # PROVISIONAL. THIS IS NOT THE PUBLISHED CONTRACT.
+    #
+    # DMRP (Digital Monthly Reporting Plan) is being developed by Leidos for
+    # CDC. The real endpoint is reachable only from the CDC Dev environment
+    # and no OpenAPI description has been published to LCG.
+    #
+    # This document is a best-effort reconstruction from what LCG knows, so
+    # that:
+    #   * the implementing service has a machine-readable source of truth, and
+    #   * replacing this file with the published contract turns every
+    #     difference into a C# compile error rather than a silent divergence.
+    #
+    # WHEN THE PUBLISHED CONTRACT ARRIVES: replace this file WHOLESALE,
+    # rebuild, and fix the resulting compile errors. Do not hand-merge. Do not
+    # add endpoints of our own to this file -- the service that implements this
+    # contract also hosts a separate support surface, which is deliberately
+    # absent here so that this document can be replaced without losing it.
+    #
+    # The parameter names and the response body below came from LCG's record
+    # of the real request and response. The status codes, the rejection of a
+    # malformed period, and the component identifiers MSC and PS did not.
+    ##########################################################################
+
+    ## Two reporting plans, two components
+
+    A reporting plan lists the NHSN modules a facility is enrolled to report.
+    There are two, and they differ in both subject and cadence:
+
+    | Operation      | Component | Subject          | Cadence |
+    |----------------|-----------|------------------|---------|
+    | `/msc`         | MSC       | Medicine reports | Monthly |
+    | `/ps/annual`   | PS        | Patient safety   | Annual  |
+
+    Both accept the same query parameters. `month` has no meaning for the
+    annual plan, whose entries carry no month, so it is accepted and ignored
+    there rather than narrowing the result to nothing.
+
+    ## Only nhsnorgid is required
+
+    Everything else narrows the result. Omitting `year` returns every year the
+    facility has entries for; omitting `month` returns every month; omitting
+    `name` returns every module. A caller that supplies only `nhsnorgid` gets
+    the facility's whole plan for that component.
+
+    `year` and `month` are strings on the wire, not integers.
+
+    ## Enrollment is expressed by presence, not by value
+
+    Both operations return only the modules a facility IS enrolled in. A module
+    that does not appear in the `plans` array means the facility is NOT
+    enrolled in it. There is no negative representation, and `reporting` is
+    only ever `Y` - so that field carries no information a caller can act on.
+
+    Consequently a facility enrolled in nothing returns `200` with an empty
+    `plans` array - not `204`, and not `404`. An empty plan is a
+    meaningful answer, not an absent resource.
+
+    ## The same value appears twice, with two types
+
+    `month` and `year` are NUMERIC on the root object and STRINGS inside
+    `plans`, and the facility is `orgid` (numeric) at the root but
+    `nhsnorgid` (string) inside `plans`. This stand-in reproduces that
+    faithfully. Normalising it would let a consumer write code that works here
+    and fails against the real endpoint, which is precisely what this service
+    exists to prevent.
+
+servers:
+  - url: http://localhost:6159
+    description: Local instance
+
+tags:
+  - name: Reporting Plans
+    description: Retrieval of a facility's reporting plan.
+
+paths:
+
+  /msc:
+    get:
+      tags: [Reporting Plans]
+      operationId: GetMonthlyMedicineReportingPlan
+      summary: Get a facility's monthly medicine reporting plan.
+      description: |
+        Returns the medicine-report modules the facility is enrolled to report,
+        narrowed by whichever of `name`, `year` and `month` are supplied.
+      security:
+        - dmrpBearer: []
+      parameters:
+        - $ref: '#/components/parameters/NhsnOrgId'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+      responses:
+        '200':
+          description: The reporting plan. `plans` may be empty.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /ps/annual:
+    get:
+      tags: [Reporting Plans]
+      operationId: GetPatientSafetyAnnualReportingPlan
+      summary: Get a facility's annual patient-safety reporting plan.
+      description: |
+        Returns the patient-safety modules the facility is enrolled to report,
+        narrowed by whichever of `name` and `year` are supplied.
+
+        This plan is annual. `month` is accepted for symmetry with the monthly
+        plan but does not narrow the result, and the response omits
+        `reportingMonth`.
+      security:
+        - dmrpBearer: []
+      parameters:
+        - $ref: '#/components/parameters/NhsnOrgId'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+      responses:
+        '200':
+          description: The reporting plan. `plans` may be empty.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+components:
+
+  parameters:
+
+    NhsnOrgId:
+      name: nhsnorgid
+      in: query
+      required: true
+      description: The Link Cloud facility identifier.
+      schema: { type: string, minLength: 1, maxLength: 120 }
+      example: '100'
+
+    Name:
+      name: name
+      in: query
+      required: false
+      description: |
+        The NHSN module, for example `HOB` or `HTCDI`. Not to be confused with
+        the dQM (ACH Monthly, Daily, and so on). Omit to return every module.
+      schema: { type: string, maxLength: 50 }
+      example: HOB
+
+    Year:
+      name: year
+      in: query
+      required: false
+      description: The year of the reporting period. Omit to return every year.
+      schema: { type: string, maxLength: 4 }
+      example: '2020'
+
+    Month:
+      name: month
+      in: query
+      required: false
+      description: |
+        The month of the reporting period, `1` to `12`. Omit to return every
+        month. Has no effect on the annual plan.
+      schema: { type: string, maxLength: 2 }
+      example: '2'
+
+  securitySchemes:
+    dmrpBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A bearer token issued by the reporting system's authorization server.
+
+  responses:
+    BadRequest:
+      description: The request failed validation.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    Unauthorized:
+      description: Missing, malformed or expired bearer token.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    Unavailable:
+      description: The API is not available in this environment.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    ReportingPlanResponse:
+      type: object
+      required: [plans]
+      description: |
+        NOTE THE TYPES. `month` and `year` are NUMERIC here and STRINGS inside
+        `plans`. That is how the real API behaves, and this stand-in reproduces
+        it deliberately rather than tidying it up -- a consumer that codes
+        against a cleaned-up shape here would break on first contact with the
+        real endpoint, which is the one failure this service exists to prevent.
+      properties:
+        psDMRptPlanID:
+          type: integer
+          format: int32
+          nullable: true
+          description: The reporting plan record's own identifier.
+          example: 1
+        orgid:
+          type: integer
+          format: int32
+          nullable: true
+          description: |
+            The facility, as a NUMBER. Equivalent to the Link Cloud facility
+            identifier. Null when the facility identifier is not numeric --
+            see `plans[].nhsnorgid`, which carries it as a string.
+          example: 100
+        year:
+          type: integer
+          format: int32
+          nullable: true
+          description: |
+            The year the result was narrowed to, echoed from the request. Null
+            when no year was supplied, in which case `plans` may span several
+            years. NUMERIC here, a string inside `plans`.
+          example: 2020
+        month:
+          type: integer
+          format: int32
+          nullable: true
+          description: |
+            The month the result was narrowed to, echoed from the request. Null
+            when no month was supplied, and always null on the annual plan.
+            NUMERIC here, a string inside `plans`.
+          example: 2
+        modifyDate:
+          type: string
+          nullable: true
+          description: |
+            When the plan was last changed. Note the format: a space separator
+            and no timezone, which is NOT RFC 3339. Typed as a plain string so
+            it is emitted exactly as the real API emits it rather than being
+            normalised to ISO 8601 by a date-time binding.
+          example: '2023-09-09 11:12:12.59'
+        createDate:
+          type: string
+          nullable: true
+          description: When the plan was created. Same format as `modifyDate`.
+          example: '2023-09-09 11:12:12.59'
+        plans:
+          type: array
+          description: |
+            Only modules the facility IS enrolled in appear here. Absence of a
+            module means the facility is NOT enrolled in it. There is no
+            negative representation. An empty array is a valid, meaningful
+            response.
+          items: { $ref: '#/components/schemas/ReportingPlanItem' }
+
+    ReportingPlanItem:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: |
+            The NHSN measure the facility is enrolled in. A consumer maps this
+            to the dQM Link Cloud reports patients against; that mapping is not
+            part of this API.
+          example: HOB
+        nhsnorgid:
+          type: string
+          nullable: true
+          description: The facility, as a STRING here. Numeric at the root as `orgid`.
+          example: '100'
+        month:
+          type: string
+          nullable: true
+          description: |
+            The entry's own reporting month, as a STRING. Numeric at the root.
+            Absent for an annual component, whose entries carry no month.
+          example: '2'
+        year:
+          type: string
+          nullable: true
+          description: The entry's own reporting year, as a STRING. Numeric at the root.
+          example: '2020'
+        reporting:
+          type: string
+          nullable: true
+          description: |
+            Only ever `Y`. Every entry returned is one the facility is enrolled
+            to report for the period, so this field carries no information a
+            caller can act on -- enrollment is conveyed by the entry's presence.
+          example: 'Y'
+        rptSeq:
+          type: integer
+          format: int32
+          nullable: true
+          description: Report sequence.
+          example: 0
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457 problem detail.
+      properties:
+        type: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        status: { type: integer, format: int32, nullable: true }
+        detail: { type: string, nullable: true }
+        instance: { type: string, nullable: true }
+        traceId: { type: string, nullable: true }
+      additionalProperties: true

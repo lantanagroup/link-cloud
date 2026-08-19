@@ -2,35 +2,51 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
     public class RedisResourceCache : IResourceCache
     {
-        private readonly IDatabase _db;
+        private readonly IRedisDatabase _redisDatabase;
         private readonly ILogger<RedisResourceCache> _logger;
+        private readonly TimeSpan _cacheEntryTtl;
 
-        public RedisResourceCache(IConnectionMultiplexer redis, ILogger<RedisResourceCache> logger)
+        public RedisResourceCache(
+            IRedisDatabase redisDatabase,
+            IOptions<ResourceCacheSettings> settings,
+            ILogger<RedisResourceCache> logger)
         {
-            _db = redis.GetDatabase();
+            _redisDatabase = redisDatabase;
             _logger = logger;
-        }
 
-        public void Delete(List<string> cacheKeys)
-        {
-            foreach (var cacheKey in cacheKeys)
+            var cacheEntryTtlDays = settings.Value.Redis.CacheEntryTtlDays;
+            if (cacheEntryTtlDays <= 0)
             {
-                _db.KeyDelete(cacheKey);
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:Redis:CacheEntryTtlDays must be greater than zero.");
             }
+
+            _cacheEntryTtl = TimeSpan.FromDays(cacheEntryTtlDays);
         }
 
-        public List<DomainResource> Get(string cacheKey)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            var hashEntries = _db.HashGetAll(cacheKey);
+            var database = _redisDatabase.Database;
+            await Task.WhenAll(cacheKeys.Select(cacheKey => database.KeyDeleteAsync(cacheKey))).WaitAsync(cancellationToken);
+        }
+
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var hashEntries = await _redisDatabase.Database.HashGetAllAsync(cacheKey).WaitAsync(cancellationToken);
 
             if (hashEntries == null || hashEntries.Length == 0) {
                 return new List<DomainResource>();
@@ -73,7 +89,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 
@@ -82,7 +98,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
             }
 
-            _db.HashSet(correlationId, correlationHash.ToArray());
+            await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
