@@ -12,13 +12,16 @@ namespace UnitTests.DMRP
     {
         private readonly Mock<ILogger<MeasureMappingManager>> _mockLogger;
         private readonly Mock<IEntityRepository<MeasureMapping>> _mockRepository;
+        private readonly Mock<IEntityRepository<FacilityReportingPlan>> _mockReportingPlanRepository;
         private readonly MeasureMappingManager _manager;
 
         public MeasureMappingManagerTests()
         {
             _mockLogger = new Mock<ILogger<MeasureMappingManager>>();
             _mockRepository = new Mock<IEntityRepository<MeasureMapping>>();
-            _manager = new MeasureMappingManager(_mockLogger.Object, _mockRepository.Object);
+            _mockReportingPlanRepository = new Mock<IEntityRepository<FacilityReportingPlan>>();
+            _manager = new MeasureMappingManager(_mockLogger.Object, _mockRepository.Object,
+                _mockReportingPlanRepository.Object);
         }
 
         [Fact]

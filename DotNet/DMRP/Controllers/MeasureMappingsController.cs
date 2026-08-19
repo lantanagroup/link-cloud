@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
+using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -281,15 +282,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <param name="id">The mapping to delete.</param>
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="204">The mapping was deleted.</response>
-        /// <response code="404">
-        /// No measure mapping has that Id — or the delete was refused because reporting plans still
-        /// reference it. The manager reports both as the same failure, so read the message: a refused
-        /// delete says the mapping "failed to delete" rather than that it was not found.
+        /// <response code="404">No measure mapping has that Id.</response>
+        /// <response code="409">
+        /// The mapping exists but is referenced by one or more facility reporting plans, so the
+        /// database refused to remove it. Delete those reporting plans first.
         /// </response>
         /// <response code="500">The measure mapping could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMeasureMapping(string id, CancellationToken cancellationToken)
         {
@@ -298,6 +301,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
             try
             {
                 await _manager.DeleteAsync(id, cancellationToken);
+            }
+            catch (MeasureMappingInUseException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (ApplicationException ex)
             {
@@ -322,10 +329,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// </remarks>
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="204">The mappings were deleted. Deleting an empty table also succeeds.</response>
-        /// <response code="500">
-        /// The mappings could not be deleted, including when reporting plans still reference them.
+        /// <response code="409">
+        /// One or more mappings are referenced by facility reporting plans, so the database refused
+        /// to remove them. Nothing was deleted. Delete the reporting plans first.
         /// </response>
+        /// <response code="500">The mappings could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpDelete]
@@ -334,6 +344,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
             try
             {
                 await _manager.DeleteAllAsync(cancellationToken);
+            }
+            catch (MeasureMappingInUseException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (Exception ex)
             {
