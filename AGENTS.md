@@ -30,7 +30,13 @@ This system is a high-performing, big-data platform intended to support collecti
     - Use UUIDs for sensitive identifiers to reduce enumeration risk.
 - **Search/List endpoints**
     - Return 200 with a paged model (`records` + `metadata`).
-    - Return 204 if no results.
+    - Return 200 with an empty `records` array when nothing matches — a search that matches nothing
+      is still a successful search. Do not return 204: it discards the `metadata` clients need to
+      render paging, and forces every caller to special-case an absent body (Angular's `HttpClient`
+      surfaces it as a `null` body, silently violating the declared response type).
+    - Reserve 404 for a single resource fetched by id that does not exist.
+    - Older endpoints predating this rule may still return 204 on empty; bring them in line when you
+      are already changing them, not as a drive-by.
 - **DELETE**
     - Return 204 on successful removal.
 - Prefer **typed HttpClient clients with HttpClientFactory**; enable **header propagation** (e.g., `Authorization`).

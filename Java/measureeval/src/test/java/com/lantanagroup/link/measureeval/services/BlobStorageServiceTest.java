@@ -1,6 +1,11 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
@@ -8,12 +13,16 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.services.ReportClient;
+import org.hl7.fhir.r4.model.Condition;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Reference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -140,6 +149,99 @@ class BlobStorageServiceTest {
         assertTrue(content.contains("\"reference\":\"Patient/patient-A\""));
         // Check if MeasureReport ID line is present
         assertTrue(content.contains("MeasureReport/mr1"));
+    }
+
+    @Test
+    void testStorePatientInBlobStorageWithDuplicateIdPartAcrossTypes() {
+        PatientReportingEvaluationStatus status = new PatientReportingEvaluationStatus();
+        status.setPatientId("patient1");
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportTrackingId("track1");
+        report.setReportType("type1");
+        status.setReports(List.of(report));
+
+        ReportScheduleModel schedule = new ReportScheduleModel();
+        schedule.setPayloadRootUri("https://storage.com/test-container/root/");
+        when(reportClient.getReportSchedule("track1")).thenReturn(schedule);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("mr1");
+
+        // Two contained resources of different types sharing the same ID part.
+        // Previously this threw IllegalStateException from Collectors.toMap.
+        Condition condition = new Condition();
+        condition.setId("#LCR-A");
+        measureReport.addContained(condition);
+
+        Observation observation = new Observation();
+        observation.setId("#LCR-A");
+        measureReport.addContained(observation);
+
+        blobStorageService.storePatientInBlobStorage(status, report, measureReport);
+
+        ArgumentCaptor<BinaryData> contentCaptor = ArgumentCaptor.forClass(BinaryData.class);
+        verify(blobClient).upload(contentCaptor.capture(), eq(true));
+        String content = contentCaptor.getValue().toString();
+
+        assertTrue(content.contains("Condition/A"));
+        assertTrue(content.contains("Observation/A"));
+    }
+
+    @Test
+    void testStorePatientInBlobStorageWithAmbiguousUntypedReferenceIsSkippedAndLogged() {
+        Logger blobStorageServiceLogger =
+                (Logger) LoggerFactory.getLogger(BlobStorageService.class);
+        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+        logAppender.setContext((LoggerContext) LoggerFactory.getILoggerFactory());
+        logAppender.start();
+        blobStorageServiceLogger.addAppender(logAppender);
+
+        try {
+            PatientReportingEvaluationStatus status = new PatientReportingEvaluationStatus();
+            status.setPatientId("patient1");
+            PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+            report.setReportTrackingId("track1");
+            report.setReportType("type1");
+            status.setReports(List.of(report));
+
+            ReportScheduleModel schedule = new ReportScheduleModel();
+            schedule.setPayloadRootUri("https://storage.com/test-container/root/");
+            when(reportClient.getReportSchedule("track1")).thenReturn(schedule);
+
+            MeasureReport measureReport = new MeasureReport();
+            measureReport.setId("mr1");
+
+            Condition condition = new Condition();
+            condition.setId("#LCR-A");
+            measureReport.addContained(condition);
+
+            Observation observation = new Observation();
+            observation.setId("#LCR-A");
+            measureReport.addContained(observation);
+
+            // Untyped contained reference to the ambiguous ID part - cannot be resolved deterministically.
+            measureReport.setSubject(new Reference("#LCR-A"));
+
+            blobStorageService.storePatientInBlobStorage(status, report, measureReport);
+
+            ArgumentCaptor<BinaryData> contentCaptor = ArgumentCaptor.forClass(BinaryData.class);
+            verify(blobClient).upload(contentCaptor.capture(), eq(true));
+            String content = contentCaptor.getValue().toString();
+
+            // First line is the "MeasureReport/<id>" marker, second is the MeasureReport JSON itself.
+            String measureReportJson = content.split("\n")[1];
+            MeasureReport parsed = fhirContext.newJsonParser().parseResource(MeasureReport.class, measureReportJson);
+
+            // The ambiguous reference is left unresolved rather than guessing which resource it means.
+            assertEquals("#LCR-A", parsed.getSubject().getReference());
+
+            boolean warningLogged = logAppender.list.stream()
+                    .anyMatch(event -> event.getLevel() == Level.WARN
+                            && event.getFormattedMessage().contains("LCR-A"));
+            assertTrue(warningLogged, "Expected a warning to be logged for the ambiguous contained reference");
+        } finally {
+            blobStorageServiceLogger.detachAppender(logAppender);
+        }
     }
 
     @Test

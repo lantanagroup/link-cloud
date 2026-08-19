@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -185,32 +494,30 @@
 <h1>Data Acquisition Service</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produces:</strong> <a href="event-resourceacquired.html">Resource Acquired [event]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-readytoacquire.html">Ready to Acquire [event]</a>, <a href="event-patientcensusscheduled.html">Patient Census Scheduled [event]</a></div>
-        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <div class="mb-3"><strong>Produces:</strong> <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-patientcensusscheduled.html">Patient Census Scheduled [event]</a>, <a href="command-dataacquisitionrequested.html">Data Acquisition Requested [command]</a></div>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Data Acquisition service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the Epic FHIR STU3 Patient List resource to inform which patients are currently admitted in the facility. While this is the current solution to acquiring the patient census, there are other means of patient acquisition being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.</p>
 <p>In addition to FHIR endpoints, the service supports <strong>SFTP-based acquisition</strong> for tenants that drop extract files (e.g., Cerner CCL pipe-delimited extracts) onto a remote SFTP server rather than exposing a queryable FHIR API. See <a href="#sftp-data-acquisition">SFTP Data Acquisition</a> below.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
-  nDataAcquisitionService_4CBC2504 -->|produces| nResourceAcquired_B18E97B["Event: ResourceAcquired"]
-  nReadyToAcquire_37BFEA79["Event: ReadyToAcquire"] -->|consumed by| nDataAcquisitionService_4CBC2504
-  nPatientCensusScheduled_29F77A9B["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_4CBC2504
-  nDataAcquisitionService_4CBC2504 -->|provides| nGetFacilityConfig_487F50A0["Query: GetFacilityConfig"]
-  nDataAcquisitionService_4CBC2504 -->|provides| nGetServiceInfo_77B82099["Query: GetServiceInfo"]
-  subgraph nDataAccess_3BCC4CFC_domain["Domain: Data Access"]
-    nDataAcquisitionService_4CBC2504
-    nReadyToAcquire_37BFEA79
-    nResourceAcquired_B18E97B
+nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_3BF82DDB
+  nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_3BF82DDB
+  nDataAcquisitionService_3BF82DDB -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
+  nDataAcquisitionService_3BF82DDB -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_4BBEB8F8
+    nDataAcquisitionService_3BF82DDB
   end
-  subgraph nReport_623174B2_domain["Domain: Report"]
-    nPatientCensusScheduled_29F77A9B
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPatientCensusScheduled_2383C0C6
   end
-  subgraph nTenant_1ABB3779_domain["Domain: Tenant"]
-    nGetFacilityConfig_487F50A0
-    nGetServiceInfo_77B82099
+  subgraph nTenant_379CD514_domain["Domain: Tenant"]
+    nGetFacilityConfig_32C58A79
+    nGetServiceInfo_13F02E06
   end
 </pre></div>
-<h2 id="common-configurations">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -224,9 +531,9 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#data-acquisition-service-configuration">Data Acquisition Service Configuration</a></li>
 <li><a href="#sftp-acquisition-settings">SFTP Acquisition Settings</a></li>
 </ul>
-<h2 id="features-and-functionality">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p><strong>Data Acquisition</strong> is a crucial step in the report generation pipeline, responsible for obtaining clinical data from external systems, such as FHIR R4 endpoints within electronic health record (EHR) systems. By systematically acquiring and managing data, it ensures that downstream processes like evaluation and reporting are equipped with the necessary information.</p>
-<h3 id="key-roles-of-data-acquisition">Key Roles of Data Acquisition <a id="key-roles-of-data-acquisition" href="#key-roles-of-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Roles of Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="key-roles-of-data-acquisition" class="content-heading">Key Roles of Data Acquisition <a id="key-roles-of-data-acquisition" href="#key-roles-of-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Roles of Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>Census Acquisition</strong>:</li>
 </ol>
@@ -247,7 +554,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <ul>
 <li>Retrieves additional data elements that may not be needed for initial evaluations but are desirable for complete submission and reporting.</li>
 </ul>
-<h3 id="where-data-acquisition-fits-in-the-pipeline">Where Data Acquisition Fits in the Pipeline <a id="where-data-acquisition-fits-in-the-pipeline" href="#where-data-acquisition-fits-in-the-pipeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where Data Acquisition Fits in the Pipeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="where-data-acquisition-fits-in-the-pipeline" class="content-heading">Where Data Acquisition Fits in the Pipeline <a id="where-data-acquisition-fits-in-the-pipeline" href="#where-data-acquisition-fits-in-the-pipeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where Data Acquisition Fits in the Pipeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data acquisition plays a role in three distinct stages of the report generation pipeline:</p>
 <ol>
 <li><strong>Patient Identification</strong>:</li>
@@ -269,7 +576,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li>Acquiring additional, non-essential data to enrich the submission.</li>
 <li>Completes the dataset for comprehensive evaluation and reporting.</li>
 </ul>
-<h3 id="progressive-querying">Progressive Querying <a id="progressive-querying" href="#progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="progressive-querying" class="content-heading">Progressive Querying <a id="progressive-querying" href="#progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>To optimize data acquisition, the system employs a technique called <strong>Progressive Querying</strong>.</p>
 <p>During progressive querying, data is acquired in stages to meet the evaluation pipeline's needs. It flows between services via Kafka topics/events, starting from <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a> to normalization, through initial evaluation to determine patient relevance, and back to acquire supplemental data, which is then normalized and re-evaluated.</p>
 <p>This method minimizes the data retrieved from the EHR by acquiring only what is necessary at each stage of the pipeline:</p>
@@ -278,13 +585,13 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li><strong>Supplemental Querying</strong>: Retrieves additional data elements after initial evaluations confirm patient relevance.</li>
 <li><strong>Final Evaluation</strong>: Combines initial and supplemental data for comprehensive measure evaluation and reporting.</li>
 </ol>
-<h4 id="benefits-of-progressive-querying">Benefits of Progressive Querying <a id="benefits-of-progressive-querying" href="#benefits-of-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits of Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="benefits-of-progressive-querying" class="content-heading">Benefits of Progressive Querying <a id="benefits-of-progressive-querying" href="#benefits-of-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits of Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li><strong>Efficiency</strong>: Reduces the volume of data retrieved from the EHR, optimizing system performance.</li>
 <li><strong>Precision</strong>: Focuses on acquiring only data that is needed for specific stages in the pipeline.</li>
 <li><strong>Scalability</strong>: Supports large-scale operations by limiting unnecessary data transfers.</li>
 </ul>
-<h3 id="bulk-fhir-in-data-acquisition">Bulk FHIR in Data Acquisition <a id="bulk-fhir-in-data-acquisition" href="#bulk-fhir-in-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Bulk FHIR in Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="bulk-fhir-in-data-acquisition" class="content-heading">Bulk FHIR in Data Acquisition <a id="bulk-fhir-in-data-acquisition" href="#bulk-fhir-in-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Bulk FHIR in Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Bulk FHIR</strong> is a mechanism under exploration for acquiring data efficiently. However, several limitations impact its general use in data acquisition workflows:</p>
 <ol>
 <li><strong>Challenges with Bulk FHIR</strong>:</li>
@@ -303,7 +610,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li>It can acquire &quot;Patient&quot; resources for a group of patients associated with a query, filter, or registry in the EHR.</li>
 <li>This use case is limited to identifying patients of interest and does not address broader data acquisition.</li>
 </ul>
-<h3 id="configuration-for-data-acquisition">Configuration for Data Acquisition <a id="configuration-for-data-acquisition" href="#configuration-for-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration for Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration-for-data-acquisition" class="content-heading">Configuration for Data Acquisition <a id="configuration-for-data-acquisition" href="#configuration-for-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration for Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data acquisition is configurable per tenant, ensuring flexibility to accommodate diverse EHR systems and data requirements. Key configurable parameters include:</p>
 <ul>
 <li><p><strong>Base FHIR URL</strong>:</p>
@@ -367,7 +674,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 </ul>
 </li>
 </ul>
-<h3 id="configuring-query-plans">Configuring Query Plans <a id="configuring-query-plans" href="#configuring-query-plans" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Query Plans"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuring-query-plans" class="content-heading">Configuring Query Plans <a id="configuring-query-plans" href="#configuring-query-plans" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Query Plans"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Types of query plans:</strong></p>
 <ul>
 <li>Daily</li>
@@ -518,12 +825,12 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
   }
 }
 </code></pre>
-<h4 id="configuring-census-and-data-sources">Configuring Census and Data Sources <a id="configuring-census-and-data-sources" href="#configuring-census-and-data-sources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Census and Data Sources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="configuring-census-and-data-sources" class="content-heading">Configuring Census and Data Sources <a id="configuring-census-and-data-sources" href="#configuring-census-and-data-sources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Census and Data Sources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Data sources (where the FHIR server is located and how to authenticate) are configured via &quot;Query Configs&quot;. There is currently no association between a query <em>plan</em> and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the &quot;Query Config&quot;, for the specified facility/tenant.</p>
 <p>TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.</p>
-<h3 id="query-plans-and-acquisition-logs">Query Plans and Acquisition Logs <a id="query-plans-and-acquisition-logs" href="#query-plans-and-acquisition-logs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plans and Acquisition Logs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="query-plans-and-acquisition-logs" class="content-heading">Query Plans and Acquisition Logs <a id="query-plans-and-acquisition-logs" href="#query-plans-and-acquisition-logs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plans and Acquisition Logs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Data Acquisition Service uses <strong>Query Plans</strong> to define the strategy for retrieving data. These plans are translated into <strong>Data Acquisition Logs</strong>, which represent discrete units of work to be executed by the worker service.</p>
-<h4 id="acquisition-log-lifecycle">Acquisition Log Lifecycle <a id="acquisition-log-lifecycle" href="#acquisition-log-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Log Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="acquisition-log-lifecycle" class="content-heading">Acquisition Log Lifecycle <a id="acquisition-log-lifecycle" href="#acquisition-log-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Log Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each acquisition task follows a strictly managed state machine:</p>
 <ol>
 <li><strong>Scheduled</strong>: The log entry is created but not yet ready for execution. This usually happens when a <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> event is received.</li>
@@ -533,21 +840,21 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li><strong>Completed</strong>: All resources for the log have been successfully acquired and normalized.</li>
 <li><strong>Failed</strong>: An error occurred during acquisition that exceeded the maximum retry attempts.</li>
 </ol>
-<h4 id="log-creation-process">Log Creation Process <a id="log-creation-process" href="#log-creation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Creation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="log-creation-process" class="content-heading">Log Creation Process <a id="log-creation-process" href="#log-creation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Creation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>When a <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> event is received, the service:</p>
 <ol>
 <li>Retrieves the appropriate <strong>Query Plan</strong> for the facility and report type.</li>
 <li>Identifies the target patients (either from the event itself or by creating a <strong>Census</strong> log).</li>
 <li>Generates a set of <code>DataAcquisitionLog</code> entries for each required resource type and patient, assigned to the <strong>Initial</strong> phase.</li>
 </ol>
-<h4 id="execution-and-dependency-management">Execution and Dependency Management <a id="execution-and-dependency-management" href="#execution-and-dependency-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Execution and Dependency Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="execution-and-dependency-management" class="content-heading">Execution and Dependency Management <a id="execution-and-dependency-management" href="#execution-and-dependency-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Execution and Dependency Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The system determines when a log should be executed based on its <code>Status</code> and <code>QueryPhase</code>:</p>
 <ul>
 <li><strong>Phase-Based Execution</strong>: Logs are typically executed in phases. <strong>Initial</strong> phase logs are created first. Once initial data is acquired and evaluated by downstream services, they may trigger <strong>Supplemental</strong> acquisition by sending new <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> events with a supplemental phase flag.</li>
 <li><strong>Wait Logic</strong>: Supplemental logs are not created until the initial evaluation confirms the patient's relevance to the report. This prevents unnecessary data retrieval for patients who do not meet the report's criteria.</li>
 <li><strong>Retry Mechanism</strong>: If a log fails due to transient issues (e.g., network timeout), it is incremented and returned to a <code>Pending</code> or <code>Scheduled</code> state for retry, up to a maximum of 5 attempts.</li>
 </ul>
-<h4 id="query-plan-structure">Query Plan Structure <a id="query-plan-structure" href="#query-plan-structure" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan Structure"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="query-plan-structure" class="content-heading">Query Plan Structure <a id="query-plan-structure" href="#query-plan-structure" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan Structure"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>A Query Plan relates to logs by defining the &quot;blueprint&quot; for their creation:</p>
 <ul>
 <li><strong>ResourceType</strong>: The FHIR resource to be queried (e.g., Patient, Encounter, Observation).</li>
@@ -560,13 +867,13 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 <li><strong>QueryPhase</strong>: Categorizes the query into <code>Initial</code> or <code>Supplemental</code>.</li>
 </ul>
 <p>For more details on how these logs are processed, see the <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a>.</p>
-<h3 id="tail-messages">Tail Messages <a id="tail-messages" href="#tail-messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="tail-messages" class="content-heading">Tail Messages <a id="tail-messages" href="#tail-messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data Acquisition emits a tail <a href="event-resourceacquired.html">Resource Acquired</a> event for each <code>(patientId, reportTrackingId, queryType)</code> tuple when all resources for the phase are produced. This tail sets <code>acquisitionComplete = true</code> and signals downstream services to proceed. See:</p>
 <ul>
 <li>Events → <a href="event-resourceacquired.html">Resource Acquired</a></li>
 <li>Docs → <a href="docs/development/patterns/tail_messages">Tail Messages: Patient Completion Signals</a></li>
 </ul>
-<h2 id="fhir-list-acquisition">FHIR List Acquisition <a id="fhir-list-acquisition" href="#fhir-list-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIR List Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="fhir-list-acquisition" class="content-heading">FHIR List Acquisition <a id="fhir-list-acquisition" href="#fhir-list-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIR List Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Epic EHR deployments will have FHIR Lists available for Link to track recently admitted and discharged patients within a facility. Currently, there are six separate FHIR List Id's that track the time difference since the patient was admitted:</p>
 <table>
 <thead>
@@ -602,7 +909,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h3 id="list-acquisition-processing-sequence">List Acquisition Processing Sequence <a id="list-acquisition-processing-sequence" href="#list-acquisition-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: List Acquisition Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="list-acquisition-processing-sequence" class="content-heading">List Acquisition Processing Sequence <a id="list-acquisition-processing-sequence" href="#list-acquisition-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: List Acquisition Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following demonstrates the workflow when the Data Acquisition service consumes a <code>PatientCensusScheduled</code> event for an Epic EHR facility:</p>
 <pre class="mermaid">sequenceDiagram
     participant CS as Census Service
@@ -627,10 +934,10 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
     CS->>SQL: Insert into Materialized View Store
     CS->>K: Produce PatientEvent (if patient is discharged)
 </pre>
-<h2 id="sftp-data-acquisition">SFTP Data Acquisition <a id="sftp-data-acquisition" href="#sftp-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="sftp-data-acquisition" class="content-heading">SFTP Data Acquisition <a id="sftp-data-acquisition" href="#sftp-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Some EHR deployments (notably Cerner via CCL extracts) cannot expose a queryable FHIR endpoint for census or resource acquisition. For these tenants, Data Acquisition supports pulling extract files from a per-facility SFTP server, parsing them into Link's domain model, and emitting Kafka events that drive the rest of the report generation pipeline.</p>
 <p>SFTP acquisition is implemented as an independent acquisition channel from FHIR querying. It does not consume <code>DataAcquisitionRequested</code> or produce <code>ReadyToAcquire</code> — instead, a background worker polls the <code>SftpAcquisitionLog</code> table on a fixed interval, opens an SFTP session per facility, and dispatches files to a processor selected by the log's <code>AcquisitionType</code> and <code>SubType</code>.</p>
-<h3 id="when-to-use-sftp-acquisition">When to Use SFTP Acquisition <a id="when-to-use-sftp-acquisition" href="#when-to-use-sftp-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Use SFTP Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="when-to-use-sftp-acquisition" class="content-heading">When to Use SFTP Acquisition <a id="when-to-use-sftp-acquisition" href="#when-to-use-sftp-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Use SFTP Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -653,7 +960,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h3 id="architecture">Architecture <a id="architecture" href="#architecture" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="architecture" class="content-heading">Architecture <a id="architecture" href="#architecture" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre class="mermaid">flowchart LR
     subgraph Tenant["Tenant Environment"]
         EHR[(EHR /&lt;br/>Extract Job)]
@@ -690,7 +997,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
     Proc -->|update status &amp; benchmarks| Log
     Kafka --> Census
 </pre>
-<h3 id="acquisition-lifecycle">Acquisition Lifecycle <a id="acquisition-lifecycle" href="#acquisition-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="acquisition-lifecycle" class="content-heading">Acquisition Lifecycle <a id="acquisition-lifecycle" href="#acquisition-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Each <code>SftpAcquisitionLog</code> follows its own state machine, distinct from the FHIR <code>DataAcquisitionLog</code> lifecycle described above.</p>
 <pre class="mermaid">stateDiagram-v2
     [*] --> Pending : Census schedule creates log
@@ -706,7 +1013,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
     MaxRetriesReached --> [*]
 </pre>
 <p>Retries use exponential backoff between <code>BaseRetryDelaySeconds</code> and <code>MaxRetryDelaySeconds</code> (e.g., 60s, 120s, 240s, 480s, ... capped at 3600s). The log's <code>RetryAttempts</code> field is incremented on each transition through <code>Failed</code>; once it exceeds <code>MaxRetryAttempts</code>, the log is parked in <code>MaxRetriesReached</code> and excluded from future polls.</p>
-<h3 id="per-file-processing-sequence">Per-File Processing Sequence <a id="per-file-processing-sequence" href="#per-file-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-File Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="per-file-processing-sequence" class="content-heading">Per-File Processing Sequence <a id="per-file-processing-sequence" href="#per-file-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-File Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre class="mermaid">sequenceDiagram
     participant W as SftpAcquisitionService
     participant H as SftpAcquisitionHandler
@@ -747,9 +1054,9 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
         end
     end
 </pre>
-<h3 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>SFTP acquisition is configured at three layers: <strong>service-wide settings</strong>, <strong>per-facility connection / acquisition definitions</strong>, and <strong>secret-managed credentials</strong>.</p>
-<h4 id="sftp-acquisition-settings">SFTP Acquisition Settings <a id="sftp-acquisition-settings" href="#sftp-acquisition-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Acquisition Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="sftp-acquisition-settings" class="content-heading">SFTP Acquisition Settings <a id="sftp-acquisition-settings" href="#sftp-acquisition-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Acquisition Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Worker-level tuning, sourced from the <code>SftpAcquisition</code> configuration section in <code>appsettings.json</code> / Azure App Configuration. These apply to the <code>SftpAcquisitionService</code> background host.</p>
 <table>
 <thead>
@@ -833,7 +1140,7 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 }
 </code></pre>
 <p>A separate <code>SftpValidation</code> section (bound to <code>SftpValidationSettings</code>) holds validation rules applied to incoming <code>SftpConfiguration</code> payloads via the configuration API.</p>
-<h4 id="per-facility-sftp-configuration">Per-Facility SFTP Configuration <a id="per-facility-sftp-configuration" href="#per-facility-sftp-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-Facility SFTP Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="per-facility-sftp-configuration" class="content-heading">Per-Facility SFTP Configuration <a id="per-facility-sftp-configuration" href="#per-facility-sftp-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-Facility SFTP Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each facility that uses SFTP acquisition has exactly one <code>SftpConfiguration</code> row, managed via the <code>/api/data/sftp-configurations</code> endpoints on the Data Acquisition service. This describes <strong>how to connect</strong> to the tenant's SFTP server and <strong>what files to look for</strong>.</p>
 <table>
 <thead>
@@ -959,22 +1266,22 @@ nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h4 id="credentials">Credentials <a id="credentials" href="#credentials" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Credentials"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="credentials" class="content-heading">Credentials <a id="credentials" href="#credentials" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Credentials"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>SFTP credentials are <strong>never stored on the <code>SftpConfiguration</code> row</strong>. They are persisted via the <code>ISecretManager</code> interface in whichever backend the deployment is configured to use, under the key:</p>
 <pre><code>sftp-credentials-{organizationId}
 </code></pre>
 <p>The payload is an <code>SftpCredentialsModel</code> (<code>Username</code>, <code>Password</code>). The configuration API exposes endpoints to set, retrieve status (without revealing the password), and delete credentials independently of the connection metadata.</p>
-<h4 id="connection-test">Connection Test <a id="connection-test" href="#connection-test" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Connection Test"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="connection-test" class="content-heading">Connection Test <a id="connection-test" href="#connection-test" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Connection Test"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>A dedicated test endpoint (<code>/api/data/sftp-configurations/{facilityId}/test</code>) opens a live SFTP session using the saved configuration and credentials, lists the configured <code>RemoteDirectory</code>, and reports success or the underlying error. Use this when onboarding a tenant or after rotating credentials.</p>
-<h3 id="kafka-events">Kafka Events <a id="kafka-events" href="#kafka-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="kafka-events" class="content-heading">Kafka Events <a id="kafka-events" href="#kafka-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>SFTP acquisition emits events on a separate topic from FHIR acquisition. The current processor produces:</p>
 <ul>
 <li><strong><code>CernerPatientsAcquired</code></strong> — published by <code>CernerCCLExtractProcessor</code> once per successfully parsed census file. Consumed by the Census service's <code>CernerPatientsAcquiredListener</code>, which translates encounters into <code>PatientEvent</code> admit/discharge messages that feed the standard census workflow.</li>
 </ul>
 <p>SFTP processing intentionally does <strong>not</strong> emit <code>PatientListsAcquired</code> or <code>ReadyToAcquire</code>; those events remain specific to the FHIR-driven acquisition path.</p>
-<h3 id="observability">Observability <a id="observability" href="#observability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="observability" class="content-heading">Observability <a id="observability" href="#observability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When <code>EnableBenchmarking</code> is set on an <code>SftpConfiguration</code>, the worker writes an <code>SftpAcquisitionBenchmark</code> entry per processed file containing per-stage durations (connection, listing, download, parse, publish) and item counts. These are stored on the <code>SftpAcquisitionLog</code> and are queryable via <code>/api/data/sftp-logs</code>. The <code>Notes</code> field on the log captures human-readable error messages when a run fails.</p>
-<h2 id="logging">Logging <a id="logging" href="#logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="logging" class="content-heading">Logging <a id="logging" href="#logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Logging configuration defines the logging levels for different parts of the application.</p>
 <table>
 <thead>
@@ -2311,30 +2618,42 @@ Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nDataAcquisitionService_4CBC2504["Service: Data Acquisition Service"]
-  nDataAcquisitionService_4CBC2504 -->|produces| nResourceAcquired_B18E97B["Event: ResourceAcquired"]
-  nReadyToAcquire_37BFEA79["Event: ReadyToAcquire"] -->|consumed by| nDataAcquisitionService_4CBC2504
-  nPatientCensusScheduled_29F77A9B["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_4CBC2504
-  nDataAcquisitionService_4CBC2504 -->|provides| nGetFacilityConfig_487F50A0["Query: GetFacilityConfig"]
-  nDataAcquisitionService_4CBC2504 -->|provides| nGetServiceInfo_77B82099["Query: GetServiceInfo"]
-  subgraph nDataAccess_3BCC4CFC_domain["Domain: Data Access"]
-    nDataAcquisitionService_4CBC2504
-    nReadyToAcquire_37BFEA79
-    nResourceAcquired_B18E97B
+nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_3BF82DDB
+  nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_3BF82DDB
+  nDataAcquisitionService_3BF82DDB -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
+  nDataAcquisitionService_3BF82DDB -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_4BBEB8F8
+    nDataAcquisitionService_3BF82DDB
   end
-  subgraph nReport_623174B2_domain["Domain: Report"]
-    nPatientCensusScheduled_29F77A9B
+  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
+    nPatientCensusScheduled_2383C0C6
   end
-  subgraph nTenant_1ABB3779_domain["Domain: Tenant"]
-    nGetFacilityConfig_487F50A0
-    nGetServiceInfo_77B82099
+  subgraph nTenant_379CD514_domain["Domain: Tenant"]
+    nGetFacilityConfig_32C58A79
+    nGetServiceInfo_13F02E06
   end</pre>
-            <div class="mermaid-actions no-print">
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>

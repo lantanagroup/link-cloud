@@ -3,39 +3,31 @@ package com.lantanagroup.link.validation.providers;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.IValidationSupport.CodeValidationResult;
 import ca.uhn.fhir.context.support.IValidationSupport.IssueSeverity;
+import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.gclient.ICriterion;
 import ca.uhn.fhir.rest.gclient.IOperation;
 import ca.uhn.fhir.rest.gclient.IOperationUnnamed;
 import ca.uhn.fhir.rest.gclient.IOperationUntyped;
 import ca.uhn.fhir.rest.gclient.IOperationUntypedWithInputAndPartialOutput;
+import ca.uhn.fhir.rest.gclient.IQuery;
+import ca.uhn.fhir.rest.gclient.IUntypedQuery;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
-import org.hl7.fhir.r4.model.BooleanType;
-import org.hl7.fhir.r4.model.CodeableConcept;
-import org.hl7.fhir.r4.model.OperationOutcome;
-import org.hl7.fhir.r4.model.Parameters;
-import org.hl7.fhir.r4.model.StringType;
-import org.hl7.fhir.r4.model.ValueSet;
+import com.lantanagroup.link.shared.utils.LogUtils;
+import org.hl7.fhir.instance.model.api.IBaseBundle;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link RemoteTermServiceValidation#invokeRemoteValidateCode}. The HAPI generic client
@@ -78,6 +70,34 @@ class RemoteTermServiceValidationTest {
             when(withInput.execute()).thenReturn(executeResult);
         }
         return operation;
+    }
+
+    /**
+     * Stubs the fluent {@code client.search().forResource(..).where(..).summaryMode(..).returnBundle(..).execute()}
+     * chain so that {@code execute()} returns the supplied bundle. Returns the query mock so callers can capture
+     * the summary mode requested.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private IQuery stubSearchChain(RemoteTermServiceValidation subject, IBaseBundle executeResult) {
+        IGenericClient client = mock(IGenericClient.class);
+        IUntypedQuery untypedQuery = mock(IUntypedQuery.class);
+        IQuery query = mock(IQuery.class);
+
+        doReturn(client).when(subject).provideClient();
+        when(client.search()).thenReturn(untypedQuery);
+        when(untypedQuery.forResource(anyString())).thenReturn(query);
+        when(query.where(any(ICriterion.class))).thenReturn(query);
+        when(query.summaryMode(any(SummaryEnum.class))).thenReturn(query);
+        when(query.returnBundle(any(Class.class))).thenReturn(query);
+        when(query.execute()).thenReturn(executeResult);
+        return query;
+    }
+
+    private Bundle searchsetContaining(Resource resource) {
+        Bundle bundle = new Bundle();
+        bundle.setType(Bundle.BundleType.SEARCHSET);
+        bundle.addEntry().setResource(resource);
+        return bundle;
     }
 
     private Parameters validateCodeResponse(boolean result, String paramName, String paramValue) {
@@ -312,6 +332,56 @@ class RemoteTermServiceValidationTest {
         verify(operation).onType("ValueSet");
     }
 
+    // ---------- fetchValueSet summary mode ----------
+    // fetchValueSet(String) is the public IValidationSupport hook HAPI calls to resolve a bound ValueSet.
+    // Requesting _summary=false makes the Link terminology service enumerate every code of the value set
+    // into ValueSet.expansion.contains, which is the client-side trigger for terminology-service memory
+    // exhaustion -- and the expansion is never read (validateCodeInValueSet uses only the canonical URL).
+    // These tests pin the summary mode so it cannot be silently changed back.
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void fetchValueSet_requestsSummaryModeTrue() {
+        RemoteTermServiceValidation subject = newSpy();
+        ValueSet valueSet = new ValueSet();
+        valueSet.setUrl(VALUE_SET_URL);
+        IQuery query = stubSearchChain(subject, searchsetContaining(valueSet));
+
+        IBaseResource result = subject.fetchValueSet(VALUE_SET_URL);
+
+        ArgumentCaptor<SummaryEnum> summaryMode = ArgumentCaptor.forClass(SummaryEnum.class);
+        verify(query).summaryMode(summaryMode.capture());
+        assertEquals(SummaryEnum.TRUE, summaryMode.getValue(),
+                "fetchValueSet must not request _summary=false: that makes the terminology service "
+                        + "enumerate the full expansion for a resource whose expansion is never read.");
+        assertSame(valueSet, result);
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void fetchValueSet_noMatch_returnsNull() {
+        RemoteTermServiceValidation subject = newSpy();
+        Bundle empty = new Bundle();
+        empty.setType(Bundle.BundleType.SEARCHSET);
+        IQuery query = stubSearchChain(subject, empty);
+
+        assertNull(subject.fetchValueSet(VALUE_SET_URL));
+        verify(query).summaryMode(SummaryEnum.TRUE);
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void invokeIsValueSetSupported_requestsSummaryModeTrue() {
+        // The existence check has always used _summary=true; fetchValueSet(String) now matches it.
+        RemoteTermServiceValidation subject = newSpy();
+        ValueSet valueSet = new ValueSet();
+        valueSet.setUrl(VALUE_SET_URL);
+        IQuery query = stubSearchChain(subject, searchsetContaining(valueSet));
+
+        assertTrue(subject.invokeIsValueSetSupported(VALUE_SET_URL));
+        verify(query).summaryMode(SummaryEnum.TRUE);
+    }
+
     // ---------- isCodeSystemSupported / isValueSetSupported delegation to cache ----------
     // These methods are hit per-system per-chain-traversal by HAPI's ValidationSupportChain, so the
     // remote lookup has to go through ValidationCacheService. The tests below verify the delegation
@@ -380,5 +450,65 @@ class RemoteTermServiceValidationTest {
 
         assertFalse(subject.isValueSetSupported(null, "http://example.org/ValueSet/vs"));
         verifyNoInteractions(cacheService);
+    }
+
+    // ---------- log-sanitization tests ----------
+
+    @Test
+    void invokeRemoteValidateCode_codeSystemBranch_sanitizesLogArguments() {
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            RemoteTermServiceValidation subject = newSpy();
+            stubClientChain(subject, validateCodeResponse(true, "display", "Glucose"), false);
+
+            subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, null, null);
+
+            logUtils.verify(() -> LogUtils.sanitize(CODE_SYSTEM_URL));
+            logUtils.verify(() -> LogUtils.sanitize(CODE));
+        }
+    }
+
+    @Test
+    void invokeRemoteValidateCode_valueSetBranch_sanitizesLogArguments() {
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            RemoteTermServiceValidation subject = newSpy();
+            stubClientChain(subject, validateCodeResponse(true, "display", "Glucose"), false);
+
+            subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, VALUE_SET_URL, null);
+
+            logUtils.verify(() -> LogUtils.sanitize(VALUE_SET_URL));
+            logUtils.verify(() -> LogUtils.sanitize(CODE));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void invokeLookupCode_catchBlock_sanitizesLogArguments() {
+        RemoteTermServiceValidation subject = newSpy();
+
+        IGenericClient client = mock(IGenericClient.class);
+        IOperation operation = mock(IOperation.class);
+        IOperationUnnamed unnamed = mock(IOperationUnnamed.class);
+        IOperationUntyped untyped = mock(IOperationUntyped.class);
+        IOperationUntypedWithInputAndPartialOutput withInput = mock(IOperationUntypedWithInputAndPartialOutput.class);
+
+        doReturn(client).when(subject).provideClient();
+        when(client.getFhirContext()).thenReturn(fhirContext);
+        when(client.operation()).thenReturn(operation);
+        when(operation.onType(any(Class.class))).thenReturn(unnamed);
+        when(unnamed.named(anyString())).thenReturn(untyped);
+        when(untyped.withParameters(any())).thenReturn(withInput);
+        when(withInput.useHttpGet()).thenReturn(withInput);
+        InvalidRequestException exception = new InvalidRequestException("bad request\nInjected");
+        when(withInput.execute()).thenThrow(exception);
+
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            subject.invokeLookupCode(CODE, CODE_SYSTEM_URL, null, "");
+
+            // CODE and CODE_SYSTEM_URL each appear in both the happy-path debug log (line 107)
+            // and the catch-block debug log (line 131), hence times(2).
+            logUtils.verify(() -> LogUtils.sanitize(CODE), org.mockito.Mockito.times(2));
+            logUtils.verify(() -> LogUtils.sanitize(CODE_SYSTEM_URL), org.mockito.Mockito.times(2));
+            logUtils.verify(() -> LogUtils.sanitize(exception.getMessage()));
+        }
     }
 }

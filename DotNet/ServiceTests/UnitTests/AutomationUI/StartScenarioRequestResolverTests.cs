@@ -12,10 +12,10 @@ public class StartScenarioRequestResolverTests
     // ---------- Non-Custom scenarios use scenario-kind defaults outright ----------
 
     [Theory]
-    [InlineData(AutomationScenarioKind.AdhocReportTest, 1, 1000, 20260326)]
-    [InlineData(AutomationScenarioKind.MultiPatientTest, 1000, 100, 20260328)]
+    [InlineData(AutomationScenarioKind.AdhocReportTest, 1, 1000, 20260326, 0)]
+    [InlineData(AutomationScenarioKind.MultiPatientTest, 1000, 100, 20260328, 0)]
     public void Non_custom_scenarios_use_scenario_kind_defaults(
-        AutomationScenarioKind scenario, int expectedPatientCount, int expectedResources, int expectedSeed)
+        AutomationScenarioKind scenario, int expectedPatientCount, int expectedResources, int expectedSeed, int expectedMaxPollingDurationMinutes)
     {
         var request = new StartScenarioRequest
         {
@@ -31,6 +31,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(expectedPatientCount);
         options.ResourcesPerPatient.Should().Be(expectedResources);
         options.Seed.Should().Be(expectedSeed);
+        options.MaxPollingDurationMinutes.Should().Be(expectedMaxPollingDurationMinutes);
     }
 
     [Fact]
@@ -76,6 +77,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(7);
         options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
+        options.MaxPollingDurationMinutes.Should().Be(30);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);

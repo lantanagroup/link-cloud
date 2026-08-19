@@ -52,6 +52,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
         options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
     });
 
     builder.Services.AddTerminologyProblemDetails(

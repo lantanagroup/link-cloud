@@ -24,6 +24,28 @@ public interface ICodeGroupCacheService
     List<CodeGroup> GetAllCodeGroups(CodeGroup.CodeGroupTypes type);
 
     /// <summary>
+    /// Replaces the codes of an already-cached code group with the contents of a CSV, preserving the
+    /// FHIR resource metadata (url, version, id, name, identifiers) loaded from disk.
+    /// </summary>
+    /// <remarks>
+    /// Affects this instance's in-memory cache only: nothing is written to the configured terminology
+    /// path, and <see cref="LoadCache"/> restores the on-disk state. The replacement is all-or-nothing —
+    /// a CSV that fails to parse leaves the previously cached codes untouched.
+    /// </remarks>
+    /// <param name="type">The kind of code group to replace.</param>
+    /// <param name="id">The resource id of the code group.</param>
+    /// <param name="version">The version to replace, or null for the latest cached version.</param>
+    /// <param name="csvContent">
+    /// The CSV content, including a header row. A CodeSystem CSV has 2 or 3 columns (code, display and
+    /// optionally status); a ValueSet CSV has 3 or 4 (system, code, display and optionally status).
+    /// </param>
+    /// <param name="cancellationToken">Token to indicate if the operation should be cancelled.</param>
+    /// <returns>The replaced code group, carrying the codes just loaded.</returns>
+    /// <exception cref="Exceptions.CodeGroupNotFoundException">No such code group is cached.</exception>
+    /// <exception cref="InvalidOperationException">The CSV does not have a supported number of columns.</exception>
+    CodeGroup ReplaceCodesFromCsv(CodeGroup.CodeGroupTypes type, string id, string? version, string csvContent, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Clears all cached code groups.
     /// </summary>
     void ClearCache();
@@ -31,5 +53,5 @@ public interface ICodeGroupCacheService
     /// <summary>
     /// Loads (or reloads) the cache from the configured terminology source.
     /// </summary>
-    Task LoadCache();
+    Task LoadCache(CancellationToken cancellationToken = default);
 }

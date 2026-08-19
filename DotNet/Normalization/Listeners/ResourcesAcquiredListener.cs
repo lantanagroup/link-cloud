@@ -202,7 +202,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
 
-                List<DomainResource> resources = resourceCache.Get(cacheKey);
+                List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -289,12 +289,12 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                 }
 
-                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
+                await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
-            resourceCache.Delete(result.Message.Value.CacheKeys);
+            await resourceCache.DeleteAsync(result.Message.Value.CacheKeys, cancellationToken);
         }
     }
 

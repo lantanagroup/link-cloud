@@ -17,6 +17,17 @@
           <th mat-header-cell *matHeaderCellDef>Name</th>
           <td mat-cell *matCellDef="let vendor"> {{vendor.name}} </td>
         </ng-container>
+        <!-- Key Vault Secret ID Column -->
+        <ng-container matColumnDef="secretId">
+          <th mat-header-cell *matHeaderCellDef>Secret ID</th>
+          <td mat-cell *matCellDef="let vendor">
+            @if (vendor.secretId) {
+              {{vendor.secretId}}
+            } @else {
+              <span class="not-set">Not set</span>
+            }
+          </td>
+        </ng-container>
         <!-- Actions Column -->
         <ng-container matColumnDef="Actions">
           <th mat-header-cell *matHeaderCellDef class="actions-column"> Actions </th>
@@ -24,9 +35,20 @@
             <div class="actions">
               <button
                 mat-icon-button
+                color="primary"
+                class="mat-elevation-z2"
+                (click)="onEdit(vendor)"
+                aria-label="Edit Vendor"
+                matTooltip="Edit Vendor"
+                >
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button
+                mat-icon-button
                 color="warn"
                 class="mat-elevation-z2"
                 (click)="onDelete(vendor)"
+                aria-label="Delete Vendor"
                 matTooltip="Delete Vendor"
                 >
                 <mat-icon>delete</mat-icon>

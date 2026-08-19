@@ -16,6 +16,8 @@ public class ReportAbsManifestValidatorTests
 {
     private const string ExpectedStart = "2025-01-01T00:00:00Z";
     private const string ExpectedEnd = "2025-01-31T23:59:59Z";
+    private const string DeviceProfile = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/nhsn-submitting-device";
+    private const string PatientListProfile = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
 
     [Fact]
     public async Task ValidateAllAsync_WithMockExternalAbsFromGeneratedData_Passes()
@@ -149,7 +151,7 @@ public class ReportAbsManifestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_FailsOnCountMismatches()
+    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_AlignsMeasureReportExpectationToTerminalState()
     {
         var output = new BufferingAutomationOutput();
         var patientId = "Patient-UT-001";
@@ -183,8 +185,6 @@ public class ReportAbsManifestValidatorTests
                 {
                     $"Patient/{patientId}",
                     $"Condition/{patientId}-Condition-001",
-                    $"Condition/{patientId}-Condition-032",
-                    $"Condition/{patientId}-Condition-037",
                 }
             },
             ExpectedAbsPatientIdsOverride = new HashSet<string>(StringComparer.Ordinal) { patientId }
@@ -233,23 +233,21 @@ public class ReportAbsManifestValidatorTests
 
         var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader(reportClient.Object));
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            validator.ValidateAllAsync(
-                internalAbsResources,
-                new[] { patientId },
-                new[] { achMeasureId, hypoMeasureId },
-                ExpectedStart,
-                ExpectedEnd,
-                facilityId: "Facility-UT",
-                reportId: scheduleId.ToString(),
-                generatedBundles: null,
-                expectedManifestPatientListIds: new[] { patientId },
-                expectDataAcquisitionData: true,
-                manifest: manifest));
+        await validator.ValidateAllAsync(
+            internalAbsResources,
+            new[] { patientId },
+            new[] { achMeasureId, hypoMeasureId },
+            ExpectedStart,
+            ExpectedEnd,
+            facilityId: "Facility-UT",
+            reportId: scheduleId.ToString(),
+            generatedBundles: null,
+            expectedManifestPatientListIds: new[] { patientId },
+            expectDataAcquisitionData: true,
+            manifest: manifest);
 
-        Assert.Contains("predicted reportable MeasureReport count=2, actual terminal reportable count=1", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("type=Condition: expected=3", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("type=MeasureReport: expected=2", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Aligning predicted reportable MeasureReport count to terminal state", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -273,12 +271,67 @@ public class ReportAbsManifestValidatorTests
         Assert.Contains("VALIDATION failed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceIsMissingProfile_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-4", ExpectedStart, ExpectedEnd, deviceProfile: null);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-4",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device is missing meta.profile", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenPatientListProfileIsWrong_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId,
+            bundles,
+            "MEASURE-UT-5",
+            ExpectedStart,
+            ExpectedEnd,
+            patientListProfile: "https://www.cdc.gov/nhsn/nhsn-measures/StructureDefinition/poi-list");
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-5",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest List meta.profile mismatch", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static Dictionary<string, object> BuildMockExternalAbsResources(
         string patientId,
         IReadOnlyList<(string Name, string Json)> bundles,
         string measureId,
         string start,
-        string end)
+        string end,
+        string? deviceProfile = DeviceProfile,
+        string? patientListProfile = PatientListProfile)
     {
         var generatedPatientJson = ExtractGeneratedPatientJson(patientId, bundles);
 
@@ -294,18 +347,18 @@ public class ReportAbsManifestValidatorTests
                 resourceType = "Organization",
                 id = orgId
             }),
-            JsonSerializer.Serialize(new
+            SerializeWithOptionalProfile(deviceProfile, new Dictionary<string, object>
             {
-                resourceType = "Device",
-                id = deviceId
+                ["resourceType"] = "Device",
+                ["id"] = deviceId
             }),
-            JsonSerializer.Serialize(new
+            SerializeWithOptionalProfile(patientListProfile, new Dictionary<string, object>
             {
-                resourceType = "List",
-                id = "PatientList-UT",
-                status = "current",
-                mode = "snapshot",
-                extension = new object[]
+                ["resourceType"] = "List",
+                ["id"] = "PatientList-UT",
+                ["status"] = "current",
+                ["mode"] = "snapshot",
+                ["extension"] = new object[]
                 {
                     new
                     {
@@ -317,7 +370,7 @@ public class ReportAbsManifestValidatorTests
                         }
                     }
                 },
-                entry = new object[]
+                ["entry"] = new object[]
                 {
                     new { item = new { reference = $"Patient/{patientId}" } }
                 }
@@ -377,11 +430,12 @@ public class ReportAbsManifestValidatorTests
         var manifestNdjson = string.Join("\n", new[]
         {
             JsonSerializer.Serialize(new { resourceType = "Organization", id = "Org-UT" }),
-            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT" }),
+            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT", meta = new { profile = new[] { DeviceProfile } } }),
             JsonSerializer.Serialize(new
             {
                 resourceType = "List",
                 id = "PatientList-UT",
+                meta = new { profile = new[] { PatientListProfile } },
                 status = "current",
                 mode = "snapshot",
                 extension = new object[]
@@ -441,6 +495,18 @@ public class ReportAbsManifestValidatorTests
         };
     }
 
+    /// <summary>
+    /// Serializes a manifest resource, adding meta.profile only when a profile is supplied so
+    /// tests can model a resource that is missing it entirely.
+    /// </summary>
+    private static string SerializeWithOptionalProfile(string? profile, Dictionary<string, object> resource)
+    {
+        if (profile != null)
+            resource["meta"] = new { profile = new[] { profile } };
+
+        return JsonSerializer.Serialize(resource);
+    }
+
     private static string ExtractGeneratedPatientJson(string patientId, IReadOnlyList<(string Name, string Json)> bundles)
     {
         foreach (var (_, bundleJson) in bundles)
@@ -478,11 +544,12 @@ public class ReportAbsManifestValidatorTests
         var manifestNdjson = string.Join("\n", new[]
         {
             JsonSerializer.Serialize(new { resourceType = "Organization", id = "Org-UT" }),
-            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT" }),
+            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT", meta = new { profile = new[] { DeviceProfile } } }),
             JsonSerializer.Serialize(new
             {
                 resourceType = "List",
                 id = "PatientList-UT",
+                meta = new { profile = new[] { PatientListProfile } },
                 status = "current",
                 mode = "snapshot",
                 extension = new object[]

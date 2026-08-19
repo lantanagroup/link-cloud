@@ -14,12 +14,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
             _cache = cache;
         }
 
-        public T Get<T>(string key)
+        public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
         {
 
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
 
-            string? value = _cache.GetString(key);
+            string? value = await _cache.GetStringAsync(key, cancellationToken);
 
             if (string.IsNullOrEmpty(value)) return default;
 
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 
         }
 
-        public void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding)
+        public async Task SetAsync<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(key))
                 throw new ArgumentNullException(nameof(key));
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
                 {
                     AbsoluteExpirationRelativeToNow = expiration
                 };
-                _cache.SetString(key, serializedValue, options);
+                await _cache.SetStringAsync(key, serializedValue, options, cancellationToken);
             }
             catch (JsonException ex)
             {
@@ -61,9 +61,9 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 
         }
 
-        public void Remove(string key)
+        public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
-            _cache.Remove(key);
+            await _cache.RemoveAsync(key, cancellationToken);
         }
     }
 }

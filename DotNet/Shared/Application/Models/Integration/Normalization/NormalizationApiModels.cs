@@ -18,7 +18,7 @@ public class CreateNormalizationOperationRequestApiModel
     public string? FacilityId { get; set; }
     public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
     public string? Description { get; set; }
-    public List<string> VendorIds { get; set; } = [];
+    public List<Guid> VendorVersionIds { get; set; } = [];
 }
 
 public class CreateNormalizationOperationDetailsApiModel
@@ -100,27 +100,13 @@ public class CreateNormalizationOperationSequenceApiModel
     public int? Sequence { get; set; }
 }
 
-public class NormalizationVendorApiModel
+public class CreateNormalizationVendorVersionOperationPresetRequestApiModel
 {
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public List<NormalizationVendorVersionApiModel> Versions { get; set; } = [];
-}
-
-public class NormalizationVendorVersionApiModel
-{
-    public Guid Id { get; set; }
-    public Guid VendorId { get; set; }
-    public string Version { get; set; } = string.Empty;
-}
-
-public class CreateNormalizationVendorPresetRequestApiModel
-{
-    public Guid? VendorId { get; set; }
+    public Guid? VendorVersionId { get; set; }
     public Guid? OperationResourceTypeId { get; set; }
 }
 
-public class NormalizationVendorPresetApiModel
+public class NormalizationVendorVersionOperationPresetApiModel
 {
     public Guid Id { get; set; }
     public Guid VendorVersionId { get; set; }

@@ -36,9 +36,14 @@ class PreQualOperationOutcomeBuilderTest {
     // -------------------------------------------------------------------------
 
     private Category category(String id, boolean acceptable) {
+        return category(id, acceptable, true);
+    }
+
+    private Category category(String id, boolean acceptable, boolean submit) {
         Category category = new Category();
         category.setId(id);
         category.setAcceptable(acceptable);
+        category.setSubmit(submit);
         return category;
     }
 
@@ -59,7 +64,7 @@ class PreQualOperationOutcomeBuilderTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void build_oneIssuePerUnacceptableCategory_withOoTotal() {
+    void build_oneIssuePerSubmittedCategory_withOoTotal() {
         Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
         Result r2 = result("Unable to validate.", "expr2", category("unable_to_validate_code", false));
 
@@ -133,7 +138,7 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
-    void build_oneResultMappingToMultipleUnacceptableCategories_producesAnIssuePerCategory() {
+    void build_oneResultMappingToMultipleSubmittedCategories_producesAnIssuePerCategory() {
         Result r = result("msg", "expr", category("cat_a", false), category("cat_b", false));
 
         OperationOutcome oo = builder.build(List.of(r), MEASURE_REPORT, true).orElseThrow();
@@ -142,23 +147,41 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
-    void build_excludesAcceptableCategories() {
-        Result unacceptable = result("bad", "expr1", category("inactive_code", false));
-        Result acceptable = result("ok", "expr2", category("incorrect_display_value_for_code", true));
+    void build_includesSubmittedCategoriesRegardlessOfAcceptable() {
+        Result submitted = result("included", "expr1", category("submitted", true, true));
+        Result nonSubmitted = result("excluded", "expr2", category("not-submitted", false, false));
 
-        OperationOutcome oo = builder.build(List.of(unacceptable, acceptable), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(submitted, nonSubmitted), MEASURE_REPORT, true).orElseThrow();
 
         assertEquals(1, oo.getIssue().size());
         CodeType cat = (CodeType) oo.getIssueFirstRep()
                 .getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue();
-        assertEquals("inactive_code", cat.getValue());
+        assertEquals("submitted", cat.getValue());
+        int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
+        assertEquals(1, total);
     }
 
     @Test
-    void build_noUnacceptableFindings_returnsEmpty() {
-        Result acceptable = result("ok", "expr", category("incorrect_display_value_for_code", true));
+    void build_resultWithMixedSubmitCategories_emitsOnlySubmittedCategory() {
+        Result result = result("message", "expr",
+                category("submitted", false, true),
+                category("not-submitted", false, false));
 
-        assertTrue(builder.build(List.of(acceptable), MEASURE_REPORT, true).isEmpty());
+        OperationOutcome oo = builder.build(List.of(result), MEASURE_REPORT, true).orElseThrow();
+
+        assertEquals(1, oo.getIssue().size());
+        CodeType category = (CodeType) oo.getIssueFirstRep()
+                .getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue();
+        assertEquals("submitted", category.getValue());
+        int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
+        assertEquals(1, total);
+    }
+
+    @Test
+    void build_noSubmittedFindings_returnsEmpty() {
+        Result nonSubmitted = result("not submitted", "expr", category("not-submitted", false, false));
+
+        assertTrue(builder.build(List.of(nonSubmitted), MEASURE_REPORT, true).isEmpty());
     }
 
     @Test
@@ -199,7 +222,7 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
-    void build_nullMeasureReportId_omitsLocatorButKeepsResultExpressions() {
+    void build_noMeasureReportRef_omitsLocatorButKeepsResultExpressions() {
         Result r1 = result("msg", "result-expr", category("inactive_code", false));
 
         OperationOutcome oo = builder.build(List.of(r1), null, true).orElseThrow();
@@ -208,9 +231,39 @@ class PreQualOperationOutcomeBuilderTest {
         assertEquals(List.of("result-expr"), expressions);
     }
 
+    @Test
+    void build_measureReportWithNullId_omitsLocatorButKeepsResultExpressions() {
+        // A MeasureReport with no id resolves to a non-null ref whose id is null. Formatting that would
+        // emit where(id = 'null') — valid FHIRPath that resolves to nothing, i.e. a silently dead locator
+        // in submitted output. The locator must be omitted instead.
+        Result r1 = result("msg", "result-expr", category("inactive_code", false));
+        PreQualOperationOutcomeBuilder.MeasureReportRef ref =
+                new PreQualOperationOutcomeBuilder.MeasureReportRef(0, null);
+
+        OperationOutcome oo = builder.build(List.of(r1), ref, true).orElseThrow();
+
+        List<String> expressions = expressionStrings(oo.getIssueFirstRep());
+        assertEquals(List.of("result-expr"), expressions);
+        assertFalse(expressions.stream().anyMatch(e -> e.contains("null")),
+                "Locator must not be emitted with a null id");
+    }
+
     // -------------------------------------------------------------------------
     // MeasureReport resolution (index + id)
     // -------------------------------------------------------------------------
+
+    @Test
+    void resolveMeasureReport_measureReportWithoutId_yieldsRefWithNullId() {
+        // Pins the source of the null id the builder has to defend against.
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(new MeasureReport());
+
+        PreQualOperationOutcomeBuilder.MeasureReportRef ref = builder.resolveMeasureReport(bundle);
+
+        assertNotNull(ref);
+        assertEquals(0, ref.index());
+        assertNull(ref.id());
+    }
 
     @Test
     void resolveMeasureReport_returnsIndexAndIdWhenFirstEntry() {
