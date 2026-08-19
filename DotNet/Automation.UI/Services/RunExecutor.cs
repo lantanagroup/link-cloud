@@ -468,7 +468,8 @@ internal sealed class RunExecutor
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
-                output, facilityId, measureIds);
+                services.GetRequiredService<IDmrpServiceClient>(),
+                output, facilityId, measureIds, cancellationToken);
             normalizationResolution = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
