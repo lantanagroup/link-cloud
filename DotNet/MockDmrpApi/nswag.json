@@ -1,0 +1,32 @@
+{
+  "runtime": "Net80",
+  "documentGenerator": {
+    "fromDocument": {
+      "url": "Contracts/dmrp-openapi.yaml"
+    }
+  },
+  "codeGenerators": {
+    "openApiToCSharpController": {
+      "className": "Dmrp",
+      "operationGenerationMode": "SingleClientFromOperationId",
+      "controllerBaseClass": "Microsoft.AspNetCore.Mvc.ControllerBase",
+      "controllerStyle": "Abstract",
+      "controllerTarget": "AspNetCore",
+      "useActionResultType": true,
+      "useCancellationToken": true,
+      "generateDtoTypes": true,
+      "generateDataAnnotations": true,
+      "generateModelValidationAttributes": true,
+      "generateOptionalParameters": false,
+      "generateClientInterfaces": false,
+      "jsonLibrary": "SystemTextJson",
+      "arrayType": "System.Collections.Generic.ICollection",
+      "arrayInstanceType": "System.Collections.Generic.List",
+      "dictionaryType": "System.Collections.Generic.IDictionary",
+      "dateTimeType": "System.DateTimeOffset",
+      "requiredPropertiesMustBeDefined": true,
+      "namespace": "LantanaGroup.Link.MockDmrpApi.Contracts.Generated",
+      "output": "$(OutputPath)"
+    }
+  }
+}

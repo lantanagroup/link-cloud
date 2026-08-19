@@ -75,9 +75,14 @@ public class CategorizationService {
 
     @Transactional
     public void saveCategorySnapshot(CategorySnapshot categorySnapshot) {
+        // Category has an assigned (non-generated) ID, so save() always routes through merge(). For an
+        // ID that isn't in the database yet, merge() returns a *different* managed instance than the one
+        // passed in — the rule has to be attached to that instance, or the persistence context ends up
+        // holding two representations of the same category.
         Category category = categoryRepository.findById(categorySnapshot.getId())
+                .map(categorySnapshot::applyTo)
                 .orElseGet(categorySnapshot::toCategory);
-        categoryRepository.save(category);
+        category = categoryRepository.save(category);
         CategoryRule categoryRule = categorySnapshot.toCategoryRule(category);
         categoryRuleRepository.save(categoryRule);
     }

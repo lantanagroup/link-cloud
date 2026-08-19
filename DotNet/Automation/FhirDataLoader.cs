@@ -1,12 +1,13 @@
 ﻿using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Helpers;
+using RestSharp;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Reflection;
+using System.Text.Json.Nodes;
 
 namespace LantanaGroup.Automation;
 
-using System.Reflection;
-using System.Text.Json.Nodes;
-using RestSharp;
 
 /// <summary>
 /// Generic FHIR data loader that interacts with a FHIR server via REST.
@@ -40,6 +41,110 @@ public class FhirDataLoader
         _baseUriForRelativeResolution = EnsureTrailingSlash(_baseUri);
         _restClient = new RestClient(trimmed);
         GetAuthorization();
+    }
+
+    public async Task<(int Succeeded, int Failed, IReadOnlyList<string> Failures)> DeleteResourcesWithExpungeAsync(
+        IEnumerable<string> resources,
+        CancellationToken ct = default)
+    {
+        var succeeded = 0;
+        var failed = 0;
+        var failures = new List<string>();
+
+        foreach (var resource in resources.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var request = new RestRequest(resource, Method.Delete);
+            request.AddHeader("Content-Type", "application/fhir+json");
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
+            request.AddQueryParameter("_expunge", "true");
+
+            var response = await _restClient.ExecuteAsync(request, ct);
+            if (response.IsSuccessful)
+            {
+                succeeded++;
+            }
+            else
+            {
+                failed++;
+                if (failures.Count < 25)
+                    failures.Add($"{resource}: {(int)response.StatusCode} {response.StatusCode} {response.Content}");
+            }
+        }
+
+        return (succeeded, failed, failures);
+    }
+
+    public async Task<bool> PatientExistsAsync(string patientId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            throw new ArgumentException("Patient ID is required.", nameof(patientId));
+
+        var request = new RestRequest($"Patient/{patientId.Trim()}", Method.Get);
+        request.AddHeader("Accept", "application/fhir+json");
+
+        if (!string.IsNullOrEmpty(_authorization))
+            request.AddHeader("Authorization", _authorization);
+
+        var response = await _restClient.ExecuteAsync(request, ct);
+        if (response.IsSuccessful)
+            return true;
+
+        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.Gone)
+            return false;
+
+        throw new InvalidOperationException(
+            $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for Patient/{patientId}. Response body: {response.Content}");
+    }
+
+    /// <summary>
+    /// Waits until a Patient is no longer available from the FHIR server. This is used
+    /// after requesting an expunge, which can complete asynchronously on deployed servers.
+    /// </summary>
+    public async Task WaitForPatientDeletionAsync(
+        string patientId,
+        Action<string>? progress = null,
+        TimeSpan? timeout = null,
+        CancellationToken ct = default)
+    {
+        var maxWait = timeout ?? TimeSpan.FromSeconds(60);
+        var started = DateTime.UtcNow;
+        var attempt = 0;
+        var delay = TimeSpan.FromSeconds(1);
+        var maxDelay = TimeSpan.FromSeconds(5);
+
+        while (DateTime.UtcNow - started < maxWait)
+        {
+            ct.ThrowIfCancellationRequested();
+            attempt++;
+
+            try
+            {
+                if (!await PatientExistsAsync(patientId, ct))
+                {
+                    progress?.Invoke($"FHIR purge completed for patient '{patientId}'.");
+                    return;
+                }
+
+                progress?.Invoke($"Waiting for FHIR purge to complete for patient '{patientId}' (check {attempt}, elapsed {(DateTime.UtcNow - started).TotalSeconds:F1}s).");
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                progress?.Invoke($"Could not verify FHIR purge completion for patient '{patientId}' (check {attempt}): {ex.Message}");
+            }
+
+            var remaining = maxWait - (DateTime.UtcNow - started);
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            var nextDelay = delay <= remaining ? delay : remaining;
+            await Task.Delay(nextDelay, ct);
+            delay = delay + TimeSpan.FromSeconds(1) <= maxDelay ? delay + TimeSpan.FromSeconds(1) : maxDelay;
+        }
+
+        throw new TimeoutException($"Timed out waiting for FHIR purge to complete for patient '{patientId}' after {maxWait.TotalSeconds:F0}s.");
     }
 
     private void GetAuthorization()
@@ -298,7 +403,8 @@ public class FhirDataLoader
     public async Task<bool> UploadBundlesSequentiallyAsync(
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles,
-        string progressPrefix = "")
+        string progressPrefix = "",
+        bool logSuccessfulPosts = true)
     {
         for (var i = 0; i < bundles.Count; i++)
         {
@@ -307,7 +413,7 @@ public class FhirDataLoader
                 ? $"[{i + 1}/{bundles.Count}]"
                 : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
 
-            var response = await PostBundleWithRetryAsync(json, name, progress, output);
+            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts);
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -393,11 +499,20 @@ public class FhirDataLoader
         var currentPageRequestUri = new Uri(_baseUriForRelativeResolution, $"Patient/{patientId}/$everything");
 
         // Page 1: anchored at the operation URL relative to the configured server base.
-        var firstPage = await GetPageAsync(
-            $"Patient/{patientId}/$everything",
-            useFullUrl: false,
-            descriptionForError: $"Patient/{patientId}/$everything",
-            ct);
+        string firstPage;
+        try
+        {
+            firstPage = await GetPageAsync(
+                $"Patient/{patientId}/$everything",
+                useFullUrl: false,
+                descriptionForError: $"Patient/{patientId}/$everything",
+                ct);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"FHIR server failed responding to Patient/{patientId}/$everything (initial page). {ex.Message}", ex);
+        }
 
         var rootBundle = JsonNode.Parse(firstPage)
             ?? throw new InvalidOperationException(
@@ -434,11 +549,20 @@ public class FhirDataLoader
                 currentPageRequestUri,
                 $"Patient/{patientId}/$everything (page {pageCount})");
 
-            var pageJson = await GetPageAsync(
-                validatedNextUrl.AbsoluteUri,
-                useFullUrl: true,
-                descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
-                ct);
+            string pageJson;
+            try
+            {
+                pageJson = await GetPageAsync(
+                    validatedNextUrl.AbsoluteUri,
+                    useFullUrl: true,
+                    descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"FHIR server failed while Automation followed Bundle.next for Patient/{patientId}/$everything (page {pageCount}). {ex.Message}", ex);
+            }
 
             // Advance only after the page request succeeds so subsequent relative links
             // are resolved against the URI that actually produced this page.
@@ -478,48 +602,105 @@ public class FhirDataLoader
     /// </summary>
     private async Task<string> GetPageAsync(string url, bool useFullUrl, string descriptionForError, CancellationToken ct)
     {
-        RestResponse response;
-        if (useFullUrl)
+        RestResponse? response = null;
+        Exception? lastException = null;
+        var delay = InitialRetryDelay;
+
+        for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
-            // Defense-in-depth: callers (the paging loop) already validate via
-            // ResolveAndValidateSameOrigin, but re-check here so a future caller can't
-            // bypass the origin guard.
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var target))
+            ct.ThrowIfCancellationRequested();
+            response = null;
+
+            try
             {
-                throw new InvalidOperationException(
-                    $"Refusing to issue request for {descriptionForError}: '{url}' is not an absolute URI.");
+                if (useFullUrl)
+                {
+                    // Defense-in-depth: callers (the paging loop) already validate via
+                    // ResolveAndValidateSameOrigin, but re-check here so a future caller can't
+                    // bypass the origin guard.
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out var target))
+                    {
+                        throw new InvalidOperationException(
+                            $"Refusing to issue request for {descriptionForError}: '{url}' is not an absolute URI.");
+                    }
+                    if (!IsSameOrigin(_baseUri, target))
+                    {
+                        throw new InvalidOperationException(
+                            $"Refusing to issue request for {descriptionForError}: target origin " +
+                            $"{target.GetLeftPart(UriPartial.Authority)} differs from configured FHIR base " +
+                            $"{_baseUri.GetLeftPart(UriPartial.Authority)}.");
+                    }
+
+                    using var oneOffClient = new RestClient(url);
+                    var request = new RestRequest("", Method.Get);
+                    request.AddHeader("Accept", "application/fhir+json");
+                    if (!string.IsNullOrEmpty(_authorization))
+                        request.AddHeader("Authorization", _authorization);
+                    response = await oneOffClient.ExecuteAsync(request, ct);
+                }
+                else
+                {
+                    var request = new RestRequest(url, Method.Get);
+                    request.AddHeader("Accept", "application/fhir+json");
+                    if (!string.IsNullOrEmpty(_authorization))
+                        request.AddHeader("Authorization", _authorization);
+                    response = await _restClient.ExecuteAsync(request, ct);
+                }
+
+                if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
+                    return response.Content;
             }
-            if (!IsSameOrigin(_baseUri, target))
+            catch (Exception ex) when (attempt < MaxRetries)
             {
-                throw new InvalidOperationException(
-                    $"Refusing to issue request for {descriptionForError}: target origin " +
-                    $"{target.GetLeftPart(UriPartial.Authority)} differs from configured FHIR base " +
-                    $"{_baseUri.GetLeftPart(UriPartial.Authority)}.");
+                lastException = ex;
             }
 
-            using var oneOffClient = new RestClient(url);
-            var request = new RestRequest("", Method.Get);
-            request.AddHeader("Accept", "application/fhir+json");
-            if (!string.IsNullOrEmpty(_authorization))
-                request.AddHeader("Authorization", _authorization);
-            response = await oneOffClient.ExecuteAsync(request, ct);
-        }
-        else
-        {
-            var request = new RestRequest(url, Method.Get);
-            request.AddHeader("Accept", "application/fhir+json");
-            if (!string.IsNullOrEmpty(_authorization))
-                request.AddHeader("Authorization", _authorization);
-            response = await _restClient.ExecuteAsync(request, ct);
+            if (attempt < MaxRetries && IsRetriablePagingFailure(response))
+            {
+                await Task.Delay(delay, ct);
+                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+                continue;
+            }
+
+            break;
         }
 
-        if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+        if (lastException != null && response == null)
         {
             throw new InvalidOperationException(
-                $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for {descriptionForError}: {response.Content}");
+                $"FHIR server request failed for {descriptionForError} after {MaxRetries} attempt(s): {lastException.Message}",
+                lastException);
+        }
+
+        if (response == null || !response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+        {
+            var statusCode = response != null ? (int)response.StatusCode : 0;
+            var statusText = response?.StatusCode.ToString() ?? "(no status)";
+            var responseBody = response?.Content ?? "";
+            throw new InvalidOperationException(
+                $"FHIR server returned {statusCode} {statusText} for {descriptionForError}. " +
+                $"Automation issued the request successfully, but the server response was unsuccessful or empty. " +
+                $"Response body: {responseBody}");
         }
 
         return response.Content;
+    }
+
+    private static bool IsRetriablePagingFailure(RestResponse? response)
+    {
+        if (response == null)
+            return true;
+
+        if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
+            return false;
+
+        var code = (int)response.StatusCode;
+        if (code == 0)
+            return true;
+
+        return response.StatusCode == HttpStatusCode.RequestTimeout
+               || response.StatusCode == HttpStatusCode.TooManyRequests
+               || code >= 500;
     }
 
     /// <summary>
@@ -603,7 +784,8 @@ public class FhirDataLoader
         string bundleJson,
         string name,
         string progress,
-        IAutomationOutput output)
+        IAutomationOutput output,
+        bool logSuccessfulPosts = true)
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
@@ -622,10 +804,13 @@ public class FhirDataLoader
 
             if (lastResponse.IsSuccessful)
             {
-                if (attempt > 1)
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
-                else
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                if (logSuccessfulPosts)
+                {
+                    if (attempt > 1)
+                        output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
+                    else
+                        output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                }
                 return lastResponse;
             }
 

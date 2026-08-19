@@ -4,13 +4,16 @@ using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -29,6 +32,17 @@ public class CodeGroupCacheService(
     private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
+
+    /// <summary>
+    /// The number of cache keys currently tracked.
+    /// </summary>
+    /// <remarks>
+    /// Exposed for tests only. A duplicate key is invisible through the public surface — the lookups still
+    /// return the right group and merely scan further, and <see cref="GetAllCodeGroups"/> collapses
+    /// duplicates with its group-by on id — so this count is the only thing that can actually fail if the
+    /// composite-key guard in <see cref="SetCodeGroup"/> regresses to reference equality.
+    /// </remarks>
+    internal int CacheKeyCount => _cacheKeys.Count;
 
     /// <summary>
     /// Determines whether the specified directory exists on the file system.
@@ -195,8 +209,81 @@ public class CodeGroupCacheService(
         CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes)codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
         cache.Set(urlKey.Key, codeGroup, _cacheOptions);
 
-        if (!_cacheKeys.Contains(urlKey))
+        // Compare on the composite key rather than the instance: CacheKey overrides neither Equals nor
+        // GetHashCode, so ConcurrentBag.Contains is reference equality and never matches. That was
+        // harmless while LoadCache was the only caller (it clears the cache first), but replacing a
+        // loaded code group calls this a second time for a key already in the bag, and each duplicate
+        // lengthens the scans in GetCodeGroup/GetCodeGroupById/GetAllCodeGroups.
+        if (!_cacheKeys.Any(k => string.Equals(k.Key, urlKey.Key, StringComparison.Ordinal)))
             _cacheKeys.Add(urlKey);
+    }
+
+    /// <summary>
+    /// Replaces the codes of an already-cached code group with the contents of a CSV, preserving the
+    /// FHIR resource metadata loaded from disk. See <see cref="ICodeGroupCacheService.ReplaceCodesFromCsv"/>.
+    /// </summary>
+    public virtual CodeGroup ReplaceCodesFromCsv(
+        CodeGroup.CodeGroupTypes type,
+        string id,
+        string? version,
+        string csvContent,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = GetCodeGroupById(type, id, version)
+            ?? throw new CodeGroupNotFoundException(
+                $"No {type} found in the cache with id '{id}' and version '{version ?? "latest"}'");
+
+        // Build a replacement rather than mutating the cached instance. ProcessValueSetCsv and
+        // ProcessCodeSystemCsv append to Codes without clearing it, so reusing the cached group would
+        // merge the old codes with the new ones. It is also what keeps this safe to call while requests
+        // are being served: this service is a singleton and FhirService enumerates CodeGroup.Codes, so
+        // an in-place edit could tear a reader's enumeration. The swap is the single cache.Set inside
+        // SetCodeGroup, leaving every reader with either the whole old group or the whole new one.
+        var replacement = new CodeGroup
+        {
+            Type = existing.Type,
+            Id = existing.Id,
+            Version = existing.Version,
+            Name = existing.Name,
+            Url = existing.Url,
+            Identifiers = [.. existing.Identifiers],
+            // Shared by reference on purpose: FhirService deep-copies the resource before attaching an
+            // expansion and otherwise returns it untouched, and an upload must never alter the metadata.
+            Resource = existing.Resource
+        };
+
+        using var reader = new StringReader(csvContent);
+        // Mirrors LoadCache: the optional trailing status column means a missing field is not an error.
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
+        using var csv = new CsvReader(reader, config);
+
+        // Both Process*Csv methods enumerate the CSV lazily and reach SetCodeGroup only once every row
+        // has been read, so any parse failure throws before the cache is touched and the previously
+        // loaded codes survive intact. There is deliberately no rollback here, and no pre-clearing.
+        // Nothing after SetCodeGroup may throw, or the cache would be swapped and the caller still told
+        // the operation failed - which is exactly what the trailing LogDebug in ProcessCodeSystemCsv
+        // used to do on a header-only file.
+        switch (type)
+        {
+            case CodeGroup.CodeGroupTypes.CodeSystem:
+                ProcessCodeSystemCsv(replacement, csv, cancellationToken);
+                break;
+            case CodeGroup.CodeGroupTypes.ValueSet:
+                ProcessValueSetCsv(replacement, csv, cancellationToken);
+                break;
+            default:
+                throw new InvalidOperationException($"Code group type {type} is not supported");
+        }
+
+        logger.LogWarning(
+            "Codes for {Type} {Id} version {Version} were replaced in memory from an uploaded CSV ({Count} codes). " +
+            "This instance no longer matches the terminology files on disk until the cache is reloaded.",
+            type,
+            id.SanitizeForLog(),
+            (existing.Version ?? "latest").SanitizeForLog(),
+            replacement.Codes.Values.Sum(codes => codes.Count));
+
+        return replacement;
     }
 
     private async Task<CodeGroup> GetCodeGroup(string jsonFilePath)
@@ -205,7 +292,7 @@ public class CodeGroupCacheService(
 
         // Read the JSON file and parse it as a FHIR resource
         var jsonContent = await ReadAllTextAsync(jsonFilePath);
-        codeGroup.Resource = new Hl7.Fhir.Serialization.FhirJsonParser().Parse<Resource>(jsonContent);
+        codeGroup.Resource = new FhirJsonParser().Parse<Resource>(jsonContent);
 
         if (codeGroup.Resource is CodeSystem codeSystem)
         {
@@ -232,7 +319,7 @@ public class CodeGroupCacheService(
         return codeGroup;
     }
 
-    internal void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessValueSetCsv(CodeGroup codeGroup, CsvReader csv, CancellationToken cancellationToken)
     {
         // Validate column count
         csv.Read();
@@ -245,26 +332,40 @@ public class CodeGroupCacheService(
 
         // A 4-column file carries value set membership status; a 3-column file does not.
         // Members loaded with membership status are authoritative; members without it fall back to
-        // the code system status when validated (see FhirService.ResolveIsActive).
+        // the code system status when validated (see FhirService.ResolveCodeStatus).
         bool hasStatusColumn = headers.Length == 4;
 
-        var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
         List<Code>? systemCodes = null;
+        int scientificNotationCodeCount = 0;
+        string scientificNotationCodeExamples = "";
+        var statusParser = new CodeStatusParser();
 
-        foreach (var record in records)
+        while (csv.Read())
         {
-            string code = record.Code;
-            string display = record.Display;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            LogScientificNotationWarning(code, codeGroup.Id);
+            string recordSystem = csv.GetField(0) ?? string.Empty;
+            string code = csv.GetField(1) ?? string.Empty;
+            string display = csv.GetField(2) ?? string.Empty;
+            CodeStatus status = hasStatusColumn
+                ? statusParser.Parse(csv.GetField(3), code)
+                : CodeStatus.Active;
 
-            if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
+            if (ScientificNotationPattern.IsMatch(code))
             {
-                if (string.IsNullOrEmpty(record.System))
+                scientificNotationCodeCount++;
+
+                if (scientificNotationCodeExamples.Length < 100)
+                    scientificNotationCodeExamples += (scientificNotationCodeExamples.Length > 0 ? ", " : "") + code;
+            }
+
+            if (system == null || (!string.IsNullOrEmpty(recordSystem) && system != recordSystem))
+            {
+                if (string.IsNullOrEmpty(recordSystem))
                     continue;
 
-                system = record.System;
+                system = recordSystem;
                 if (!codeGroup.Codes.ContainsKey(system))
                 {
                     systemCodes = new List<Code>();
@@ -288,7 +389,7 @@ public class CodeGroupCacheService(
                 {
                     Value = code,
                     Display = display,
-                    Status = record.Status
+                    Status = status
                 });
             }
             else
@@ -301,11 +402,14 @@ public class CodeGroupCacheService(
             }
         }
 
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
+        LogInvalidStatusWarning(statusParser, codeGroup.Id);
+
         SetCodeGroup(codeGroup);
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
 
-    internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
+    internal void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv, CancellationToken cancellationToken)
     {
         if (codeGroup == null)
             throw new ArgumentNullException(nameof(codeGroup));
@@ -324,14 +428,24 @@ public class CodeGroupCacheService(
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
         string system = codeGroup.Url;
+        int scientificNotationCodeCount = 0;
+        string scientificNotationCodeExamples = "";
+        var statusParser = new CodeStatusParser();
 
         foreach (var record in records)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string code = record.Code;
             string display = record.Display;
-            CodeStatus status = record.Status;
+            CodeStatus status = statusParser.Parse(record.Status, code);
 
-            LogScientificNotationWarning(code, codeGroup.Id);
+            if (ScientificNotationPattern.IsMatch(code))
+            {
+                scientificNotationCodeCount++;
+
+                if (scientificNotationCodeExamples.Length < 100)
+                    scientificNotationCodeExamples += (scientificNotationCodeExamples.Length > 0 ? ", " : "") + code;
+            }
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
@@ -344,18 +458,123 @@ public class CodeGroupCacheService(
             });
         }
 
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
+        LogInvalidStatusWarning(statusParser, codeGroup.Id);
+
         SetCodeGroup(codeGroup);
-        logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+
+        // TryGetValue rather than the indexer: a CSV with a header but no data rows never creates the
+        // system key, so the indexer threw KeyNotFoundException *after* SetCodeGroup had already swapped
+        // the emptied group into the cache. Log arguments are evaluated eagerly regardless of the
+        // configured level, so it threw even with Debug off. Emptying a code group is a legitimate
+        // outcome of a CSV upload, not an error.
+        var loadedCount = codeGroup.Codes.TryGetValue(system, out var loadedCodes) ? loadedCodes.Count : 0;
+        logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, loadedCount);
     }
 
-    private void LogScientificNotationWarning(string code, string? codeGroupId)
+    private void LogScientificNotationWarning(int scientificNotationCodeCount, string? codeGroupId, string? examples)
     {
-        if (ScientificNotationPattern.IsMatch(code))
+        if (scientificNotationCodeCount > 0)
         {
             logger.LogWarning(
-                "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
-                code.SanitizeForLog(),
-                codeGroupId.SanitizeForLog());
+                "Found {Count} code(s) in code group {CodeGroupId} that appear to be in scientific notation. Verify that codes were not altered during CSV creation. Example codes: {Examples}",
+                scientificNotationCodeCount,
+                codeGroupId.SanitizeForLog(),
+                examples.SanitizeForLog());
+        }
+    }
+
+    /// <summary>
+    /// Reports status cells that could not be understood, once per file rather than once per row.
+    /// </summary>
+    private void LogInvalidStatusWarning(CodeStatusParser statusParser, string? codeGroupId)
+    {
+        if (statusParser.InvalidCount > 0)
+        {
+            logger.LogWarning(
+                "Found {Count} code(s) in code group {CodeGroupId} with an unrecognized status; each was loaded as Active. Valid values are 'Active' and 'Inactive'. Example codes: {Examples}",
+                statusParser.InvalidCount,
+                codeGroupId.SanitizeForLog(),
+                statusParser.Examples.SanitizeForLog());
+        }
+    }
+
+    /// <summary>
+    /// Parses the optional trailing status column shared by CodeSystem and ValueSet CSVs, tallying the
+    /// values it could not understand so one warning can be logged per file.
+    /// </summary>
+    /// <remarks>
+    /// The tally exists because these loops run once per code, and a large code system carries hundreds of
+    /// thousands of them — a per-row warning on a malformed file would flood Loki.
+    /// </remarks>
+    private sealed class CodeStatusParser
+    {
+        /// <summary>The point at which the sample stops accepting further entries.</summary>
+        private const int MaxExampleLength = 100;
+
+        /// <summary>
+        /// The cap applied to each half of an entry before it is appended.
+        /// </summary>
+        /// <remarks>
+        /// Both the code and the raw status are CSV content, and neither is length-limited by the format,
+        /// so without this one row could put an arbitrarily long value into the log line — the upload
+        /// endpoints accept up to 32 MB. Capping the parts rather than the finished string keeps every
+        /// entry readable instead of cutting the last one mid-token.
+        /// </remarks>
+        private const int MaxExampleValueLength = 24;
+
+        private string _examples = string.Empty;
+
+        /// <summary>The number of rows whose status cell could not be parsed.</summary>
+        internal int InvalidCount { get; private set; }
+
+        /// <summary>
+        /// A comma-separated sample of the offending codes and their raw values, each half truncated to
+        /// <see cref="MaxExampleValueLength"/>. Entries stop being added once the sample reaches
+        /// <see cref="MaxExampleLength"/>, so the result is bounded at roughly that plus one entry.
+        /// </summary>
+        internal string Examples => _examples;
+
+        /// <summary>
+        /// Caps one caller-supplied value so a single row cannot dominate the sample.
+        /// </summary>
+        private static string Truncate(string value) =>
+            value.Length <= MaxExampleValueLength ? value : value[..MaxExampleValueLength] + "...";
+
+        /// <summary>
+        /// Resolves one status cell. A blank cell means "not stated" and yields Active, matching the
+        /// 2- and 3-column forms that predate the status column. A value that is neither status name
+        /// also yields Active, but is tallied.
+        /// </summary>
+        /// <remarks>
+        /// Defaulting rather than rejecting is deliberate. Statuses are read into a strongly typed
+        /// enum, and letting a converter throw on a bad cell aborts the whole file: the enclosing
+        /// <see cref="LoadCache"/> catch would drop every code in the group — tens of thousands of good
+        /// rows — over one typo, and the group would then answer 404 rather than anything diagnosable.
+        /// One code loading as Active with a warning attached is the far smaller failure.
+        /// </remarks>
+        internal CodeStatus Parse(string? rawStatus, string code)
+        {
+            if (string.IsNullOrWhiteSpace(rawStatus))
+            {
+                return CodeStatus.Active;
+            }
+
+            // IsDefined rejects the out-of-range numerics TryParse otherwise accepts ("7" would
+            // parse to (CodeStatus)7 and compare equal to neither status).
+            if (Enum.TryParse<CodeStatus>(rawStatus, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+            {
+                return parsed;
+            }
+
+            InvalidCount++;
+
+            if (_examples.Length < MaxExampleLength)
+            {
+                _examples += (_examples.Length > 0 ? ", " : "") + $"{Truncate(code)}='{Truncate(rawStatus)}'";
+            }
+
+            return CodeStatus.Active;
         }
     }
 
@@ -365,7 +584,7 @@ public class CodeGroupCacheService(
     /// Logs the number of successfully loaded code groups and warnings for directories
     /// that could not be processed.
     /// </summary>
-    public async System.Threading.Tasks.Task LoadCache()
+    public async Task LoadCache(CancellationToken cancellationToken = default)
     {
         this.ClearCache();
 
@@ -417,12 +636,12 @@ public class CodeGroupCacheService(
                 {
                     case CodeGroup.CodeGroupTypes.CodeSystem:
                         logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
-                        this.ProcessCodeSystemCsv(codeGroup, csv);
+                        this.ProcessCodeSystemCsv(codeGroup, csv, cancellationToken);
                         loadedCodeSystems++;
                         break;
                     case CodeGroup.CodeGroupTypes.ValueSet:
                         logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
-                        this.ProcessValueSetCsv(codeGroup, csv);
+                        this.ProcessValueSetCsv(codeGroup, csv, cancellationToken);
                         loadedValueSets++;
                         break;
                     default:

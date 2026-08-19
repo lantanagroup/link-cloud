@@ -16,5 +16,27 @@
         }
       </mat-form-field>
     </div>
+
+    <mat-accordion>
+      <mat-expansion-panel [expanded]="keySettingsExpanded" data-testid="vendor-key-settings-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>JWT / Authentication</mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input ">
+            <mat-label>Key Vault Secret ID</mat-label>
+            <input matInput formControlName="secretId" [readonly]="viewOnly"
+                   data-testid="vendor-secret-id-input">
+            <mat-hint>Name of the Key Vault secret holding the PEM signing key.</mat-hint>
+            @if (secretId.hasError('pattern')) {
+              <mat-error data-testid="vendor-secret-id-error">
+                Use the secret's name, not its URL: 1 to 127 letters, digits or dashes.
+              </mat-error>
+            }
+          </mat-form-field>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
   </form>
 </div>

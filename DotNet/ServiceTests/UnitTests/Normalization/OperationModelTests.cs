@@ -13,7 +13,7 @@ public class OperationModelTests
             resourceTypes: [],
             operation: new CopyLocationOperation(),
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Contains("Location", model.ResourceTypes);
@@ -26,7 +26,7 @@ public class OperationModelTests
             resourceTypes: ["Location"],
             operation: new CopyLocationOperation(),
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Equal("Location", model.ResourceTypes[0]);
@@ -41,7 +41,7 @@ public class OperationModelTests
             operation: new CopyLocationOperation(),
             isDisabled: false,
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Contains("Location", model.ResourceTypes);
@@ -56,7 +56,7 @@ public class OperationModelTests
             operation: new CopyLocationOperation(),
             isDisabled: false,
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Equal("Location", model.ResourceTypes[0]);
@@ -79,7 +79,7 @@ public class OperationModelTests
             resourceTypes: [],
             operation: new CopyLocationAliasToTypeIterativelyOperation(),
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Contains("Location", model.ResourceTypes);
@@ -94,7 +94,7 @@ public class OperationModelTests
             operation: new CopyLocationAliasToTypeIterativelyOperation(),
             isDisabled: false,
             facilityId: null,
-            vendorIds: null);
+            vendorVersionIds: null);
 
         Assert.Single(model.ResourceTypes);
         Assert.Contains("Location", model.ResourceTypes);

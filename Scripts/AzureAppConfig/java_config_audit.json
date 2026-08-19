@@ -1,0 +1,249 @@
+{
+  "_comment": [
+    "Hand-maintained audit of the configuration the Java services bind.",
+    "",
+    "The Java surface is small enough that an AST parser is not worth building: 15",
+    "@ConfigurationProperties classes, 12 @Value sites, and two logback-spring.xml files.",
+    "extract_config_keys.py folds this into the generated inventory.",
+    "",
+    "Keys are written in Spring's dotted property form. The App Configuration stores hold the",
+    "equivalent slash form (spring.datasource.url <-> /spring/datasource/url); the provider",
+    "strips the leading slash and converts remaining slashes to dots.",
+    "",
+    "Update this file when a @ConfigurationProperties class or @Value site changes.",
+    "",
+    "This is NOT a subset of app-config.yaml and must not be derived from it. The catalog",
+    "records what should be provisioned per environment; this records what the code actually",
+    "binds. Phase 2 compares the two, so deriving either from the other makes the comparison",
+    "circular. Today 21 of these 31 keys are absent from the catalog.",
+    "",
+    "Possible improvement: spring-boot-configuration-processor is not currently declared in",
+    "any pom. Adding it would make Maven emit META-INF/spring-configuration-metadata.json for",
+    "every @ConfigurationProperties class, replacing most of this file. It would not replace",
+    "all of it - the processor does not see @Value sites, nor loki.app, which logback-spring.xml",
+    "reads via <springProperty> and which a class-only scan would wrongly report as dead."
+  ],
+  "keys": [
+    {
+      "key": "authentication.authority",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "AuthenticationConfig"}]
+    },
+    {
+      "key": "authentication.anonymous",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "AuthenticationConfig"}]
+    },
+    {
+      "key": "authentication.admin-email",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "AuthenticationConfig"}]
+    },
+    {
+      "key": "authentication.signing-key",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "AuthenticationConfig"}]
+    },
+    {
+      "key": "spring.kafka.retry.max-attempts",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/KafkaRetryConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "KafkaRetryConfig"}]
+    },
+    {
+      "key": "spring.kafka.retry.retry-backoff-ms",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/KafkaRetryConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "KafkaRetryConfig"}]
+    },
+    {
+      "key": "loki.enabled",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java", "line": 9, "kind": "ConfigurationProperties", "type": "LokiConfig"}]
+    },
+    {
+      "key": "loki.url",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java", "line": 9, "kind": "ConfigurationProperties", "type": "LokiConfig"}]
+    },
+    {
+      "key": "loki.app",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": false,
+      "note": "Read by logback-spring.xml via <springProperty>, not by LokiConfig. A property-based scan of the binding classes alone would wrongly call this dead.",
+      "evidence": [
+        {"file": "Java/measureeval/src/main/resources/logback-spring.xml", "line": 3, "kind": "springProperty"},
+        {"file": "Java/validation/src/main/resources/logback-spring.xml", "line": 3, "kind": "springProperty"}
+      ]
+    },
+    {
+      "key": "secret-management.key-vault-uri",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/SecretManagementConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "SecretManagementConfig"}]
+    },
+    {
+      "key": "service-information.service-name",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/ServiceInformationConfig.java", "line": 12, "kind": "ConfigurationProperties", "type": "ServiceInformationConfig"}]
+    },
+    {
+      "key": "telemetry.exporter-endpoint",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/TelemetryConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "TelemetryConfig"}]
+    },
+    {
+      "key": "link.reportability-predicate",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java", "line": 24, "kind": "ConfigurationProperties", "type": "LinkConfig"}]
+    },
+    {
+      "key": "link.cql-debug",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java", "line": 24, "kind": "ConfigurationProperties", "type": "LinkConfig"}]
+    },
+    {
+      "key": "link.report.base-url",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java", "line": 42, "kind": "ConfigurationProperties", "type": "ReportClient"}]
+    },
+    {
+      "key": "internal-blob-storage.connection-string",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java", "line": 21, "kind": "ConfigurationProperties", "type": "BlobStorageConfig"}]
+    },
+    {
+      "key": "internal-blob-storage.blob-container-name",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java", "line": 21, "kind": "ConfigurationProperties", "type": "BlobStorageConfig"}]
+    },
+    {
+      "key": "resource-cache.blob-storage.connection-string",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/CacheBlobStorageConfig.java", "line": 19, "kind": "ConfigurationProperties", "type": "CacheBlobStorageConfig"}]
+    },
+    {
+      "key": "resource-cache.blob-storage.blob-container-name",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/CacheBlobStorageConfig.java", "line": 19, "kind": "ConfigurationProperties", "type": "CacheBlobStorageConfig"}]
+    },
+    {
+      "key": "resource-cache.blob-storage.blob-root",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": true,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/CacheBlobStorageConfig.java", "line": 19, "kind": "ConfigurationProperties", "type": "CacheBlobStorageConfig"}]
+    },
+    {
+      "key": "link.terminology-service-url",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/LinkConfig.java", "line": 16, "kind": "ConfigurationProperties", "type": "LinkConfig"}]
+    },
+    {
+      "key": "link.fhir-terminology-service-url",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/LinkConfig.java", "line": 16, "kind": "ConfigurationProperties", "type": "LinkConfig"}]
+    },
+    {
+      "key": "cache.type",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/CacheConfig.java", "line": 9, "kind": "ConfigurationProperties", "type": "CacheConfig"}]
+    },
+    {
+      "key": "cache.validate-code.ttl",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/CacheConfig.java", "line": 9, "kind": "ConfigurationProperties", "type": "CacheConfig"}]
+    },
+    {
+      "key": "pre-qualification.write-pre-qual-operation-outcome",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/PreQualificationConfig.java", "line": 16, "kind": "ConfigurationProperties", "type": "PreQualificationConfig"}]
+    },
+    {
+      "key": "pre-qualification.write-expressions-in-operation-outcome",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/PreQualificationConfig.java", "line": 16, "kind": "ConfigurationProperties", "type": "PreQualificationConfig"}]
+    },
+    {
+      "key": "link.info-route",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": false,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/BaseSpringConfig.java", "line": 23, "kind": "Value"}]
+    },
+    {
+      "key": "link.fhir-client-retry.max-attempts",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": false,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/FhirConfig.java", "line": 35, "kind": "Value"}]
+    },
+    {
+      "key": "link.fhir-client-retry.backoff-millis",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": false,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/FhirConfig.java", "line": 36, "kind": "Value"}]
+    },
+    {
+      "key": "management.health.resource-cache.timeout-ms",
+      "runtime": "java",
+      "consumers": ["MeasureEval"],
+      "derived": false,
+      "evidence": [{"file": "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/health/ResourceCacheHealthIndicator.java", "line": 67, "kind": "Value"}]
+    },
+    {
+      "key": "management.health.redis.timeout-ms",
+      "runtime": "java",
+      "consumers": ["Validation"],
+      "derived": false,
+      "evidence": [{"file": "Java/validation/src/main/java/com/lantanagroup/link/validation/health/RedisHealthIndicator.java", "line": 56, "kind": "Value"}]
+    }
+  ]
+}

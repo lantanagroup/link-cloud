@@ -1,6 +1,6 @@
-﻿using System.Text.Json;
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -72,7 +72,7 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
     private static OrganizationResourceMapTemplateDocument ToDocument(OrganizationResourceMapTemplate model) => new()
     {
         Id = model.Id,
-        Name = model.Name,
+        Name = model.Name.Trim(),
         Description = model.Description,
         IsSystem = model.IsSystem,
         IsDefault = model.IsDefault,
@@ -87,7 +87,8 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
         Description = doc.Description,
         IsSystem = doc.IsSystem,
         IsDefault = doc.IsDefault,
-        Conditions = Deserialize<List<OrganizationResourceMapCondition>>(doc.ConditionsJson) ?? [],
+        Conditions = Deserialize<List<OrganizationResourceMapCondition>>(
+        doc.ConditionsJson) ?? [],
         UpdatedAt = doc.UpdatedAt
     };
 

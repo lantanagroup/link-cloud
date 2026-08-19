@@ -12,12 +12,11 @@ namespace Automation.UI.Services.Persistence;
 ///
 /// <para>
 /// Imported FHIR transaction bundles attached to a scenario are <b>not</b> embedded in
-/// the scenario document &mdash; they are persisted to a sibling
-/// <c>automation_imported_bundles</c> collection and referenced by id via
-/// <see cref="TestScenarioDocument.ImportedBundleRefs"/>. This avoids breaching
-/// MongoDB's 16&#8239;MB document limit when a scenario carries several large bundles
-/// while keeping reads transparent to callers (the bundle JSON is hydrated back into
-/// each <see cref="ImportedPatientInput.BundleJson"/> on load).
+/// the scenario document. Metadata is persisted to the sibling
+/// <c>automation_imported_bundles</c> collection, content is externalized to Azure Blob
+/// Storage, and scenarios reference bundle ids via
+/// <see cref="TestScenarioDocument.ImportedBundleRefs"/>. Scenario reads retain those
+/// references; raw payloads are resolved only at the execution boundary.
 /// </para>
 ///
 /// <para>
@@ -31,10 +30,12 @@ namespace Automation.UI.Services.Persistence;
 /// </para>
 ///
 /// <para>
-/// <b>Back-compat.</b> Two legacy on-disk shapes are accepted on read:
+/// <b>Back-compat.</b> Legacy on-disk shapes are accepted on read:
 /// <list type="number">
 ///   <item>Pre-externalization: bundle JSON embedded inline in
 ///         <see cref="TestScenarioDocument.ImportedPatientBundlesJson"/> with no refs.</item>
+///   <item>Mongo-payload era: bundle JSON stored directly on <see cref="ImportedBundleDocument.BundleJson"/>.
+///         Startup migration pushes payloads to ABS and clears the Mongo field.</item>
 ///   <item>First externalization (single-owner): one bundle row per scenario keyed by a
 ///         singular <c>ScenarioId</c> field. <see cref="MongoIndexManager"/> ignores extra
 ///         elements via <see cref="MongoDB.Bson.Serialization.Attributes.BsonIgnoreExtraElementsAttribute"/>,
@@ -54,16 +55,18 @@ public sealed class MongoScenarioStore : IScenarioStore
 
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
+    private readonly IImportedBundleContentStore _bundleContentStore;
 
     static MongoScenarioStore()
     {
         CohortJsonOptions.Converters.Add(new JsonStringEnumConverter());
     }
 
-    public MongoScenarioStore(IMongoDatabase database)
+    public MongoScenarioStore(IMongoDatabase database, IImportedBundleContentStore bundleContentStore)
     {
         _scenarios = database.GetCollection<TestScenarioDocument>("automation_scenarios");
         _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+        _bundleContentStore = bundleContentStore;
     }
 
     public async Task<List<TestScenarioDefinition>> GetAllAsync(CancellationToken ct = default)
@@ -72,14 +75,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             .SortBy(d => d.Name)
             .ToListAsync(ct);
 
-        // Batch-fetch all referenced bundles in a single round trip rather than
-        // looking each one up per-scenario.
-        var allBundleIds = docs.SelectMany(d => d.ImportedBundleRefs.Select(r => r.BundleId))
-            .Distinct()
-            .ToList();
-        var bundlesById = await LoadBundlesByIdAsync(allBundleIds, ct);
-
-        return docs.Select(d => ToModel(d, bundlesById)).ToList();
+        return docs.Select(ToModel).ToList();
     }
 
     public async Task<TestScenarioDefinition?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -87,10 +83,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         var doc = await _scenarios.Find(d => d.Id == id).FirstOrDefaultAsync(ct);
         if (doc == null) return null;
 
-        var bundleIds = doc.ImportedBundleRefs.Select(r => r.BundleId).ToList();
-        var bundlesById = await LoadBundlesByIdAsync(bundleIds, ct);
-
-        return ToModel(doc, bundlesById);
+        return ToModel(doc);
     }
 
     public async Task UpsertAsync(TestScenarioDefinition scenario, CancellationToken ct = default)
@@ -153,11 +146,12 @@ public sealed class MongoScenarioStore : IScenarioStore
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(input.BundleJson))
+            var bundleJson = input.BundleJson;
+            if (string.IsNullOrWhiteSpace(bundleJson))
                 continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
 
-            var hash = ComputeContentHash(input.BundleJson!);
-            var byteCount = Encoding.UTF8.GetByteCount(input.BundleJson!);
+            var hash = ComputeContentHash(bundleJson);
+            var byteCount = Encoding.UTF8.GetByteCount(bundleJson);
 
             // Single round-trip: find by hash, set immutable fields on insert, refresh
             // mutable metadata, and add this scenario id to the references set. The
@@ -165,7 +159,6 @@ public sealed class MongoScenarioStore : IScenarioStore
             var update = Builders<ImportedBundleDocument>.Update
                 .SetOnInsert(b => b.Id, Guid.NewGuid())
                 .SetOnInsert(b => b.ContentHash, hash)
-                .SetOnInsert(b => b.BundleJson, input.BundleJson!)
                 .SetOnInsert(b => b.ByteCount, byteCount)
                 .SetOnInsert(b => b.CreatedAt, now)
                 .SetOnInsert(b => b.IsLibraryEntry, false)
@@ -182,6 +175,16 @@ public sealed class MongoScenarioStore : IScenarioStore
 
             var bundleDoc = await _bundles.FindOneAndUpdateAsync<ImportedBundleDocument>(
                 b => b.ContentHash == hash, update, options, ct);
+
+            var stored = await _bundleContentStore.StoreAsync(bundleDoc.Id, bundleDoc.ContentHash, bundleJson, ct);
+            await _bundles.UpdateOneAsync(
+                b => b.Id == bundleDoc.Id,
+                Builders<ImportedBundleDocument>.Update
+                    .Set(b => b.BundleBlobName, stored.BlobName)
+                    .Set(b => b.ByteCount, stored.ByteCount)
+                    .Set(b => b.BundleJson, null)
+                    .Set(b => b.UpdatedAt, now),
+                cancellationToken: ct);
 
             refs.Add(new ImportedBundleReference
             {
@@ -200,26 +203,53 @@ public sealed class MongoScenarioStore : IScenarioStore
         DateTimeOffset now,
         CancellationToken ct)
     {
+        var bundleDoc = await TryAttachBundleByIdAsync(bundleId, input, scenarioId, now, ct);
+        if (bundleDoc != null)
+        {
+            return new ImportedBundleReference
+            {
+                BundleId = bundleDoc.Id,
+                PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+            };
+        }
+
+        var redirect = await _bundles.Find(b => b.Id == bundleId).FirstOrDefaultAsync(ct);
+        if (redirect?.CanonicalBundleId is Guid canonicalBundleId)
+        {
+            bundleDoc = await TryAttachBundleByIdAsync(canonicalBundleId, input, scenarioId, now, ct);
+            if (bundleDoc != null)
+            {
+                return new ImportedBundleReference
+                {
+                    BundleId = bundleDoc.Id,
+                    PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ImportedBundleDocument?> TryAttachBundleByIdAsync(
+        Guid bundleId,
+        ImportedPatientInput input,
+        Guid scenarioId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var update = Builders<ImportedBundleDocument>.Update
             .Set(b => b.UpdatedAt, now)
             .Set(b => b.PatientId, input.PatientId ?? string.Empty)
             .Set(b => b.FileName, input.FileName)
             .AddToSet(b => b.ScenarioIds, scenarioId);
 
-        var bundleDoc = await _bundles.FindOneAndUpdateAsync(
-            b => b.Id == bundleId,
+        return await _bundles.FindOneAndUpdateAsync(
+            b => b.Id == bundleId
+                 && (b.DeletionClaimToken == null || b.DeletionClaimToken == string.Empty)
+                 && b.CanonicalBundleId == null,
             update,
             new FindOneAndUpdateOptions<ImportedBundleDocument> { ReturnDocument = ReturnDocument.After },
             ct);
-
-        if (bundleDoc == null)
-            return null;
-
-        return new ImportedBundleReference
-        {
-            BundleId = bundleDoc.Id,
-            PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
-        };
     }
 
     /// <summary>
@@ -245,16 +275,77 @@ public sealed class MongoScenarioStore : IScenarioStore
             Builders<ImportedBundleDocument>.Update.Pull(b => b.ScenarioIds, scenarioId),
             cancellationToken: ct);
 
-        // Delete unreferenced, non-library bundles. Treats both an empty list and a missing
-        // ScenarioIds field as orphan so legacy single-owner rows (without ScenarioIds) can
-        // be cleaned up too.
+        // Claim orphaned docs first so concurrent attachments cannot race with blob delete.
+        // Delete only docs successfully claimed by this pass.
         var orphanFilter = Builders<ImportedBundleDocument>.Filter.And(
             Builders<ImportedBundleDocument>.Filter.Or(
                 Builders<ImportedBundleDocument>.Filter.Size(b => b.ScenarioIds, 0),
                 Builders<ImportedBundleDocument>.Filter.Exists(b => b.ScenarioIds, false)),
             Builders<ImportedBundleDocument>.Filter.Eq(b => b.IsLibraryEntry, false));
 
-        await _bundles.DeleteManyAsync(orphanFilter, ct);
+        var claimToken = Guid.NewGuid().ToString("N");
+        var claimFilter = Builders<ImportedBundleDocument>.Filter.And(
+            orphanFilter,
+            Builders<ImportedBundleDocument>.Filter.Or(
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, null),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, string.Empty)));
+
+        var claimUpdate = Builders<ImportedBundleDocument>.Update
+            .Set(b => b.DeletionClaimToken, claimToken)
+            .Set(b => b.DeletionClaimedAt, DateTimeOffset.UtcNow)
+            .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow);
+
+        var claimedOrphans = new List<ImportedBundleDocument>();
+        while (true)
+        {
+            var claimed = await _bundles.FindOneAndUpdateAsync(
+                claimFilter,
+                claimUpdate,
+                new FindOneAndUpdateOptions<ImportedBundleDocument>
+                {
+                    ReturnDocument = ReturnDocument.After
+                },
+                ct);
+
+            if (claimed == null)
+                break;
+
+            claimedOrphans.Add(claimed);
+        }
+
+        if (claimedOrphans.Count == 0)
+            return;
+
+        var deletableIds = new List<Guid>(claimedOrphans.Count);
+        foreach (var orphan in claimedOrphans)
+        {
+            try
+            {
+                await _bundleContentStore.DeleteAsync(orphan, ct);
+                deletableIds.Add(orphan.Id);
+            }
+            catch
+            {
+                await _bundles.UpdateOneAsync(
+                    b => b.Id == orphan.Id && b.DeletionClaimToken == claimToken,
+                    Builders<ImportedBundleDocument>.Update
+                        .Set(b => b.DeletionClaimToken, null)
+                        .Set(b => b.DeletionClaimedAt, null)
+                        .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
+                throw;
+            }
+        }
+
+        if (deletableIds.Count > 0)
+        {
+            var deleteFilter = Builders<ImportedBundleDocument>.Filter.And(
+                Builders<ImportedBundleDocument>.Filter.In(b => b.Id, deletableIds),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, claimToken),
+                orphanFilter);
+
+            await _bundles.DeleteManyAsync(deleteFilter, ct);
+        }
     }
 
     /// <summary>
@@ -297,17 +388,6 @@ public sealed class MongoScenarioStore : IScenarioStore
         return Convert.ToHexString(hash);
     }
 
-    private async Task<Dictionary<Guid, string>> LoadBundlesByIdAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
-    {
-        if (ids.Count == 0)
-            return new Dictionary<Guid, string>();
-
-        var docs = await _bundles.Find(Builders<ImportedBundleDocument>.Filter.In(b => b.Id, ids))
-            .ToListAsync(ct);
-
-        return docs.ToDictionary(b => b.Id, b => b.BundleJson);
-    }
-
     private static TestScenarioDocument ToDocument(
         TestScenarioDefinition model,
         List<ImportedPatientInput> sanitizedBundles,
@@ -338,9 +418,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             UpdatedAt = model.UpdatedAt
         };
 
-    private static TestScenarioDefinition ToModel(
-        TestScenarioDocument doc,
-        IReadOnlyDictionary<Guid, string> bundlesById) => new()
+    private static TestScenarioDefinition ToModel(TestScenarioDocument doc) => new()
         {
             Id = doc.Id,
             Name = doc.Name,
@@ -366,19 +444,16 @@ public sealed class MongoScenarioStore : IScenarioStore
             ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,
             ReportPeriodEnd = doc.ReportPeriodEnd.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodEnd.Value, DateTimeKind.Utc)) : null,
             ImportedPatientIds = DeserializeImported(doc.ImportedPatientIdsJson),
-            ImportedPatientBundles = HydrateBundles(doc, bundlesById),
+            ImportedPatientBundles = AttachBundleReferences(doc),
             UpdatedAt = doc.UpdatedAt
         };
 
     /// <summary>
-    /// Restores each <see cref="ImportedPatientInput.BundleJson"/> from the externalized
-    /// bundle collection. Falls back to whatever <c>BundleJson</c> is already on the
-    /// deserialized input (legacy inline-embedded layout) when the document carries no
-    /// references &mdash; this keeps pre-migration scenarios readable.
+    /// Attaches each external bundle id to its scenario input without loading raw bundle
+    /// content. Legacy inline payloads remain available for migration compatibility, but
+    /// externally stored content is resolved only by the execution layer.
     /// </summary>
-    private static List<ImportedPatientInput> HydrateBundles(
-        TestScenarioDocument doc,
-        IReadOnlyDictionary<Guid, string> bundlesById)
+    private static List<ImportedPatientInput> AttachBundleReferences(TestScenarioDocument doc)
     {
         var inputs = DeserializeImported(doc.ImportedPatientBundlesJson);
         if (doc.ImportedBundleRefs.Count == 0 || inputs.Count == 0)
@@ -401,16 +476,11 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         foreach (var input in inputs)
         {
-            if (!string.IsNullOrEmpty(input.BundleJson))
-                continue; // already inline (legacy doc) — leave as-is
-
             var key = input.PatientId ?? string.Empty;
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
             {
                 var bundleId = queue.Dequeue();
                 input.UploadedBundleId = bundleId;
-                if (bundlesById.TryGetValue(bundleId, out var json))
-                    input.BundleJson = json;
             }
         }
 

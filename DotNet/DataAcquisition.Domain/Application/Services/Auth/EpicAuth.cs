@@ -48,9 +48,9 @@ public class EpicAuth : IAuth
     /// <param name="httpClient"></param>
     /// <param name="authSettings"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
-        var cachedToken = _cacheService.Get<string>(facilityId);
+        var cachedToken = await _cacheService.GetAsync<string>(facilityId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
@@ -74,7 +74,7 @@ public class EpicAuth : IAuth
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
+                    await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
                     return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
                 }
             }

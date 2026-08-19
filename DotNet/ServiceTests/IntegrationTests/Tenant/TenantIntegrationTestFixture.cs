@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
@@ -25,6 +26,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Moq;
 using Quartz;
 using Quartz.Spi;
 using System.Diagnostics;
@@ -71,6 +73,10 @@ namespace IntegrationTests.Tenant
             // Register the service
             builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
             builder.Services.AddScoped<IFacilityManager, FacilityManager>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddSingleton<Mock<INormalizationServiceClient>>();
+            builder.Services.AddSingleton(provider => provider.GetRequiredService<Mock<INormalizationServiceClient>>().Object);
 
             // Add IHttpClientFactory
             builder.Services.AddHttpClient();
@@ -115,8 +121,9 @@ namespace IntegrationTests.Tenant
 
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
 
-            // Stub producer for AuditEventCommand
-            builder.Services.AddSingleton<IProducer<string, AuditEventMessage>>(new StubProducer<string, AuditEventMessage>());
+            // Recording producer for AuditEventCommand, so tests can assert on emitted audit events.
+            builder.Services.AddSingleton<RecordingAuditProducer>();
+            builder.Services.AddSingleton<IProducer<string, AuditEventMessage>>(sp => sp.GetRequiredService<RecordingAuditProducer>());
 
             // Add the real CreateAuditEventCommand
             builder.Services.AddSingleton<CreateAuditEventCommand>();
@@ -204,13 +211,58 @@ namespace IntegrationTests.Tenant
             }
         }
 
-        private class StubProducer<TKey, TValue> : IProducer<TKey, TValue>
+        /// <summary>
+        /// Captures audit events instead of discarding them. CreateAuditEventCommand.Execute is
+        /// async void, so a test awaits <see cref="WaitForAsync"/> rather than assuming the
+        /// message has landed by the time the manager call returns.
+        /// </summary>
+        public class RecordingAuditProducer : StubProducer<string, AuditEventMessage>
+        {
+            private readonly List<(string Key, AuditEventMessage Value)> _produced = new();
+
+            public IReadOnlyList<(string Key, AuditEventMessage Value)> Produced
+            {
+                get { lock (_produced) { return _produced.ToList(); } }
+            }
+
+            public void Clear()
+            {
+                lock (_produced) { _produced.Clear(); }
+            }
+
+            public override Task<DeliveryResult<string, AuditEventMessage>> ProduceAsync(
+                string topic, Message<string, AuditEventMessage> message, CancellationToken cancellationToken = default)
+            {
+                lock (_produced) { _produced.Add((message.Key, message.Value)); }
+                return base.ProduceAsync(topic, message, cancellationToken);
+            }
+
+            public async Task<IReadOnlyList<(string Key, AuditEventMessage Value)>> WaitForAsync(
+                int count, TimeSpan timeout)
+            {
+                var deadline = DateTime.UtcNow + timeout;
+                while (DateTime.UtcNow < deadline)
+                {
+                    var produced = Produced;
+                    if (produced.Count >= count)
+                    {
+                        return produced;
+                    }
+
+                    await Task.Delay(20);
+                }
+
+                return Produced;
+            }
+        }
+
+        public class StubProducer<TKey, TValue> : IProducer<TKey, TValue>
         {
             public Handle Handle => null;
 
             public string Name => "stub";
 
-            public Task<DeliveryResult<TKey, TValue>> ProduceAsync(string topic, Message<TKey, TValue> message, CancellationToken cancellationToken = default)
+            public virtual Task<DeliveryResult<TKey, TValue>> ProduceAsync(string topic, Message<TKey, TValue> message, CancellationToken cancellationToken = default)
             {
                 return Task.FromResult(new DeliveryResult<TKey, TValue>
                 {

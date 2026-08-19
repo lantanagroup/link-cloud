@@ -59,10 +59,10 @@
 
     <mat-form-field appearance="outline">
       <mat-label>Vendor</mat-label>
-      <mat-select formControlName="vendor" [placeholder]="'Select a vendor'" [disabled]="viewOnly">
-        @for (vendor of vendors; track vendor) {
+      <mat-select formControlName="vendor" [placeholder]="'Select a vendor'" [disabled]="viewOnly" [compareWith]="compareVendors">
+        @for (vendor of vendors; track vendor.id) {
           <mat-option [disabled]="viewOnly" [value]="vendor">
-            {{ vendor }}
+            {{ vendor.vendorName }} - {{ vendor.version }}
           </mat-option>
         }
       </mat-select>

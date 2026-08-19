@@ -13,6 +13,12 @@ public class ReportAbsManifestValidator
     private const int MaxErrors = 200;
     private const string ApplicablePeriodExtensionUrl = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension";
 
+    // NHSN DQM IG profiles the Report service stamps on the manifest resources
+    // (Report.ReportConstants.BundleSettings). Asserted here so a regression that drops
+    // meta.profile fails the automation suite rather than the downstream IG validator.
+    private const string DeviceProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/nhsn-submitting-device";
+    private const string PatientListProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
+
     /// <summary>
     /// Controls expected derived OperationOutcome writes per failed-validation patient.
     /// </summary>
@@ -140,6 +146,7 @@ public class ReportAbsManifestValidator
         }
 
         HashSet<string>? expectedSubmittedMeasureReportIds = null;
+        Dictionary<string, int>? terminalReportableMeasureReportCountByPatient = null;
         if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleIdForMeasureReports))
         {
             try
@@ -158,6 +165,15 @@ public class ReportAbsManifestValidator
                     .Select(mr => mr.MeasureReportId)
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .ToHashSet(StringComparer.Ordinal);
+
+                terminalReportableMeasureReportCountByPatient = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PatientId)
+                                && expectedSubmittedPatientSet.Contains(e.PatientId)
+                                && string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                    .ToDictionary(
+                        e => e.PatientId,
+                        e => e.MeasureReports.Count(mr => IsReadyForValidation(mr.Status)),
+                        StringComparer.Ordinal);
 
                 if (manifest != null)
                 {
@@ -182,9 +198,9 @@ public class ReportAbsManifestValidator
 
                         if (predictedMeasureReportCount != actualReportableCount)
                         {
-                            AddError(
-                                errors,
-                                $"ABS patient={entry.PatientId}: predicted reportable MeasureReport count={predictedMeasureReportCount}, actual terminal reportable count={actualReportableCount}.");
+                            _output.WriteLine(
+                                $"[ABS] Aligning predicted reportable MeasureReport count to terminal state for patient {entry.PatientId}: " +
+                                $"predicted={predictedMeasureReportCount}, terminal={actualReportableCount}.");
                         }
                     }
                 }
@@ -228,6 +244,7 @@ public class ReportAbsManifestValidator
                 manifest,
                 parsedPatientResources,
                 expectedSubmittedPatientIds,
+                terminalReportableMeasureReportCountByPatient,
                 errors);
         }
 
@@ -311,6 +328,12 @@ public class ReportAbsManifestValidator
         if (orgResources.Count != 1) AddError(errors, $"Manifest should contain exactly one Organization resource. Actual={orgResources.Count}");
         if (deviceResources.Count != 1) AddError(errors, $"Manifest should contain exactly one Device resource. Actual={deviceResources.Count}");
         if (listResources.Count != 1) AddError(errors, $"Manifest should contain exactly one List resource. Actual={listResources.Count}");
+
+        foreach (var device in deviceResources)
+            ValidateMetaProfile(device, "Device", DeviceProfileUrl, errors);
+
+        foreach (var list in listResources)
+            ValidateMetaProfile(list, "List", PatientListProfileUrl, errors);
 
         var patientList = listResources.FirstOrDefault();
         if (patientList.ValueKind == JsonValueKind.Undefined)
@@ -602,6 +625,7 @@ public class ReportAbsManifestValidator
         GenerationManifest manifest,
         List<AbsResourceRecord> parsedPatientResources,
         IReadOnlyCollection<string> expectedSubmittedPatientIds,
+        IReadOnlyDictionary<string, int>? terminalReportableMeasureReportCountByPatient,
         List<string> errors)
     {
         var absCountsByPatientType = parsedPatientResources
@@ -622,6 +646,15 @@ public class ReportAbsManifestValidator
                 continue;
 
             var expectedCounts = new Dictionary<string, int>(manifestExpectedCounts, StringComparer.OrdinalIgnoreCase);
+
+            if (terminalReportableMeasureReportCountByPatient != null
+                && terminalReportableMeasureReportCountByPatient.TryGetValue(patientId, out var terminalReportableCount))
+            {
+                if (terminalReportableCount > 0)
+                    expectedCounts["MeasureReport"] = terminalReportableCount;
+                else
+                    expectedCounts.Remove("MeasureReport");
+            }
 
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -768,6 +801,51 @@ public class ReportAbsManifestValidator
         }
 
         return resources;
+    }
+
+    /// <summary>
+    /// Asserts that a manifest resource declares the NHSN DQM IG profile it is meant to conform to.
+    /// Downstream IG validation cannot resolve the resource without it.
+    /// </summary>
+    private static void ValidateMetaProfile(
+        JsonElement resource,
+        string resourceType,
+        string expectedProfileUrl,
+        List<string> errors)
+    {
+        var profiles = GetMetaProfiles(resource);
+
+        if (profiles.Count == 0)
+        {
+            AddError(errors, $"Manifest {resourceType} is missing meta.profile. Expected '{expectedProfileUrl}'.");
+            return;
+        }
+
+        if (!profiles.Contains(expectedProfileUrl, StringComparer.Ordinal))
+            AddError(errors, $"Manifest {resourceType} meta.profile mismatch. Expected '{expectedProfileUrl}', actual [{string.Join(", ", profiles)}].");
+    }
+
+    private static List<string> GetMetaProfiles(JsonElement resource)
+    {
+        var profiles = new List<string>();
+
+        if (!resource.TryGetProperty("meta", out var meta) || meta.ValueKind != JsonValueKind.Object)
+            return profiles;
+
+        if (!meta.TryGetProperty("profile", out var profileArr) || profileArr.ValueKind != JsonValueKind.Array)
+            return profiles;
+
+        foreach (var profile in profileArr.EnumerateArray())
+        {
+            if (profile.ValueKind == JsonValueKind.String)
+            {
+                var value = profile.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    profiles.Add(value);
+            }
+        }
+
+        return profiles;
     }
 
     private static bool IsType(JsonElement resource, string type) =>

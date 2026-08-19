@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.26")
+                .HasAnnotation("ProductVersion", "8.0.27")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -687,46 +687,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("ResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Vendor");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<Guid>("VendorId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Version")
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VendorId");
-
-                    b.ToTable("VendorVersion");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersionOperationPreset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -846,17 +806,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Navigation("OperationResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", "Vendor")
-                        .WithMany("VendorVersions")
-                        .HasForeignKey("VendorId")
-                        .IsRequired()
-                        .HasConstraintName("FK_VendorVersion_Vendor");
-
-                    b.Navigation("Vendor");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersionOperationPreset", b =>
                 {
                     b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.OperationResourceType", "OperationResourceType")
@@ -865,15 +814,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_VendorOperationPreset_OperationResourceTypes");
 
-                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", "VendorVersion")
-                        .WithMany("VendorVersionOperationPresets")
-                        .HasForeignKey("VendorVersionId")
-                        .IsRequired()
-                        .HasConstraintName("FK_VendorOperationPreset_VendorVersion");
-
                     b.Navigation("OperationResourceType");
-
-                    b.Navigation("VendorVersion");
                 });
 
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
@@ -907,16 +848,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.ResourceType", b =>
                 {
                     b.Navigation("OperationResourceTypes");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Vendor", b =>
-                {
-                    b.Navigation("VendorVersions");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.VendorVersion", b =>
-                {
-                    b.Navigation("VendorVersionOperationPresets");
                 });
 #pragma warning restore 612, 618
         }

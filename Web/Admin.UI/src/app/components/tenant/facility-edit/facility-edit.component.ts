@@ -61,7 +61,6 @@ import {
 import {
   IOrganizationLocationConfigurationModel
 } from '../../../interfaces/data-acquisition/organization-location-config-model.interface';
-import { Vendor } from '../../../interfaces/tenant/vendor.enum';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
   QueryPlanConfigDialogComponent
@@ -87,6 +86,7 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {IVendor, IVendorVersion} from "src/app/interfaces/tenant/vendor-interface";
 
 
 @Component({
@@ -175,7 +175,7 @@ export class FacilityEditComponent implements OnInit {
     return this._displayReportDashboard;
   }
 
-  get facilityVendor(): Vendor | undefined {
+  get facilityVendor(): IVendor | undefined {
     return this.facilityConfig?.vendor;
   }
 

@@ -7,7 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { IFacilityConfigModel, PagedFacilityConfigModel } from '../../../interfaces/tenant/facility-config-model.interface';
-import { Vendor } from '../../../interfaces/tenant/vendor.enum';
+import { IVendor } from '../../../interfaces/tenant/vendor-interface';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -73,7 +73,7 @@ export class TenantDashboardComponent implements OnInit, OnDestroy {
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
   showDeleted = false;
 
-  readonly vendorOptions = Object.values(Vendor);
+  vendorOptions: IVendor[] = [];
   readonly timezoneOptions: string[] = moment.tz.names();
 
   // Facility autocomplete
@@ -84,7 +84,7 @@ export class TenantDashboardComponent implements OnInit, OnDestroy {
 
   //search parameters
   filterTimeZone: string = '';
-  filterVendor: string = '';
+  filterVendor: IVendor | null = null;
   sortBy: string = 'FacilityId';
   sortOrder: number = 0;
 
@@ -111,6 +111,10 @@ export class TenantDashboardComponent implements OnInit, OnDestroy {
       map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
     );
 
+    this.tenantService.getVendors().subscribe(vendors => {
+      this.vendorOptions = vendors;
+    });
+
     this.getFacilities();
   }
 
@@ -125,7 +129,7 @@ export class TenantDashboardComponent implements OnInit, OnDestroy {
       facilityIdParam,
       facilityNameParam,
       this.filterTimeZone,
-      this.filterVendor,
+      this.filterVendor?.id ?? '',
       this.sortBy,
       this.sortOrder,
       this.paginationMetadata.pageSize,
@@ -210,7 +214,7 @@ export class TenantDashboardComponent implements OnInit, OnDestroy {
     this.selectedFacilityId = null;
     this.facilityInputControl.setValue('', { emitEvent: false });
     this.filterTimeZone = '';
-    this.filterVendor = '';
+    this.filterVendor = null;
     this.showDeleted = false;
     this.paginationMetadata.pageNumber = 0;
     this.getFacilities();

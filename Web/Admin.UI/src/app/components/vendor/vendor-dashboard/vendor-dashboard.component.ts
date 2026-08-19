@@ -51,7 +51,7 @@ export class VendorDashboardComponent {
 
   dataSource!: MatTableDataSource<IVendorConfigModel>;
 
-  displayedColumns: string[] = ['name', 'Actions'];
+  displayedColumns: string[] = ['name', 'secretId', 'Actions'];
 
   loading = false;
   error: string | null = null;
@@ -72,11 +72,37 @@ export class VendorDashboardComponent {
     this.vendorService.getVendors().subscribe({
       next: (data) => {
         this.vendors = data;
+        // Cleared here too: the success path used to leave the flag set, so anything keyed off
+        // `loading` stayed in its loading state for the rest of the session.
+        this.loading = false;
       },
       error: (error) => {
         this.error = 'Failed to load vendors. Please try again.';
         this.loading = false;
         console.error('Error loading vendors:', error);
+      }
+    });
+  }
+
+  onEdit(row: IVendorConfigModel): void {
+    this.dialog.open(VendorConfigDialogComponent,
+      {
+        width: '75%',
+        data: {
+          dialogTitle: 'Vendor Configuration',
+          formMode: FormMode.Edit,
+          viewOnly: false,
+          vendorConfig: row,
+        }
+      }).afterClosed().subscribe(res => {
+      if (res) {
+        this.getVendors();
+        this.snackBar.open(`Vendor Updated`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
       }
     });
   }
