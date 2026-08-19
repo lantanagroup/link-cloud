@@ -7,10 +7,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // Semantic ordering in Java — the DB stores semver as a string, and lexically 1.10.0 < 1.9.0.
-public record Semver(long major, long minor, long patch, String preRelease) implements Comparable<Semver> {
+// Kept intentionally simple: MAJOR.MINOR.PATCH only, no pre-release tags.
+public record Semver(long major, long minor, long patch) implements Comparable<Semver> {
 
-    public static final Pattern PATTERN =
-            Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?$");
+    public static final Pattern PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)$");
 
     public static Semver parse(String value) {
         if (value == null) {
@@ -18,17 +18,18 @@ public record Semver(long major, long minor, long patch, String preRelease) impl
         }
         Matcher m = PATTERN.matcher(value.trim());
         if (!m.matches()) {
-            throw new IllegalArgumentException("'" + value + "' is not a valid semantic version");
+            throw new IllegalArgumentException(
+                    "'" + value + "' is not a valid semantic version (expected MAJOR.MINOR.PATCH, e.g. 1.2.0)");
         }
         try {
             // long, not int — timestamp-style components like 1.0.1753017600000 must not overflow
             return new Semver(
                     Long.parseLong(m.group(1)),
                     Long.parseLong(m.group(2)),
-                    Long.parseLong(m.group(3)),
-                    m.group(4));
+                    Long.parseLong(m.group(3)));
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("'" + value + "' has a numeric component out of range");
+            throw new IllegalArgumentException(
+                    "'" + value + "' has a numeric component out of range: each of MAJOR, MINOR, PATCH must be less than " + Long.MAX_VALUE);
         }
     }
 
@@ -61,7 +62,13 @@ public record Semver(long major, long minor, long patch, String preRelease) impl
     // canonical form with leading zeros stripped, e.g. "01.02.3" -> "1.2.3" — used so
     // storage/lookup treat numerically-equal segments as the same version
     public String toCanonicalString() {
-        return major + "." + minor + "." + patch + (preRelease != null ? "-" + preRelease : "");
+        return major + "." + minor + "." + patch;
+    }
+
+    // true once leading zeros are stripped, e.g. "0.00.0" -> "0.0.0" — reserved, never a
+    // registrable version
+    public boolean isZero() {
+        return major == 0 && minor == 0 && patch == 0;
     }
 
     // canonical form if the value parses, otherwise the value unchanged. This is the single
@@ -82,10 +89,6 @@ public record Semver(long major, long minor, long patch, String preRelease) impl
         if (c != 0) return c;
         c = Long.compare(minor, o.minor);
         if (c != 0) return c;
-        c = Long.compare(patch, o.patch);
-        if (c != 0) return c;
-        if (preRelease == null) return o.preRelease == null ? 0 : 1;
-        if (o.preRelease == null) return -1;
-        return preRelease.compareTo(o.preRelease);
+        return Long.compare(patch, o.patch);
     }
 }

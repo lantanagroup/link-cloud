@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Comparator;
+
 /**
  * Cache wrappers for the rubric lookups on the evaluate path. Lifecycle changes go through
  * {@link #evictVersion} so they take effect right away instead of waiting out the TTL.
@@ -49,13 +51,14 @@ public class RubricCacheService {
                 .orElse(null);
     }
 
-    // latest PUBLISHED semver, i.e. what an evaluate call without a version gets. Sorted
-    // semantically (1.10.0 > 1.9.0) — the DB stores semver as a string, lexical order is wrong.
+    // latest PUBLISHED semver, i.e. what an evaluate call without a version gets. "Latest" means
+    // the most recently published version (by publishedAt), not the highest semver number — a
+    // hotfix like 1.0.1 published after 2.0.0 was rolled back should still win.
     @Cacheable(value = LATEST_SEMVER_CACHE, key = "#rubricId", unless = "#result == null")
     public String getLatestPublishedSemver(String rubricId) {
         return rubricVersionRepository.findByRubricIdAndStatus(rubricId, RubricVersionStatus.PUBLISHED)
                 .stream()
-                .max(Semver.versionComparator())
+                .max(Comparator.comparing(RubricVersion::getPublishedAt))
                 .map(RubricVersion::getSemver)
                 .orElse(null);
     }

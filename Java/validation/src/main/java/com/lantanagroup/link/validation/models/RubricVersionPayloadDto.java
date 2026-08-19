@@ -34,9 +34,9 @@ public class RubricVersionPayloadDto {
     private String id;
 
     @NotBlank
-    @Size(max = 32)
-    @Pattern(regexp = "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$",
-            message = "must be a semantic version like 1.2.0")
+    @Size(max = 32, message = "must be at most 32 characters")
+    @Pattern(regexp = "^\\d+\\.\\d+\\.\\d+$",
+            message = "must be a semantic version like 1.2.0 (MAJOR.MINOR.PATCH, no pre-release tag)")
     private String semver;
 
     @Size(max = 256)
