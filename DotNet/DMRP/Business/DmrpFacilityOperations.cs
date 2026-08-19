@@ -173,9 +173,7 @@ namespace LantanaGroup.Link.DMRP.Business
                 return EmptySchedule();
             }
 
-            var unmapped = entries.Where(e => string.IsNullOrWhiteSpace(e.DQM)).ToList();
-
-            foreach (var entry in unmapped)
+            foreach (var entry in entries.Where(e => string.IsNullOrWhiteSpace(e.DQM)))
             {
                 // The scheduling workflow records a measure DMRP returned that Link has no mapping for
                 // with a null dQM, precisely so it shows up here rather than being lost.

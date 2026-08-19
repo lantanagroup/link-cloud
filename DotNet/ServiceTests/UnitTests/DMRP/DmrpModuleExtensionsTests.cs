@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -152,6 +153,59 @@ namespace UnitTests.DMRP
             builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
 
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
+        }
+
+        /// <summary>
+        /// The module decorates whatever the host registered, so it has to be registered first.
+        /// Getting that order wrong is otherwise invisible: RemoveAll finds nothing to remove, the
+        /// host's later registration wins the resolve, and DMRP runs with none of its facility
+        /// behavior.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_refuses_to_decorate_a_host_that_registered_nothing()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityOperations>();
+
+            var mvcBuilder = builder.Services.AddControllers();
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+
+            Assert.Contains(nameof(IFacilityOperations), exception.Message);
+        }
+
+        /// <summary>
+        /// A host that registers its implementation by type rather than behind the interface has met
+        /// the same requirement, and the module resolves it by type regardless.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_accepts_a_host_that_registered_only_the_implementation_type()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityOperations>();
+            builder.Services.AddScoped(_ => new HostFacilityOperations());
+
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
+                builder.Services.AddControllers());
+
+            Assert.True(registered);
+        }
+
+        /// <summary>
+        /// A host that never registered it is only a problem when the module is on. Disabled, the
+        /// module leaves the host exactly as it found it.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_does_not_check_the_hosts_registration_when_disabled()
+        {
+            var builder = CreateBuilder(enabled: false);
+            builder.Services.RemoveAll<IFacilityOperations>();
+
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
+                builder.Services.AddControllers());
+
+            Assert.False(registered);
         }
 
         [Fact]

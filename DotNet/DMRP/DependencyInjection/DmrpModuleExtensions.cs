@@ -79,6 +79,27 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what
             // puts the module's behavior in front of the host's without moving a route. The host's own
             // implementation stays resolvable by its own type, which is what the module delegates to.
+            //
+            // Checked rather than assumed: RemoveAll on a service nobody registered removes nothing and
+            // reports nothing, so a host that called this before registering its own implementation
+            // would have that registration appended afterwards and win the resolve. The module would be
+            // enabled with none of its facility behavior and no sign of it. Fail loudly instead.
+            //
+            // Either registration counts. The host normally registers the interface and lets the
+            // TryAddScoped below make its implementation resolvable by type; a host that registers the
+            // implementation type itself - to hand it dependencies of its own - has satisfied the same
+            // requirement.
+            var hostRegisteredItsOperations = builder.Services.Any(d =>
+                d.ServiceType == typeof(IFacilityOperations) || d.ServiceType == typeof(THostFacilityOperations));
+
+            if (!hostRegisteredItsOperations)
+            {
+                throw new InvalidOperationException(
+                    $"The DMRP module decorates the host's {nameof(IFacilityOperations)}, but neither it nor " +
+                    $"{typeof(THostFacilityOperations).Name} is registered. Register the host's implementation " +
+                    $"before calling {nameof(AddDmrpModule)}.");
+            }
+
             builder.Services.RemoveAll<IFacilityOperations>();
             builder.Services.TryAddScoped<THostFacilityOperations>();
             builder.Services.AddScoped<IFacilityOperations>(sp =>

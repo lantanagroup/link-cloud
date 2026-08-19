@@ -109,12 +109,36 @@ namespace UnitTests.DMRP
             Assert.Equal(new[] { "ach-monthly" }, facility.ScheduledReports.Monthly);
         }
 
+        /// <summary>
+        /// The unmapped entry carries a frequency the schedule does have a bucket for, so the only
+        /// thing that can exclude it is the missing dQM.
+        /// </summary>
         [Fact]
         public async Task Excludes_an_enrolled_measure_that_has_no_dqm_mapped()
         {
             GivenPlan(
                 new ReportingPlanEntry("HOB", "dqm-monthly", Frequency.Monthly),
-                new ReportingPlanEntry("NEWMEASURE", string.Empty, Frequency.Adhoc));
+                new ReportingPlanEntry("NEWMEASURE", string.Empty, Frequency.Monthly));
+
+            var facility = Facility();
+
+            await CreateOperations().CreateAsync(facility);
+
+            Assert.Equal(new[] { "dqm-monthly" }, facility.ScheduledReports.Monthly);
+            Assert.Empty(facility.ScheduledReports.Daily);
+            Assert.Empty(facility.ScheduledReports.Weekly);
+        }
+
+        /// <summary>
+        /// The schedule the host stores has a bucket for daily, weekly and monthly and nothing else, so
+        /// a measure mapped as adhoc belongs to no bucket rather than to a default one.
+        /// </summary>
+        [Fact]
+        public async Task Excludes_an_enrolled_measure_mapped_to_an_adhoc_frequency()
+        {
+            GivenPlan(
+                new ReportingPlanEntry("HOB", "dqm-monthly", Frequency.Monthly),
+                new ReportingPlanEntry("HTCDI", "dqm-adhoc", Frequency.Adhoc));
 
             var facility = Facility();
 
