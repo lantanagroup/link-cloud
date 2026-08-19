@@ -793,9 +793,15 @@
             <summary id="dmrpCheck">System verified that the facility has at least one result returned from the DMRP API. This confirms that the site has enrolled in at least one reporting plan. At the end of the enrollment workflow, the user will validate that their reporting plan is accurate prior to completing enrollment.</summary>
           </details>
         </div>
-        <h1>Welcome to NHSNLink Onboarding</h1>
+        <h1>Welcome to DQM Onboarding</h1>
         <p class="subtitle">The National Healthcare Safety Network (NHSN) uses <a href="https://www.cdc.gov/nhsn/fhirportal/about.html">NHSNLink</a>, an open-source Fast Healthcare Interoperability Resources (<a href="https://www.hl7.org/fhir/R4/index.html">FHIR®</a>) application, to enable reporting of digital quality measures (dQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of dQMs to NHSN.</p>
 
+        
+        <h2>Intended Audience</h2>
+        <p class="subtitle">The onboarding steps that follow should be completed by the site’s information technology team.</p>
+
+        <h2>Workflow</h2>
+        <p class="subtitle">Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time.</p>
         <div class="btn-row" id="enrollmentContinueRow">
           <button class="btn" id="enrollmentContinueBtn">Continue</button>
         </div>
@@ -882,7 +888,7 @@
     <section class="panel" id="panel-fhir" hidden>
       <div class="card">
         <h1>FHIR Server Information</h1>
-        <p class="subtitle">NHSNLink uses the <a href="https://hl7.org/fhir/R4/summary.html">FHIR</a> standard to connect with your facility’s health information system. Please provide the technical information needed to securely connect your EHR FHIR API's to NHSNLink.</p>
+        <p class="subtitle">NHSNLink uses the <a href="https://hl7.org/fhir/R4/summary.html">FHIR</a> standard to connect with your facility’s EHR system. Please provide the technical information needed to securely connect your EHR FHIR API's to NHSNLink.</p>
 
         <div class="form-group">
           <label for="fhirBaseUrl">FHIR Server Base URL
@@ -1348,7 +1354,7 @@
         <h1>MRN Identifier Intake</h1>
         <p class="subtitle">When multiple patient identifiers are present in FHIR, the facility reporting digital quality measures (dQMs) to NHSN should identify the one that is operationally used by end users in the source EHR. This allows NHSN to provide back to the facility the medical record number (MRN) end user can use to recognize and retrieve the patients based on their NHSN analysis reports. In FHIR implementations, Patient.identifier is a repeating element, and more than one identifier may be represented as MRN or may appear to be the MRN. Fields such as type, use, system, assigner, and period can help distinguish identifiers. If more than one identifier is coded as the MRN, NHSN needs to differentiate the usable MRN using FHIR fields such as identifier.system, identifier.use, identifier.assigner, and identifier.period.</p>
 
-        <p class="subtitle">NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided in this form ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This form should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.</p>
+        <p class="subtitle">NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided on this page ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This page should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.</p>
 
         <div class="section-title" style="margin-top:0;">Multiple MRN Candidates</div>
         <div class="form-group">
@@ -1484,8 +1490,8 @@
     <!-- ============ GENERATE REPORT ============ -->
     <section class="panel" id="panel-report" hidden>
       <div class="card">
-        <h1>Generate Report</h1>
-        <p class="subtitle">With the necessary configurations set, NHSNLink is ready to connect and run reports for your facility. Prior to completing the enrollment process, let's run a report to ensure that NHSNLink is accurately generating reports. Below, add the reporting period, measures and FHIR Patient's you would like NHSNLink to evaluate against.</p>
+        <h1>Generate Test Report</h1>
+        <p class="subtitle">With the necessary configurations set, NHSNLink is ready to connect and run reports for your facility. Prior to completing the enrollment process, let's run a test report to ensure that NHSNLink is accurately generating reports. Below, add the reporting period, measures and FHIR Patient's you would like NHSNLink to evaluate against.</p>
 
         <div class="todo-box" id="reportPendingNotice" style="border-color:var(--blue); background:#eaf2fc; color:var(--blue-dark);" hidden>
           <span class="todo-tag" style="background:var(--blue);">Pending</span>
@@ -2085,7 +2091,7 @@
     steps.push({ id: 'location-org', label: 'Organization Identification', panel: 'panel-location-org' });
     steps.push({ id: 'hsloc', label: 'Location Identification (HSLOC)', panel: 'panel-hsloc' });
     steps.push({ id: 'encounter', label: 'Encounter Mapping', panel: 'panel-encounter' });
-    steps.push({ id: 'report', label: 'Generate Report', panel: 'panel-report' });
+    steps.push({ id: 'report', label: 'Generate Test Report', panel: 'panel-report' });
     steps.push({ id: 'report-results', label: 'Report Results', panel: 'panel-report-results' });
     steps.push({ id: 'mrn-intake', label: 'MRN Identifier Intake', panel: 'panel-mrn-intake' });
     steps.push({ id: 'complete', label: 'Enrollment Complete', panel: 'panel-complete' });
