@@ -2,6 +2,10 @@
 KAFKA RETRY - ARCHITECTURE & DESIGN DECISIONS
 ================================================================================
 
+Companion doc: Java/docs/retry-cleanup-and-cache-ownership.md covers what the
+retry machinery is FOR - the resource-cache ownership contract, terminal-only
+cleanup and the onDeadLetter hook, fail-fast blob clients, and testing recipes.
+
 --------------------------------------------------------------------------------
 1. THE DRIVING CONSTRAINT
 --------------------------------------------------------------------------------
