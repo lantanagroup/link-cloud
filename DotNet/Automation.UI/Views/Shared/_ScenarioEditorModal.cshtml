@@ -230,6 +230,9 @@
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
+                                        <button type="button" class="btn btn-sm btn-au-action" id="btnSuggestFromImported">
+                                            <i class="bi bi-magic me-1"></i>Suggest ORM &amp; Normalization
+                                        </button>
                                         <span id="importedUploadStatus" class="small text-muted" style="display:none;" role="status" aria-live="polite"></span>
                                     </div>
                                 </div>
@@ -281,6 +284,7 @@
     </div>
 </div>
 
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
     (function () {
         var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
@@ -1515,7 +1519,7 @@
                 if (!allImportedCleanly && lastSpecialOutcomeMessage) {
                     setImportedUploadStatus(lastSpecialOutcomeMessage, false);
                 } else {
-                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s).', false);
+                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s). Use Suggest ORM & Normalization to build maps from this data.', false);
                 }
             }
             ev.target.value = '';
@@ -1710,6 +1714,9 @@
         async function openEditor(id, mode) {
             clearErrors();
             clearWarnings();
+            cfgGenFingerprint = null;
+            cfgGenLastOrmId = null;
+            cfgGenLastSuiteId = null;
             if (id) {
                 try {
                     var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));
@@ -1807,6 +1814,112 @@
                 catch (err) { showError('Clone failed: ' + (err.message || 'Unknown error')); }
             });
         });
+
+        var cfgGenAnalyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
+        var cfgGenApplyOrmUrl = '@Url.Action("ApplyOrm", "ConfigurationGeneration")';
+        var cfgGenApplyNormUrl = '@Url.Action("ApplyNormalization", "ConfigurationGeneration")';
+        var cfgGenFingerprint = null;
+        var cfgGenLastOrmId = null;
+        var cfgGenLastSuiteId = null;
+
+        function upsertSelectOption(selectId, id, name) {
+            var sel = document.getElementById(selectId);
+            if (!sel || !id) return;
+            var existing = Array.prototype.find.call(sel.options, function (o) { return o.value === String(id); });
+            if (!existing) {
+                var opt = document.createElement('option');
+                opt.value = String(id);
+                opt.textContent = name || String(id);
+                sel.appendChild(opt);
+            }
+            sel.value = String(id);
+        }
+
+        function collectImportedAnalyzeRequest() {
+            var rows = importedRows ? importedRows.children : [];
+            var sources = [];
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (row.dataset.source === 'Bundle' && (row.dataset.uploadedBundleId || row.dataset.bundleJson)) {
+                    sources.push({
+                        source: 'Bundle',
+                        uploadedBundleId: row.dataset.uploadedBundleId || null,
+                        bundleJson: row.dataset.uploadedBundleId ? null : (row.dataset.bundleJson || null)
+                    });
+                    continue;
+                }
+                if (row.dataset.source === 'ExistingId') {
+                    var pid = (row.querySelector('.imp-pid') || {}).value;
+                    if (pid) sources.push({ source: 'ExistingId', patientId: pid });
+                }
+            }
+            if (!sources.length) return null;
+            return {
+                sources: sources,
+                priorFingerprint: cfgGenFingerprint,
+                refineOrmId: cfgGenLastOrmId,
+                refineSuiteId: cfgGenLastSuiteId
+            };
+        }
+
+        var btnSuggest = document.getElementById('btnSuggestFromImported');
+        if (btnSuggest) {
+            btnSuggest.addEventListener('click', async function () {
+                if (!window.BundleConfigGeneration) {
+                    showError('Configuration generator script failed to load.');
+                    return;
+                }
+                var req = collectImportedAnalyzeRequest();
+                if (!req) {
+                    showError('Add or upload at least one imported patient first.');
+                    return;
+                }
+                try {
+                    btnSuggest.disabled = true;
+                    var proposal = await window.BundleConfigGeneration.analyzeAndShow(
+                        { analyze: cfgGenAnalyzeUrl, applyOrm: cfgGenApplyOrmUrl, applyNorm: cfgGenApplyNormUrl },
+                        req,
+                        {
+                            selectOrmLabel: 'Save new ORM and select it',
+                            selectSuiteLabel: 'Save new suite and select it',
+                            namePrefix: (document.getElementById('ScenarioName') || {}).value || '',
+                            onSelectOrm: function (id, name) {
+                                upsertSelectOption('OrganizationResourceMap', id, name);
+                            },
+                            onSelectSuite: function (id, name) {
+                                upsertSelectOption('NormalizationSuite', id, name);
+                            },
+                            onSavedOrm: function (id) { cfgGenLastOrmId = id; },
+                            onSavedSuite: function (id) { cfgGenLastSuiteId = id; },
+                            onExtendOrm: async function (id) {
+                                var refined = await window.BundleConfigGeneration.postJson(cfgGenAnalyzeUrl, Object.assign({}, req, { refineOrmId: id }));
+                                cfgGenFingerprint = refined.fingerprint || refined.Fingerprint || cfgGenFingerprint;
+                                var saved = await window.BundleConfigGeneration.postJson(cfgGenApplyOrmUrl, {
+                                    proposal: refined.orm || refined.Orm,
+                                    updateExistingId: id
+                                });
+                                cfgGenLastOrmId = saved.id || saved.Id;
+                                upsertSelectOption('OrganizationResourceMap', saved.id || saved.Id, saved.name || saved.Name);
+                            },
+                            onExtendSuite: async function (id) {
+                                var refined = await window.BundleConfigGeneration.postJson(cfgGenAnalyzeUrl, Object.assign({}, req, { refineSuiteId: id }));
+                                cfgGenFingerprint = refined.fingerprint || refined.Fingerprint || cfgGenFingerprint;
+                                var saved = await window.BundleConfigGeneration.postJson(cfgGenApplyNormUrl, {
+                                    proposal: refined.normalization || refined.Normalization,
+                                    updateExistingSuiteId: id
+                                });
+                                cfgGenLastSuiteId = saved.id || saved.Id;
+                                upsertSelectOption('NormalizationSuite', saved.id || saved.Id, saved.name || saved.Name);
+                            }
+                        });
+                    cfgGenFingerprint = proposal.fingerprint || proposal.Fingerprint || cfgGenFingerprint;
+                } catch (err) {
+                    showError(err.message || 'Suggestion failed.');
+                } finally {
+                    btnSuggest.disabled = false;
+                }
+            });
+        }
 
         document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
             btn.addEventListener('click', async function () {

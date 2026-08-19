@@ -1338,17 +1338,14 @@ internal sealed class RunExecutor
             poolSeeds: seeds,
             patientProvisioner: patientProvisioner);
 
-        var hasPatternSeeds = seeds.Any(s => s.Pattern.HasValue);
-        IReadOnlyList<PatientStateEvent> autoAdmits = [];
-        if (hasPatternSeeds)
-        {
-            autoAdmits = await _liveInjector.ApplyAutomaticAdmitsAsync(state.RunId, cancellationToken);
-        }
+        output.WriteLine(
+            $"Live pool: {seeds.Count} patient(s), {seeds.Count(s => s.Origin == LivePatientOrigin.Import)} imported, {seeds.Count(s => s.ExpectedInReport == true)} expected in report.");
+        var autoAdmits = await _liveInjector.ApplyAutomaticAdmitsAsync(state.RunId, cancellationToken);
 
         state.Status = AutomationRunStatus.LiveWindowOpen;
         await callbacks.BroadcastStatus();
         output.WriteLine(
-            $"Live window open until {windowEnd:u}. Auto-admitted {autoAdmits.Count} patient(s) from inpatient patterns. Optional Admit/Discharge/Generate/Upload/Reference until the window closes. Auto-discharges at {automaticDischargeAt:u}.");
+            $"Live window open until {windowEnd:u}. Auto-admitted {autoAdmits.Count} patient(s). Optional Admit/Discharge/Generate/Upload/Reference until the window closes. Auto-discharges at {automaticDischargeAt:u}.");
 
         var remainingToDischarge = automaticDischargeAt - DateTimeOffset.UtcNow;
         if (remainingToDischarge > TimeSpan.Zero)
@@ -1526,6 +1523,29 @@ internal sealed class RunExecutor
             return path["Location.".Length..];
 
         return path;
+    }
+
+    /// <summary>
+    /// Maps stored operator names to the Normalization API <c>ConditionOperator</c> numeric values.
+    /// The API deserializes this as an enum and rejects the string "Equal".
+    /// </summary>
+    private static int ToConditionOperatorValue(string? operatorName)
+    {
+        if (int.TryParse(operatorName, out var numeric))
+            return numeric;
+
+        return operatorName?.Trim().ToLowerInvariant() switch
+        {
+            "equal" => 0,
+            "greaterthan" => 1,
+            "greaterthanorequal" => 2,
+            "lessthan" => 3,
+            "lessthanorequal" => 4,
+            "notequal" => 5,
+            "exists" => 6,
+            "notexists" => 7,
+            _ => 0
+        };
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
@@ -1796,7 +1816,7 @@ internal sealed class RunExecutor
                     apiOp.Conditions = opDef.Conditions.Select(c => new CreateNormalizationConditionApiModel
                     {
                         FhirPathSource = c.FhirPathSource,
-                        Operator = c.Operator,
+                        Operator = ToConditionOperatorValue(c.Operator),
                         Value = c.Value
                     }).ToList();
                     break;
@@ -1812,7 +1832,14 @@ internal sealed class RunExecutor
                     }).ToList();
                     break;
                 case "RemoveExtensions":
-                    apiOp.ExtensionUrls = opDef.ExtensionUrls;
+                    apiOp.ExtensionUrls = [.. (opDef.ExtensionUrls ?? [])
+                        .Select(u => u?.Trim() ?? "")
+                        .Where(u => Uri.TryCreate(u, UriKind.Absolute, out _))];
+                    if (apiOp.ExtensionUrls.Count == 0)
+                    {
+                        output.WriteLine($"  Skipping '{opDef.Name}' (RemoveExtensions): no absolute extension URLs remain after filtering.");
+                        continue;
+                    }
                     break;
                 case "CopyLocationAliasToTypeIteratively":
                     apiOp.MaxIterations = opDef.MaxIterations;
@@ -1831,7 +1858,8 @@ internal sealed class RunExecutor
 
             if (!createResp.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}");
+                var detail = string.IsNullOrWhiteSpace(createResp.RawBody) ? "" : $": {createResp.RawBody}";
+                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}{detail}");
             }
 
             output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");

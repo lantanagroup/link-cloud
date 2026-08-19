@@ -180,6 +180,44 @@ public class LiveExpectedStateTrackerTests
     }
 
     [Fact]
+    public void Expected_imported_patient_is_auto_admitted_without_pattern()
+    {
+        var tracker = NewTracker([
+            new LivePatientSeed
+            {
+                PatientId = "import-q",
+                Origin = LivePatientOrigin.Import,
+                ExpectedInReport = true
+            }
+        ]);
+
+        var admits = tracker.ApplyAutomaticAdmits();
+
+        admits.Should().ContainSingle(e => e.PatientId == "import-q");
+        tracker.GetExpectedPopulation().Should().Equal("import-q");
+        tracker.GetState().Pool.Single().CensusState.Should().Be(LivePatientCensusState.Admitted);
+    }
+
+    [Fact]
+    public void Nq_imported_patient_is_auto_admitted_but_not_expected_in_report()
+    {
+        var tracker = NewTracker([
+            new LivePatientSeed
+            {
+                PatientId = "import-nq",
+                Origin = LivePatientOrigin.Import,
+                ExpectedInReport = false
+            }
+        ]);
+
+        var admits = tracker.ApplyAutomaticAdmits();
+
+        admits.Should().ContainSingle(e => e.PatientId == "import-nq");
+        tracker.GetExpectedPopulation().Should().BeEmpty();
+        tracker.GetState().Pool.Single().CensusState.Should().Be(LivePatientCensusState.Admitted);
+    }
+
+    [Fact]
     public void Manual_admit_of_outside_period_patient_does_not_force_report_inclusion()
     {
         var tracker = NewTrackerWithPattern("pat-1", ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod);

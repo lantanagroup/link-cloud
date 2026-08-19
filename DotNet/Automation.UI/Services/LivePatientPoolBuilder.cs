@@ -28,11 +28,12 @@ public static class LivePatientPoolBuilder
             if (profilesAlignedToPatientIds != null && i < profilesAlignedToPatientIds.Count)
                 profile = profilesAlignedToPatientIds[i];
 
+            var isImported = imported.Contains(id);
             seeds.Add(new LivePatientSeed
             {
                 PatientId = id,
-                Origin = imported.Contains(id) ? LivePatientOrigin.Import : LivePatientOrigin.Cohort,
-                Pattern = imported.Contains(id) ? null : profile?.ScheduledInpatientPattern,
+                Origin = isImported ? LivePatientOrigin.Import : LivePatientOrigin.Cohort,
+                Pattern = isImported ? null : profile?.ScheduledInpatientPattern,
                 ExpectedInReport = ResolveExpectedInReport(id, profile, expectedInReportPatientIds)
             });
         }

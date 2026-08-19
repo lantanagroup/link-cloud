@@ -1,0 +1,378 @@
+using Automation.UI.Models;
+
+namespace Automation.UI.Services.ConfigurationGeneration;
+
+public static class NormalizationProposalBuilder
+{
+    public static GeneratedNormalizationProposal Build(
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        IReadOnlyList<NormalizationSuiteDefinition> existingSuites,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences = null,
+        NormalizationSuiteDefinition? refineExisting = null)
+    {
+        var proposal = new GeneratedNormalizationProposal
+        {
+            SuggestedSuiteName = refineExisting is { IsSystem: false }
+                ? refineExisting.Name
+                : "",
+            SuggestedSuiteDescription = "Auto-built from structures found in the uploaded bundle. Review before use.",
+            SuggestedSequenceName = "Generated patient sequence"
+        };
+
+        var existingSuiteTypes = SuiteOperationTypes(refineExisting, existingOps, sequences);
+        var existingSuiteExtensionUrls = SuiteExtensionUrls(refineExisting, existingOps, sequences);
+
+        TryAddCopyLocation(proposal, fingerprint, existingOps, existingSuiteTypes);
+        TryAddCopyProperty(proposal, fingerprint, existingOps, existingSuiteTypes);
+        TryAddCopyAlias(proposal, fingerprint, existingOps, existingSuiteTypes);
+        TryAddConditionalTransform(proposal, fingerprint, existingOps, existingSuiteTypes);
+        TryAddCodeMap(proposal, fingerprint, existingOps, existingSuiteTypes);
+        TryAddRemoveExtensions(proposal, fingerprint, existingOps, existingSuiteTypes, existingSuiteExtensionUrls);
+
+        if (proposal.Operations.Count == 0)
+        {
+            proposal.Notes.Add(refineExisting != null
+                ? "The selected suite already covers every normalization opportunity found in this upload."
+                : "No normalization opportunities were found in the uploaded data.");
+        }
+        else
+        {
+            proposal.Notes.Add($"Proposed {proposal.Operations.Count} operation(s), preferring one of each type the data can support.");
+            if (refineExisting != null)
+                proposal.Notes.Add($"Only operations not already covered by '{refineExisting.Name}' are listed so the suite can be extended.");
+        }
+
+        proposal.Reuse = ScoreSuites(proposal, existingSuites, existingOps, sequences);
+        return proposal;
+    }
+
+    private static void TryAddCopyLocation(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes)
+    {
+        if (fingerprint.LocationIdentifiers.Count == 0)
+            return;
+        if (existingSuiteTypes.Contains("CopyLocation"))
+            return;
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "CopyLocation", StringComparison.OrdinalIgnoreCase)
+            && o.ResourceTypes.Contains("Location", StringComparer.OrdinalIgnoreCase));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "CopyLocation",
+            SuggestedName = "Copy Location identifiers to type",
+            SuggestedDescription = "Locations in the upload carry identifiers. CopyLocation turns those into type CodeableConcepts.",
+            ResourceTypes = ["Location"],
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static void TryAddCopyProperty(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes)
+    {
+        if (fingerprint.LocationIdentifiers.Count == 0)
+            return;
+        if (existingSuiteTypes.Contains("CopyProperty"))
+            return;
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "CopyProperty", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(o.SourceFhirPath, "identifier[0].value", StringComparison.OrdinalIgnoreCase));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "CopyProperty",
+            SuggestedName = "Copy first Location identifier value to type code",
+            SuggestedDescription = "Copies identifier[0].value onto type[0].coding.code for Location resources.",
+            ResourceTypes = ["Location"],
+            SourceFhirPath = "identifier[0].value",
+            TargetFhirPath = "type[0].coding.code",
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static void TryAddCopyAlias(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes)
+    {
+        if (fingerprint.LocationAliases.Count == 0)
+            return;
+        if (existingSuiteTypes.Contains("CopyLocationAliasToTypeIteratively"))
+            return;
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "CopyLocationAliasToTypeIteratively", StringComparison.OrdinalIgnoreCase));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "CopyLocationAliasToTypeIteratively",
+            SuggestedName = "Copy Location aliases to type iteratively",
+            SuggestedDescription = $"Locations include alias values ({string.Join(", ", fingerprint.LocationAliases.Take(3))}). Iterative copy can surface those as type codes.",
+            ResourceTypes = ["Location"],
+            MaxIterations = 15,
+            SplitOnComma = fingerprint.LocationAliases.Any(a => a.Contains(',')),
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static void TryAddConditionalTransform(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes)
+    {
+        if (existingSuiteTypes.Contains("ConditionalTransform"))
+            return;
+
+        var encounterClass = fingerprint.Codings.FirstOrDefault(c =>
+            string.Equals(c.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.Path, "class", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(c.Code));
+        if (encounterClass == null)
+            return;
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "ConditionalTransform", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(o.ConditionTargetFhirPath, "status", StringComparison.OrdinalIgnoreCase)
+            && o.ResourceTypes.Contains("Encounter", StringComparer.OrdinalIgnoreCase));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "ConditionalTransform",
+            SuggestedName = "Set Encounter status when class matches upload",
+            SuggestedDescription = $"When Encounter.class.code is '{encounterClass.Code}', set status to in-progress. Uses a primitive code target the Normalization API accepts.",
+            ResourceTypes = ["Encounter"],
+            ConditionTargetFhirPath = "status",
+            ConditionTargetValue = "in-progress",
+            Conditions =
+            [
+                new NormalizationCondition
+                {
+                    FhirPathSource = "class.code",
+                    Operator = "Equal",
+                    Value = encounterClass.Code
+                }
+            ],
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static void TryAddCodeMap(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes)
+    {
+        var locationCodes = fingerprint.Codings
+            .Where(c => string.Equals(c.ResourceType, "Location", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(c.Path, "type.coding", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (locationCodes.Count == 0)
+            return;
+        if (existingSuiteTypes.Contains("CodeMap"))
+            return;
+
+        var bySystem = locationCodes
+            .GroupBy(c => c.System, StringComparer.OrdinalIgnoreCase)
+            .First();
+
+        var maps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal);
+        foreach (var coding in bySystem)
+        {
+            maps[coding.Code] = new NormalizationCodeMapEntry
+            {
+                Code = coding.Code,
+                Display = coding.Display ?? coding.Code
+            };
+        }
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "CodeMap", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(o.CodeMapFhirPath, "type.coding", StringComparison.OrdinalIgnoreCase));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "CodeMap",
+            SuggestedName = $"Code map Location.type ({bySystem.Key})",
+            SuggestedDescription = "Identity map seeded from Location.type codes in the upload. Review and replace targets if a different code system is required.",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type.coding",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = bySystem.Key,
+                    TargetSystem = bySystem.Key,
+                    CodeMaps = maps
+                }
+            ],
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static void TryAddRemoveExtensions(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        HashSet<string> existingSuiteTypes,
+        HashSet<string> existingSuiteExtensionUrls)
+    {
+        if (fingerprint.Extensions.Count == 0)
+            return;
+
+        var observed = fingerprint.Extensions
+            .Select(e => e.Url?.Trim() ?? "")
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var invalid = observed.Where(url => !UploadedBundleAnalyzer.IsAbsoluteExtensionUrl(url)).ToList();
+        var urls = observed
+            .Where(UploadedBundleAnalyzer.IsAbsoluteExtensionUrl)
+            .Where(url => !existingSuiteExtensionUrls.Contains(url))
+            .OrderBy(u => u, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (invalid.Count > 0)
+            proposal.Notes.Add($"Skipped {invalid.Count} relative/invalid extension URL(s); RemoveExtensions only accepts absolute URLs.");
+        if (urls.Count == 0)
+            return;
+
+        var types = fingerprint.Extensions
+            .Where(e => urls.Contains(e.Url, StringComparer.OrdinalIgnoreCase))
+            .Select(e => e.ResourceType)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var reuse = existingOps.FirstOrDefault(o =>
+            string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase)
+            && urls.All(url => o.ExtensionUrls.Contains(url, StringComparer.OrdinalIgnoreCase)));
+
+        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
+        {
+            OperationType = "RemoveExtensions",
+            SuggestedName = "Remove extensions found in upload",
+            SuggestedDescription = $"Removes {urls.Count} extension URL(s) observed on {string.Join(", ", types)}.",
+            ResourceTypes = types,
+            ExtensionUrls = urls,
+            ReuseOperationId = reuse?.Id,
+            ReuseOperationName = reuse?.Name
+        });
+    }
+
+    private static List<ReuseCandidate> ScoreSuites(
+        GeneratedNormalizationProposal proposal,
+        IReadOnlyList<NormalizationSuiteDefinition> suites,
+        IReadOnlyList<NormalizationOperationDefinition> ops,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences)
+    {
+        var neededTypes = proposal.Operations
+            .Select(o => o.OperationType)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (neededTypes.Count == 0)
+            return [];
+
+        var opsById = ops.ToDictionary(o => o.Id);
+        var seqById = (sequences ?? []).ToDictionary(s => s.Id);
+        var results = new List<ReuseCandidate>();
+        foreach (var suite in suites)
+        {
+            var suiteOpIds = suite.OperationIds.ToList();
+            foreach (var seqId in suite.SequenceIds)
+            {
+                if (!seqById.TryGetValue(seqId, out var seq))
+                    continue;
+                suiteOpIds.AddRange(seq.Entries.Select(e => e.OperationId));
+            }
+
+            var suiteOps = suiteOpIds
+                .Distinct()
+                .Select(id => opsById.GetValueOrDefault(id))
+                .Where(o => o != null)
+                .Cast<NormalizationOperationDefinition>()
+                .ToList();
+            var types = suiteOps.Select(o => o.OperationType).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var hit = neededTypes.Count(types.Contains);
+            if (hit == 0)
+                continue;
+
+            var score = (double)hit / neededTypes.Count;
+            results.Add(new ReuseCandidate
+            {
+                Id = suite.Id,
+                Name = suite.Name,
+                Kind = suite.IsSystem ? "System suite" : "Custom suite",
+                Score = Math.Round(score, 2),
+                Recommendation = score >= 0.999 ? "Reuse" : "Extend",
+                Reason = score >= 0.999
+                    ? "This suite already includes every proposed operation type."
+                    : suite.IsSystem
+                        ? $"This system suite includes {hit} of {neededTypes.Count} proposed operation types. Extending clones a custom copy so the system suite stays unchanged."
+                        : $"This suite includes {hit} of {neededTypes.Count} proposed operation types."
+            });
+        }
+
+        return results
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToList();
+    }
+
+    private static HashSet<string> SuiteOperationTypes(
+        NormalizationSuiteDefinition? suite,
+        IReadOnlyList<NormalizationOperationDefinition> ops,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences)
+        => ResolveSuiteOperations(suite, ops, sequences)
+            .Select(o => o.OperationType)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static HashSet<string> SuiteExtensionUrls(
+        NormalizationSuiteDefinition? suite,
+        IReadOnlyList<NormalizationOperationDefinition> ops,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences)
+        => ResolveSuiteOperations(suite, ops, sequences)
+            .Where(o => string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(o => o.ExtensionUrls)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static List<NormalizationOperationDefinition> ResolveSuiteOperations(
+        NormalizationSuiteDefinition? suite,
+        IReadOnlyList<NormalizationOperationDefinition> ops,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences)
+    {
+        if (suite == null)
+            return [];
+
+        var opsById = ops.ToDictionary(o => o.Id);
+        var seqById = (sequences ?? []).ToDictionary(s => s.Id);
+        var ids = suite.OperationIds.ToList();
+        foreach (var seqId in suite.SequenceIds)
+        {
+            if (!seqById.TryGetValue(seqId, out var seq))
+                continue;
+            ids.AddRange(seq.Entries.Select(e => e.OperationId));
+        }
+
+        return ids
+            .Distinct()
+            .Select(id => opsById.GetValueOrDefault(id))
+            .Where(o => o != null)
+            .Cast<NormalizationOperationDefinition>()
+            .ToList();
+    }
+}

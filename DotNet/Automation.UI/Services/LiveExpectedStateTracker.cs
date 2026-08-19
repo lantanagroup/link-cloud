@@ -103,17 +103,18 @@ public sealed class LiveExpectedStateTracker
             var events = new List<PatientStateEvent>();
             foreach (var entry in _pool.Values.OrderBy(e => e.PatientId, StringComparer.Ordinal))
             {
-                if (entry.Pattern is not { } pattern)
-                    continue;
-                if (!pattern.GetCensusBehavior().EmitAdmitDuringWindow)
-                    continue;
                 if (entry.CensusState != LivePatientCensusState.NotAdmitted)
                     continue;
+                if (!ShouldAutoAdmit(entry))
+                    continue;
 
+                var notes = entry.Origin == LivePatientOrigin.Import
+                    ? "Automatic admit of scenario-loaded imported patient expected in the report"
+                    : "Automatic admit from inpatient pattern";
                 events.Add(AdmitUnlocked(
                     entry.PatientId,
                     AutomaticEventSource,
-                    "Automatic admit from inpatient pattern",
+                    notes,
                     timestampUtc ?? WindowStartUtc));
             }
 
@@ -345,6 +346,17 @@ public sealed class LiveExpectedStateTracker
 
     private string[] SnapshotExpectedUnlocked()
         => _expectedInReport.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+
+    private static bool ShouldAutoAdmit(MutablePoolEntry entry)
+    {
+        if (entry.Pattern is { } pattern)
+            return pattern.GetCensusBehavior().EmitAdmitDuringWindow;
+
+        // No generated inpatient pattern means this is a scenario-loaded import
+        // (or an unpatterned seed). Admit at window open so the run is hands-off.
+        // Report inclusion stays on ExpectedInReport / the generation manifest.
+        return true;
+    }
 
     private static bool ResolveExpectedInReport(bool? expectedInReport, ScheduledInpatientPattern? pattern)
     {

@@ -237,6 +237,7 @@ builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 
 // -- API Health test suites --
