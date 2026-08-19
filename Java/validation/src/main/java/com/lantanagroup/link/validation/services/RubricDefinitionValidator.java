@@ -30,6 +30,7 @@ public class RubricDefinitionValidator {
 
     private static final int MAX_CODE_LENGTH = 128;
     private static final int MAX_PROFILES = 20;
+    private static final int MAX_SEMVER_LENGTH = 32;
 
     // Allowed parameter keys per check type (Rubric JSON Field Reference §6); unknown keys rejected.
     private static final Map<CheckType, Set<String>> ALLOWED_PARAMETER_KEYS = Map.of(
@@ -77,9 +78,7 @@ public class RubricDefinitionValidator {
         if (payload.getId() == null || payload.getId().isBlank()) {
             errors.add("id: must not be blank");
         }
-        if (!Semver.isValid(payload.getSemver())) {
-            errors.add("semver: '" + payload.getSemver() + "' is not a valid semantic version (expected MAJOR.MINOR.PATCH)");
-        }
+        validateSemver(payload.getSemver(), errors);
 
         validateDimensions(payload.getDimensions(), errors);
 
@@ -149,6 +148,26 @@ public class RubricDefinitionValidator {
 
         if (!errors.isEmpty()) {
             throw new InvalidRubricDefinitionException("Invalid rubric definition", errors);
+        }
+    }
+
+    // checked explicitly (rather than relying solely on the DTO's @Size/@Pattern) so this
+    // validator gives the same clear errors no matter how it's invoked
+    private void validateSemver(String semver, List<String> errors) {
+        if (semver == null || semver.isBlank()) {
+            errors.add("semver: must not be blank");
+            return;
+        }
+        if (semver.length() > MAX_SEMVER_LENGTH) {
+            errors.add("semver: must be at most " + MAX_SEMVER_LENGTH + " characters (got " + semver.length() + ")");
+            return;
+        }
+        try {
+            if (Semver.parse(semver).isZero()) {
+                errors.add("semver: '" + semver + "' is not allowed — 0.0.0 is reserved and cannot be registered");
+            }
+        } catch (IllegalArgumentException e) {
+            errors.add("semver: " + e.getMessage());
         }
     }
 

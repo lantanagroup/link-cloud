@@ -16,15 +16,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SemverTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"1.0.0", "0.0.1", "10.20.30", "1.0.0-alpha", "1.0.0-rc.1", "1.0.1753017600000"})
+    @ValueSource(strings = {"1.0.0", "0.0.1", "10.20.30", "1.0.1753017600000"})
     @DisplayName("valid semantic versions accepted")
     void validVersions(String value) {
         assertThat(Semver.isValid(value)).isTrue();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"v1", "1.0", "1", "1.0.0.0", "1.0.0-", "01a.0.0", "one.two.three", ""})
-    @DisplayName("invalid semantic versions rejected")
+    @ValueSource(strings = {"v1", "1.0", "1", "1.0.0.0", "1.0.0-", "1.0.0-alpha", "1.0.0-rc.1",
+            "01a.0.0", "one.two.three", ""})
+    @DisplayName("invalid semantic versions rejected (pre-release tags no longer accepted)")
     void invalidVersions(String value) {
         assertThat(Semver.isValid(value)).isFalse();
     }
@@ -44,10 +45,10 @@ class SemverTest {
     }
 
     @Test
-    @DisplayName("pre-release sorts below its release (1.0.0-alpha < 1.0.0)")
-    void preReleaseOrdering() {
-        assertThat(Semver.parse("1.0.0-alpha")).isLessThan(Semver.parse("1.0.0"));
-        assertThat(Semver.parse("1.0.0-alpha")).isLessThan(Semver.parse("1.0.0-beta"));
+    @DisplayName("isZero recognizes 0.0.0 even with leading zeros; parse/isValid still accept it syntactically")
+    void zeroVersionDetection() {
+        assertThat(Semver.parse("0.00.0").isZero()).isTrue();
+        assertThat(Semver.parse("1.0.0").isZero()).isFalse();
     }
 
     @Test
@@ -67,21 +68,28 @@ class SemverTest {
     @CsvSource({
             "01.02.03,   1.2.3",
             "1.2.3,       1.2.3",
-            "001.0.0,     1.0.0",
-            "1.0.0-alpha, 1.0.0-alpha",
-            "01.02.03-rc.1, 1.2.3-rc.1"
+            "001.0.0,     1.0.0"
     })
-    @DisplayName("toCanonicalString strips leading zeros and preserves any pre-release")
+    @DisplayName("toCanonicalString strips leading zeros")
     void toCanonicalStringStripsLeadingZeros(String input, String canonical) {
         assertThat(Semver.parse(input).toCanonicalString()).isEqualTo(canonical);
+    }
+
+    @Test
+    @DisplayName("parse rejects a component that overflows long, with a clear message")
+    void parseRejectsOverflowingComponent() {
+        String tooBig = "99999999999999999999.0.0";
+        assertThat(Semver.isValid(tooBig)).isFalse();
+        assertThatThrownBy(() -> Semver.parse(tooBig))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(String.valueOf(Long.MAX_VALUE));
     }
 
     @ParameterizedTest
     @CsvSource({
             "01.2.3,        1.2.3",
             "1.2.3,         1.2.3",
-            "1.02.0,        1.2.0",
-            "01.02.03-rc.1, 1.2.3-rc.1"
+            "1.02.0,        1.2.0"
     })
     @DisplayName("normalize canonicalizes a parseable semver and is idempotent")
     void normalizeCanonicalizes(String input, String expected) {
