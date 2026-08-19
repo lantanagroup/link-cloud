@@ -2,7 +2,9 @@ using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -28,10 +30,11 @@ namespace UnitTests.DMRP
         private readonly Mock<IFacilityOperations> _inner = new();
         private readonly Mock<IReportingPlanSource> _plans = new();
         private readonly Mock<IFacilityReportingPlanManager> _planManager = new();
+        private readonly Mock<IEntityRepository<FacilityReportingPlan>> _planRepository = new();
 
         private DmrpFacilityOperations CreateOperations() =>
             new(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object, _planManager.Object,
-                new FixedTimeProvider(FixedNow));
+                _planRepository.Object, new FixedTimeProvider(FixedNow));
 
         private void GivenPlan(params ReportingPlanEntry[] entries) =>
             _plans.Setup(p => p.GetForPeriodAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
@@ -255,6 +258,10 @@ namespace UnitTests.DMRP
         {
             var sequence = new List<string>();
 
+            _planRepository.Setup(r => r.StartTransactionAsync(It.IsAny<CancellationToken>()))
+                .Callback(() => sequence.Add("begin"))
+                .Returns(Task.CompletedTask);
+
             _inner.Setup(i => i.DeleteAsync(FacilityId, It.IsAny<CancellationToken>()))
                 .Callback(() => sequence.Add("facility"))
                 .Returns(Task.CompletedTask);
@@ -263,9 +270,52 @@ namespace UnitTests.DMRP
                 .Callback(() => sequence.Add("plans"))
                 .ReturnsAsync(2);
 
+            _planRepository.Setup(r => r.CommitTransactionAsync(It.IsAny<CancellationToken>()))
+                .Callback(() => sequence.Add("commit"))
+                .Returns(Task.CompletedTask);
+
             await CreateOperations().DeleteAsync(FacilityId);
 
-            Assert.Equal(new[] { "facility", "plans" }, sequence);
+            Assert.Equal(new[] { "begin", "facility", "plans", "commit" }, sequence);
+        }
+
+        /// <summary>
+        /// Both deletes are one unit. Without the rollback, a failure here left the facility gone and
+        /// its plans behind - nothing collected them, they blocked measure mapping deletes, and a
+        /// facility later created with the same id inherited them.
+        /// </summary>
+        [Fact]
+        public async Task Delete_rolls_back_the_facility_when_the_plan_cleanup_fails()
+        {
+            _planManager.Setup(m => m.DeleteForFacilityAsync(FacilityId, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("plan cleanup failed"));
+
+            var operations = CreateOperations();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => operations.DeleteAsync(FacilityId));
+
+            _planRepository.Verify(r => r.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _planRepository.Verify(r => r.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        /// <summary>
+        /// A rollback that fails must not replace the error that caused it, or the caller is told about
+        /// the cleanup rather than the thing that actually went wrong.
+        /// </summary>
+        [Fact]
+        public async Task Delete_surfaces_the_original_failure_even_when_the_rollback_fails()
+        {
+            _inner.Setup(i => i.DeleteAsync(FacilityId, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ApplicationException("facility delete refused"));
+
+            _planRepository.Setup(r => r.RollbackTransactionAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("no transaction"));
+
+            var operations = CreateOperations();
+
+            var thrown = await Assert.ThrowsAsync<ApplicationException>(() => operations.DeleteAsync(FacilityId));
+
+            Assert.Equal("facility delete refused", thrown.Message);
         }
 
         /// <summary>

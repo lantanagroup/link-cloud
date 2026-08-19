@@ -3,6 +3,8 @@ using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DMRP.Business
 {
@@ -22,18 +24,28 @@ namespace LantanaGroup.Link.DMRP.Business
         private readonly IFacilityOperations _hostImplementation;
         private readonly IReportingPlanSource _reportingPlans;
         private readonly IFacilityReportingPlanManager _reportingPlanManager;
+
+        /// <summary>
+        /// Held for its transaction control only. Facilities and reporting plans persist through the
+        /// same context, so a transaction opened here covers the host's writes as well as this
+        /// module's.
+        /// </summary>
+        private readonly IEntityRepository<FacilityReportingPlan> _reportingPlanRepository;
+
         private readonly TimeProvider _timeProvider;
 
         public DmrpFacilityOperations(ILogger<DmrpFacilityOperations> logger,
             IFacilityOperations hostImplementation,
             IReportingPlanSource reportingPlans,
             IFacilityReportingPlanManager reportingPlanManager,
+            IEntityRepository<FacilityReportingPlan> reportingPlanRepository,
             TimeProvider timeProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hostImplementation = hostImplementation ?? throw new ArgumentNullException(nameof(hostImplementation));
             _reportingPlans = reportingPlans ?? throw new ArgumentNullException(nameof(reportingPlans));
             _reportingPlanManager = reportingPlanManager ?? throw new ArgumentNullException(nameof(reportingPlanManager));
+            _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
             _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
 
@@ -64,18 +76,62 @@ namespace LantanaGroup.Link.DMRP.Business
         }
 
         /// <summary>
-        /// Removes the facility and then its reporting plans. The order matters: the host's delete can
-        /// still refuse, and plans deleted ahead of a refused delete would leave a facility that
-        /// reports nothing.
+        /// Removes the facility and its reporting plans as one unit.
         /// </summary>
+        /// <remarks>
+        /// The order still matters - the host's delete can refuse, and plans removed ahead of a refused
+        /// delete would leave a facility that reports nothing - but order alone is not enough. If the
+        /// plan cleanup failed after the facility row was gone, the plans were stranded: nothing ever
+        /// collected them, they blocked measure mapping deletes, and a facility later created with the
+        /// same id silently inherited a previous incarnation's schedule.
+        /// <para>
+        /// Both live in the host's database context, so one transaction covers them. Quartz keeps its
+        /// own store and cannot enlist, so a rollback leaves the restored facility without its jobs
+        /// until the delete is retried or the service restarts - <c>ScheduleService.StartAsync</c>
+        /// rebuilds jobs for every facility that is not deleted, and removing them is idempotent. That
+        /// heals; a stranded reporting plan does not.
+        /// </para>
+        /// </remarks>
         public async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
         {
-            await _hostImplementation.DeleteAsync(facilityId, cancellationToken);
+            await _reportingPlanRepository.StartTransactionAsync(cancellationToken);
 
-            var removed = await _reportingPlanManager.DeleteForFacilityAsync(facilityId, cancellationToken);
+            int removed;
+
+            try
+            {
+                await _hostImplementation.DeleteAsync(facilityId, cancellationToken);
+
+                removed = await _reportingPlanManager.DeleteForFacilityAsync(facilityId, cancellationToken);
+
+                await _reportingPlanRepository.CommitTransactionAsync(cancellationToken);
+            }
+            catch
+            {
+                await RollbackQuietlyAsync(facilityId, cancellationToken);
+                throw;
+            }
 
             _logger.LogInformation("Deleted {Count} reporting plan(s) belonging to removed facility {FacilityId}",
                 removed, facilityId.SanitizeForLog());
+        }
+
+        /// <summary>
+        /// A rollback that fails must not replace the error that caused it, or the caller is told about
+        /// the cleanup instead of the thing that actually went wrong.
+        /// </summary>
+        private async Task RollbackQuietlyAsync(string facilityId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _reportingPlanRepository.RollbackTransactionAsync(cancellationToken);
+            }
+            catch (Exception rollbackFailure)
+            {
+                _logger.LogError(rollbackFailure,
+                    "Rolling back the deletion of facility {FacilityId} failed. Its reporting plans may be left behind; clear them with DELETE api/dmrp/reporting-plans/facilities/{FacilityId}.",
+                    facilityId.SanitizeForLog(), facilityId.SanitizeForLog());
+            }
         }
 
         /// <summary>
