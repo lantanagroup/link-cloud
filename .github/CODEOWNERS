@@ -3,6 +3,13 @@
 **/pom.xml @lantanagroup/link-release-management-team
 **/application*.yml @lantanagroup/link-release-management-team @lantanagroup/devops
 
+# The configuration catalog and the per-environment App Configuration exports. These are what
+# the App Config import pipeline deploys, so a change here changes deployed configuration.
+# Note these are not covered by the patterns above: application*.yml matches neither the stem
+# nor the extension of app-config.yaml.
+/app-config.yaml @lantanagroup/link-release-management-team @lantanagroup/devops
+Config/app-config*.json @lantanagroup/link-release-management-team @lantanagroup/devops
+
 docs/* @lantanagroup/devops @lantanagroup/link-arch
 
 # Similarly, the DevOps team is interested in any changes to Kafka topics

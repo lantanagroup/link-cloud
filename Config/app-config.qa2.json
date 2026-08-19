@@ -1,0 +1,2845 @@
+{
+	"items": [
+		{
+			"key": ".appconfig.featureflag/NotificationSendEmailFeature",
+			"value": "{\"id\": \"NotificationSendEmailFeature\", \"description\": \"\", \"enabled\": false, \"conditions\": {\"client_filters\": []}, \"display_name\": null}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.ff+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/authentication",
+			"value": "{\r\n\t\"anonymous\": false,\r\n\t\"authority\" : \"https://qa2-demo.nhsnlink.org\",\r\n\t\"adminEmail\": \"\"\r\n}",
+			"label": null,
+			"content_type": "application/json",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/authentication/signing-key",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-bearer-key\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/internal-blob-storage/blob-container-name",
+			"value": "int-submission-qa2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/internal-blob-storage/connection-string",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/abs-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/link/report/base-url",
+			"value": "https://qa2-report.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/link/terminology-service-url",
+			"value": "http://terminology-svc",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Validation"
+			}
+		},
+		{
+			"key": "/loki/app",
+			"value": "Link QA2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/loki/enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "application/json",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/loki/url",
+			"value": "http://loki-gateway.monitoring",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/pre-qualification/write-expressions-in-operation-outcome",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Validation"
+			}
+		},
+		{
+			"key": "/pre-qualification/write-pre-qual-operation-outcome",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Report,Validation"
+			}
+		},
+		{
+			"key": "/resource-cache/blob-storage/blob-container-name",
+			"value": "resourcecacheqa2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval"
+			}
+		},
+		{
+			"key": "/resource-cache/blob-storage/blob-root",
+			"value": "resource-cache",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval"
+			}
+		},
+		{
+			"key": "/resource-cache/blob-storage/connection-string",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-resource-catch-abs-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "MeasureEval"
+			}
+		},
+		{
+			"key": "/secret-management/key-vault-uri",
+			"value": "https://nhsnlink-kv-qa2.vault.azure.net/",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/spring/data/mongodb/database",
+			"value": "botw-qa2-measureEval",
+			"label": "MeasureEval",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/data/mongodb/uri",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-mongo-connection-string-qa2\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/data/redis/host",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-redis-host\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/data/redis/password",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-resource-cache-redis-password\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/data/redis/port",
+			"value": "10000",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/data/redis/ssl/enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "application/json",
+			"tags": {}
+		},
+		{
+			"key": "/spring/datasource/password",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/spring-datasource-password\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/datasource/url",
+			"value": "jdbc:sqlserver://link-db.database.windows.net:1433;database=link-qa2-botw-validation;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;",
+			"label": "Validation",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/datasource/username",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/user-spring-db-link\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/jpa/hibernate/ddl-auto",
+			"value": "validate",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/bootstrap-servers",
+			"value": "kafka-kafka-bootstrap.kafka-qa2:9092",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/properties/sasl/jaas/config",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/sasl-jaas-config\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/properties/sasl/mechanism",
+			"value": "SCRAM-SHA-512",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/properties/security/protocol",
+			"value": "SASL_PLAINTEXT",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/retry/maxAttempts",
+			"value": "5",
+			"label": "MeasureEval",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/spring/kafka/retry/retry-backoff-ms",
+			"value": "3000",
+			"label": "MeasureEval",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval"
+			}
+		},
+		{
+			"key": "/spring/security/oauth2/resourceserver/jwt/issuer-uri",
+			"value": "https://qa2-demo.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/springdoc/api-docs/enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/springdoc/swagger-ui/enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "/telemetry/exporterEndpoint",
+			"value": "http://collector-svc.monitoring:55690",
+			"label": "MeasureEval",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "AcquisitionWorkerProcessorSettings:WorkChannelCapacity",
+			"value": "200",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "AllowReflection",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "AllowReflection",
+			"value": "true",
+			"label": "Tenant",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Authentication:ApiBearer:Audience",
+			"value": "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Authentication:ApiBearer:Authority",
+			"value": "https://login.microsoftonline.com/5934dd1c-8d18-4de5-8696-4516a5707a57/v2.0",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Authentication:ApiBearer:Enabled",
+			"value": "true",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Authentication:DefaultChallengeScheme",
+			"value": "link_openid_connect",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:DefaultScheme",
+			"value": "link_cookie",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Authentication:EnableAnonymousAccess",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Authentication:EnableAnonymousAccess",
+			"value": "true",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Authentication:EnableAnonymousAccess",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Cookie:HttpOnly",
+			"value": "true",
+			"label": null,
+			"content_type": "application/json",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:Audience",
+			"value": "link-botw",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:Authority",
+			"value": "https://oauth.nhsnlink.org/realms/NHSNLink",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:Enabled",
+			"value": "true",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:NameClaimType",
+			"value": "email",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:RoleClaimType",
+			"value": "roles",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:ValidTypes:0",
+			"value": "at+jwt",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Authentication:Schemas:Jwt:ValidTypes:1",
+			"value": "JWT",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Authentication:Schemas:LinkBearer:Authority",
+			"value": "https://qa2-demo.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,Audit,Census,DataAcquisition,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:LinkBearer:ValidateToken",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,Audit,Census,DataAcquisition,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:CallbackPath",
+			"value": "/api/signin-oauth2",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:ClientId",
+			"value": "link-oauth",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:ClientSecret",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/oauth-client-secret\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:Enabled",
+			"value": "true",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:Endpoints:Authorization",
+			"value": "https://oauth.nhsnlink.org/realms/NHSNLink/protocol/openid-connect/auth",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:Endpoints:Token",
+			"value": "https://oauth.nhsnlink.org/realms/NHSNLink/protocol/openid-connect/token",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:Oauth2:Endpoints:UserInformation",
+			"value": "https://oauth.nhsnlink.org/realms/NHSNLink/protocol/openid-connect/userinfo",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:Authority",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-openidconnect-authority\"}",
+			"label": "LinkAdminBFF",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:CallbackPath",
+			"value": "/api/signin-oidc",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:ClientId",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-openidconnect-clientid\"}",
+			"label": "LinkAdminBFF",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:ClientSecret",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-openidconnect-clientsecret\"}",
+			"label": "LinkAdminBFF",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:Enabled",
+			"value": "true",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:NameClaimType",
+			"value": "email",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:Schemas:OpenIdConnect:RoleClaimType",
+			"value": "roles",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Authentication:UseBearerForServiceCalls",
+			"value": "True",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "true",
+			"label": "Census",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Census"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "false",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "true",
+			"label": "Normalization",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Normalization"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "true",
+			"label": "QueryDispatch",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "QueryDispatch"
+			}
+		},
+		{
+			"key": "AutoMigrate",
+			"value": "true",
+			"label": "Report",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Report"
+			}
+		},
+		{
+			"key": "Automation:AdminBffBase",
+			"value": "https://qa2-admin.nhsnlink.org",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Automation:FacilityFhirServerBase",
+			"value": "https://ehr-test.nhsnlink.org/fhir",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Automation:FhirServerBase",
+			"value": "https://ehr-test.nhsnlink.org/fhir",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Automation:SlackWebhookUrl",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-slack-webhook\"}",
+			"label": "Link Automation UI",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "CORS:AllowAllHeaders",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:AllowAllHeaders",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "CORS:AllowAllMethods",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:AllowAllMethods",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "CORS:AllowAllOrigins",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:AllowAllOrigins",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowCredentials",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:AllowCredentials",
+			"value": "true",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedExposedHeaders:0",
+			"value": "X-Pagination",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:AllowedExposedHeaders:0",
+			"value": "X-Pagination",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:0",
+			"value": "Authorization",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:1",
+			"value": "Content-Type",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:2",
+			"value": "Accept",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:3",
+			"value": "Origin",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:4",
+			"value": "Access-Control-Allow-Origin",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:5",
+			"value": "User-Agent",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:6",
+			"value": "X-Requested-With",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedHeaders:7",
+			"value": "Set-Cookie",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedMethods:0",
+			"value": "GET",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedMethods:1",
+			"value": "POST",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedMethods:2",
+			"value": "PUT",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedMethods:3",
+			"value": "DELETE",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedMethods:4",
+			"value": "OPTIONS",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedOrigins:0",
+			"value": "https://qa2-demo.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedOrigins:1",
+			"value": "https://qa2-dash.nhsnlink.org",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedOrigins:2",
+			"value": "https://qa2-demo-ngnix.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedOrigins:3",
+			"value": "http://qa2-demo-ngnix.nhsnlink.org",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:AllowedOrigins:4",
+			"value": "http://localhost:4200",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "CORS:MaxAge",
+			"value": "600",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "CORS:MaxAge",
+			"value": "600",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Cache:Type",
+			"value": "Redis",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,DataAcquisition,DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "Channels:Email",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "Channels:IncludeTestMessage",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "Channels:SubjectTestMessage",
+			"value": "[!** TEST Notification - ACA **!]",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "Channels:TestMessage",
+			"value": "[!** This is a TEST notification, please disregard **!]",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-report-database-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,Audit,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-account-database-connection-string\"}",
+			"label": "Account",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-audit-database-connection-string\"}",
+			"label": "Audit",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Audit"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-census-database-connection-string\"}",
+			"label": "Census",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Census"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-data-connection-string\"}",
+			"label": "DataAcquisition",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "DataAcquisition"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-data-connection-string\"}",
+			"label": "DataAcquisitionWorker",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-normalization-connection-string\"}",
+			"label": "Normalization",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Normalization"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-notification-database-connection-string\"}",
+			"label": "Notification",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-querydispatch-sql-connection-string\"}",
+			"label": "QueryDispatch",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "QueryDispatch"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-submission-database-connection-string\"}",
+			"label": "Submission",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "ConnectionStrings:DatabaseConnection",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-tenant-database-connection-string\"}",
+			"label": "Tenant",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Tenant"
+			}
+		},
+		{
+			"key": "ConnectionStrings:Redis",
+			"value": "nhsnlink-qa2-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,DataAcquisition,DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "ConsumerSettings:ConsumerRetryDuration:0",
+			"value": "PT20S",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit,Census,DataAcquisition,DataAcquisitionWorker,Report,Submission"
+			}
+		},
+		{
+			"key": "ConsumerSettings:ConsumerRetryDuration:1",
+			"value": "PT60S",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit,Census,DataAcquisition,DataAcquisitionWorker,Report,Submission"
+			}
+		},
+		{
+			"key": "ConsumerSettings:ConsumerRetryDuration:2",
+			"value": "PT120S",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit,Census,DataAcquisition,DataAcquisitionWorker,Report,Submission"
+			}
+		},
+		{
+			"key": "ConsumerSettings:DisableConsumer",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit,Census,DataAcquisition,DataAcquisitionWorker,Report,Submission"
+			}
+		},
+		{
+			"key": "ConsumerSettings:DisableRetryConsumer",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit,Census,DataAcquisition,DataAcquisitionWorker,Report,Submission"
+			}
+		},
+		{
+			"key": "DataProtection:Enabled",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Census,DataAcquisition,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "DataProtection:KeyRing",
+			"value": "Link",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,DataAcquisition,DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "EnableSwagger",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "ExternalBlobStorage:BlobContainerName",
+			"value": "ext-submission-qa2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "ExternalBlobStorage:ConnectionString",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/abs-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "Features:DownloadReportEnabled",
+			"value": "true",
+			"label": "Submission",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "IdentityProviderConfig:Audience",
+			"value": "link-botw",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "IdentityProviderConfig:Issuer",
+			"value": "https://oauth.nhsnlink.org/auth/realms/NHSNLink",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "IdentityProviderConfig:NameClaimType",
+			"value": "email",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "IdentityProviderConfig:RoleClaimType",
+			"value": "roles",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "IdentityProviderConfig:ValidTypes:0",
+			"value": "at+jwt",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "IdentityProviderConfig:ValidTypes:1",
+			"value": "JWT",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "InternalBlobStorage:BlobContainerName",
+			"value": "int-submission-qa2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Report,Submission"
+			}
+		},
+		{
+			"key": "InternalBlobStorage:ConnectionString",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/abs-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Report,Submission"
+			}
+		},
+		{
+			"key": "KafkaConnection:ApiVersionRequest",
+			"value": "\"false\"",
+			"label": null,
+			"content_type": "application/json",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:BootstrapServers:0",
+			"value": "kafka-kafka-bootstrap.kafka-qa2:9092",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:ClientId",
+			"value": "Default",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:ClientId",
+			"value": "audit-events",
+			"label": "Audit",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Audit"
+			}
+		},
+		{
+			"key": "KafkaConnection:ClientId",
+			"value": "notification-events",
+			"label": "Notification",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "KafkaConnection:Mechanism",
+			"value": "ScramSha512",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:Protocol",
+			"value": "SaslPlaintext",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:SaslPassword",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/sasl-password\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:SaslProtocolEnabled",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "KafkaConnection:SaslUsername",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/sasl-user\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "LinkTokenService:Authority",
+			"value": "https://qa2-demo.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "LinkTokenService:Authority",
+			"value": "https://qa2-demo.nhsnlink.org",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "LinkTokenService:EnableTokenGenerationEndpoint",
+			"value": "true",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "LinkTokenService:LinkAdminEmail",
+			"value": "",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "LinkTokenService:LinkAdminEmail",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "LinkTokenService:LogToken",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "LinkTokenService:LogToken",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "LinkTokenService:SigningKey",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-bearer-key\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "LinkTokenService:TokenLifespan",
+			"value": "20",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "LinkTokenService:TokenLifespan",
+			"value": "20",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Logging:HmacKey",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-hmac-redaction-key\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,Notification"
+			}
+		},
+		{
+			"key": "Logging:LogLevel:Default",
+			"value": "Information",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Logging:LogLevel:LantanaGroup.Link.LinkAdmin.BFF",
+			"value": "Debug",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Logging:LogLevel:Microsoft",
+			"value": "Warning",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Logging:LogLevel:System",
+			"value": "Warning",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Loki:App",
+			"value": "Link QA2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "Loki:Url",
+			"value": "http://loki-gateway.monitoring",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "MongoDB:CollectionName",
+			"value": "CensusServiceConfig",
+			"label": "Census",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "MongoDB:CollectionName",
+			"value": "Facilities",
+			"label": "Tenant",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "MongoDB:ConnectionString",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-mongo-connection-string-qa2\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "MongoDB:ConnectionString",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-mongo-connection-string-qa2\"}",
+			"label": "Tenant",
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {}
+		},
+		{
+			"key": "MongoDB:DatabaseName",
+			"value": "botw-qa2-automation",
+			"label": "Link Automation UI",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AutomationUI"
+			}
+		},
+		{
+			"key": "MongoDB:DatabaseName",
+			"value": "botw-report",
+			"label": "Report",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "MonitorBackendHealthChecks",
+			"value": "false",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF"
+			}
+		},
+		{
+			"key": "Redis:Password",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-resource-cache-redis-password\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "ResourceCache:BlobStorage:BlobContainerName",
+			"value": "resourcecacheqa2",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:BlobStorage:BlobRoot",
+			"value": "resource-cache",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:BlobStorage:ConnectionString",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-resource-catch-abs-connection-string\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:CacheImplementation",
+			"value": "Hybrid",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:Redis:ConnectionString",
+			"value": "nhsnlink-qa2-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:Redis:MemoryThresholdPercent",
+			"value": "80.0",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:Redis:CacheEntryTtlDays",
+			"value": "7",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:Redis:Password",
+			"value": "{\"uri\":\"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-resource-cache-redis-password\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Normalization"
+			}
+		},
+		{
+			"key": "ReverseProxy:Clusters:AccountService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:AuditService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:AuditServiceSwagger:Destinations:destination1:Address",
+			"value": "https://qa2-audit.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:CensusService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:DataAcquisitionService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:MeasureEvaluationService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:NormalizationService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:NotificationService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:QueryDispatchService:Destinations:destination1:Address",
+			"value": "https://qa2-querydispatch.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:ReportService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:SubmissionService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:TenantService:Destinations:destination1:Address",
+			"value": "",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:TerminologyService:Destinations:destination1:Address",
+			"value": "https://qa2-terminology.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Clusters:ValidationService:Destinations:destination1:Address",
+			"value": "https://qa2-validation.nhsnlink.org/",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:AuditSwagger:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:AuditSwagger:ClusterId",
+			"value": "AuditServiceSwagger",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:AuditSwagger:Match:Path",
+			"value": "api/audit/swagger",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:AuditSwagger:Transforms:0:PathPattern",
+			"value": "/swagger",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route10:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route10:ClusterId",
+			"value": "SubmissionService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route10:Match:Path",
+			"value": "api/submission/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route11:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route11:ClusterId",
+			"value": "TenantService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route11:Match:Path",
+			"value": "api/facility/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route12:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route12:ClusterId",
+			"value": "QueryDispatchService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route12:Match:Path",
+			"value": "api/querydispatch/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route13:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route13:ClusterId",
+			"value": "ValidationService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route13:Match:Path",
+			"value": "api/validation/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route14:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route14:ClusterId",
+			"value": "TerminologyService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route14:Match:Path",
+			"value": "api/terminology/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route1:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route1:ClusterId",
+			"value": "AccountService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route1:Match:Path",
+			"value": "api/account/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route2:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route2:ClusterId",
+			"value": "AuditService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route2:Match:Path",
+			"value": "api/audit/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route3:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route3:ClusterId",
+			"value": "CensusService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route3:Match:Path",
+			"value": "api/census/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route4:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route4:ClusterId",
+			"value": "DataAcquisitionService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route4:Match:Path",
+			"value": "api/data/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route5:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route5:ClusterId",
+			"value": "MeasureEvaluationService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route5:Match:Path",
+			"value": "api/measureeval/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route6:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route6:ClusterId",
+			"value": "NormalizationService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route6:Match:Path",
+			"value": "api/normalization/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route7:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route7:ClusterId",
+			"value": "NotificationService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route7:Match:Path",
+			"value": "api/notification/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route8:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route8:ClusterId",
+			"value": "ReportService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route8:Match:Path",
+			"value": "api/report/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route9:AuthorizationPolicy",
+			"value": "AuthenticatedUser",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route9:ClusterId",
+			"value": "ReportService",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ReverseProxy:Routes:route9:Match:Path",
+			"value": "api/reportconfig/{**catch-all}",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "SecretManagement:Enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "SecretManagement:Manager",
+			"value": "AzureKeyVault",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,DataAcquisition,DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SecretManagement:ManagerUri",
+			"value": "https://nhsnlink-kv-qa2.vault.azure.net/",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "AdminBFF,DataAcquisition,DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "Serilog:MinimumLevel:Default",
+			"value": "Information",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:MinimumLevel:Override:Microsoft",
+			"value": "Warning",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:MinimumLevel:Override:System",
+			"value": "Warning",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:Using:0",
+			"value": "Serilog.Sinks.Console",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:Using:1",
+			"value": "Serilog.Sinks.Grafana.Loki",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:0:Name",
+			"value": "Console",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:0:key",
+			"value": "app",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:0:value",
+			"value": "Link QA2",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:key",
+			"value": "component",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Account",
+			"label": "Account",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Audit",
+			"label": "Audit",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Census",
+			"label": "Census",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "DataAcquisition",
+			"label": "DataAcquisition",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "DataAcquisitionWorker",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "LinkAdminBFF",
+			"label": "LinkAdminBFF",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Normalization",
+			"label": "Normalization",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Notification",
+			"label": "Notification",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "QueryDispatch",
+			"label": "QueryDispatch",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Report",
+			"label": "Report",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Submission",
+			"label": "Submission",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Tenant",
+			"label": "Tenant",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Terminology",
+			"label": "Terminology",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:propertiesAsLabels:0",
+			"value": "app",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:propertiesAsLabels:1",
+			"value": "component",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:uri",
+			"value": "http://loki-gateway.monitoring",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Name",
+			"value": "GrafanaLoki",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ServiceRegistry:AccountServiceUrl",
+			"value": "https://qa2-account.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:AdminBffServiceUrl",
+			"value": "https://qa2-admin.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:AuditServiceUrl",
+			"value": "https://qa2-audit.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:CensusServiceUrl",
+			"value": "https://qa2-census.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:DataAcquisitionServiceUrl",
+			"value": "https://qa2-data.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:MeasureServiceUrl",
+			"value": "https://qa2-measure.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:NormalizationServiceUrl",
+			"value": "https://qa2-normalization.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:NotificationServiceUrl",
+			"value": "https://qa2-notification.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:QueryDispatchServiceUrl",
+			"value": "https://qa2-querydispatch.nhsnlink.org/",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:ReportServiceUrl",
+			"value": "https://qa2-report.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:SubmissionServiceUrl",
+			"value": "https://qa2-submission.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:TenantService:CheckIfTenantExists",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:TenantService:GetTenantRelativeEndpoint",
+			"value": "/facility",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:TenantService:TenantServiceUrl",
+			"value": "https://qa2-tenant.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:TerminologyServiceUrl",
+			"value": "https://qa2-terminology.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:ValidationServiceUrl",
+			"value": "https://qa2-validation.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "SftpAcquisition:BaseRetryDelaySeconds",
+			"value": "60",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:EnableParallelProcessing",
+			"value": "true",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:JobIntervalSeconds",
+			"value": "30",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:MaxBatchSize",
+			"value": "10",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:MaxConcurrency",
+			"value": "3",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:MaxRetryAttempts",
+			"value": "3",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:MaxRetryDelaySeconds",
+			"value": "3600",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SftpAcquisition:ParallelProcessingThreshold",
+			"value": "5",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisitionWorker"
+			}
+		},
+		{
+			"key": "SmtpConnection:ClientId",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-smtp-connection-client-id\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:ClientSecret",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-smtp-connection-client-secret\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:EmailFrom",
+			"value": "link-support@nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:Host",
+			"value": "smtp.office365.com",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:Port",
+			"value": "587",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:TenantId",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-smtp-connection-tenant-id\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:UseBasicAuth",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:UseOAuth2",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SmtpConnection:Username",
+			"value": "{\"uri\": \"https://nhsnlink-kv-qa2.vault.azure.net/secrets/link-smtp-username\"}",
+			"label": null,
+			"content_type": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8",
+			"tags": {
+				"link:consumers": "Notification"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:CensusUrl",
+			"value": "https://qa2-census.nhsnlink.org/api/Census",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "SubmissionServiceConfig:DataAcquisitionUrl",
+			"value": "https://qa2-data.nhsnlink.org/api",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:0:MeasureId",
+			"value": "NHSNdQMAcuteCareHospitalInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:0:ShortName",
+			"value": "ACH",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:0:Url",
+			"value": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:1:MeasureId",
+			"value": "NHSNAcuteCareHospitalDailyInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:1:ShortName",
+			"value": "ACHD",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:1:Url",
+			"value": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalDailyInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:2:MeasureId",
+			"value": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:2:ShortName",
+			"value": "ACHM",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:2:Url",
+			"value": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:3:MeasureId",
+			"value": "NHSNGlycemicControlHypoglycemicInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:3:ShortName",
+			"value": "HYPO",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:3:Url",
+			"value": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:4:MeasureId",
+			"value": "NHSNRespiratoryPathogensSurveillanceInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:4:ShortName",
+			"value": "RPS",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:MeasureNames:4:Url",
+			"value": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:PatientBundleBatchSize",
+			"value": "5",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "SubmissionServiceConfig:ReportServiceUrl",
+			"value": "https://qa2-report.nhsnlink.org/api/Report",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "SubmissionServiceConfig:SubmissionDirectory",
+			"value": "/link/submission",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Submission"
+			}
+		},
+		{
+			"key": "Telemetry:EnableAzureMonitor",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Telemetry:EnableOtelCollector",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Telemetry:EnableRuntimeInstrumentation",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Telemetry:EnableTelemetry",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Telemetry:EnableTracing",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "Telemetry:OtelCollectorEndpoint",
+			"value": "http://collector-svc.monitoring:55690",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant,Terminology"
+			}
+		},
+		{
+			"key": "TelemetryConfig:EnableAzureMonitor",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:EnableOtelCollector",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:EnableRuntimeInstrumentation",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:Enabled",
+			"value": "true",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:OtelCollectorEndpoint",
+			"value": "http://collector-svc:55690",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:TelemetryCollectorEndpoint",
+			"value": "http://collector-svc:55690",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "TelemetryConfig:TraceExporterEndpoint",
+			"value": "https://qa2-jaeger.nhsnlink.org:4317/",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		}
+	]
+}

@@ -23,8 +23,8 @@ If neither --service nor --all-services is specified, the script will interactiv
 
 Recognized services:
     account, admin-bff, admin-ui, audit, census, dataacq, dataacq-worker,
-    measureeval, normalization, querydispatch, report, submission, tenant,
-    terminology, validation
+    measureeval, mock-dmrp-api, normalization, querydispatch, report,
+    submission, tenant, terminology, validation
 """
 
 import argparse
@@ -44,6 +44,10 @@ SERVICES = {
     "dataacq": {"repo": "link-dataacquisition", "dockerfile": "DotNet/DataAcquisition/Dockerfile", "context": ".", "deployment": "data-acquisition-deploy", "container": "data"},
     "dataacq-worker": {"repo": "link-dataacquisition-worker", "dockerfile": "DotNet/DataAcquisition.AcquisitionWorker/Dockerfile", "context": ".", "deployment": "data-acquisition-worker-deploy", "container": "data-worker"},
     "measureeval": {"repo": "link-measureeval", "dockerfile": "Java/measureeval/Dockerfile", "context": "Java", "deployment": "measure-deploy", "container": "measure"},
+    # Stand-in for the CDC DMRP API, deployed to the lower environments only. Selecting it
+    # against a namespace that has no mock-dmrp-deploy fails the kubectl step, and because
+    # that failure exits the script, it would stop any services queued behind it.
+    "mock-dmrp-api": {"repo": "link-mock-dmrp", "dockerfile": "DotNet/MockDmrpApi/Dockerfile", "context": ".", "deployment": "mock-dmrp-deploy", "container": "mock-dmrp"},
     "normalization": {"repo": "link-normalization", "dockerfile": "DotNet/Normalization/Dockerfile", "context": ".", "deployment": "normalization-deploy", "container": "normalization"},
     "querydispatch": {"repo": "link-querydispatch", "dockerfile": "DotNet/QueryDispatch/Dockerfile", "context": ".", "deployment": "query-dispatch-deploy", "container": "query-dispatch"},
     "report": {"repo": "link-report", "dockerfile": "DotNet/Report/Dockerfile", "context": ".", "deployment": "report-deploy", "container": "report"},

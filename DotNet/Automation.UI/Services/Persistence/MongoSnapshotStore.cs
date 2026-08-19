@@ -1,4 +1,6 @@
 ﻿using MongoDB.Driver;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -18,20 +20,30 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
+    private const int MaxLogLinesPerChunk = 1_000;
+    private const int MaxLogChunkEstimatedBsonBytes = 12 * 1024 * 1024;
+    private const int EstimatedBsonBytesPerLineOverhead = 64;
+    private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
+    private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
+
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
     private readonly IMongoCollection<RunLogDocument> _logs;
+    private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
+    private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
-    public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger)
+    public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
+        _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+        _snapshotPayloadStore = snapshotPayloadStore ?? new InlineSnapshotPayloadStore();
         _logger = logger;
     }
 
@@ -64,13 +76,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // Clear stale domain snapshot data so milestones/entries from a prior report
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
     public async Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default)
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.IsActive, false)
-            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow)
             .Set(r => r.Duration, duration);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
@@ -81,23 +93,35 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var hasIdentifiers = !string.IsNullOrWhiteSpace(facilityId)
             && !string.IsNullOrWhiteSpace(reportId);
 
-        var update = Builders<AutomationRunDocument>.Update
-            .Set(r => r.RunName, summary.RunName)
-            .Set(r => r.Scenario, summary.Scenario.ToString())
-            .Set(r => r.SelectedMeasure, summary.SelectedMeasure)
-            .Set(r => r.PatientCount, summary.PatientCount)
-            .Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
-            .Set(r => r.Seed, summary.Seed)
-            .Set(r => r.Status, summary.Status.ToString())
-            .Set(r => r.CreatedAt, summary.CreatedAt)
-            .Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
-            .Set(r => r.FinishedAt, summary.FinishedAt)
-            .Set(r => r.Error, summary.Error)
-            .Set(r => r.FacilityId, facilityId ?? string.Empty)
-            .Set(r => r.ReportId, reportId ?? string.Empty)
-            .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
-            .Set(r => r.CompletedAt, summary.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled ? summary.FinishedAt ?? DateTimeOffset.UtcNow : null)
-            .SetOnInsert(r => r.RunId, summary.RunId);
+        var updates = new List<UpdateDefinition<AutomationRunDocument>>
+        {
+            Builders<AutomationRunDocument>.Update.Set(r => r.RunName, summary.RunName),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Scenario, summary.Scenario.ToString()),
+            Builders<AutomationRunDocument>.Update.Set(r => r.SelectedMeasure, summary.SelectedMeasure),
+            Builders<AutomationRunDocument>.Update.Set(r => r.PatientCount, summary.PatientCount),
+            Builders<AutomationRunDocument>.Update.Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Seed, summary.Seed),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Status, summary.Status.ToString()),
+            Builders<AutomationRunDocument>.Update.Set(r => r.CreatedAt, summary.CreatedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
+            Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
+            Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
+            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled),
+            Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
+        };
+
+        if (summary.GeneratedTemplateCacheVersionId.HasValue)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionId, summary.GeneratedTemplateCacheVersionId));
+        if (summary.GeneratedTemplateCacheVersionNumber.HasValue)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionNumber, summary.GeneratedTemplateCacheVersionNumber));
+        if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateCacheScenarioKey))
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheScenarioKey, summary.GeneratedTemplateCacheScenarioKey));
+        if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateSetHash))
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash));
+
+        var update = Builders<AutomationRunDocument>.Update.Combine(updates);
 
         await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
     }
@@ -244,7 +268,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
-        await _logs.DeleteOneAsync(l => l.RunId == runId, ct);
+        await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
+        await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
+
+        // Only remove externalized payload blobs after Mongo cleanup succeeds so
+        // a DB failure cannot orphan pointer records that still reference payload data.
+        await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
@@ -342,6 +371,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
+            GeneratedTemplateCacheVersionId = doc.GeneratedTemplateCacheVersionId,
+            GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,
+            GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
+            GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
             Logs = []
         };
     }
@@ -351,17 +384,37 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     public async Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
     {
         var json = JsonSerializer.Serialize(data);
+        var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
 
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
 
+        var existing = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
+        var existingPointer = TryReadSnapshotPayloadPointer(existing?.Data);
+
+        SnapshotPayloadPointer? newPointer = null;
+        var storedJson = json;
+        if (_snapshotPayloadStore.ShouldExternalize(domain, payloadUtf8Bytes))
+        {
+            newPointer = await _snapshotPayloadStore.StoreAsync(runId, domain, json, ct);
+            storedJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
+            {
+                [SnapshotPayloadPointerEnvelopeProperty] = newPointer
+            });
+        }
+
         var update = Builders<DomainSnapshotDocument>.Update
-            .Set(d => d.Data, json)
+            .Set(d => d.Data, storedJson)
             .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
             .SetOnInsert(d => d.RunId, runId)
             .SetOnInsert(d => d.Domain, domain);
 
         await _snapshots.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+
+        if (existingPointer != null && (newPointer == null || !string.Equals(existingPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
+        {
+            await _snapshotPayloadStore.DeleteIfExistsAsync(existingPointer, ct);
+        }
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
@@ -378,7 +431,22 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         try
         {
-            var data = JsonSerializer.Deserialize<T>(doc.Data);
+            var payloadJson = doc.Data;
+            var pointer = TryReadSnapshotPayloadPointer(payloadJson);
+            if (pointer != null)
+            {
+                payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
+                if (string.IsNullOrWhiteSpace(payloadJson))
+                {
+                    var sanitizedRunId = runId.ToString().SanitizeForLog();
+                    var sanitizedDomain = domain.SanitizeForLog();
+                    var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
+                    _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
+                    return null;
+                }
+            }
+
+            var data = JsonSerializer.Deserialize<T>(payloadJson);
             if (data == null)
             {
                 _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, doc.Data?.Length ?? 0);
@@ -394,44 +462,296 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
     }
 
+    private static SnapshotPayloadPointer? TryReadSnapshotPayloadPointer(string? payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+
+            if (!doc.RootElement.TryGetProperty(SnapshotPayloadPointerEnvelopeProperty, out var pointerElement)
+                || pointerElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var pointer = pointerElement.Deserialize<SnapshotPayloadPointer>();
+            if (pointer == null)
+                return null;
+
+            if (!string.Equals(pointer.Kind, SnapshotPayloadPointer.KindValue, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (string.IsNullOrWhiteSpace(pointer.BlobName))
+                return null;
+
+            return pointer;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed class InlineSnapshotPayloadStore : ISnapshotPayloadStore
+    {
+        public bool ShouldExternalize(string domain, int payloadUtf8Bytes) => false;
+
+        public Task<SnapshotPayloadPointer> StoreAsync(Guid runId, string domain, string payloadJson, CancellationToken ct = default)
+            => throw new NotSupportedException("Inline snapshot payload store does not externalize payloads.");
+
+        public Task<string?> ReadAsync(SnapshotPayloadPointer pointer, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
+
+        public Task DeleteIfExistsAsync(SnapshotPayloadPointer pointer, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task DeleteRunPayloadsAsync(Guid runId, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
     // --- Logs ---
 
     public async Task AppendLogsAsync(Guid runId, IReadOnlyList<string> newLines, CancellationToken ct = default)
     {
-        if (newLines.Count == 0) return;
+        if (newLines.Count == 0)
+            return;
 
-        var filter = Builders<RunLogDocument>.Filter.Eq(l => l.RunId, runId);
+        var nextLineSequence = await ReserveLogSequenceRangeAsync(runId, newLines.Count, ct);
+
+        foreach (var rawLine in newLines)
+        {
+            var lineSequence = nextLineSequence++;
+            var line = NormalizeLineForChunkBudget(runId, rawLine);
+            var lineEstimatedBsonBytes = EstimateLogLineBsonBytes(line);
+
+            while (true)
+            {
+                var currentChunk = await _logs.Find(CreateLogChunkFilter(runId))
+                    .SortByDescending(l => l.Id)
+                    .FirstOrDefaultAsync(ct);
+
+                if (currentChunk != null && currentChunk.BsonByteCount == 0 && currentChunk.LineCount > 0)
+                {
+                    var estimatedChunkBsonBytes = EstimateChunkLinesBsonBytes(currentChunk.Lines);
+                    var initializeBsonBytesFilter = Builders<RunLogDocument>.Filter.And(
+                        Builders<RunLogDocument>.Filter.Eq(l => l.Id, currentChunk.Id),
+                        Builders<RunLogDocument>.Filter.Or(
+                            Builders<RunLogDocument>.Filter.Eq(l => l.BsonByteCount, 0),
+                            Builders<RunLogDocument>.Filter.Exists(nameof(RunLogDocument.BsonByteCount), false)));
+
+                    var initializeBsonBytesResult = await _logs.UpdateOneAsync(
+                        initializeBsonBytesFilter,
+                        Builders<RunLogDocument>.Update.Set(l => l.BsonByteCount, estimatedChunkBsonBytes),
+                        cancellationToken: ct);
+
+                    if (initializeBsonBytesResult.ModifiedCount == 1)
+                    {
+                        currentChunk.BsonByteCount = estimatedChunkBsonBytes;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                var currentChunkEstimatedBsonBytes = currentChunk?.BsonByteCount ?? 0;
+                if (currentChunk == null
+                    || currentChunk.LineCount >= MaxLogLinesPerChunk
+                    || currentChunkEstimatedBsonBytes + lineEstimatedBsonBytes > MaxLogChunkEstimatedBsonBytes
+                    || (currentChunk.LineSequences?.Count ?? 0) != currentChunk.LineCount)
+                {
+                    var nextChunkNumber = currentChunk?.ChunkNumber + 1 ?? 0;
+                    var nextChunk = new RunLogDocument
+                    {
+                        Id = CreateLogChunkId(runId, nextChunkNumber),
+                        RunId = runId,
+                        ChunkNumber = nextChunkNumber,
+                        LineCount = 1,
+                        BsonByteCount = lineEstimatedBsonBytes,
+                        Lines = [line],
+                        LineSequences = [lineSequence],
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    };
+
+                    try
+                    {
+                        await _logs.InsertOneAsync(nextChunk, cancellationToken: ct);
+                        break;
+                    }
+                    catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+                    {
+                        // Another concurrent logger created this chunk first. Re-read and append to it.
+                    }
+
+                    continue;
+                }
+
+                var filter = Builders<RunLogDocument>.Filter.And(
+                    Builders<RunLogDocument>.Filter.Eq(l => l.Id, currentChunk.Id),
+                    Builders<RunLogDocument>.Filter.Lt(l => l.LineCount, MaxLogLinesPerChunk),
+                    Builders<RunLogDocument>.Filter.Lte(l => l.BsonByteCount, MaxLogChunkEstimatedBsonBytes - lineEstimatedBsonBytes));
+                var update = Builders<RunLogDocument>.Update
+                    .Push(l => l.Lines, line)
+                    .Push(l => l.LineSequences, lineSequence)
+                    .Inc(l => l.LineCount, 1)
+                    .Inc(l => l.BsonByteCount, lineEstimatedBsonBytes)
+                    .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow);
+
+                var result = await _logs.UpdateOneAsync(filter, update, cancellationToken: ct);
+                if (result.ModifiedCount == 1)
+                    break;
+            }
+        }
+    }
+
+    private async Task<long> ReserveLogSequenceRangeAsync(Guid runId, int lineCount, CancellationToken ct)
+    {
+        await EnsureLogSequenceCounterInitializedAsync(runId, ct);
+
+        var update = Builders<RunLogSequenceDocument>.Update.Inc(s => s.NextSequence, lineCount);
+        var updated = await _logSequences.FindOneAndUpdateAsync(
+            s => s.RunId == runId,
+            update,
+            new FindOneAndUpdateOptions<RunLogSequenceDocument>
+            {
+                ReturnDocument = ReturnDocument.After
+            },
+            ct);
+
+        return updated.NextSequence - lineCount;
+    }
+
+    private async Task EnsureLogSequenceCounterInitializedAsync(Guid runId, CancellationToken ct)
+    {
+        var existing = await _logSequences.Find(s => s.RunId == runId).AnyAsync(ct);
+        if (existing)
+            return;
+
+        var legacyLog = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
+        var chunks = await _logs.Find(CreateLogChunkFilter(runId)).ToListAsync(ct);
+        var existingLineCount = (legacyLog?.Lines.Count ?? 0) + chunks.Sum(c => c.LineCount);
 
         try
         {
-            var update = Builders<RunLogDocument>.Update
-                .PushEach(l => l.Lines, newLines)
-                .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow)
-                .SetOnInsert(l => l.RunId, runId);
-
-            await _logs.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+            await _logSequences.InsertOneAsync(new RunLogSequenceDocument
+            {
+                RunId = runId,
+                NextSequence = existingLineCount
+            }, cancellationToken: ct);
         }
-        catch (MongoCommandException)
+        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
         {
-            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
-            var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
-            if (doc == null)
-            {
-                doc = new RunLogDocument { RunId = runId, Lines = new List<string>(newLines), UpdatedAt = DateTimeOffset.UtcNow };
-                await _logs.InsertOneAsync(doc, cancellationToken: ct);
-            }
-            else
-            {
-                doc.Lines.AddRange(newLines);
-                doc.UpdatedAt = DateTimeOffset.UtcNow;
-                await _logs.ReplaceOneAsync(filter, doc, cancellationToken: ct);
-            }
+            // Another concurrent append initialized the counter first.
         }
+    }
+
+    private string NormalizeLineForChunkBudget(Guid runId, string line)
+    {
+        if (EstimateLogLineBsonBytes(line) <= MaxLogChunkEstimatedBsonBytes)
+            return line;
+
+        var suffixBytes = Encoding.UTF8.GetByteCount(OversizedLogLineSuffix);
+        var maxLineContentBytes = Math.Max(0, MaxLogChunkEstimatedBsonBytes - EstimatedBsonBytesPerLineOverhead - suffixBytes);
+        var truncatedLine = TruncateToUtf8ByteCount(line, maxLineContentBytes);
+
+        _logger.LogWarning(
+            "[Store] AppendLogs: truncated oversized log line for run={RunId} from {OriginalBytes} to {PersistedBytes} bytes",
+            runId,
+            Encoding.UTF8.GetByteCount(line),
+            Encoding.UTF8.GetByteCount(truncatedLine));
+
+        return truncatedLine + OversizedLogLineSuffix;
+    }
+
+    private static int EstimateLogLineBsonBytes(string line)
+        => Encoding.UTF8.GetByteCount(line) + EstimatedBsonBytesPerLineOverhead;
+
+    private static int EstimateChunkLinesBsonBytes(IReadOnlyList<string> lines)
+    {
+        var total = 0;
+        foreach (var chunkLine in lines)
+            total += EstimateLogLineBsonBytes(chunkLine);
+
+        return total;
+    }
+
+    private static string TruncateToUtf8ByteCount(string value, int maxBytes)
+    {
+        if (string.IsNullOrEmpty(value) || maxBytes <= 0)
+            return string.Empty;
+
+        var builder = new StringBuilder(value.Length);
+        var usedBytes = 0;
+        foreach (var rune in value.EnumerateRunes())
+        {
+            var runeBytes = rune.Utf8SequenceLength;
+            if (usedBytes + runeBytes > maxBytes)
+                break;
+
+            builder.Append(rune.ToString());
+            usedBytes += runeBytes;
+        }
+
+        return builder.ToString();
     }
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
     {
-        var doc = await _logs.Find(l => l.RunId == runId).FirstOrDefaultAsync(ct);
-        return doc?.Lines ?? [];
+        var legacyLog = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
+        var chunks = await _logs.Find(CreateLogChunkFilter(runId))
+            .SortBy(l => l.Id)
+            .ToListAsync(ct);
+
+        var orderedLines = new List<(long Sequence, int Ordinal, string Line)>();
+        var fallbackSequence = 0L;
+        var ordinal = 0;
+
+        if (legacyLog != null)
+        {
+            foreach (var line in legacyLog.Lines)
+                orderedLines.Add((fallbackSequence++, ordinal++, line));
+        }
+
+        foreach (var chunk in chunks)
+        {
+            var chunkSequences = chunk.LineSequences ?? [];
+            for (var i = 0; i < chunk.Lines.Count; i++)
+            {
+                if (i < chunkSequences.Count)
+                {
+                    var sequence = chunkSequences[i];
+                    orderedLines.Add((sequence, ordinal++, chunk.Lines[i]));
+                    if (fallbackSequence <= sequence)
+                        fallbackSequence = sequence + 1;
+                }
+                else
+                {
+                    orderedLines.Add((fallbackSequence++, ordinal++, chunk.Lines[i]));
+                }
+            }
+        }
+
+        return orderedLines
+            .OrderBy(l => l.Sequence)
+            .ThenBy(l => l.Ordinal)
+            .Select(l => l.Line)
+            .ToList();
     }
+
+    private static FilterDefinition<RunLogDocument> CreateLogChunkFilter(Guid runId)
+    {
+        var prefix = CreateLogChunkPrefix(runId);
+        return Builders<RunLogDocument>.Filter.And(
+            Builders<RunLogDocument>.Filter.Gte(l => l.Id, prefix),
+            Builders<RunLogDocument>.Filter.Lt(l => l.Id, prefix + '\uffff'));
+    }
+
+    private static string CreateLogChunkId(Guid runId, int chunkNumber) => $"{CreateLogChunkPrefix(runId)}{chunkNumber:D8}";
+
+    private static string CreateLogChunkPrefix(Guid runId) => $"{runId:N}:";
 }
