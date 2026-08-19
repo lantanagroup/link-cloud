@@ -686,9 +686,12 @@ services:
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
-      # DMRP system feature switch. Must match DMRP__Enabled on the services, which this stack sets
-      # true in the tenant service's appsettings.Docker.json.
-      LINK_DMRP_ENABLED: "true"
+      # DMRP system feature switch. Must match DMRP:Enabled on the services, which this stack leaves
+      # off in the tenant service's appsettings.Docker.json - the Backend E2E suite creates facilities
+      # with a schedule of its own, which DMRP refuses. To exercise DMRP locally, set this to "true"
+      # and DMRP:Enabled to true in DotNet/Tenant/appsettings.Docker.json; both, or the facility form
+      # quietly creates facilities that report nothing.
+      LINK_DMRP_ENABLED: "false"
     networks:
       - link-nw
     depends_on:

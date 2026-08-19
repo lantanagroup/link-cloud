@@ -95,6 +95,47 @@ public class MeasureMappingsControllerTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Delete-all is refused while any reporting plan exists, since every plan would be orphaned. The
+    /// refusal happens before anything is removed, so the table is left whole rather than half emptied.
+    /// </summary>
+    [Fact]
+    public async Task DeleteAllMeasureMappings_WhenAnyReportingPlanExists_ReturnsConflictAndDeletesNothing()
+    {
+        var sp = _scope.ServiceProvider;
+        var mappingId = await CreateMappingAsync();
+
+        var plans = sp.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
+        var plan = new FacilityReportingPlan
+        {
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            MeasureMappingId = mappingId,
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = true
+        };
+        await plans.AddAsync(plan);
+        await plans.SaveChangesAsync();
+
+        try
+        {
+            var result = await _controller.DeleteAllMeasureMappings(CancellationToken.None);
+
+            var problem = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+
+            // Nothing was removed, not even the mappings no plan points at.
+            var stillThere = Assert.IsType<OkObjectResult>(
+                await _controller.GetMeasureMapping(mappingId, CancellationToken.None));
+            Assert.NotNull(stillThere.Value);
+        }
+        finally
+        {
+            plans.Remove(plan);
+            await plans.SaveChangesAsync();
+        }
+    }
+
     [Fact]
     public async Task DeleteMeasureMapping_WhenNothingReferencesIt_ReturnsNoContent()
     {

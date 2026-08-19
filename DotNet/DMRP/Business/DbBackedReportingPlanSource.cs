@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.DMRP.Business
                     // read that raced a delete rather than an ordinary miss.
                     _logger.LogWarning(
                         "Reporting plan {PlanId} for facility {FacilityId} references measure mapping {MeasureMappingId}, which was not found. The measure is excluded from the facility's schedule.",
-                        plan.Id.Sanitize(), facilityId.Sanitize(), plan.MeasureMappingId.Sanitize());
+                        plan.Id.SanitizeForLog(), facilityId.SanitizeForLog(), plan.MeasureMappingId.SanitizeForLog());
 
                     continue;
                 }

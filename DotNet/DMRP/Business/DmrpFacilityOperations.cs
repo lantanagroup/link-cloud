@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.DMRP.Business
             var removed = await _reportingPlanManager.DeleteForFacilityAsync(facilityId, cancellationToken);
 
             _logger.LogInformation("Deleted {Count} reporting plan(s) belonging to removed facility {FacilityId}",
-                removed, facilityId.Sanitize());
+                removed, facilityId.SanitizeForLog());
         }
 
         /// <summary>
@@ -112,7 +112,7 @@ namespace LantanaGroup.Link.DMRP.Business
             {
                 _logger.LogInformation(
                     "Facility {FacilityId} has no reporting plans for {Month}/{Year}; it is scheduled for no reports.",
-                    facilityId.Sanitize(), month, year);
+                    facilityId.SanitizeForLog(), month, year);
 
                 return EmptySchedule();
             }
@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.DMRP.Business
                 // with a null dQM, precisely so it shows up here rather than being lost.
                 _logger.LogWarning(
                     "Facility {FacilityId} is enrolled in measure {Measure} for {Month}/{Year}, which has no dQM mapped. It is excluded from the facility's schedule.",
-                    facilityId.Sanitize(), entry.Measure.Sanitize(), month, year);
+                    facilityId.SanitizeForLog(), entry.Measure.SanitizeForLog(), month, year);
             }
 
             return new TenantScheduledReportConfig
@@ -174,7 +174,7 @@ namespace LantanaGroup.Link.DMRP.Business
                 // error about reporting periods.
                 _logger.LogWarning(ex,
                     "Facility {FacilityId} has an unusable timezone; the reporting period was read in UTC instead.",
-                    facility.FacilityId?.Sanitize());
+                    facility.FacilityId?.SanitizeForLog());
 
                 return (utcNow.Month, utcNow.Year);
             }
