@@ -46,4 +46,7 @@ internal sealed class MutableRunState(
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    public DateTimeOffset? LiveWindowStartUtc { get; set; }
+    public DateTimeOffset? LiveWindowEndUtc { get; set; }
+    public IReadOnlyList<string> LiveExpectedPopulation { get; set; } = [];
 }

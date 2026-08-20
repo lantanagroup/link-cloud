@@ -61,7 +61,7 @@ public class ReportAbsManifestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAllAsync_WithManifest_UsesConfiguredOperationOutcomeWriters()
+    public async Task ValidateAllAsync_WithManifest_ExpectsOperationOutcomeWhenValidationWriterIsOn()
     {
         var output = new BufferingAutomationOutput();
         var patientId = "patient-oo-1";
@@ -146,7 +146,6 @@ public class ReportAbsManifestValidatorTests
             expectDataAcquisitionData: true,
             manifest: manifest,
             operationOutcomeExpectations: new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
-                ReportWritesLegacyOperationOutcomeWhenInvalid: true,
                 ValidationWritesPreQualOperationOutcomeWhenInvalid: true));
     }
 
@@ -484,7 +483,6 @@ public class ReportAbsManifestValidatorTests
                 type = "individual",
                 subject = new { reference = $"Patient/{patientId}" }
             }),
-            JsonSerializer.Serialize(new { resourceType = "OperationOutcome", id = $"oo-{patientId}-legacy" }),
             JsonSerializer.Serialize(new { resourceType = "OperationOutcome", id = $"oo-{patientId}-prequal" })
         });
 

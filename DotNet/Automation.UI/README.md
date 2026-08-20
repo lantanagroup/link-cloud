@@ -655,8 +655,8 @@ with:
 
 That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` for
 strict prediction-vs-actual comparison. The Report service's `ReportEntry.ReportingStatus`
-rows feed the `OperationOutcome` count prediction (one OO per patient with
-`FailedValidation`).
+rows feed the `OperationOutcome` count prediction (one OO per `FailedValidation` patient)
+when Validation's `pre-qualification.write-pre-qual-operation-outcome` flag is on.
 
 The CQL simulator is resource-aware, not just type-aware. In addition to checking that a
 resource type is acquired and referenced by CQL, it applies known SDE `where` predicates per

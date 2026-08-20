@@ -698,7 +698,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        internal static async Task<(bool IsValid, string? ErrorMessage)> ValidateOperation(string operationType, string operationJson, List<string> resources)
+        public static async Task<(bool IsValid, string? ErrorMessage)> ValidateOperation(string operationType, string operationJson, List<string> resources)
         {
             try
             {

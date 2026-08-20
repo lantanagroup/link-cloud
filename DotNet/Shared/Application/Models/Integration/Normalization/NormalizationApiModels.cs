@@ -50,7 +50,13 @@ public class CreateNormalizationOperationDetailsApiModel
 public class CreateNormalizationConditionApiModel
 {
     public string FhirPathSource { get; set; } = string.Empty;
-    public string Operator { get; set; } = "Equal";
+
+    /// <summary>
+    /// Numeric <c>ConditionOperator</c> value expected by the Normalization API
+    /// (0=Equal, 1=GreaterThan, 2=GreaterThanOrEqual, 3=LessThan, 4=LessThanOrEqual, 5=NotEqual, 6=Exists, 7=NotExists).
+    /// </summary>
+    public int Operator { get; set; }
+
     public object? Value { get; set; }
 }
 

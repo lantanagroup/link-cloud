@@ -493,9 +493,8 @@ pipeline-derived additions:
 | `GetExpectedAbsCountsForPatient(patientId)` | `ReportAbsManifestValidator` (patient NDJSON in ABS) | Patient, MeasureReport, **OperationOutcome** |
 | `GetExpectedReportResourceCountsForPatient(patientId)` | `ReportDatabaseValidator` (`ReportResource` table) | Patient, MeasureReport (OperationOutcome excluded) |
 
-OperationOutcome is excluded from the DB prediction because
-`ValidationCompleteListener.ProcessMessageAsync` appends it directly to the ABS blob via
-`PatientAggregator.AppendResourceToBlob(...)`, bypassing `PatientAggregator`'s aggregation +
+OperationOutcome is excluded from the DB prediction because the Validation service
+appends it directly to the ABS blob, bypassing `PatientAggregator`'s aggregation +
 `ReportResourceManager.AddAsyncWithAggregateResult` flow. It never reaches the table.
 
 ### 8.5 CQL filter simulator semantics
