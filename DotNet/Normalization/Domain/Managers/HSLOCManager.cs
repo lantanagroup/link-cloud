@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -21,62 +22,73 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     public class HSLOCManager : IHSLOCManager
     {
         private readonly NormalizationDbContext _dbContext;
-        public HSLOCManager(NormalizationDbContext dbContext)
+        private readonly ILogger<HSLOCManager> _logger;
+
+        public HSLOCManager(NormalizationDbContext dbContext, ILogger<HSLOCManager> logger)
         {
             _dbContext = dbContext;
+            _logger = logger;
         }
 
         public async Task Update(string oldVersion, string newVersion, Stream csv)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
-            ArgumentException.ThrowIfNullOrWhiteSpace(newVersion);
-            ArgumentNullException.ThrowIfNull(csv);
-
-            if (!csv.CanRead)
+            try
             {
-                throw new ArgumentException("The HSLOC CSV stream must be readable.", nameof(csv));
-            }
+                ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
+                ArgumentException.ThrowIfNullOrWhiteSpace(newVersion);
+                ArgumentNullException.ThrowIfNull(csv);
 
-            var importedRows = ParseCsv(csv);
-            var importedCodes = importedRows
-                .Select(row => row.HSLOCCode)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var oldRows = await _dbContext.HSLOCS
-                .Where(row => row.Version == oldVersion)
-                .ToListAsync();
-            var oldRowsByCode = oldRows.ToDictionary(row => row.HSLOCCode, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var importedRow in importedRows)
-            {
-                if (oldRowsByCode.TryGetValue(importedRow.HSLOCCode, out var oldRow))
+                if (!csv.CanRead)
                 {
-                    oldRow.CDCCode = importedRow.CDCCode;
-                    oldRow.ShortDescription = importedRow.ShortDescription;
-                    oldRow.LongDescription = importedRow.LongDescription;
-                    oldRow.Version = newVersion;
-                    oldRow.IsActive = true;
+                    throw new ArgumentException("The HSLOC CSV stream must be readable.", nameof(csv));
                 }
-                else
+
+                var importedRows = ParseCsv(csv);
+                var importedCodes = importedRows
+                    .Select(row => row.HSLOCCode)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var oldRows = await _dbContext.HSLOCS
+                    .Where(row => row.Version == oldVersion)
+                    .ToListAsync();
+                var oldRowsByCode = oldRows.ToDictionary(row => row.HSLOCCode, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var importedRow in importedRows)
                 {
-                    _dbContext.HSLOCS.Add(new HSLOC
+                    if (oldRowsByCode.TryGetValue(importedRow.HSLOCCode, out var oldRow))
                     {
-                        CDCCode = importedRow.CDCCode,
-                        ShortDescription = importedRow.ShortDescription,
-                        HSLOCCode = importedRow.HSLOCCode,
-                        LongDescription = importedRow.LongDescription,
-                        Version = newVersion,
-                        IsActive = true
-                    });
+                        oldRow.CDCCode = importedRow.CDCCode;
+                        oldRow.ShortDescription = importedRow.ShortDescription;
+                        oldRow.LongDescription = importedRow.LongDescription;
+                        oldRow.Version = newVersion;
+                        oldRow.IsActive = true;
+                    }
+                    else
+                    {
+                        _dbContext.HSLOCS.Add(new HSLOC
+                        {
+                            CDCCode = importedRow.CDCCode,
+                            ShortDescription = importedRow.ShortDescription,
+                            HSLOCCode = importedRow.HSLOCCode,
+                            LongDescription = importedRow.LongDescription,
+                            Version = newVersion,
+                            IsActive = true
+                        });
+                    }
                 }
-            }
 
-            foreach (var oldRow in oldRows.Where(row => !importedCodes.Contains(row.HSLOCCode)))
+                foreach (var oldRow in oldRows.Where(row => !importedCodes.Contains(row.HSLOCCode)))
+                {
+                    oldRow.IsActive = false;
+                }
+
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (Exception exception)
             {
-                oldRow.IsActive = false;
+                _logger.LogError(exception, "Failed to update HSLOC data from CSV.");
+                throw;
             }
-
-            await _dbContext.SaveChangesAsync();
         }
 
         private static string GetRequiredField(string[] fields, int index, string columnName, long lineNumber)
@@ -90,17 +102,41 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task DeleteAll()
         {
-            await _dbContext.HSLOCS.ExecuteDeleteAsync();
+            try
+            {
+                await _dbContext.HSLOCS.ExecuteDeleteAsync();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to delete all HSLOC records.");
+                throw;
+            }
         }
 
         public async Task DeleteByVersion(string version)
         {
-            await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync();
+            try
+            {
+                await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to delete HSLOC records for the specified version.");
+                throw;
+            }
         }
 
         public async Task DeleteById(Guid id)
         {
-            await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync();
+            try
+            {
+                await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to delete the specified HSLOC record.");
+                throw;
+            }
         }
 
         private static List<HSLOC> ParseCsv(Stream csv)
