@@ -1351,7 +1351,7 @@
     <!-- ============ MRN IDENTIFIER INTAKE ============ -->
     <section class="panel" id="panel-mrn-intake" hidden>
       <div class="card">
-        <h1>MRN Identifier Intake</h1>
+        <h1>Usable MRN Identifier</h1>
         <p class="subtitle">When multiple patient identifiers are present in FHIR, the facility reporting digital quality measures (dQMs) to NHSN should identify the one that is operationally used by end users in the source EHR. This allows NHSN to provide back to the facility the medical record number (MRN) end user can use to recognize and retrieve the patients based on their NHSN analysis reports. In FHIR implementations, Patient.identifier is a repeating element, and more than one identifier may be represented as MRN or may appear to be the MRN. Fields such as type, use, system, assigner, and period can help distinguish identifiers. If more than one identifier is coded as the MRN, NHSN needs to differentiate the usable MRN using FHIR fields such as identifier.system, identifier.use, identifier.assigner, and identifier.period.</p>
 
         <p class="subtitle">NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided on this page ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This page should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.</p>
@@ -2093,7 +2093,7 @@
     steps.push({ id: 'encounter', label: 'Encounter Mapping', panel: 'panel-encounter' });
     steps.push({ id: 'report', label: 'Generate Test Report', panel: 'panel-report' });
     steps.push({ id: 'report-results', label: 'Report Results', panel: 'panel-report-results' });
-    steps.push({ id: 'mrn-intake', label: 'MRN Identifier Intake', panel: 'panel-mrn-intake' });
+    steps.push({ id: 'mrn-intake', label: 'Usable MRN Identifier', panel: 'panel-mrn-intake' });
     steps.push({ id: 'complete', label: 'Enrollment Complete', panel: 'panel-complete' });
     return steps;
   }
