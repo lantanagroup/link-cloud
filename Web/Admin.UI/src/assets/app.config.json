@@ -8,6 +8,6 @@
     "scope": "openid profile email",
     "responseType": "code"
   },
-  "grafanaUrl": "https://grafana.nhsnlink.org",
+  "grafanaUrl": "",
   "kafkaUrl": ""
 }
