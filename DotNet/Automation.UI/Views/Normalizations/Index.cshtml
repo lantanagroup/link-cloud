@@ -10,6 +10,20 @@
     <h2 class="fw-bold mb-1"><i class="bi bi-funnel me-2"></i>Normalizations</h2>
     <p class="text-muted mb-3">Manage normalization operations, sequences, and suites. Suites are selectable on scenarios to control which normalizations run during a test.</p>
 
+    <div class="au-card">
+        <div class="card-header">Suggest from a patient bundle</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Upload one or more FHIR bundles. We'll propose one operation of each type the data can support, reuse existing operations when they already match, and recommend a suite if one already covers the work. Upload additional patients to refine the same suite.</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @Html.AntiForgeryToken()
+                <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
+                <button type="button" class="btn btn-sm btn-au-action" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNormGenerateReset">Start over</button>
+                <span id="normGenSessionHint" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs mb-3" id="normTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
@@ -423,6 +437,7 @@
 <div id="suiteModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @section Scripts {
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
     // -- Data from server --
     const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
@@ -1039,5 +1054,74 @@
         await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
         location.reload();
     }));
+
+    const analyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
+    const applyOrmUrl = '@Url.Action("ApplyOrm", "ConfigurationGeneration")';
+    const applyNormUrl = '@Url.Action("ApplyNormalization", "ConfigurationGeneration")';
+    const normGenKey = 'cfgGen.norm';
+    function loadNormGenState(){
+        try { return JSON.parse(sessionStorage.getItem(normGenKey) || '{}'); } catch { return {}; }
+    }
+    function saveNormGenState(state){ sessionStorage.setItem(normGenKey, JSON.stringify(state || {})); }
+    function refreshNormGenHint(){
+        const hint = document.getElementById('normGenSessionHint');
+        if (!hint) return;
+        const state = loadNormGenState();
+        hint.textContent = state.fingerprint
+            ? 'Session has prior patient data. The next analyze will refine the current proposal. Use Start over to reset.'
+            : '';
+    }
+    refreshNormGenHint();
+    document.getElementById('btnNormGenerateReset').addEventListener('click', () => {
+        sessionStorage.removeItem(normGenKey);
+        document.getElementById('normGenFile').value = '';
+        refreshNormGenHint();
+    });
+    document.getElementById('btnNormGenerate').addEventListener('click', async () => {
+        const files = document.getElementById('normGenFile').files;
+        if (!files.length) { alert('Choose one or more FHIR bundle JSON files first.'); return; }
+        const btn = document.getElementById('btnNormGenerate');
+        btn.disabled = true;
+        try {
+        const sources = await window.BundleConfigGeneration.readFilesAsSources(files);
+        const state = loadNormGenState();
+        const request = { sources, priorFingerprint: state.fingerprint || null, refineOrmId: state.lastOrmId || null, refineSuiteId: state.lastSuiteId || null };
+        function persist(idKey, id, proposal){
+            const next = loadNormGenState();
+            if (proposal) next.fingerprint = proposal.fingerprint || proposal.Fingerprint || next.fingerprint;
+            if (idKey && id) next[idKey] = id;
+            saveNormGenState(next);
+            refreshNormGenHint();
+        }
+        const proposal = await window.BundleConfigGeneration.analyzeAndShow(
+            { analyze: analyzeUrl, applyOrm: applyOrmUrl, applyNorm: applyNormUrl },
+            request,
+            {
+                selectOrmLabel: 'Save new ORM',
+                selectSuiteLabel: 'Save new suite',
+                onSelectOrm: () => location.reload(),
+                onSelectSuite: () => location.reload(),
+                onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
+                onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
+                onExtendOrm: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
+                    persist('lastOrmId', saved.id || saved.Id, refined);
+                    location.reload();
+                },
+                onExtendSuite: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
+                    persist('lastSuiteId', saved.id || saved.Id, refined);
+                    location.reload();
+                }
+            });
+        persist(null, null, proposal);
+        } catch (err) {
+            alert(err.message || 'Suggestion failed.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
 </script>
 }
