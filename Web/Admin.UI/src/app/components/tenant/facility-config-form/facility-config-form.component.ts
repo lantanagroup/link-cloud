@@ -147,7 +147,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
-      { validators: ScheduledReportsValidator(this.dmrpEnabled) } // Apply the custom validator to the entire FormGroup
+      { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
 
     this.tenantService.getVendorVersions().subscribe({
@@ -310,10 +310,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   clearFacilityName(): void {
     this.facilityNameControl.setValue('');
     this.facilityNameControl.updateValueAndValidity();
-  }
-
-  get noReportsEntered(): string | null {
-    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
   }
 
   get reportsNotUniqueError(): string | null {

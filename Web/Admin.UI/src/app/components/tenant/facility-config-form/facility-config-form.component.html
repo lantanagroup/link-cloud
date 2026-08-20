@@ -122,12 +122,6 @@
         <small class="error">{{ reportsNotUniqueError }}</small>
       </div>
     }
-
-    @if (noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
-      <div>
-        <small class="error">{{ noReportsEntered }}</small>
-      </div>
-    }
     }
 
   </form>

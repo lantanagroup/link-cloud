@@ -131,13 +131,11 @@ describe('FacilityConfigFormComponent with DMRP enabled', () => {
     expect(submitted).toEqual({ daily: [], monthly: [], weekly: [] });
   });
 
-  it('allows submitting with no reports selected, which the validator would otherwise block', () => {
+  it('submits an empty schedule when no reports are selected', () => {
     component.monthlyReportsControl.setValue([]);
     component.dailyReportsControl.setValue([]);
     component.weeklyReportsControl.setValue([]);
     component.facilityConfigForm.updateValueAndValidity();
-
-    expect(component.facilityConfigForm.errors?.['noReportsEntered']).toBeUndefined();
 
     component.formMode = FormMode.Create;
     component.submitConfiguration();

@@ -12,8 +12,8 @@ export interface AppConfig {
    * into the runtime config instead. Both carry the same decision and must agree.
    *
    * When it is on, a facility's scheduled reports are derived from its DMRP reporting plans and the
-   * API refuses a facility that supplies its own, so the form hides the report pickers and stops
-   * requiring a selection.
+   * API refuses a facility that supplies its own, so the form hides the report pickers and submits
+   * an empty schedule.
    *
    * This must never be on here while it is off in the services: the form would then send an empty
    * schedule that Tenant accepts, quietly creating a facility that reports nothing. The other way
@@ -23,12 +23,10 @@ export interface AppConfig {
    * "DMRP feature flag" and:
    *   1. delete this property, the dmrpEnabled getter on FacilityConfigFormComponent, the
    *      LINK_DMRP_ENABLED block in server/main.js, and the key in assets/app.config.json;
-   *   2. drop the parameter from ScheduledReportsValidator along with the "at least one report"
-   *      check it guards;
-   *   3. in facility-config-form.component.html keep the @if body and delete the @else that holds
+   *   2. in facility-config-form.component.html keep the @if body and delete the @else that holds
    *      the report pickers;
-   *   4. in submitConfiguration keep the empty arrays and delete the conditionals;
-   *   5. remove LINK_DMRP_ENABLED from docker-compose.yml.
+   *   3. in submitConfiguration keep the empty arrays and delete the conditionals;
+   *   4. remove LINK_DMRP_ENABLED from docker-compose.yml.
    */
   dmrpEnabled: boolean;
   oauth2?: {
