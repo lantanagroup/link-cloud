@@ -412,6 +412,8 @@ public sealed class MongoScenarioStore : IScenarioStore
             CleanupFhirData = model.CleanupFhirData,
             ReportPeriodStart = model.ReportPeriodStart?.UtcDateTime,
             ReportPeriodEnd = model.ReportPeriodEnd?.UtcDateTime,
+            IsLiveSimulation = model.IsLiveSimulation,
+            ReportingWindowMinutes = model.ReportingWindowMinutes,
             ImportedPatientIdsJson = JsonSerializer.Serialize(model.ImportedPatientIds),
             ImportedPatientBundlesJson = JsonSerializer.Serialize(sanitizedBundles),
             ImportedBundleRefs = bundleRefs,
@@ -443,6 +445,8 @@ public sealed class MongoScenarioStore : IScenarioStore
             CleanupFhirData = doc.CleanupFhirData,
             ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,
             ReportPeriodEnd = doc.ReportPeriodEnd.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodEnd.Value, DateTimeKind.Utc)) : null,
+            IsLiveSimulation = doc.IsLiveSimulation,
+            ReportingWindowMinutes = doc.ReportingWindowMinutes > 0 ? doc.ReportingWindowMinutes : 10,
             ImportedPatientIds = DeserializeImported(doc.ImportedPatientIdsJson),
             ImportedPatientBundles = AttachBundleReferences(doc),
             UpdatedAt = doc.UpdatedAt

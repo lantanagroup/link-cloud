@@ -7,8 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Flags controlling the pre-qualification OperationOutcome that the Validation service writes to the
- * patient NDJSON. These are the Java-runtime keys for a cross-runtime concept; the .NET Report service
- * reads the equivalent {@code PreQualification:WritePreQualOperationOutcome} key (LEGLINK-466).
+ * patient NDJSON. Validation is the sole writer of that resource (LEGLINK-425).
  */
 @Getter
 @Setter
@@ -16,8 +15,8 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties("pre-qualification")
 public class PreQualificationConfig {
     /**
-     * Master gate. When true, the Validation service is the sole writer of the pre-qualification
-     * OperationOutcome to the patient NDJSON. When false (default), it writes nothing.
+     * Master gate. When true, Validation writes the pre-qualification OperationOutcome to the
+     * patient NDJSON. When false (default), it writes nothing.
      */
     private boolean writePreQualOperationOutcome = false;
 
