@@ -89,6 +89,22 @@ public class HSLOCControllerTests
         manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>()), Times.Once);
     }
 
+    [Fact]
+    public async Task Update_HtmlVersions_PassesSanitizedVersionsToManager()
+    {
+        var manager = new Mock<IHSLOCManager>();
+        var queries = new Mock<IHSLOCQueries>();
+        var controller = CreateController(manager, queries);
+        var model = CreateUpdateModel();
+        model.OldVersion = "<script>alert(1)</script>2025";
+        model.NewVersion = "2026<script>alert(1)</script>";
+
+        var result = await controller.Update(model);
+
+        Assert.IsType<NoContentResult>(result);
+        manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>()), Times.Once);
+    }
+
     [Theory]
     [MemberData(nameof(UpdateExceptionCases))]
     public async Task Update_ManagerThrows_ReturnsMappedProblemDetails(Exception exception, HttpStatusCode expectedStatus)
@@ -162,6 +178,19 @@ public class HSLOCControllerTests
         var controller = CreateController(manager, queries);
 
         var result = await controller.DeleteByVersion("2026");
+
+        Assert.IsType<NoContentResult>(result);
+        manager.Verify(manager => manager.DeleteByVersion("2026"), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteByVersion_HtmlVersion_PassesSanitizedVersionToManager()
+    {
+        var manager = new Mock<IHSLOCManager>();
+        var queries = new Mock<IHSLOCQueries>();
+        var controller = CreateController(manager, queries);
+
+        var result = await controller.DeleteByVersion("2026<script>alert(1)</script>");
 
         Assert.IsType<NoContentResult>(result);
         manager.Verify(manager => manager.DeleteByVersion("2026"), Times.Once);

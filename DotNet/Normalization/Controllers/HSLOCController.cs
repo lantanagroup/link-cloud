@@ -3,6 +3,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,6 +48,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> Update([FromForm] PutHSLOCModel model)
         {
+            model.OldVersion = model.OldVersion.Sanitize();
+            model.NewVersion = model.NewVersion.Sanitize();
+
             if (model.CsvFile is null || model.CsvFile.Length == 0)
             {
                 return Problem(detail: "A non-empty HSLOC CSV file must be provided.", statusCode: StatusCodes.Status400BadRequest);
@@ -91,10 +95,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpDelete("versions/{version}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteByVersion(string version)
         {
+            version = version.SanitizeAndRemove();
+
             if (string.IsNullOrWhiteSpace(version))
             {
                 return Problem(detail: "An HSLOC version must be provided.", statusCode: StatusCodes.Status400BadRequest);
@@ -113,6 +120,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpDelete("{id:guid}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteById(Guid id)
