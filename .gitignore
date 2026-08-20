@@ -426,5 +426,6 @@ Config/config-key-inventory.json
 /Prompt Staging
 
 # Scratch build/agent output. Keep these outside the repo (e.g. %TEMP%).
+.agent-out/
 .tmp*/
 .tmp-*/
