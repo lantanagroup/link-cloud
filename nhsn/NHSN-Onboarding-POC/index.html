@@ -2479,7 +2479,8 @@
         title: 'Organization Identification — Location Identifiers',
         rows: {
           headers: ['Location Identifier System', 'Location Identifier Code'],
-          data: (f.locationOrg.locationIdentifierPairs || []).map(function (p) { return [p.system || '', p.code || '']; })
+          data: (f.locationOrg.locationIdentifierPairs || []).map(function (p) { return [p.system || '', p.code || '']; }),
+          importKey: 'locationIdentifierPairs'
         }
       });
     } else if (vendor === 'Cerner') {
@@ -2487,14 +2488,16 @@
         title: 'Organization Identification — Location Types',
         rows: {
           headers: ['Location Type Code', 'Location Alias'],
-          data: (f.locationOrg.locationTypePairs || []).map(function (p) { return [p.code || '', p.alias || '']; })
+          data: (f.locationOrg.locationTypePairs || []).map(function (p) { return [p.code || '', p.alias || '']; }),
+          importKey: 'locationTypePairs'
         }
       });
       sections.push({
         title: 'Organization Identification — Managing Organizations',
         rows: {
           headers: ['Managing Organization'],
-          data: (f.locationOrg.managingOrgs || []).map(function (p) { return [p.value || '']; })
+          data: (f.locationOrg.managingOrgs || []).map(function (p) { return [p.value || '']; }),
+          importKey: 'managingOrgs'
         }
       });
     }
@@ -2503,7 +2506,8 @@
       title: 'HSLOC Location Mapping',
       rows: {
         headers: ['Your Code', getHslocFieldLabel(vendor), 'HSLOC Code'],
-        data: (f.hslocMappings || []).map(function (m) { return [m.yourCode || '', m.locationValue || '', m.hslocCode || '']; })
+        data: (f.hslocMappings || []).map(function (m) { return [m.yourCode || '', m.locationValue || '', m.hslocCode || '']; }),
+        importKey: 'hslocMappings'
       }
     });
 
@@ -2517,8 +2521,61 @@
       title: 'Encounter Mapping',
       rows: {
         headers: ['Encounter.type Code System', 'Local Encounter.type Code', 'Reference Code System', 'Reference Code'],
-        data: encounterRows
+        data: encounterRows,
+        importKey: 'encounterCodeSystems'
       }
+    });
+
+    var mrnIntake = f.mrnIntake || defaultMrnIntake();
+
+    sections.push({
+      title: 'MRN Identifier Intake — Multiple MRN Candidates',
+      fields: [
+        { key: 'mrnHasMultiple', label: "In your facility's EHR, are there multiple MRN-like patient identifiers? (TRUE/FALSE)", description: '' },
+        { key: 'mrnMultipleTypes', label: 'Multiple MRN Types Present (comma-separated)', description: 'Comma-separated list of any that apply: empi, legacy, facility, visit, other (Enterprise identifier (EMPI), Legacy MRN, Facility-specific MRN, Visit identifier, Other identifier).' },
+        { key: 'mrnMultipleOtherText', label: 'Other Identifier — Description', description: "Required if 'other' is included above." }
+      ]
+    });
+    sections.push({
+      title: 'MRN Identifier Intake — User-Facing MRN in the EHR',
+      fields: [
+        { key: 'mrnUserFacingNames', label: 'User-Facing Identifier(s) (comma-separated)', description: 'Comma-separated list, using the same keys as above (empi, legacy, facility, visit, other), of the identifier(s) frontline users typically use to look up a patient.' },
+        { key: 'mrnIsCalledMrn', label: 'Is this the identifier staff call the MRN? (TRUE/FALSE)', description: '' },
+        { key: 'mrnOtherTerm', label: 'If No, what term is used?', description: '' },
+        { key: 'mrnCanSearchByIdentifier', label: 'Can staff search for patients using this identifier? (TRUE/FALSE)', description: '' }
+      ]
+    });
+
+    var mrnRuleRows = (mrnIntake.mrnRuleList || []).map(function (row) {
+      var elDef = MRN_RULE_ELEMENT_DEFS.filter(function (d) { return d.key === row.element; })[0];
+      var ops = MRN_RULE_OPERATOR_DEFS[row.element] || [];
+      var opDef = ops.filter(function (o) { return o.key === row.rule; })[0];
+      return [elDef ? elDef.label : (row.element || ''), opDef ? opDef.label : (row.rule || ''), row.value || ''];
+    });
+    sections.push({
+      title: 'Rule to Identify the Usable MRN',
+      rows: {
+        headers: ['Element', 'Rule / Operator', 'Value'],
+        data: mrnRuleRows,
+        importKey: 'mrnRuleList'
+      }
+    });
+
+    sections.push({
+      title: 'MRN Identifier Intake — Variability Across Facilities or Settings',
+      fields: [
+        { key: 'mrnVariesByFacility', label: 'Does MRN vary by facility/campus/setting within your health system? (TRUE/FALSE)', description: '' },
+        { key: 'mrnVarianceTypes', label: 'Variance Type(s) (comma-separated)', description: 'Comma-separated list of any that apply: facility, campus, setting, ehr_instance, other.' },
+        { key: 'mrnVarianceOtherText', label: 'Varies by Other — Description', description: "Required if 'other' is included above." }
+      ]
+    });
+    sections.push({
+      title: 'MRN Identifier Intake — MRN Changes Over Time',
+      fields: [
+        { key: 'mrnChangesOverTime', label: 'Can the usable MRN change over time for the same patient? (TRUE/FALSE)', description: '' },
+        { key: 'mrnChangeTypes', label: 'Change Type(s) (comma-separated)', description: 'Comma-separated list of any that apply: merge, transfer, correction, other.' },
+        { key: 'mrnChangeOtherText', label: 'Change by Other — Description', description: "Required if 'other' is included above." }
+      ]
     });
 
     return sections;
@@ -2561,8 +2618,25 @@
       case 'otherScope': return f.fhir.otherScope;
       case 'locOrgMethod': return f.locationOrg.method;
       case 'customFhirPath': return f.locationOrg.customFhirPath;
+      case 'mrnHasMultiple': return f.mrnIntake.hasMultipleMrn === true ? 'TRUE' : (f.mrnIntake.hasMultipleMrn === false ? 'FALSE' : '');
+      case 'mrnMultipleTypes': return (f.mrnIntake.multipleMrnTypes || []).join(', ');
+      case 'mrnMultipleOtherText': return f.mrnIntake.multipleMrnOtherText;
+      case 'mrnUserFacingNames': return (f.mrnIntake.userFacingIdentifierNames || []).join(', ');
+      case 'mrnIsCalledMrn': return f.mrnIntake.isCalledMrn === true ? 'TRUE' : (f.mrnIntake.isCalledMrn === false ? 'FALSE' : '');
+      case 'mrnOtherTerm': return f.mrnIntake.otherTermUsed;
+      case 'mrnCanSearchByIdentifier': return f.mrnIntake.canSearchByIdentifier === true ? 'TRUE' : (f.mrnIntake.canSearchByIdentifier === false ? 'FALSE' : '');
+      case 'mrnVariesByFacility': return f.mrnIntake.variesByFacility === true ? 'TRUE' : (f.mrnIntake.variesByFacility === false ? 'FALSE' : '');
+      case 'mrnVarianceTypes': return (f.mrnIntake.varianceTypes || []).join(', ');
+      case 'mrnVarianceOtherText': return f.mrnIntake.varianceOtherText;
+      case 'mrnChangesOverTime': return f.mrnIntake.changesOverTime === true ? 'TRUE' : (f.mrnIntake.changesOverTime === false ? 'FALSE' : '');
+      case 'mrnChangeTypes': return (f.mrnIntake.changeTypes || []).join(', ');
+      case 'mrnChangeOtherText': return f.mrnIntake.changeOtherText;
       default: return '';
     }
+  }
+
+  function splitCsvList(value) {
+    return String(value == null ? '' : value).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
   function setFieldValueOnFacility(key, value) {
@@ -2594,6 +2668,77 @@
       case 'otherScope': facility.fhir.otherScope = String(value).trim(); break;
       case 'locOrgMethod': facility.locationOrg.method = String(value).trim(); break;
       case 'customFhirPath': facility.locationOrg.customFhirPath = String(value).trim(); break;
+      case 'mrnHasMultiple': ensureMrnIntake().hasMultipleMrn = /^(true|yes|1)$/i.test(String(value).trim()); break;
+      case 'mrnMultipleTypes': ensureMrnIntake().multipleMrnTypes = splitCsvList(value); break;
+      case 'mrnMultipleOtherText': ensureMrnIntake().multipleMrnOtherText = String(value).trim(); break;
+      case 'mrnUserFacingNames': ensureMrnIntake().userFacingIdentifierNames = splitCsvList(value); break;
+      case 'mrnIsCalledMrn': ensureMrnIntake().isCalledMrn = /^(true|yes|1)$/i.test(String(value).trim()); break;
+      case 'mrnOtherTerm': ensureMrnIntake().otherTermUsed = String(value).trim(); break;
+      case 'mrnCanSearchByIdentifier': ensureMrnIntake().canSearchByIdentifier = /^(true|yes|1)$/i.test(String(value).trim()); break;
+      case 'mrnVariesByFacility': ensureMrnIntake().variesByFacility = /^(true|yes|1)$/i.test(String(value).trim()); break;
+      case 'mrnVarianceTypes': ensureMrnIntake().varianceTypes = splitCsvList(value); break;
+      case 'mrnVarianceOtherText': ensureMrnIntake().varianceOtherText = String(value).trim(); break;
+      case 'mrnChangesOverTime': ensureMrnIntake().changesOverTime = /^(true|yes|1)$/i.test(String(value).trim()); break;
+      case 'mrnChangeTypes': ensureMrnIntake().changeTypes = splitCsvList(value); break;
+      case 'mrnChangeOtherText': ensureMrnIntake().changeOtherText = String(value).trim(); break;
+    }
+  }
+
+  function getImportTableDefs(f) {
+    var defs = [];
+    getImportSections(f).forEach(function (s) {
+      if (s.rows && s.rows.importKey) defs.push({ title: s.title, importKey: s.rows.importKey, columns: s.rows.headers.length });
+    });
+    return defs;
+  }
+
+  function setTableValueOnFacility(importKey, rows) {
+    switch (importKey) {
+      case 'locationIdentifierPairs':
+        facility.locationOrg.locationIdentifierPairs = rows.filter(function (r) { return r[0] || r[1]; })
+          .map(function (r) { return { system: (r[0] || '').trim(), code: (r[1] || '').trim() }; });
+        break;
+      case 'locationTypePairs':
+        facility.locationOrg.locationTypePairs = rows.filter(function (r) { return r[0] || r[1]; })
+          .map(function (r) { return { code: (r[0] || '').trim(), alias: (r[1] || '').trim() }; });
+        break;
+      case 'managingOrgs':
+        facility.locationOrg.managingOrgs = rows.filter(function (r) { return r[0]; })
+          .map(function (r) { return { value: (r[0] || '').trim() }; });
+        break;
+      case 'hslocMappings':
+        facility.hslocMappings = rows.filter(function (r) { return r[0] || r[1] || r[2]; })
+          .map(function (r) { return { yourCode: (r[0] || '').trim(), locationValue: (r[1] || '').trim(), hslocCode: (r[2] || '').trim() }; });
+        break;
+      case 'encounterCodeSystems': {
+        var map = {};
+        var order = [];
+        rows.forEach(function (r) {
+          var sysKey = (r[0] || '').trim();
+          var localValue = (r[1] || '').trim();
+          var system = (r[2] || '').trim();
+          var code = (r[3] || '').trim();
+          if (!sysKey && !localValue && !system && !code) return;
+          if (!map[sysKey]) { map[sysKey] = { codeSystem: sysKey, mappings: [] }; order.push(sysKey); }
+          if (localValue || system || code) map[sysKey].mappings.push({ localValue: localValue, system: system, code: code });
+        });
+        facility.encounterCodeSystems = order.map(function (k) { return map[k]; });
+        break;
+      }
+      case 'mrnRuleList': {
+        var m = ensureMrnIntake();
+        m.mrnRuleList = rows.filter(function (r) { return r[0]; }).map(function (r) {
+          var elText = (r[0] || '').trim();
+          var elDef = MRN_RULE_ELEMENT_DEFS.filter(function (d) { return d.label.toLowerCase() === elText.toLowerCase() || d.key === elText; })[0];
+          var element = elDef ? elDef.key : elText;
+          var ops = MRN_RULE_OPERATOR_DEFS[element] || [];
+          var ruleText = (r[1] || '').trim();
+          var opDef = ops.filter(function (o) { return o.label.toLowerCase() === ruleText.toLowerCase() || o.key === ruleText; })[0];
+          var rule = opDef ? opDef.key : ruleText;
+          return { id: generateGuid(), element: element, rule: rule, value: (r[2] || '').trim() };
+        });
+        break;
+      }
     }
   }
 
@@ -3184,7 +3329,24 @@
       var doc = parser.parseFromString(results[0], 'application/xml');
       if (doc.getElementsByTagName('parsererror').length) throw new Error('Could not parse worksheet XML');
       var rowEls = doc.getElementsByTagName('row');
+
+      // Sections whose data is a table (e.g. HSLOC/encounter mappings, MRN rules) are written as
+      // a title row, a header row, then N data rows. Track section boundaries by title text so
+      // those table rows can be reconstructed on import instead of only round-tripping flat
+      // single-value fields via column A (key) / column C (value).
+      var sections = getImportSections(facility);
+      var sectionTitleSet = {};
+      var tableTitleMap = {};
+      sections.forEach(function (s) {
+        sectionTitleSet[s.title] = true;
+        if (s.rows && s.rows.importKey) tableTitleMap[s.title] = { importKey: s.rows.importKey, columns: s.rows.headers.length };
+      });
+
       var kv = {};
+      var tables = {};
+      var tableState = null;
+      var TABLE_COLS = ['A', 'B', 'C', 'D'];
+
       for (var r = 0; r < rowEls.length; r++) {
         var cellEls = rowEls[r].getElementsByTagName('c');
         var byCol = {};
@@ -3193,9 +3355,24 @@
           var col = ref.replace(/[0-9]/g, '');
           byCol[col] = resolveCellValue(cellEls[c], sharedStrings);
         }
-        if (byCol.A) kv[byCol.A.trim()] = byCol.C !== undefined ? byCol.C : '';
+        var colA = byCol.A !== undefined ? byCol.A.trim() : '';
+
+        if (tableTitleMap[colA]) {
+          tableState = { importKey: tableTitleMap[colA].importKey, columns: tableTitleMap[colA].columns, mode: 'awaiting-header' };
+          if (!tables[tableState.importKey]) tables[tableState.importKey] = [];
+        } else if (sectionTitleSet[colA]) {
+          tableState = null;
+        } else if (tableState) {
+          if (tableState.mode === 'awaiting-header') {
+            tableState.mode = 'data';
+          } else if (colA !== '(none added yet)' && colA !== '(no data)') {
+            tables[tableState.importKey].push(TABLE_COLS.slice(0, tableState.columns).map(function (col) { return byCol[col] !== undefined ? byCol[col] : ''; }));
+          }
+        }
+
+        if (byCol.A) kv[colA] = byCol.C !== undefined ? byCol.C : '';
       }
-      return kv;
+      return { kv: kv, tables: tables };
     });
   }
 
@@ -3555,7 +3732,9 @@
     $('importSheetStatus').textContent = 'Reading file…';
     file.arrayBuffer().then(function (buf) {
       return parseImportXlsx(buf);
-    }).then(function (kv) {
+    }).then(function (result) {
+      var kv = result.kv;
+      var tables = result.tables;
       var fields = getImportFieldDefs(facility);
       var applied = 0;
       fields.forEach(function (f) {
@@ -3564,9 +3743,17 @@
           applied++;
         }
       });
+      var tableDefs = getImportTableDefs(facility);
+      var tablesApplied = 0;
+      tableDefs.forEach(function (t) {
+        if (Object.prototype.hasOwnProperty.call(tables, t.importKey)) {
+          setTableValueOnFacility(t.importKey, tables[t.importKey]);
+          tablesApplied++;
+        }
+      });
       populateFormsFromFacility();
       saveFacility();
-      $('importSheetStatus').textContent = 'Imported ' + applied + ' of ' + fields.length + ' field(s) from ' + file.name + '.';
+      $('importSheetStatus').textContent = 'Imported ' + applied + ' of ' + fields.length + ' field(s)' + (tablesApplied ? ' and ' + tablesApplied + ' table(s)' : '') + ' from ' + file.name + '.';
     }).catch(function (err) {
       console.error(err);
       $('importSheetStatus').textContent = 'Could not read that file — make sure it is the .xlsx import sheet downloaded from this page.';
