@@ -96,6 +96,7 @@ public sealed class AutomationRunsApiController(
     }
 
     [HttpPost("{runId:guid}/events/admit")]
+    [ValidateAntiForgeryToken] // CodeQL cs/web/missing-token-validation; live mutations are browser-reachable
     public async Task<IActionResult> Admit(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request?.PatientId))
@@ -113,6 +114,7 @@ public sealed class AutomationRunsApiController(
     }
 
     [HttpPost("{runId:guid}/events/discharge")]
+    [ValidateAntiForgeryToken] // CodeQL cs/web/missing-token-validation; live mutations are browser-reachable
     public async Task<IActionResult> Discharge(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request?.PatientId))
@@ -166,6 +168,7 @@ public sealed class AutomationRunsApiController(
     }
 
     [HttpPost("{runId:guid}/pool/generate")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> GeneratePoolPatient(Guid runId, CancellationToken cancellationToken)
     {
         return await ExecuteLivePoolAsync(
@@ -175,6 +178,7 @@ public sealed class AutomationRunsApiController(
     }
 
     [HttpPost("{runId:guid}/pool/upload")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadPoolPatient(Guid runId, CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(Request.Body);
@@ -186,6 +190,7 @@ public sealed class AutomationRunsApiController(
     }
 
     [HttpPost("{runId:guid}/pool/reference")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ReferencePoolPatient(Guid runId, [FromBody] LivePoolReferenceRequest? request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request?.PatientId))

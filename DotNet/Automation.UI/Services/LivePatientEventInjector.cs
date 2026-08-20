@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Automation.UI.Services;
@@ -82,7 +83,7 @@ public sealed class LivePatientEventInjector(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to publish live admit for run {RunId}, patient {PatientId}.", runId, evt.PatientId);
+            logger.LogError(ex, "Failed to publish live admit for run {RunId}, patient {PatientId}.", runId, ForLog(evt.PatientId));
             throw new LiveInjectionException(
                 $"Admit recorded locally but census publish failed: {ex.Message}",
                 StatusCodes.Status502BadGateway);
@@ -112,7 +113,7 @@ public sealed class LivePatientEventInjector(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to publish live discharge for run {RunId}, patient {PatientId}.", runId, evt.PatientId);
+            logger.LogError(ex, "Failed to publish live discharge for run {RunId}, patient {PatientId}.", runId, ForLog(evt.PatientId));
             throw new LiveInjectionException(
                 $"Discharge recorded locally but census publish failed: {ex.Message}",
                 StatusCodes.Status502BadGateway);
@@ -223,7 +224,7 @@ public sealed class LivePatientEventInjector(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to reference live pool patient {PatientId} for run {RunId}.", patientId, runId);
+            logger.LogError(ex, "Failed to reference live pool patient {PatientId} for run {RunId}.", ForLog(patientId), runId);
             throw new LiveInjectionException(
                 $"Failed to reference patient: {ex.Message}",
                 StatusCodes.Status502BadGateway);
@@ -427,7 +428,7 @@ public sealed class LivePatientEventInjector(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to publish automatic {EventType} for run {RunId}, patient {PatientId}.", evt.EventType, runId, evt.PatientId);
+                logger.LogError(ex, "Failed to publish automatic {EventType} for run {RunId}, patient {PatientId}.", evt.EventType, runId, ForLog(evt.PatientId));
                 throw new LiveInjectionException(
                     $"Automatic {evt.EventType} recorded locally but census publish failed: {ex.Message}",
                     StatusCodes.Status502BadGateway);
@@ -521,6 +522,13 @@ public sealed class LivePatientEventInjector(
 
         return null;
     }
+
+    // CodeQL cs/log-forging treats Replace as a barrier; SanitizeForLog alone is not recognized.
+    private static string ForLog(string? value)
+        => (value ?? string.Empty)
+            .Replace("\r", string.Empty)
+            .Replace("\n", string.Empty)
+            .SanitizeForLog() ?? string.Empty;
 
     private sealed class LiveSession(
         LiveExpectedStateTracker tracker,
