@@ -1,6 +1,8 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -19,6 +21,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Quartz;
 using System.Net;
 using System.Text.Json;
 using Xunit.Abstractions;
@@ -63,8 +66,9 @@ public class FacilityControllerTests : IDisposable
         var linkBearerServiceOptions = sp.GetRequiredService<IOptions<LinkBearerServiceOptions>>();
         var queries = sp.GetRequiredService<IFacilityQueries>();
         var manager = sp.GetRequiredService<IFacilityManager>();
+        var facilityOperations = sp.GetRequiredService<IFacilityOperations>();
 
-        _controller = new FacilityController(logger, manager, queries, scheduleService, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
+        _controller = new FacilityController(logger, manager, queries, facilityOperations, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
 
         // Set HttpContext
         var httpContext = new DefaultHttpContext();
@@ -310,6 +314,49 @@ public class FacilityControllerTests : IDisposable
 
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Contains("is not deleted", badRequestResult.Value?.ToString());
+    }
+
+    /// <summary>
+    /// The endpoints reach the scheduler through <see cref="IFacilityOperations"/>, so the jobs are the
+    /// only proof the scheduling half of each operation still runs. Asserting on the response alone
+    /// would pass with the scheduling dropped entirely.
+    /// </summary>
+    [Fact]
+    public async Task Facility_lifecycle_keeps_the_scheduled_jobs_in_step()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = $"Scheduled Jobs Test {facilityId}",
+            TimeZone = "America/Chicago",
+            ScheduledReports = new TenantScheduledReportConfig
+            {
+                Daily = Array.Empty<string>(),
+                Weekly = Array.Empty<string>(),
+                Monthly = new[] { "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
+            }
+        };
+
+        Assert.IsType<CreatedResult>(await _controller.StoreFacility(facility, CancellationToken.None));
+        Assert.True(await MonthlyJobExistsAsync(facilityId), "Creating a facility should schedule its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.SoftDeleteFacility(facilityId, CancellationToken.None));
+        Assert.False(await MonthlyJobExistsAsync(facilityId), "Soft deleting a facility should remove its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.RestoreFacility(facilityId, CancellationToken.None));
+        Assert.True(await MonthlyJobExistsAsync(facilityId), "Restoring a facility should recreate its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.DeleteFacility(facilityId, CancellationToken.None));
+        Assert.False(await MonthlyJobExistsAsync(facilityId), "Deleting a facility should remove its jobs.");
+    }
+
+    private async Task<bool> MonthlyJobExistsAsync(string facilityId)
+    {
+        var scheduler = await _scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler();
+
+        return await scheduler.CheckExists(
+            new JobKey($"{facilityId}-{ScheduleService.MONTHLY}", nameof(KafkaTopic.ReportScheduled)));
     }
 
     [Fact]

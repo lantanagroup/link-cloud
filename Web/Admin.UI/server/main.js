@@ -173,5 +173,15 @@ function getConfig() {
     console.log('Found KAFKA_URL:', config.kafkaUrl);
   }
 
+  // DMRP feature flag. A system-wide switch that the services read from the DMRP:Enabled key; this
+  // app cannot read App Configuration, so it arrives here instead. The two must match: set here but
+  // not there and the facility form quietly creates facilities that report nothing; set there but
+  // not here and the form asks for a schedule the Tenant API then refuses. Temporary — see the
+  // removal steps on AppConfig.dmrpEnabled.
+  if (process.env.LINK_DMRP_ENABLED !== undefined) {
+    config.dmrpEnabled = process.env.LINK_DMRP_ENABLED === 'true';
+    console.log('Found LINK_DMRP_ENABLED:', config.dmrpEnabled);
+  }
+
   return config;
 }
