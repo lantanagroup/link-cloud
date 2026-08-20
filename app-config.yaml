@@ -504,6 +504,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -541,6 +545,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -622,6 +630,10 @@ services:
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
       sensitive: true
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
