@@ -16,8 +16,9 @@ public sealed class GenerationManifest
     /// They appear in ABS as a deterministic function of the pipeline, not of generated input:
     /// <list type="bullet">
     ///   <item><c>MeasureReport</c> — MeasureEval writes one per submitted patient per measure.</item>
-    ///   <item><c>OperationOutcome</c> — one per patient that fails validation. Normally 0;
-    ///         callers set <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
+    ///   <item><c>OperationOutcome</c> — one per failed-validation patient when Validation's
+    ///         pre-qualification flag is on. Normally 0; callers set
+    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
     /// </list>
     /// These types are never compared key-for-key; instead a count-level prediction is added
     /// (<see cref="GetExpectedAbsCountsForPatient"/>) so strict prediction-vs-actual reconciliation works.
@@ -95,7 +96,8 @@ public sealed class GenerationManifest
     /// Per-patient count of expected <c>OperationOutcome</c> resources in ABS.
     /// Defaults to 0 (strict: no validation failures expected).
     ///
-    /// The Validation service emits one OperationOutcome per patient when validation fails.
+    /// The Validation service emits one OperationOutcome per failed-validation patient when
+    /// <c>pre-qualification.write-pre-qual-operation-outcome</c> is true.
     /// Tests or post-run validators that know which patients failed can populate this map
     /// to keep the strict prediction-vs-actual comparison passing.
     /// </summary>
@@ -316,7 +318,8 @@ public sealed class GenerationManifest
     /// Adds count-level predictions for pipeline-derived resource types that have no
     /// deterministic key-level prediction (IDs assigned downstream).
     /// <c>OperationOutcome</c> is appended directly to the patient aggregate blob by
-    /// <c>ValidationCompleteListener</c> when <c>ValidationComplete.IsValid == false</c>.
+    /// the Validation service when <c>pre-qualification.write-pre-qual-operation-outcome</c>
+    /// is true and the patient failed validation.
     /// </summary>
     private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts)
     {

@@ -119,39 +119,24 @@ internal sealed class RunExecutor
     private static (ReportAbsManifestValidator.OperationOutcomeExpectationSettings Settings, string Source)
         ResolveOperationOutcomeExpectations(IConfiguration configuration)
     {
-        var reportWritePreQual = TryGetBool(configuration, "PreQualification:WritePreQualOperationOutcome");
-
         var validationCandidates = new[]
         {
             "/pre-qualification/write-pre-qual-operation-outcome",
             "pre-qualification.write-pre-qual-operation-outcome"
         };
 
-        bool? validationWritePreQual = null;
-        string validationSource = "default(false)";
         foreach (var key in validationCandidates)
         {
             var value = TryGetBool(configuration, key);
             if (!value.HasValue)
                 continue;
 
-            validationWritePreQual = value.Value;
-            validationSource = key;
-            break;
+            return (
+                new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(value.Value),
+                key);
         }
 
-        var reportWritesLegacyWhenInvalid = !(reportWritePreQual ?? false);
-        var validationWritesPreQualWhenInvalid = validationWritePreQual ?? false;
-
-        var source =
-            $"Report(PreQualification:WritePreQualOperationOutcome={(reportWritePreQual.HasValue ? reportWritePreQual.Value.ToString() : "default(false)")}), " +
-            $"Validation({validationSource}={(validationWritePreQual.HasValue ? validationWritePreQual.Value.ToString() : "default(false)")})";
-
-        return (
-            new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
-                ReportWritesLegacyOperationOutcomeWhenInvalid: reportWritesLegacyWhenInvalid,
-                ValidationWritesPreQualOperationOutcomeWhenInvalid: validationWritesPreQualWhenInvalid),
-            source);
+        return (ReportAbsManifestValidator.OperationOutcomeExpectationSettings.Default, "default(false)");
     }
 
     /// <summary>
@@ -461,9 +446,11 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
-            normalizationResolution = await EnsureNormalizationFromSuiteAsync(
+            var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
+            normalizationResolution = normalizationSetup.Resolution;
+            var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output, facilityId, measureIds, "Epic", queryPlanInput);
@@ -817,8 +804,8 @@ internal sealed class RunExecutor
 
             // The ABS manifest validator enriches the manifest with downstream-derived
             // predictions that are not known at generation time — most notably the
-            // per-patient OperationOutcome count (one OO is appended to the ABS blob for
-            // every patient whose ReportingStatus is FailedValidation). Re-persist the
+            // per-patient OperationOutcome count (Validation appends one OO to the ABS blob
+            // for every FailedValidation patient when its pre-qualification flag is on). Re-persist the
             // snapshot so the Runs dashboard shows the final, fully-enriched predictions
             // rather than the pre-validation snapshot taken at line ~506.
             if (generationManifest != null)
@@ -925,6 +912,24 @@ internal sealed class RunExecutor
 
             var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
             output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+
+            var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
+                normalizationResolution,
+                runtimeNormalizationSequences,
+                normalizationSummaryLogs);
+            NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
+            try
+            {
+                await _snapshotStore.SetDomainAsync(
+                    state.RunId,
+                    NormalizationEvidenceSnapshot.Domain,
+                    normalizationEvidence,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+            }
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
@@ -1692,13 +1697,17 @@ internal sealed class RunExecutor
         return plan;
     }
 
+    private sealed record NormalizationFacilitySetup(
+        NormalizationSuiteResolution Resolution,
+        List<NormalizationRuntimeSequenceStep> RuntimeSequences);
+
     /// <summary>
     /// Resolves the normalization suite and creates the appropriate operations and sequences
     /// via the Normalization API for the given facility. Replaces the legacy
     /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
     /// hard-coded CopyProperty operation.
     /// </summary>
-    private async Task<NormalizationSuiteResolution> EnsureNormalizationFromSuiteAsync(
+    private async Task<NormalizationFacilitySetup> EnsureNormalizationFromSuiteAsync(
         INormalizationServiceClient normalizationClient,
         IAutomationOutput output,
         string facilityId,
@@ -1773,14 +1782,15 @@ internal sealed class RunExecutor
 
         output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
 
+        var runtimeSequences = new List<NormalizationRuntimeSequenceStep>();
         if (resolution.Operations.Count == 0)
         {
             output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
-            return resolution;
+            return new NormalizationFacilitySetup(resolution, runtimeSequences);
         }
 
         // Track sequence intent in suite order; operation IDs are resolved after reconciliation.
-        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order)>>(StringComparer.OrdinalIgnoreCase);
+        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order, string Name, string Type)>>(StringComparer.OrdinalIgnoreCase);
 
         var existingPoolByKey = existingOperations
             .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty), EqualityComparer<(string Name, string Type)>.Default)
@@ -1899,14 +1909,16 @@ internal sealed class RunExecutor
                         createdOpsByResourceType[resourceType] = mapped;
                     }
 
-                    mapped.Add((matched.Id, i + 1));
+                    mapped.Add((matched.Id, i + 1, planned.Name ?? string.Empty, planned.OperationType ?? string.Empty));
                 }
             }
 
+            // Per-resource-type 1..N numbering must stay aligned with
+            // NormalizationRuntimeSequencePlanner (suite sequences, then standalone).
             foreach (var (resourceType, ops) in createdOpsByResourceType)
             {
-                var sequences = ops
-                    .OrderBy(o => o.Order)
+                var ordered = ops.OrderBy(o => o.Order).ToList();
+                var sequences = ordered
                     .Select((o, idx) => new CreateNormalizationOperationSequenceApiModel
                     {
                         OperationId = o.OpId,
@@ -1916,12 +1928,26 @@ internal sealed class RunExecutor
 
                 var seqResp = await normalizationClient.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
                 if (seqResp.IsSuccessStatusCode)
+                {
                     output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
+                    for (var idx = 0; idx < ordered.Count; idx++)
+                    {
+                        var step = new NormalizationRuntimeSequenceStep
+                        {
+                            ResourceType = resourceType,
+                            Sequence = idx + 1,
+                            OperationType = ordered[idx].Type,
+                            OperationName = ordered[idx].Name
+                        };
+                        runtimeSequences.Add(step);
+                        output.WriteLine($"    [runtime] {resourceType}#{step.Sequence} {step.OperationType} '{step.OperationName}'");
+                    }
+                }
                 else
                     throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {(int)seqResp.StatusCode}");
             }
         }
 
-        return resolution;
+        return new NormalizationFacilitySetup(resolution, runtimeSequences);
     }
 }

@@ -51,7 +51,8 @@ public sealed class LiveExpectedStateTracker
             {
                 PatientId = s.PatientId.Trim(),
                 Origin = s.Origin,
-                Pattern = s.Pattern
+                Pattern = s.Pattern,
+                ExpectedInReport = s.ExpectedInReport
             })
             .DistinctBy(s => s.PatientId, StringComparer.Ordinal)
             .ToList();

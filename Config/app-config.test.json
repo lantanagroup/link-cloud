@@ -103,7 +103,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Report,Validation"
+				"link:consumers": "Validation,AutomationUI"
 			}
 		},
 		{
@@ -1585,15 +1585,6 @@
 		},
 		{
 			"key": "PatientAggregator:IncludeOrganizationResource",
-			"value": "true",
-			"label": null,
-			"content_type": "",
-			"tags": {
-				"link:consumers": "Report"
-			}
-		},
-		{
-			"key": "PreQualification:WritePreQualOperationOutcome",
 			"value": "true",
 			"label": null,
 			"content_type": "",

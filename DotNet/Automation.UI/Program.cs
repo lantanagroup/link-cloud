@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -237,6 +238,7 @@ builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddNormalizationEngine();
 builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 

@@ -195,6 +195,7 @@ public class LiveExpectedStateTrackerTests
 
         admits.Should().ContainSingle(e => e.PatientId == "import-q");
         tracker.GetExpectedPopulation().Should().Equal("import-q");
+        tracker.GetState().Pool.Single().ExpectedInReport.Should().BeTrue();
         tracker.GetState().Pool.Single().CensusState.Should().Be(LivePatientCensusState.Admitted);
     }
 

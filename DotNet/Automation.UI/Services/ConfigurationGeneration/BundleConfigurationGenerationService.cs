@@ -3,7 +3,9 @@ using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Normalization.Engine;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
@@ -14,7 +16,8 @@ public sealed class BundleConfigurationGenerationService(
     IOrganizationResourceMapTemplateStore ormStore,
     IImportedBundleContentStore bundleContentStore,
     IMongoDatabase database,
-    IOptions<AutomationConfig> automationConfig)
+    IOptions<AutomationConfig> automationConfig,
+    NormalizationEngine normalizationEngine)
 {
     private readonly IMongoCollection<ImportedBundleDocument> _bundles =
         database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -53,6 +56,13 @@ public sealed class BundleConfigurationGenerationService(
 
         var orm = OrgResourceMapProposalBuilder.Build(fingerprint, templates, refineOrm);
         var normalization = NormalizationProposalBuilder.Build(fingerprint, ops, suites, sequences, refineSuite);
+        await AddPostNormalizationPredictionNotesAsync(
+            resources,
+            ops,
+            sequences,
+            refineSuite,
+            normalization,
+            cancellationToken);
 
         var summary = new List<string>
         {
@@ -352,6 +362,93 @@ public sealed class BundleConfigurationGenerationService(
         throw new InvalidOperationException("Provide bundle JSON, an uploaded bundle id, or an existing FHIR patient id.");
     }
 
+    private async System.Threading.Tasks.Task AddPostNormalizationPredictionNotesAsync(
+        IReadOnlyList<Resource> resources,
+        IReadOnlyList<NormalizationOperationDefinition> allOps,
+        IReadOnlyList<NormalizationSequenceDefinition> sequences,
+        NormalizationSuiteDefinition? refineSuite,
+        GeneratedNormalizationProposal proposal,
+        CancellationToken cancellationToken)
+    {
+        var domainResources = resources.OfType<DomainResource>().ToList();
+        if (domainResources.Count == 0)
+            return;
+
+        var existingOps = ResolveSuiteOperationsInOrder(refineSuite, allOps, sequences);
+        var workItems = NormalizationOperationMapper.ToWorkItems(existingOps, proposal.Operations);
+        if (workItems.Count == 0)
+            return;
+
+        var clones = domainResources
+            .Select(r => (DomainResource)r.DeepCopy())
+            .ToList();
+
+        try
+        {
+            await normalizationEngine.ApplyAllAsync(clones, workItems, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            proposal.Notes.Add($"Post-normalization prediction could not apply the suite ({ex.GetType().Name}: {ex.Message}). Eligibility notes above are based on raw upload data.");
+            return;
+        }
+
+        var measures = new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        var before = ImportedPatientClassifier.Classify(ToEntries(domainResources), measures);
+        var after = ImportedPatientClassifier.Classify(ToEntries(clones), measures);
+
+        foreach (var measure in measures)
+        {
+            before.MeasureEligibilities.TryGetValue(measure, out var beforeElig);
+            after.MeasureEligibilities.TryGetValue(measure, out var afterElig);
+            if (beforeElig == afterElig)
+                continue;
+
+            proposal.Notes.Add(
+                $"After applying this suite in-process, ACH eligibility changes {beforeElig} → {afterElig}. Predictions should follow the post-normalization result.");
+        }
+    }
+
+    private static List<Bundle.EntryComponent> ToEntries(IEnumerable<Resource> resources)
+        => resources.Select(r => new Bundle.EntryComponent { Resource = r }).ToList();
+
+    private static List<NormalizationOperationDefinition> ResolveSuiteOperationsInOrder(
+        NormalizationSuiteDefinition? suite,
+        IReadOnlyList<NormalizationOperationDefinition> ops,
+        IReadOnlyList<NormalizationSequenceDefinition> sequences)
+    {
+        if (suite == null)
+            return [];
+
+        var opsById = ops.ToDictionary(o => o.Id);
+        var seqById = sequences.ToDictionary(s => s.Id);
+        var ordered = new List<NormalizationOperationDefinition>();
+        var seen = new HashSet<Guid>();
+
+        foreach (var seqId in suite.SequenceIds)
+        {
+            if (!seqById.TryGetValue(seqId, out var seq))
+                continue;
+            foreach (var entry in seq.Entries.OrderBy(e => e.Sequence))
+            {
+                if (!seen.Add(entry.OperationId))
+                    continue;
+                if (opsById.TryGetValue(entry.OperationId, out var op))
+                    ordered.Add(op);
+            }
+        }
+
+        foreach (var id in suite.OperationIds)
+        {
+            if (!seen.Add(id))
+                continue;
+            if (opsById.TryGetValue(id, out var op))
+                ordered.Add(op);
+        }
+
+        return ordered;
+    }
+
     private static HashSet<Guid> SuiteOperationIds(
         NormalizationSuiteDefinition suite,
         IReadOnlyList<NormalizationSequenceDefinition> sequences)
@@ -403,7 +500,7 @@ public sealed class BundleConfigurationGenerationService(
             return trimmedPrefix;
         if (trimmedName.StartsWith(trimmedPrefix, StringComparison.OrdinalIgnoreCase))
             return trimmedName;
-        return $"{trimmedPrefix} — {trimmedName}";
+        return $"{trimmedPrefix} - {trimmedName}";
     }
 
     private static string UniqueName(string? name)

@@ -231,7 +231,7 @@
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
                                         <button type="button" class="btn btn-sm btn-au-action" id="btnSuggestFromImported">
-                                            <i class="bi bi-magic me-1"></i>Suggest ORM &amp; Normalization
+                                            <i class="bi bi-magic me-1"></i>Suggest from patient data
                                         </button>
                                         <span id="importedUploadStatus" class="small text-muted" style="display:none;" role="status" aria-live="polite"></span>
                                     </div>
@@ -1519,7 +1519,7 @@
                 if (!allImportedCleanly && lastSpecialOutcomeMessage) {
                     setImportedUploadStatus(lastSpecialOutcomeMessage, false);
                 } else {
-                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s). Use Suggest ORM & Normalization to build maps from this data.', false);
+                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s). Use Suggest from patient data to build location matching and cleanup from this upload.', false);
                 }
             }
             ev.target.value = '';

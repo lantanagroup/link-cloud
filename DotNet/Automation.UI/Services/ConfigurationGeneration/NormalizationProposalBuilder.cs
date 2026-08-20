@@ -24,11 +24,10 @@ public static class NormalizationProposalBuilder
         var existingSuiteExtensionUrls = SuiteExtensionUrls(refineExisting, existingOps, sequences);
 
         TryAddCopyLocation(proposal, fingerprint, existingOps, existingSuiteTypes);
-        TryAddCopyProperty(proposal, fingerprint, existingOps, existingSuiteTypes);
         TryAddCopyAlias(proposal, fingerprint, existingOps, existingSuiteTypes);
-        TryAddConditionalTransform(proposal, fingerprint, existingOps, existingSuiteTypes);
         TryAddCodeMap(proposal, fingerprint, existingOps, existingSuiteTypes);
         TryAddRemoveExtensions(proposal, fingerprint, existingOps, existingSuiteTypes, existingSuiteExtensionUrls);
+        AddEligibilityGuardNotes(proposal, fingerprint, existingOps, sequences, refineExisting);
 
         if (proposal.Operations.Count == 0)
         {
@@ -38,7 +37,7 @@ public static class NormalizationProposalBuilder
         }
         else
         {
-            proposal.Notes.Add($"Proposed {proposal.Operations.Count} operation(s), preferring one of each type the data can support.");
+            proposal.Notes.Add($"Proposed {proposal.Operations.Count} operation(s), preferring additive mapping helpers the data can support. Eligibility-critical Encounter/Location fields are left unchanged.");
             if (refineExisting != null)
                 proposal.Notes.Add($"Only operations not already covered by '{refineExisting.Name}' are listed so the suite can be extended.");
         }
@@ -66,36 +65,8 @@ public static class NormalizationProposalBuilder
         {
             OperationType = "CopyLocation",
             SuggestedName = "Copy Location identifiers to type",
-            SuggestedDescription = "Locations in the upload carry identifiers. CopyLocation turns those into type CodeableConcepts.",
+            SuggestedDescription = "Locations in the upload carry identifiers. CopyLocation adds those as extra type CodeableConcepts without replacing existing type codes.",
             ResourceTypes = ["Location"],
-            ReuseOperationId = reuse?.Id,
-            ReuseOperationName = reuse?.Name
-        });
-    }
-
-    private static void TryAddCopyProperty(
-        GeneratedNormalizationProposal proposal,
-        BundleConfigFingerprint fingerprint,
-        IReadOnlyList<NormalizationOperationDefinition> existingOps,
-        HashSet<string> existingSuiteTypes)
-    {
-        if (fingerprint.LocationIdentifiers.Count == 0)
-            return;
-        if (existingSuiteTypes.Contains("CopyProperty"))
-            return;
-
-        var reuse = existingOps.FirstOrDefault(o =>
-            string.Equals(o.OperationType, "CopyProperty", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(o.SourceFhirPath, "identifier[0].value", StringComparison.OrdinalIgnoreCase));
-
-        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
-        {
-            OperationType = "CopyProperty",
-            SuggestedName = "Copy first Location identifier value to type code",
-            SuggestedDescription = "Copies identifier[0].value onto type[0].coding.code for Location resources.",
-            ResourceTypes = ["Location"],
-            SourceFhirPath = "identifier[0].value",
-            TargetFhirPath = "type[0].coding.code",
             ReuseOperationId = reuse?.Id,
             ReuseOperationName = reuse?.Name
         });
@@ -119,53 +90,10 @@ public static class NormalizationProposalBuilder
         {
             OperationType = "CopyLocationAliasToTypeIteratively",
             SuggestedName = "Copy Location aliases to type iteratively",
-            SuggestedDescription = $"Locations include alias values ({string.Join(", ", fingerprint.LocationAliases.Take(3))}). Iterative copy can surface those as type codes.",
+            SuggestedDescription = $"Locations include alias values ({string.Join(", ", fingerprint.LocationAliases.Take(3))}). Iterative copy adds those as extra type codes without replacing existing ones.",
             ResourceTypes = ["Location"],
             MaxIterations = 15,
             SplitOnComma = fingerprint.LocationAliases.Any(a => a.Contains(',')),
-            ReuseOperationId = reuse?.Id,
-            ReuseOperationName = reuse?.Name
-        });
-    }
-
-    private static void TryAddConditionalTransform(
-        GeneratedNormalizationProposal proposal,
-        BundleConfigFingerprint fingerprint,
-        IReadOnlyList<NormalizationOperationDefinition> existingOps,
-        HashSet<string> existingSuiteTypes)
-    {
-        if (existingSuiteTypes.Contains("ConditionalTransform"))
-            return;
-
-        var encounterClass = fingerprint.Codings.FirstOrDefault(c =>
-            string.Equals(c.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(c.Path, "class", StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(c.Code));
-        if (encounterClass == null)
-            return;
-
-        var reuse = existingOps.FirstOrDefault(o =>
-            string.Equals(o.OperationType, "ConditionalTransform", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(o.ConditionTargetFhirPath, "status", StringComparison.OrdinalIgnoreCase)
-            && o.ResourceTypes.Contains("Encounter", StringComparer.OrdinalIgnoreCase));
-
-        proposal.Operations.Add(new GeneratedNormalizationOperationProposal
-        {
-            OperationType = "ConditionalTransform",
-            SuggestedName = "Set Encounter status when class matches upload",
-            SuggestedDescription = $"When Encounter.class.code is '{encounterClass.Code}', set status to in-progress. Uses a primitive code target the Normalization API accepts.",
-            ResourceTypes = ["Encounter"],
-            ConditionTargetFhirPath = "status",
-            ConditionTargetValue = "in-progress",
-            Conditions =
-            [
-                new NormalizationCondition
-                {
-                    FhirPathSource = "class.code",
-                    Operator = "Equal",
-                    Value = encounterClass.Code
-                }
-            ],
             ReuseOperationId = reuse?.Id,
             ReuseOperationName = reuse?.Name
         });
@@ -177,28 +105,72 @@ public static class NormalizationProposalBuilder
         IReadOnlyList<NormalizationOperationDefinition> existingOps,
         HashSet<string> existingSuiteTypes)
     {
-        var locationCodes = fingerprint.Codings
-            .Where(c => string.Equals(c.ResourceType, "Location", StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(c.Path, "type.coding", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (locationCodes.Count == 0)
-            return;
         if (existingSuiteTypes.Contains("CodeMap"))
             return;
 
-        var bySystem = locationCodes
-            .GroupBy(c => c.System, StringComparer.OrdinalIgnoreCase)
-            .First();
+        // CopyLocation (already in the suite, or proposed earlier in this same pass) writes
+        // identifier system/value onto Location.type. CodeMap runs after that, so identity-mapping
+        // original upload type systems (often v3-RoleCode on a parent location) finds nothing.
+        var copyLocationWillRun = existingSuiteTypes.Contains("CopyLocation")
+            || proposal.Operations.Any(o =>
+                string.Equals(o.OperationType, "CopyLocation", StringComparison.OrdinalIgnoreCase));
 
-        var maps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal);
-        foreach (var coding in bySystem)
+        string sourceSystem;
+        Dictionary<string, NormalizationCodeMapEntry> maps;
+        string description;
+        if (copyLocationWillRun && fingerprint.LocationIdentifiers.Count > 0)
         {
-            maps[coding.Code] = new NormalizationCodeMapEntry
+            var bySystem = fingerprint.LocationIdentifiers
+                .Where(i => !string.IsNullOrWhiteSpace(i.System) && !string.IsNullOrWhiteSpace(i.Value))
+                .GroupBy(i => i.System, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Select(i => i.Value).Distinct(StringComparer.Ordinal).Count())
+                .FirstOrDefault();
+            if (bySystem == null)
+                return;
+
+            sourceSystem = bySystem.Key;
+            maps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal);
+            foreach (var identifier in bySystem)
             {
-                Code = coding.Code,
-                Display = coding.Display ?? coding.Code
-            };
+                maps[identifier.Value] = new NormalizationCodeMapEntry
+                {
+                    Code = identifier.Value,
+                    Display = identifier.Value
+                };
+            }
+
+            description = "Identity map seeded from Location identifiers. CopyLocation writes those onto type.coding before this CodeMap runs.";
         }
+        else
+        {
+            var locationCodes = fingerprint.Codings
+                .Where(c => string.Equals(c.ResourceType, "Location", StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(c.Path, "type.coding", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (locationCodes.Count == 0)
+                return;
+
+            var bySystem = locationCodes
+                .GroupBy(c => c.System, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Count())
+                .First();
+
+            sourceSystem = bySystem.Key;
+            maps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal);
+            foreach (var coding in bySystem)
+            {
+                maps[coding.Code] = new NormalizationCodeMapEntry
+                {
+                    Code = coding.Code,
+                    Display = coding.Display ?? coding.Code
+                };
+            }
+
+            description = "Identity map seeded from Location.type codes in the upload. Review and replace targets if a different code system is required.";
+        }
+
+        if (maps.Count == 0 || string.IsNullOrWhiteSpace(sourceSystem))
+            return;
 
         var reuse = existingOps.FirstOrDefault(o =>
             string.Equals(o.OperationType, "CodeMap", StringComparison.OrdinalIgnoreCase)
@@ -207,16 +179,16 @@ public static class NormalizationProposalBuilder
         proposal.Operations.Add(new GeneratedNormalizationOperationProposal
         {
             OperationType = "CodeMap",
-            SuggestedName = $"Code map Location.type ({bySystem.Key})",
-            SuggestedDescription = "Identity map seeded from Location.type codes in the upload. Review and replace targets if a different code system is required.",
+            SuggestedName = $"Code map Location.type ({sourceSystem})",
+            SuggestedDescription = description,
             ResourceTypes = ["Location"],
             CodeMapFhirPath = "type.coding",
             CodeSystemMaps =
             [
                 new NormalizationCodeSystemMap
                 {
-                    SourceSystem = bySystem.Key,
-                    TargetSystem = bySystem.Key,
+                    SourceSystem = sourceSystem,
+                    TargetSystem = sourceSystem,
                     CodeMaps = maps
                 }
             ],
@@ -331,6 +303,72 @@ public static class NormalizationProposalBuilder
             .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .Take(5)
             .ToList();
+    }
+
+    /// <summary>
+    /// Auto-generated suites must not rewrite Encounter class/status/period or overwrite
+    /// Location.type codes. Those fields are what ACH IP CQL uses; a FHIRPath write that
+    /// lands incorrectly can drop a qualifying patient from the report.
+    /// </summary>
+    private static void AddEligibilityGuardNotes(
+        GeneratedNormalizationProposal proposal,
+        BundleConfigFingerprint fingerprint,
+        IReadOnlyList<NormalizationOperationDefinition> existingOps,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences,
+        NormalizationSuiteDefinition? refineExisting)
+    {
+        var hasEncounterClass = fingerprint.Codings.Any(c =>
+            string.Equals(c.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.Path, "class", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(c.Code));
+        if (hasEncounterClass)
+        {
+            proposal.Notes.Add(
+                "Encounter.class is present. Generated suites will not rewrite Encounter.status or class — those values already drive measure eligibility.");
+        }
+
+        if (fingerprint.LocationIdentifiers.Count > 0)
+        {
+            proposal.Notes.Add(
+                "Location identifiers will not be copied over existing Location.type codes. Overwriting type[0].coding.code can remove HSLOC (or other) codes the measure uses for initial population.");
+        }
+
+        if (refineExisting == null)
+            return;
+
+        var suiteOps = ResolveSuiteOperations(refineExisting, existingOps, sequences);
+        var risky = suiteOps
+            .Where(IsEligibilityCriticalWrite)
+            .Select(o => $"{o.OperationType} '{o.Name}'")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (risky.Count == 0)
+            return;
+
+        proposal.Notes.Add(
+            $"The suite being extended already contains eligibility-critical write(s): {string.Join("; ", risky)}. Those can make a qualifying patient ineligible after normalization. Review them before reuse.");
+    }
+
+    private static bool IsEligibilityCriticalWrite(NormalizationOperationDefinition op)
+    {
+        if (string.Equals(op.OperationType, "ConditionalTransform", StringComparison.OrdinalIgnoreCase)
+            && op.ResourceTypes.Contains("Encounter", StringComparer.OrdinalIgnoreCase))
+        {
+            var target = op.ConditionTargetFhirPath ?? op.TargetFhirPath ?? "";
+            return target.Contains("status", StringComparison.OrdinalIgnoreCase)
+                   || target.Contains("class", StringComparison.OrdinalIgnoreCase)
+                   || target.Contains("period", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (string.Equals(op.OperationType, "CopyProperty", StringComparison.OrdinalIgnoreCase)
+            && op.ResourceTypes.Contains("Location", StringComparer.OrdinalIgnoreCase))
+        {
+            var target = op.TargetFhirPath ?? "";
+            return target.Contains("type[", StringComparison.OrdinalIgnoreCase)
+                   && target.Contains("coding.code", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 
     private static HashSet<string> SuiteOperationTypes(

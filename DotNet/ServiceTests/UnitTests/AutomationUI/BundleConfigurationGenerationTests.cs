@@ -12,7 +12,7 @@ public class BundleConfigurationGenerationTests
     public void Analyzer_ignores_relative_nested_extension_urls()
     {
         var patient = new Patient { Id = "p1" };
-        var race = new Extension("http://hl7.org/fhir/us/core/StructureDefinition/us-core-race");
+        var race = new Extension { Url = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race" };
         race.Extension.Add(new Extension("ombCategory", new Coding("urn:oid:2.16.840.1.113883.6.238", "2106-3")));
         race.Extension.Add(new Extension("text", new FhirString("White")));
         patient.Extension.Add(race);
@@ -21,7 +21,8 @@ public class BundleConfigurationGenerationTests
         var fp = UploadedBundleAnalyzer.Analyze([patient]);
 
         fp.Extensions.Should().ContainSingle(e => e.Url.Contains("us-core-race"));
-        fp.Extensions.Should().NotContain(e => e.Url is "ombCategory" or "text" or "not-a-url");
+        fp.Extensions.Should().NotContain(e =>
+            e.Url == "ombCategory" || e.Url == "text" || e.Url == "not-a-url");
     }
 
     [Fact]
@@ -227,18 +228,14 @@ public class BundleConfigurationGenerationTests
         var proposal = NormalizationProposalBuilder.Build(fp, [existingCopy], []);
         proposal.Operations.Select(o => o.OperationType).Should().BeEquivalentTo([
             "CopyLocation",
-            "CopyProperty",
             "CopyLocationAliasToTypeIteratively",
-            "ConditionalTransform",
             "CodeMap",
             "RemoveExtensions"
         ]);
         proposal.Operations.Single(o => o.OperationType == "CopyLocation").ReuseOperationId.Should().Be(existingCopy.Id);
         proposal.Operations.Single(o => o.OperationType == "CopyLocationAliasToTypeIteratively").SplitOnComma.Should().BeTrue();
-        var transform = proposal.Operations.Single(o => o.OperationType == "ConditionalTransform");
-        transform.ConditionTargetFhirPath.Should().Be("status");
-        transform.ConditionTargetValue.Should().Be("in-progress");
-        transform.ResourceTypes.Should().Equal("Encounter");
+        proposal.Notes.Should().Contain(n => n.Contains("will not rewrite Encounter.status", StringComparison.OrdinalIgnoreCase));
+        proposal.Notes.Should().Contain(n => n.Contains("will not be copied over existing Location.type", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -281,6 +278,99 @@ public class BundleConfigurationGenerationTests
 
         var proposal = NormalizationProposalBuilder.Build(fp, [existingCopy], [suite], [], suite);
         proposal.Operations.Should().NotContain(o => o.OperationType == "CopyLocation");
-        proposal.Operations.Should().Contain(o => o.OperationType == "CopyProperty");
+        proposal.Operations.Should().NotContain(o => o.OperationType == "CopyProperty");
+        proposal.Operations.Should().Contain(o => o.OperationType == "CodeMap");
+    }
+
+    [Fact]
+    public void Normalization_builder_does_not_rewrite_encounter_status_or_class()
+    {
+        var fp = new BundleConfigFingerprint
+        {
+            Codings =
+            [
+                new CodingHint { ResourceType = "Encounter", Path = "class", System = "http://terminology.hl7.org/CodeSystem/v3-ActCode", Code = "ACUTE" },
+                new CodingHint { ResourceType = "Encounter", Path = "class", System = "http://terminology.hl7.org/CodeSystem/v3-ActCode", Code = "IMP" }
+            ]
+        };
+
+        var proposal = NormalizationProposalBuilder.Build(fp, [], []);
+        proposal.Operations.Should().NotContain(o => o.OperationType == "ConditionalTransform");
+        proposal.Notes.Should().Contain(n => n.Contains("will not rewrite Encounter.status", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Normalization_builder_warns_when_extended_suite_already_writes_eligibility_fields()
+    {
+        var transformId = Guid.NewGuid();
+        var existing = new NormalizationOperationDefinition
+        {
+            Id = transformId,
+            Name = "Set Encounter status when class matches upload",
+            OperationType = "ConditionalTransform",
+            ResourceTypes = ["Encounter"],
+            ConditionTargetFhirPath = "status",
+            ConditionTargetValue = "in-progress"
+        };
+        var suite = new NormalizationSuiteDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Risky suite",
+            OperationIds = [transformId]
+        };
+        var fp = new BundleConfigFingerprint
+        {
+            Codings =
+            [
+                new CodingHint { ResourceType = "Encounter", Path = "class", Code = "IMP" }
+            ]
+        };
+
+        var proposal = NormalizationProposalBuilder.Build(fp, [existing], [suite], [], suite);
+        proposal.Notes.Should().Contain(n =>
+            n.Contains("eligibility-critical write", StringComparison.OrdinalIgnoreCase)
+            && n.Contains("Set Encounter status when class matches upload", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Normalization_builder_seeds_code_map_from_identifiers_when_copy_location_will_run()
+    {
+        var copyId = Guid.NewGuid();
+        var existingCopy = new NormalizationOperationDefinition
+        {
+            Id = copyId,
+            Name = "Copy Location Identifiers to Type",
+            OperationType = "CopyLocation",
+            ResourceTypes = ["Location"]
+        };
+        var suite = new NormalizationSuiteDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "System Default",
+            IsSystem = true,
+            SequenceIds = [],
+            OperationIds = [copyId]
+        };
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://hospital.example.org/locations", Value = "LOC-1" }],
+            Codings =
+            [
+                new CodingHint
+                {
+                    ResourceType = "Location",
+                    Path = "type.coding",
+                    System = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    Code = "HOSP"
+                }
+            ]
+        };
+
+        var proposal = NormalizationProposalBuilder.Build(fp, [existingCopy], [suite], [], suite);
+        var codeMap = proposal.Operations.Single(o => o.OperationType == "CodeMap");
+        codeMap.CodeSystemMaps.Should().ContainSingle(m =>
+            m.SourceSystem == "http://hospital.example.org/locations"
+            && m.CodeMaps.ContainsKey("LOC-1"));
     }
 }
