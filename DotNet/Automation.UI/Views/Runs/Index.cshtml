@@ -265,7 +265,10 @@
                     </button>
                 </div>
                 <div class="col-md-2">
-                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100">
+                    <a asp-controller="Scenarios"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary w-100"
+                       id="btnManageScenario">
                         <i class="bi bi-journal-text me-1"></i> Manage
                     </a>
                 </div>
@@ -302,6 +305,7 @@
     var recentRunsPartialUrl = '@Url.Action("RecentRunsPartial", "Runs")';
     var cancelUrl = '@Url.Action("CancelJson", "Runs")';
     var deleteUrl = '@Url.Action("DeleteJson", "Runs")';
+            var scenariosUrl = '@Url.Action("Index", "Scenarios")';
 
     // --- KPI elements ---
     var kpiActive = document.getElementById('kpiActive');
@@ -613,6 +617,7 @@
     var noResults = document.getElementById('quickLaunchNoResults');
     var quickTypeFilter = document.getElementById('quickLaunchTypeFilter');
     var quickSort = document.getElementById('quickLaunchSort');
+            var manageLink = document.getElementById('btnManageScenario');
 
     function getQuickLaunchOptions() {
         return Array.from(
@@ -689,6 +694,12 @@
         if (dropdownButton) {
             dropdownButton.textContent =
                 label || '-- Select a scenario --';
+        }
+
+        if (manageLink) {
+            manageLink.href = id
+                ? scenariosUrl + '?editScenarioId=' + encodeURIComponent(id)
+                : scenariosUrl;
         }
     }
 
@@ -1020,6 +1031,7 @@
         refreshRecentRunsCard({ pageSize: sel.value, pageNumber: '1' });
     });
 })();
+
 </script>
 
 @await Html.PartialAsync("_ScenarioEditorModal")

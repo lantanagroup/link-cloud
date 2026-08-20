@@ -477,7 +477,7 @@
             const conditions = collectConditions();
             const model={
                 id: document.getElementById('MapId').value || crypto.randomUUID(),
-                name: document.getElementById('MapName').value,
+                        name: document.getElementById('MapName').value.trim(),
                 description: document.getElementById('MapDescription').value || null,
                 conditions: conditions,
                 isSystem:false,

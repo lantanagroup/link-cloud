@@ -247,5 +247,18 @@
         }
 
         applyScenarioView();
+
+        // Open a scenario passed from Quick Launch directly in the editor.
+        var editScenarioId = new URLSearchParams(window.location.search).get('editScenarioId');
+
+        if (editScenarioId && typeof window.openScenarioEditor === 'function') {
+            window.openScenarioEditor(editScenarioId, 'edit');
+
+            // Remove the one-time navigation parameter so saving/reloading the
+            // Scenarios page does not automatically reopen the editor.
+            var url = new URL(window.location.href);
+            url.searchParams.delete('editScenarioId');
+            window.history.replaceState(null, '', url.toString());
+        }
     })();
 </script>
