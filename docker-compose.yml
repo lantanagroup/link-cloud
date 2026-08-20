@@ -715,7 +715,6 @@ services:
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
-      PreQualification__WritePreQualOperationOutcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
     volumes:
@@ -857,7 +856,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
-      PreQualification__WritePreQualOperationOutcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
