@@ -10,7 +10,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
     {
         private static readonly ConcurrentDictionary<string, StructureDefinition> _structureDefinitionCache = new();
         private static readonly string _structureDefinitionsPath = Path.Combine(AppContext.BaseDirectory, "Application", "Services", "FhirValidation", "StructureDefinitions");
-        private static readonly CachedResolver _resolver = new CachedResolver(new DirectorySource(_structureDefinitionsPath));
+        private static readonly Lazy<CachedResolver?> _resolver = new(CreateResolver);
+
+        private static CachedResolver? CreateResolver()
+        {
+            if (!Directory.Exists(_structureDefinitionsPath))
+                return null;
+            return new CachedResolver(new DirectorySource(_structureDefinitionsPath));
+        }
 
         /// <summary>
         /// Validates if a FHIRPath is valid for a given resource type using its StructureDefinition.
@@ -24,6 +31,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
 
             try
             {
+                if (_resolver.Value == null)
+                    return (true, null);
+
                 var structureDefinition = await GetStructureDefinitionAsync(resourceTypeName);
                 if (structureDefinition?.Snapshot == null)
                     return (false, $"StructureDefinition or snapshot not found for {resourceTypeName}");
@@ -178,10 +188,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.FhirPathValidatio
             if (_structureDefinitionCache.TryGetValue(resourceTypeName, out var definition))
                 return definition;
 
-            definition = await _resolver.FindStructureDefinitionAsync($"http://hl7.org/fhir/StructureDefinition/{resourceTypeName}");
+            var resolver = _resolver.Value;
+            if (resolver == null)
+                return null;
+
+            definition = await resolver.FindStructureDefinitionAsync($"http://hl7.org/fhir/StructureDefinition/{resourceTypeName}");
             if (definition != null && !definition.HasSnapshot)
             {
-                var generator = new SnapshotGenerator(_resolver);
+                var generator = new SnapshotGenerator(resolver);
                 await generator.UpdateAsync(definition);
                 _structureDefinitionCache.TryAdd(resourceTypeName, definition);
             }
