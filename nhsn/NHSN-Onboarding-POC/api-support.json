@@ -17,41 +17,11 @@
     "url": "/api/data/fhirQueryConfiguration",
     "description": "In the request body. Example: \"FhirServerBaseUrl\": \"https://ehr-test.nhsnlink.org/fhir\""
   },
-  "otherTokenUrl": {
-    "service": "Data Acquisition",
-    "method": "PUT",
-    "url": "/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration",
-    "description": "Jira: LEGLINK-1005. Story route recommendation for generic Other-vendor OAuth configuration. Persist as part of the facility FHIR authentication configuration resource. Example field: \"tokenUrl\": \"https://ehr.example.org/oauth2/token\"."
-  },
-  "otherClientId": {
-    "service": "Data Acquisition",
-    "method": "PUT",
-    "url": "/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration",
-    "description": "Jira: LEGLINK-1005. Story route recommendation for generic Other-vendor OAuth configuration. Persist as part of the facility FHIR authentication configuration resource. Example field: \"clientId\": \"my-client-id\"."
-  },
-  "otherClientSecret": {
-    "service": "Data Acquisition",
-    "method": "PUT",
-    "url": "/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration",
-    "description": "Jira: LEGLINK-1005. Story route recommendation for generic Other-vendor OAuth configuration. Persist as part of the facility FHIR authentication configuration resource. Example field: \"clientSecret\": \"<secret>\"."
-  },
-  "otherScope": {
-    "service": "Data Acquisition",
-    "method": "PUT",
-    "url": "/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration",
-    "description": "Jira: LEGLINK-1005. Story route recommendation for generic Other-vendor OAuth configuration. Persist as part of the facility FHIR authentication configuration resource. Example field: \"scope\": \"system/*.read\"."
-  },
   "maxConcurrent": {
     "service": "Data Acquisition",
     "method": "POST",
     "url": "/api/data/fhirQueryConfiguration",
     "description": "\"MaxConcurrentRequests\": 2"
-  },
-  "maxRetries": {
-    "service": "Data Acquisition",
-    "method": "PUT",
-    "url": "/api/data-acquisition/facilities/{facilityId}/fhir-query-configuration",
-    "description": "Jira: LEGLINK-1006. Story route recommendation for facility FHIR query configuration. Persist as part of the broader query configuration resource. Example field: \"maxRetries\": 3."
   },
   "minPullTime": {
     "service": "Data Acquisition",
@@ -137,12 +107,6 @@
     "url": "/api/census/config",
     "description": "\"scheduledTrigger\":\"0 0 */4 * * ?\""
   },
-  "censusAccuracyAckCheckbox": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for Census Results Accuracy Acknowledgment should be created in the NHSN-App-BFF because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
   "hslocMappingList": {
     "service": "Normalization",
     "method": "",
@@ -150,58 +114,10 @@
     "description": "In development for PI 2: https://lantana.atlassian.net/browse/LEGPROG-180"
   },
   "encounterCodeSystems": {
-    "service": "Terminology",
-    "method": "GET",
-    "url": "/api/terminology/codes?codeSystem={uri}&search={text}&pageNumber={pageNumber}&pageSize={pageSize}",
-    "description": "Jira: LEGLINK-1007. Story route recommendation for generic terminology-backed code search for Encounter.type reference data. May also support value-set lookups via /api/terminology/codes?valueSet={uri}&search={text}&pageNumber={pageNumber}&pageSize={pageSize}."
-  },
-  "mrnHasMultiple": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnUserFacingIdentifierName": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnIsCalledMrn": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnCanSearchByIdentifier": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnPatientIdentifierSelections": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnUsableRule": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnVariesByFacility": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
-  },
-  "mrnChangesOverTime": {
-    "service": "NHSN-App-BFF",
-    "method": "",
-    "url": "",
-    "description": "Boundary note: operations for MRN Identifier Intake should be created in the NHSN-App-BFF and its database because this is onboarding/re-configuration workflow state and is never used by the core reporting services."
+    "service": "Normalization",
+    "method": "POST",
+    "url": "/api/normalization/operations",
+    "description": "Code Map operation supports this"
   },
   "measuresSelect": {
     "service": "Tenant",
@@ -230,38 +146,38 @@
   "reportResultsReportId": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report results/detail read model."
+    "url": "api/schedules/{{id}}",
+    "description": ""
   },
   "reportResultsMeasures": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report results/detail read model."
+    "url": "api/schedules/{{id}}",
+    "description": ""
   },
   "reportResultsCreateDate": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report results/detail read model."
+    "url": "api/schedules/{{id}}",
+    "description": ""
   },
   "reportResultsEndDate": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report results/detail read model."
+    "url": "api/schedules/{{id}}",
+    "description": ""
   },
   "reportResultsStartDate": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report results/detail read model."
+    "url": "api/schedules/{{id}}",
+    "description": ""
   },
   "reportResultsStatus": {
-    "service": "Report",
-    "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for richer facility-facing report results status support. List view should also be supported by GET /api/report/report-schedules?facilityId={facilityId}&pageNumber={pageNumber}&pageSize={pageSize}."
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "More statuses needed for a user to follow patient reporting statuses: https://keystone.lantanagroup.com/Proposals/Details/03-report-state-machine-enhancement"
   },
   "reportResultsPatientCount": {
     "service": "Report",
@@ -272,32 +188,32 @@
   "rdReportId": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report detail read model."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "rdPeriod": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report detail read model."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "rdCreateDate": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report detail read model."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "rdPatientCount": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for report detail read model. Patient count can be returned on the report schedule/detail resource."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": "The patient count can be derived by this. A new request endpoint or an update to an existing one would need to be created if we exclusively want to return the count"
   },
   "rdStatus": {
-    "service": "Report",
-    "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}",
-    "description": "Jira: LEGLINK-1009. Story route recommendation for richer report detail status support."
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "More statuses needed for a user to follow patient reporting statuses: https://keystone.lantanagroup.com/Proposals/Details/03-report-state-machine-enhancement"
   },
   "rdMeasureMapping": {
     "service": "",
@@ -308,38 +224,38 @@
   "rdColPatientId": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level report detail rows."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "rdColReportStatus": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level report detail rows."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "reportingPlanMonth": {
-    "service": "DMRP",
-    "method": "GET",
-    "url": "/api/dmrp/facilities/{facilityId}/reporting-plans?monthsAhead=6",
-    "description": "Jira: LEGLINK-1012. Story route recommendation for facility reporting plan read model."
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
   },
   "reportingPlanYear": {
-    "service": "DMRP",
-    "method": "GET",
-    "url": "/api/dmrp/facilities/{facilityId}/reporting-plans?monthsAhead=6",
-    "description": "Jira: LEGLINK-1012. Story route recommendation for facility reporting plan read model."
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
   },
   "reportingPlanMeasures": {
-    "service": "DMRP",
-    "method": "GET",
-    "url": "/api/dmrp/facilities/{facilityId}/reporting-plans?monthsAhead=6",
-    "description": "Jira: LEGLINK-1012. Story route recommendation for facility reporting plan read model."
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
   },
   "rdColResourceCount": {
     "service": "Report",
     "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level report detail rows."
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   },
   "rdColPreQual": {
     "service": "Validation",
@@ -377,34 +293,34 @@
     "url": "/api/data/location-config/facility/{facilityId}",
     "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
   },
-  "reportResultsAckCheckbox": {
-    "service": "Report",
-    "method": "PUT",
-    "url": "/api/report/report-schedules/{reportScheduleId}/accuracy-acknowledgment",
-    "description": "Jira: LEGLINK-1010. Story route recommendation for generated report accuracy acknowledgment. Companion read route: GET /api/report/report-schedules/{reportScheduleId}/accuracy-acknowledgment."
-  },
-  "rdColLocationOrg": {
-    "service": "Report",
-    "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level Location Org indicator in report details."
-  },
-  "rdColHsloc": {
-    "service": "Report",
-    "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level HSLOC Mapping indicator in report details."
-  },
-  "rdColEncounter": {
-    "service": "Report",
-    "method": "GET",
-    "url": "/api/report/report-schedules/{reportScheduleId}/patient-statuses",
-    "description": "Jira: LEGLINK-1008. Story route recommendation for patient-level Encounter Mapping indicator in report details."
-  },
-  "rdRerunBtn": {
-    "service": "Report",
+  "otherTokenUrl": {
+    "service": "Data Acquisition",
     "method": "POST",
-    "url": "/api/report/report-schedules/{reportScheduleId}/regeneration-requests",
-    "description": "Jira: LEGLINK-1011. Story route recommendation for regenerate report processing request. Companion tracking route: GET /api/report/regeneration-requests/{regenerationRequestId}."
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherClientId": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherClientSecret": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherScope": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "maxRetries": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": ""
   }
 }
