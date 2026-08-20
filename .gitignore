@@ -424,3 +424,7 @@ FodyWeavers.xsd
 Scripts/AzureAppConfig/config_symbols.json
 Config/config-key-inventory.json
 /Prompt Staging
+
+# Scratch build/agent output. Keep these outside the repo (e.g. %TEMP%).
+.tmp*/
+.tmp-*/
