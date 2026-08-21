@@ -32,6 +32,14 @@ public class ExecutionContext {
     public List<IBaseResource> getBundleEntries() {
         return bundleEntries != null ? bundleEntries : Collections.emptyList();
     }
+
+    @Builder.Default
+    private Map<String, IBaseResource> referenceIndex = Collections.emptyMap();
+
+    public Map<String, IBaseResource> getReferenceIndex() {
+        return referenceIndex != null ? referenceIndex : Collections.emptyMap();
+    }
+
     private JsonNode rawPayload;
     private Map<String, Object> contextVars;
     private String requestor;

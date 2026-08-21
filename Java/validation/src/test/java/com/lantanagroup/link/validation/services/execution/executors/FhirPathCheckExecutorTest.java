@@ -142,6 +142,61 @@ class FhirPathCheckExecutorTest {
     }
 
     @Test
+    @DisplayName("parenthesised invariant is scoped to its resource type, not fanned out across all entries")
+    void parenthesisedInvariantIsScopedToResourceType() {
+        // A DiagnosticReport US Core invariant written as a grouped expression. Historically the
+        // leading '(' hid the resource type, so this ran against every entry and reported a phantom
+        // failure on the Patient, Observation, etc. It must now target only the DiagnosticReport.
+        org.hl7.fhir.r4.model.DiagnosticReport dr = new org.hl7.fhir.r4.model.DiagnosticReport();
+        dr.setId("dr1");
+        dr.setStatus(org.hl7.fhir.r4.model.DiagnosticReport.DiagnosticReportStatus.FINAL); // issued absent -> should fail
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(dr);
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(dr, patient))
+                .build();
+
+        String expr = "(DiagnosticReport.status='partial' or DiagnosticReport.status='preliminary' "
+                + "or DiagnosticReport.status='final' or DiagnosticReport.status='amended' "
+                + "or DiagnosticReport.status='corrected' or DiagnosticReport.status='appended') "
+                + "implies DiagnosticReport.issued.exists()";
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"" + expr + "\"}", null), ctx);
+
+        // Exactly one finding, on the DiagnosticReport only — never on the Patient.
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getLocation()).isEqualTo("DiagnosticReport/dr1");
+    }
+
+    @Test
+    @DisplayName("parenthesised invariant that holds on its resource type produces no phantom findings on other types")
+    void parenthesisedInvariantSatisfiedNoPhantomFindings() {
+        org.hl7.fhir.r4.model.DiagnosticReport dr = new org.hl7.fhir.r4.model.DiagnosticReport();
+        dr.setId("dr1");
+        dr.setStatus(org.hl7.fhir.r4.model.DiagnosticReport.DiagnosticReportStatus.FINAL);
+        dr.setIssuedElement(new org.hl7.fhir.r4.model.InstantType("2024-01-01T00:00:00Z")); // issued present -> passes
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(dr);
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(dr, patient))
+                .build();
+
+        String expr = "(DiagnosticReport.status='final') implies DiagnosticReport.issued.exists()";
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"" + expr + "\"}", null), ctx);
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
     @DisplayName("non-empty bundle: a resource-typed check runs once per matching entry")
     void nonEmptyBundleTargetsMatchingEntries() {
         Patient withName = new Patient();

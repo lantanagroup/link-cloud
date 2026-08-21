@@ -65,7 +65,7 @@ class RubricExecutionServiceCategoryOverrideTest {
     private final RubricExecutionService service = new RubricExecutionService(
             resolver, mock(RubricVersionRepository.class), registry, assembler, overrideEngine,
             scoreAggregator, mock(RubricResultPersister.class), FhirContext.forR4(), objectMapper,
-            Runnable::run, false);
+            Runnable::run, new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(), false);
 
     private final RubricVersion version = RubricVersion.builder()
             .rubricId("piqi.core").semver("1.0.0").rubricVersionId(UUID.randomUUID()).checksum("abc").build();

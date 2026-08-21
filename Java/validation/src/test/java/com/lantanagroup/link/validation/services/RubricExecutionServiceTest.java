@@ -62,7 +62,7 @@ class RubricExecutionServiceTest {
     private final RubricExecutionService service = new RubricExecutionService(
             resolver, versionRepository, registry, assembler, overrideEngine,
             new ScoreAggregator(new FindingStatusResolver()), resultPersister, fhirContext, objectMapper,
-            Runnable::run, false);
+            Runnable::run, new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(), false);
 
     private final UUID versionId = UUID.randomUUID();
     private final RubricVersion version = RubricVersion.builder()

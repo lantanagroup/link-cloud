@@ -13,6 +13,7 @@ import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.categoryoverride.CategoryOverrideEngine;
+import com.lantanagroup.link.validation.services.execution.BundleReferenceResolver;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
@@ -47,6 +48,7 @@ public class RubricExecutionService {
     private final FhirContext fhirContext;
     private final ObjectMapper objectMapper;
     private final Executor checkExecutorPool;
+    private final BundleReferenceResolver referenceResolver;
 
     private final boolean parallel;
 
@@ -60,6 +62,7 @@ public class RubricExecutionService {
                                   FhirContext fhirContext,
                                   ObjectMapper objectMapper,
                                   @Qualifier("checkExecutorPool") Executor checkExecutorPool,
+                                  BundleReferenceResolver referenceResolver,
                                   @Value("${vaas.checks.parallel:false}") boolean parallel) {
         this.versionResolver = versionResolver;
         this.rubricVersionRepository = rubricVersionRepository;
@@ -71,6 +74,7 @@ public class RubricExecutionService {
         this.fhirContext = fhirContext;
         this.objectMapper = objectMapper;
         this.checkExecutorPool = checkExecutorPool;
+        this.referenceResolver = referenceResolver;
         this.parallel = parallel;
         log.info("Rubric check execution mode: {} (vaas.checks.parallel={})",
                 parallel ? "parallel fan-out" : "sequential", parallel);
@@ -108,6 +112,7 @@ public class RubricExecutionService {
                 .subject(subject)
                 .resource(resource)
                 .bundleEntries(bundleEntries)
+                .referenceIndex(BundleReferenceResolver.buildIndex(bundleEntries))
                 .rawPayload(request.getPayload())
                 .contextVars(contextVars)
                 .requestedAt(requestedAt)
@@ -121,12 +126,7 @@ public class RubricExecutionService {
                 ? runParallel(enabled, ctx, resource)
                 : runSequential(enabled, ctx, resource);
 
-        // Findings are flattened into one list before per-check statuses are derived, because
-        // category override has to see every finding at once -- both so the category rules are
-        // read once per evaluation rather than once per check, and so a check's status is derived
-        // from post-override severities. Slices (index ranges), not groupingBy(checkLocalId): two
-        // checks in one version can share a local id, and grouping would give each of them the
-        // other's findings.
+
         List<RawFinding> allFindings = new ArrayList<>();
         List<CheckSlice> slices = new ArrayList<>(outcomes.size());
         Map<String, Long> checkDurations = new LinkedHashMap<>();
@@ -167,8 +167,6 @@ public class RubricExecutionService {
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
         } else {
-            // no result row for dry runs, but the outcome is stored on the version
-            // so the publish gate can check it later
             rubricVersionRepository.recordDryRun(
                     version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);
             log.info("Recorded dry run for rubric {} v{}: {}",
@@ -200,6 +198,8 @@ public class RubricExecutionService {
     private CheckOutcome runOne(RubricCheck c, ExecutionContext ctx, IBaseResource resource) {
         long start = System.currentTimeMillis();
         List<RawFinding> findings;
+
+        referenceResolver.bind(ctx.getReferenceIndex());
         try {
             findings = executorRegistry.get(c.getType()).execute(c, ctx);
             findings.forEach(f -> f.setCheckId(c.getCheckId()));
@@ -214,6 +214,8 @@ public class RubricExecutionService {
                     .message("Check execution failed")
                     .location(resource.fhirType())
                     .build());
+        } finally {
+            referenceResolver.clear();
         }
         long durationMs = System.currentTimeMillis() - start;
         return new CheckOutcome(c.getCheckLocalId(), findings, durationMs);
