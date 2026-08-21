@@ -268,24 +268,11 @@ class RubricRegistryServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = RubricResultStatus.class, names = {"UNACCEPTABLE", "INCONCLUSIVE"})
-    @DisplayName("dry-run gate on + disqualifying status -> publish blocked")
-    void publish_dryRunWithDisqualifyingStatus(RubricResultStatus status) {
-        dryRunConfig.setRequiredForPublish(true);
-        RubricVersion version = draftVersion();
-        version.setDryRunCompletedAt(OffsetDateTime.now());
-        version.setDryRunStatus(status);
-        stubVersion(version);
-
-        assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
-                .isInstanceOf(RubricDryRunRequiredException.class)
-                .hasMessageContaining("dry run status is " + status);
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = RubricResultStatus.class, names = {"ACCEPTABLE", "ACCEPTABLE_WITH_WARNINGS"})
-    @DisplayName("dry-run gate on + acceptable status -> publish succeeds")
-    void publish_dryRunAcceptable(RubricResultStatus status) {
+    @EnumSource(RubricResultStatus.class)
+    @DisplayName("dry-run gate on + any completed dry-run status -> publish succeeds")
+    void publish_dryRunCompletedRegardlessOfStatus(RubricResultStatus status) {
+        // a rubric that runs cleanly and correctly flags a bad test payload (UNACCEPTABLE) must
+        // still be publishable -- only a dry run that never completed blocks publish
         dryRunConfig.setRequiredForPublish(true);
         RubricVersion version = draftVersion();
         version.setDryRunCompletedAt(OffsetDateTime.now());

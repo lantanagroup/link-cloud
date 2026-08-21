@@ -7,7 +7,6 @@ import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricLifecycleEvent;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.RubricLifecycleAction;
-import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
@@ -167,11 +166,12 @@ public class RubricRegistryService {
             throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "publish");
         }
         if (dryRunConfig.isRequiredForPublish()) {
-            boolean acceptable = v.getDryRunCompletedAt() != null
-                    && (v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE
-                        || v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
-            if (!acceptable) {
-                throw new RubricDryRunRequiredException(rubricId, normalizedSemver, v.getDryRunStatus());
+            // a completed dry run is required, but its business verdict is not ΓÇö a rubric that
+            // executes cleanly and correctly flags an UNACCEPTABLE test payload must still be
+            // publishable. only a dry run that never completed (dryRunCompletedAt == null, e.g. it
+            // was never run, or the definition changed since, or execution itself threw) blocks this.
+            if (v.getDryRunCompletedAt() == null) {
+                throw new RubricDryRunRequiredException(rubricId, normalizedSemver);
             }
         }
         // the status check above can go stale before we write, so flip it with a guarded update
