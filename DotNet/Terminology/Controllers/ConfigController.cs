@@ -371,7 +371,7 @@ public class ConfigController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceValueSetCodes(
         [FromRoute] string id,
-        [FromForm] IFormFile? file,
+        IFormFile? file,
         [FromQuery] string? version = null,
         CancellationToken cancellationToken = default) =>
         ReplaceCodesAsync(CodeGroup.CodeGroupTypes.ValueSet, id, file, version, cancellationToken);
@@ -417,7 +417,7 @@ public class ConfigController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceCodeSystemCodes(
         [FromRoute] string id,
-        [FromForm] IFormFile? file,
+        IFormFile? file,
         [FromQuery] string? version = null,
         CancellationToken cancellationToken = default) =>
         ReplaceCodesAsync(CodeGroup.CodeGroupTypes.CodeSystem, id, file, version, cancellationToken);
