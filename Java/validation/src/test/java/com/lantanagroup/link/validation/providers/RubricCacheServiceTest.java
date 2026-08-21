@@ -197,6 +197,22 @@ class RubricCacheServiceTest {
     }
 
     @Test
+    @DisplayName("a row with no publishedAt is treated as oldest rather than throwing")
+    void latestPublishedSemverToleratesMissingPublishedAt() {
+        // A real PUBLISHED row always has publishedAt set, but a stale/hand-built row might not.
+        // nullsFirst treats the missing value as oldest, so it never wins and never NPEs.
+        when(versionRepository.findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED))
+                .thenReturn(List.of(
+                        RubricVersion.builder().rubricId("piqi.core").semver("1.0.0")
+                                .status(RubricVersionStatus.PUBLISHED).checksum("x").build(),
+                        RubricVersion.builder().rubricId("piqi.core").semver("2.0.0")
+                                .status(RubricVersionStatus.PUBLISHED).checksum("x")
+                                .publishedAt(OffsetDateTime.parse("2026-01-01T00:00:00Z")).build()));
+
+        assertThat(cacheService.getLatestPublishedSemver("piqi.core")).isEqualTo("2.0.0");
+    }
+
+    @Test
     @DisplayName("not-found results are never cached, so a version registered after a miss is visible immediately")
     void nullResultsAreNotCached() {
         when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0")).thenReturn(Optional.empty());

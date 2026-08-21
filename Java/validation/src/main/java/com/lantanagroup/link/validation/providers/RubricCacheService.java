@@ -56,9 +56,12 @@ public class RubricCacheService {
     // hotfix like 1.0.1 published after 2.0.0 was rolled back should still win.
     @Cacheable(value = LATEST_SEMVER_CACHE, key = "#rubricId", unless = "#result == null")
     public String getLatestPublishedSemver(String rubricId) {
+        // nullsFirst: a real PUBLISHED row always has publishedAt set (publish() writes it in the
+        // same transition), but treating a missing one as oldest rather than throwing keeps this
+        // safe against stale/hand-built rows instead of NPEing
         return rubricVersionRepository.findByRubricIdAndStatus(rubricId, RubricVersionStatus.PUBLISHED)
                 .stream()
-                .max(Comparator.comparing(RubricVersion::getPublishedAt))
+                .max(Comparator.comparing(RubricVersion::getPublishedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .map(RubricVersion::getSemver)
                 .orElse(null);
     }

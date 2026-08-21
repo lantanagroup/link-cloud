@@ -494,7 +494,7 @@ class RubricControllerTest {
         @DisplayName("dry-run enforcement blocks publish -> 409 (documented)")
         void publish_dryRunRequired() throws Exception {
             when(registry.publish(any(), any(), any()))
-                    .thenThrow(new RubricDryRunRequiredException("piqi.core", "1.0.0", null));
+                    .thenThrow(new RubricDryRunRequiredException("piqi.core", "1.0.0"));
             expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$publish"), 409);
         }
     }
