@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
         private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializationMode.Ostrich);
 
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;

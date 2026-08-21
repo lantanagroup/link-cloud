@@ -215,6 +215,8 @@ internal sealed class RunExecutor
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
             output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
+            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+            output.WriteLine($"FHIR generator: {(generationConfig.UseThetisEngine ? "Thetis Engine" : "classic factories")}");
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
@@ -223,8 +225,6 @@ internal sealed class RunExecutor
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
-            var primaryMeasure = state.Options.SelectedMeasures[0];
-            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
             var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
             var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
@@ -1453,13 +1453,15 @@ internal sealed class RunExecutor
         if (distribution == null || distribution.Count == 0)
             return new FhirGenerationConfig
             {
-                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences
+                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
+                UseThetisEngine = automationConfig.FhirGeneration?.UseThetisEngine ?? true
             };
 
         return new FhirGenerationConfig
         {
             IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
-            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
+            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase),
+            UseThetisEngine = automationConfig.FhirGeneration?.UseThetisEngine ?? true
         };
     }
 

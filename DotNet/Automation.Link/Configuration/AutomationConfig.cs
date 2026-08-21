@@ -73,6 +73,14 @@ public class AutomationConfig
         public int MaxConcurrentPatients { get; set; } = 4;
 
         /// <summary>
+        /// When true, per-patient FHIR is compiled through Thetis Engine
+        /// (<c>PatientGenerationSpec</c> → DAG → ExecuteAsync). Default true.
+        /// Set false to roll back to classic factories. Shared org/loc/pract/med
+        /// infrastructure stays factory-built.
+        /// </summary>
+        public bool UseThetisEngine { get; set; } = true;
+
+        /// <summary>
         /// Controls low-value optional cross-resource references in generated FHIR
         /// (e.g., Provenance.target, ImagingStudy.basedOn, MedicationAdministration.request).
         /// </summary>

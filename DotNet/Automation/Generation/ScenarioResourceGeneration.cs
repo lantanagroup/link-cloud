@@ -657,7 +657,7 @@ internal static class ScenarioResourceGeneration
                 false, ids.HypoInsulinGlargineMedication)));
     }
 
-    private static void ApplyGenerationRequirements(
+    internal static void ApplyGenerationRequirements(
         List<Bundle.EntryComponent> entries,
         GenerationRequirementsPlan? generationRequirementsPlan)
     {

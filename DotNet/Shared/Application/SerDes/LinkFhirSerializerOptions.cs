@@ -1,4 +1,4 @@
-﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using System.Text.Json;
 
@@ -11,56 +11,55 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
 
         public static JsonSerializerOptions ForFhirWithValidation()
         {
-            _optionsWithValidation ??= InitializeForFhirJsonSerializerOptions(true, false);
+            _optionsWithValidation ??= InitializeForFhirJsonSerializerOptions(validateFhir: true, pretty: false);
             return _optionsWithValidation;
         }
 
         public static JsonSerializerOptions ForFhirWithoutValidation()
         {
-            _optionsWithoutValidation ??= InitializeForFhirJsonSerializerOptions(false, false);
+            _optionsWithoutValidation ??= InitializeForFhirJsonSerializerOptions(validateFhir: false, pretty: false);
             return _optionsWithoutValidation;
         }
 
-        public static readonly JsonSerializerOptions ForFhirLenientSerialization =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
-
-        public static readonly FhirJsonParser FhirJsonParserPermissive = new FhirJsonParser(new ParserSettings
+        private static FhirJsonConverterOptions PermissiveConverterOptions { get; } = new()
         {
-            PermissiveParsing = true,
-        });
+            Validator = null
+        };
+
+        public static readonly JsonSerializerOptions ForFhirLenientSerialization =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, PermissiveConverterOptions)
+                .UsingMode(DeserializationMode.Ostrich);
+
+        /// <summary>
+        /// Permissive POCO deserializer. Replaces Firely 5 <c>FhirJsonParser</c> + <c>PermissiveParsing</c>.
+        /// </summary>
+        public static readonly FhirJsonDeserializer FhirJsonDeserializerPermissive =
+            new(new DeserializerSettings().UsingMode(DeserializationMode.Ostrich));
+
+        /// <summary>
+        /// Back-compat name for existing call sites. Type is now <see cref="FhirJsonDeserializer"/>.
+        /// </summary>
+        public static FhirJsonDeserializer FhirJsonParserPermissive => FhirJsonDeserializerPermissive;
 
         public static JsonSerializerOptions InitializeForFhirJsonSerializerOptions(bool validateFhir = false, bool pretty = false)
         {
-            switch (validateFhir)
+            var options = new JsonSerializerOptions
             {
-                case true:
-                    {
-                        var options = new JsonSerializerOptions();
-                        options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
-                        {
-                            DisableBase64Decoding = false,
-                            Validator = null
-                        });
-                        options.AllowTrailingCommas = true;
-                        options.PropertyNameCaseInsensitive = true;
-                        options.WriteIndented = pretty;
+                AllowTrailingCommas = true,
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = pretty
+            };
 
-                        return options;
-                    }
-                case false:
-                    {
-                        var options = new JsonSerializerOptions();
-                        options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
-                        {
-                            DisableBase64Decoding = false
-                        });
-                        options.AllowTrailingCommas = true;
-                        options.PropertyNameCaseInsensitive = true;
-                        options.WriteIndented = pretty;
-
-                        return options;
-                    }
+            if (validateFhir)
+            {
+                options.ForFhir(ModelInfo.ModelInspector, new FhirJsonConverterOptions());
             }
+            else
+            {
+                options.ForFhir(ModelInfo.ModelInspector, PermissiveConverterOptions);
+            }
+
+            return options;
         }
 
         public static JsonSerializerOptions ActivityTagging { get; } = new()
@@ -72,5 +71,15 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
                 new System.Text.Json.Serialization.JsonStringEnumConverter()
             }
         };
+
+    }
+
+    public static class FhirJsonDeserializerExtensions
+    {
+        /// <summary>
+        /// Firely 5 <c>FhirJsonParser.Parse&lt;T&gt;</c> equivalent.
+        /// </summary>
+        public static T Parse<T>(this FhirJsonDeserializer deserializer, string json) where T : Base
+            => deserializer.Deserialize<T>(json);
     }
 }

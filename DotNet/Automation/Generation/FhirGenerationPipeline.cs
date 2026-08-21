@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Automation.Generation.ResourceFactories;
+using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
 using System.Reflection;
 using System.Globalization;
@@ -109,7 +110,9 @@ public static class FhirGenerationPipeline
         string? runId = null,
         IReadOnlyList<ImportedPatientInput>? importedPatients = null,
         IGeneratedPatientTemplateCache? generatedTemplateCache = null,
-        int? maxConcurrentPatients = null)
+        int? maxConcurrentPatients = null,
+        IPatientEntryGenerator? patientEntryGenerator = null,
+        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
@@ -178,7 +181,8 @@ public static class FhirGenerationPipeline
         // ------------------------------------------------------------------
         // Shared infrastructure — generated once, uploaded first
         // ------------------------------------------------------------------
-        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan, effectiveRunId);
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) =
+            GenerateSharedInfrastructure(generationRequirementsPlan, effectiveRunId, sharedInfrastructureGenerator);
 
         if (generatedTemplateCache != null && !IsSafeRunTagForTemplateCache(ids.RunTag))
         {
@@ -238,7 +242,8 @@ public static class FhirGenerationPipeline
                         config,
                         generationRequirementsPlan,
                         ids,
-                        generatedTemplateCache);
+                        generatedTemplateCache,
+                        patientEntryGenerator);
 
                     patientIds[patientIndex] = patientId;
                     generatedTemplateKeys[patientIndex] = templateKey;
@@ -318,7 +323,9 @@ public static class FhirGenerationPipeline
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
         GenerationRequirementsPlan? generationRequirementsPlan = null,
-        AcquisitionSimulationConfig? acquisitionSimulation = null)
+        AcquisitionSimulationConfig? acquisitionSimulation = null,
+        IPatientEntryGenerator? patientEntryGenerator = null,
+        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(profile);
@@ -330,7 +337,7 @@ public static class FhirGenerationPipeline
         var uploadSharedInfrastructure = inferredRunTag == null;
         var runTag = inferredRunTag ?? Guid.NewGuid().ToString("N")[..8];
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) =
-            GenerateSharedInfrastructure(generationRequirementsPlan, runTag);
+            GenerateSharedInfrastructure(generationRequirementsPlan, runTag, sharedInfrastructureGenerator);
 
         if (uploadSharedInfrastructure)
         {
@@ -366,7 +373,8 @@ public static class FhirGenerationPipeline
             config,
             generationRequirementsPlan,
             ids,
-            generatedTemplateCache: null);
+            generatedTemplateCache: null,
+            patientEntryGenerator);
 
         var slice = sliceBuilder.Build(measures);
         targetManifest.AppendFrom(slice);
@@ -506,7 +514,8 @@ public static class FhirGenerationPipeline
         FhirGenerationConfig? config,
         GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids,
-        IGeneratedPatientTemplateCache? generatedTemplateCache)
+        IGeneratedPatientTemplateCache? generatedTemplateCache,
+        IPatientEntryGenerator? patientEntryGenerator)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
@@ -535,11 +544,35 @@ public static class FhirGenerationPipeline
 
         if (cachedTemplate == null)
         {
-            // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
-            entries = GeneratePatientEntries(
-                profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
-                sharedPractitionerIds, sharedMedicationIds, measures,
-                generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
+            var generator = patientEntryGenerator
+                ?? ((config?.UseThetisEngine ?? true) ? ThetisPatientEntryGenerator.Shared : null);
+
+            if (generator != null)
+            {
+                entries = await generator.GenerateAsync(new PatientEntryRequest
+                {
+                    Profile = profile,
+                    PatientIndex = patientIndex,
+                    BaseSeed = baseSeed,
+                    TotalResourcesPerPatient = effectiveResourcesPerPatient,
+                    SharedPractitionerIds = sharedPractitionerIds,
+                    SharedMedicationIds = sharedMedicationIds,
+                    Measures = measures,
+                    ClinicalPeriodStart = generationClinicalPeriodStart,
+                    ClinicalPeriodEnd = generationClinicalPeriodEnd,
+                    Config = config,
+                    RequirementsPlan = generationRequirementsPlan,
+                    Ids = ids,
+                    Output = output
+                });
+            }
+            else
+            {
+                entries = GeneratePatientEntries(
+                    profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
+                    sharedPractitionerIds, sharedMedicationIds, measures,
+                    generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
+            }
 
             bundles = ChunkEntries(entries, patientId, 0);
 
@@ -972,13 +1005,18 @@ public static class FhirGenerationPipeline
     // ------------------------------------------------------------------
 
     private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds, FhirBundleGenerator.SharedIds Ids)
-        GenerateSharedInfrastructure(GenerationRequirementsPlan? generationRequirementsPlan, string runTag)
+        GenerateSharedInfrastructure(
+            GenerationRequirementsPlan? generationRequirementsPlan,
+            string runTag,
+            ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null)
     {
         // All shared-infrastructure construction lives in ScenarioResourceGeneration so
         // FhirBundleGenerator (bulk path) and FhirGenerationPipeline (streaming path)
-        // can never drift on shared-resource shape, IDs, or order.
-        var ids = new FhirBundleGenerator.SharedIds(runTag);
-        var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
+        // can never drift on shared-resource shape, IDs, or order. Thetis (KD21) uses
+        // the same factory generator until a shared-infra graph exists.
+        var generator = sharedInfrastructureGenerator ?? FactorySharedInfrastructureGenerator.Shared;
+        var (ids, entries, practitionerIds, medicationIds) =
+            generator.Generate(generationRequirementsPlan, runTag);
         return (entries, practitionerIds, medicationIds, ids);
     }
 
@@ -1004,6 +1042,7 @@ public static class FhirGenerationPipeline
             PeriodEnd = periodEnd,
             Config = config,
             Requirements = requirements,
+            Generator = (config?.UseThetisEngine ?? true) ? "thetis" : "classic",
             GeneratorDependencyFingerprint = GeneratorDependencyFingerprint.Value
         });
 
@@ -1018,7 +1057,9 @@ public static class FhirGenerationPipeline
         {
             "Automation",
             "Hl7.Fhir.Base",
-            "Hl7.Fhir.Support"
+            "Hl7.Fhir.Support",
+            "Thetis.Generation.Engine",
+            "Thetis.Generation.Abstractions"
         };
 
         var dependencies = assembly
@@ -1113,12 +1154,12 @@ public static class FhirGenerationPipeline
 
     private static List<Bundle.EntryComponent> ParseBundleEntriesFromJson(IReadOnlyList<string> bundleJson)
     {
-        var parser = new FhirJsonParser();
+        var parser = new FhirJsonDeserializer(new DeserializerSettings().UsingMode(DeserializationMode.Ostrich));
         var entries = new List<Bundle.EntryComponent>();
 
         foreach (var json in bundleJson)
         {
-            var bundle = parser.Parse<Bundle>(json);
+            var bundle = parser.Deserialize<Bundle>(json);
             if (bundle?.Entry is { Count: > 0 })
             {
                 entries.AddRange(bundle.Entry.Where(entry => entry?.Resource != null));
@@ -1128,7 +1169,7 @@ public static class FhirGenerationPipeline
         return entries;
     }
 
-    private static (DateTime Start, DateTime End) DeriveEncounterWindowForProfile(
+    internal static (DateTime Start, DateTime End) DeriveEncounterWindowForProfile(
         PatientProfile profile,
         int seed,
         DateTime? clinicalPeriodStart,

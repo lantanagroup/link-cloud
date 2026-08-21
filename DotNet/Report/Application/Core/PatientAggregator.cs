@@ -10,6 +10,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
@@ -63,7 +64,7 @@ namespace LantanaGroup.Link.Report.Application.Core
 
             //The 'resourcesAdded' HashSet will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. 
             HashSet<string> resourcesAdded = new HashSet<string>();
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
 
             string bundleName = $"patient-{patientId}.ndjson";
             string reportName = _blobStorageService.GetReportName(reportSchedule);

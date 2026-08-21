@@ -1,9 +1,11 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Controllers;
 
@@ -155,12 +157,16 @@ public class RunsController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(
+        Guid id,
+        [FromServices] IOptions<AutomationConfig> automationConfig,
+        CancellationToken cancellationToken)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
         if (run == null)
             return NotFound();
 
+        ViewBag.UseThetisEngine = automationConfig.Value.FhirGeneration?.UseThetisEngine ?? true;
         return View(run);
     }
 

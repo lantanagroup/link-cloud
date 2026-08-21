@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Link.MockFhirServer.Settings;
 using Microsoft.Extensions.Options;
 using System.Globalization;
@@ -35,6 +36,19 @@ public class PatientDataStore
     // Default config — cached so we can derive per-type filtered configs cheaply.
     private static readonly FhirGenerationConfig _defaultConfig = new();
 
+    private static readonly PatientProfile MockProfile = new(new Dictionary<ProfiledMeasureType, MeasureEligibility>
+    {
+        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+    });
+
+    private static readonly IReadOnlyList<ProfiledMeasureType> MockMeasures =
+        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
+
+    private IPatientEntryGenerator PatientGenerator =>
+        _settings.UseThetisEngine
+            ? ThetisPatientEntryGenerator.Shared
+            : ClassicPatientEntryGenerator.Shared;
+
     public PatientDataStore(IOptions<MockFhirServerSettings> settings)
     {
         _settings = settings.Value;
@@ -65,7 +79,10 @@ public class PatientDataStore
     /// Reads a single resource by type and ID. Shared resources are served from cache.
     /// Patient-owned resources are regenerated on demand and immediately discarded.
     /// </summary>
-    public Resource? GetById(string resourceType, string id)
+    public async Task<Resource?> GetByIdAsync(
+        string resourceType,
+        string id,
+        CancellationToken cancellationToken = default)
     {
         if (_sharedResourceById.TryGetValue($"{resourceType}/{id}", out var shared))
             return shared;
@@ -77,7 +94,8 @@ public class PatientDataStore
         if (patientId == null)
             return null;
 
-        return GeneratePatientEntries(patientId, resourceType)
+        var entries = await GeneratePatientEntriesAsync(patientId, resourceType, cancellationToken);
+        return entries
             .FirstOrDefault(e =>
                 e.Resource != null &&
                 e.Resource.TypeName.Equals(resourceType, StringComparison.OrdinalIgnoreCase) &&
@@ -96,14 +114,15 @@ public class PatientDataStore
         CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(idList))
-            return SearchByIdList(resourceType, idList);
+            return await SearchByIdListAsync(resourceType, idList, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(patientId))
             return [];
 
         await RegisterPatientAsync(patientId, cancellationToken);
 
-        return GeneratePatientEntries(patientId, resourceType)
+        var entries = await GeneratePatientEntriesAsync(patientId, resourceType, cancellationToken);
+        return entries
             .Where(e => e.Resource != null &&
                         e.Resource.TypeName.Equals(resourceType, StringComparison.OrdinalIgnoreCase))
             .Select(e => e.Resource!)
@@ -125,7 +144,10 @@ public class PatientDataStore
     //  Private helpers                                                     //
     // ------------------------------------------------------------------ //
 
-    private List<Resource> SearchByIdList(string resourceType, string idList)
+    private async Task<List<Resource>> SearchByIdListAsync(
+        string resourceType,
+        string idList,
+        CancellationToken cancellationToken)
     {
         var ids = idList.Split(',',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -151,7 +173,8 @@ public class PatientDataStore
 
         foreach (var group in byPatient)
         {
-            var entryById = GeneratePatientEntries(group.Key!, resourceType)
+            var entries = await GeneratePatientEntriesAsync(group.Key!, resourceType, cancellationToken);
+            var entryById = entries
                 .Where(e => e.Resource != null)
                 .ToDictionary(e => e.Resource!.Id!, e => e.Resource!,
                     StringComparer.OrdinalIgnoreCase);
@@ -195,20 +218,37 @@ public class PatientDataStore
         }
     }
 
-    private List<Bundle.EntryComponent> GeneratePatientEntries(
+    private async Task<List<Bundle.EntryComponent>> GeneratePatientEntriesAsync(
         string patientId,
-        string? requestedResourceType = null)
+        string? requestedResourceType = null,
+        CancellationToken cancellationToken = default)
     {
-        return FhirBundleGenerator.GeneratePatientEntries(
-            patientId,
-            _sharedIds,
-            _practitionerIds,
-            _medicationIds,
-            _settings.ResourcesPerPatient,
-            seed: null,
-            config: requestedResourceType != null ? ConfigForType(requestedResourceType) : null,
-            clinicalPeriodStart: ParseDate(_settings.ClinicalPeriodStart),
-            clinicalPeriodEnd: ParseDate(_settings.ClinicalPeriodEnd));
+        var config = requestedResourceType != null ? ConfigForType(requestedResourceType) : null;
+        var seed = (int)(patientId.GetStableHash32() & 0x7FFFFFFFu);
+        var request = new PatientEntryRequest
+        {
+            Profile = MockProfile,
+            PatientIndex = 0,
+            BaseSeed = seed,
+            TotalResourcesPerPatient = _settings.ResourcesPerPatient,
+            SharedPractitionerIds = _practitionerIds,
+            SharedMedicationIds = _medicationIds,
+            Measures = MockMeasures,
+            ClinicalPeriodStart = ParseDate(_settings.ClinicalPeriodStart),
+            ClinicalPeriodEnd = ParseDate(_settings.ClinicalPeriodEnd),
+            Config = config,
+            Ids = _sharedIds,
+            PatientId = patientId
+        };
+
+        var entries = await PatientGenerator.GenerateAsync(request, cancellationToken);
+        if (string.IsNullOrWhiteSpace(requestedResourceType))
+            return entries;
+
+        return entries
+            .Where(e => e.Resource != null
+                        && e.Resource.TypeName.Equals(requestedResourceType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     /// <summary>
@@ -218,14 +258,18 @@ public class PatientDataStore
     /// only fans out resources of the requested type. Anchor resources (Patient, Encounter,
     /// Condition, Device, CareTeam, CarePlan) are always generated regardless.
     /// </summary>
-    private static FhirGenerationConfig ConfigForType(string resourceType)
+    private FhirGenerationConfig ConfigForType(string resourceType)
     {
         var distribution = new Dictionary<string, double>();
         if (_defaultConfig.ResourceDistribution.TryGetValue(resourceType, out var fraction))
             distribution[resourceType] = fraction;
         // If the type isn't in the distribution (e.g. Patient, Encounter — anchor types),
         // an empty distribution is fine: anchor resources are always produced.
-        return new FhirGenerationConfig { ResourceDistribution = distribution };
+        return new FhirGenerationConfig
+        {
+            ResourceDistribution = distribution,
+            UseThetisEngine = _settings.UseThetisEngine
+        };
     }
 
     /// <summary>

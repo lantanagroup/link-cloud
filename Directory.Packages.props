@@ -32,9 +32,8 @@
     <PackageVersion Include="Grpc.AspNetCore" Version="2.80.0" />
     <PackageVersion Include="Grpc.AspNetCore.Server.Reflection" Version="2.80.0" />
     <PackageVersion Include="Grpc.Net.Client" Version="2.80.0" />
-    <PackageVersion Include="Hl7.Fhir.R4" Version="5.13.4" />
-    <PackageVersion Include="Hl7.Fhir.Specification.R4" Version="5.13.4" />
-    <PackageVersion Include="Hl7.Fhir.Support" Version="4.3.0" />
+    <PackageVersion Include="Hl7.Fhir.R4" Version="6.2.0" />
+    <PackageVersion Include="Hl7.Fhir.Specification.R4" Version="6.2.0" />
     <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
     <PackageVersion Include="jose-jwt" Version="4.1.0" />
     <PackageVersion Include="JWT" Version="10.1.1" />
@@ -62,7 +61,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="8.0.27" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.27" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.27" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.16" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Compliance.Redaction" Version="8.10.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="7.3.0" />

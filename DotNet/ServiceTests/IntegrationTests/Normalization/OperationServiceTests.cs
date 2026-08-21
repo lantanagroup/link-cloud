@@ -281,7 +281,7 @@ namespace IntegrationTests.Normalization
 
             Assert.NotNull(modifiedResource.Code);
             Assert.NotNull(modifiedResource.Code.Text);
-            Assert.Equal(resource.Value.First().Value.ToString(), modifiedResource.Code.Text);
+            Assert.Equal(GetPrimitiveValue(resource.Value)?.ToString(), modifiedResource.Code.Text);
         }
 
         [Fact]
@@ -2649,5 +2649,12 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(taskResult.ErrorMessage);
             Assert.Contains("absolute", taskResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
         }
+
+        private static object? GetPrimitiveValue(DataType? value) => value switch
+        {
+            Quantity quantity => quantity.Value,
+            PrimitiveType primitive => primitive.ObjectValue,
+            _ => value
+        };
     }
 }

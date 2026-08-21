@@ -6,11 +6,20 @@
     <Nullable>enable</Nullable>
     <RootNamespace>LantanaGroup.Automation</RootNamespace>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <ThetisEngineProjectPath Condition="'$(ThetisEngineProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Engine\Thetis.Generation.Engine.csproj</ThetisEngineProjectPath>
+    <ThetisAbstractionsProjectPath Condition="'$(ThetisAbstractionsProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Abstractions\Thetis.Generation.Abstractions.csproj</ThetisAbstractionsProjectPath>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="RestSharp" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(ThetisEngineProjectPath)')">
+    <ProjectReference Include="$(ThetisAbstractionsProjectPath)" />
+    <ProjectReference Include="$(ThetisEngineProjectPath)" />
   </ItemGroup>
 
   <ItemGroup>

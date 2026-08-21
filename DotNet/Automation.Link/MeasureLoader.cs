@@ -17,7 +17,7 @@ public class MeasureLoader
     private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
     private readonly Assembly? _resourceAssembly;
-    private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
+    private readonly FhirJsonDeserializer _parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
 
     public string? MeasureId { get; private set; }
 
@@ -139,7 +139,7 @@ public class MeasureLoader
             {
                 var resource = validationEntry.Resource!;
                 var artifactId = $"{resource.TypeName}-{resource.Id}";
-                await _validationClient.UpsertResourceArtifactAsync(artifactId, await resource.ToJsonAsync());
+                await _validationClient.UpsertResourceArtifactAsync(artifactId, new FhirJsonSerializer().SerializeToString(resource));
             });
 
             await Task.WhenAll(validationTasks);
