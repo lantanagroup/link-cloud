@@ -126,9 +126,21 @@ public class FhirPathCheckExecutor implements CheckExecutor {
     }
 
     private String leadingResourceType(String expression) {
-        int dot = expression.indexOf('.');
-        if (dot <= 0) return null;
-        String token = expression.substring(0, dot);
+        int i = 0;
+        while (i < expression.length()
+                && (Character.isWhitespace(expression.charAt(i)) || expression.charAt(i) == '(')) {
+            i++;
+        }
+        int start = i;
+        while (i < expression.length()
+                && (Character.isLetterOrDigit(expression.charAt(i)) || expression.charAt(i) == '_')) {
+            i++;
+        }
+
+        if (start == i || i >= expression.length() || expression.charAt(i) != '.') {
+            return null;
+        }
+        String token = expression.substring(start, i);
         return Character.isUpperCase(token.charAt(0)) ? token : null;
     }
 

@@ -64,8 +64,11 @@ public class FhirConfig {
      * share across threads, so hand each thread its own.
      */
     @Bean
-    public IFhirPath fhirPath(FhirContext fhirContext) {
-        return new ThreadLocalFhirPath(fhirContext);
+    public IFhirPath fhirPath(FhirContext fhirContext,
+                              com.lantanagroup.link.validation.services.execution.BundleReferenceResolver bundleReferenceResolver) {
+        IFhirPath fhirPath = new ThreadLocalFhirPath(fhirContext);
+        fhirPath.setEvaluationContext(bundleReferenceResolver);
+        return fhirPath;
     }
 
     /**
@@ -82,18 +85,12 @@ public class FhirConfig {
     @Bean
     public ValidationSupportChain validationSupportChain(FhirContext fhirContext, LinkConfig linkConfig,
             ArtifactService artifactService, ValidationCacheService validationCacheService) {
-        // Mirrors the legacy validator's chain (ValidationService) exactly — same supports, same
-        // order — so FHIR_CONFORMANCE checks produce the same findings as the legacy $validate
-        // endpoint. The artifact support (IG packages: US Core, QI-Core, ...) is wrapped lazily:
-        // ArtifactService rebuilds it when artifacts change, and this singleton chain must always
-        // see the current one.
         ValidationSupportChain chain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 new LazyArtifactValidationSupport(fhirContext, artifactService),
                 new SnapshotGeneratingValidationSupport(fhirContext)
         );
-        // Same remote terminology support (existence-gated, Redis-cached, whitelist-aware), same
-        // position before the in-memory fallbacks, as the legacy validator.
+
         ValidationService.loadTerminologyValidationSupport(fhirContext, linkConfig, chain, validationCacheService);
         logger.info("Rubric-engine validation support chain composed to match legacy: DefaultProfile -> Artifacts(IG packages) -> SnapshotGenerating -> [RemoteTerminology] -> CommonCodeSystems -> InMemoryTerminology");
         return chain;

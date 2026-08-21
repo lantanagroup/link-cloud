@@ -26,6 +26,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -176,17 +177,22 @@ class RubricCacheServiceTest {
     }
 
     @Test
-    @DisplayName("latest published semver is cached and ordered semantically (1.10.0 > 1.9.0)")
-    void latestPublishedSemverCachedAndSemantic() {
+    @DisplayName("latest published semver is cached and is the most recently published (by publishedAt), not the highest semver")
+    void latestPublishedSemverCachedAndByPublishDate() {
+        // 1.9.0 was published AFTER 1.10.0 — e.g. a hotfix issued once 1.10.0 was rolled back — so
+        // "latest" must be 1.9.0. This proves the pointer follows publishedAt, not semantic version
+        // order, and guards the behaviour getLatestPublishedSemver now implements.
         when(versionRepository.findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED))
                 .thenReturn(List.of(
-                        RubricVersion.builder().rubricId("piqi.core").semver("1.9.0")
-                                .status(RubricVersionStatus.PUBLISHED).checksum("x").build(),
                         RubricVersion.builder().rubricId("piqi.core").semver("1.10.0")
-                                .status(RubricVersionStatus.PUBLISHED).checksum("x").build()));
+                                .status(RubricVersionStatus.PUBLISHED).checksum("x")
+                                .publishedAt(OffsetDateTime.parse("2026-01-01T00:00:00Z")).build(),
+                        RubricVersion.builder().rubricId("piqi.core").semver("1.9.0")
+                                .status(RubricVersionStatus.PUBLISHED).checksum("x")
+                                .publishedAt(OffsetDateTime.parse("2026-02-01T00:00:00Z")).build()));
 
-        assertThat(cacheService.getLatestPublishedSemver("piqi.core")).isEqualTo("1.10.0");
-        assertThat(cacheService.getLatestPublishedSemver("piqi.core")).isEqualTo("1.10.0");
+        assertThat(cacheService.getLatestPublishedSemver("piqi.core")).isEqualTo("1.9.0");
+        assertThat(cacheService.getLatestPublishedSemver("piqi.core")).isEqualTo("1.9.0");
         verify(versionRepository, times(1)).findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED);
     }
 

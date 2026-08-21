@@ -290,6 +290,7 @@ class RubricExecutionServiceParallelTest {
                 FHIR_CONTEXT,
                 objectMapper,
                 checkPool,
+                new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(),
                 parallel);
     }
 

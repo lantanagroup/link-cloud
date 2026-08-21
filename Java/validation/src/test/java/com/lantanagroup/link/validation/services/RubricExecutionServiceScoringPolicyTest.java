@@ -61,7 +61,7 @@ class RubricExecutionServiceScoringPolicyTest {
     private final RubricExecutionService service = new RubricExecutionService(
             resolver, versionRepository, registry, assembler, overrideEngine,
             scoreAggregator, resultPersister, FhirContext.forR4(), objectMapper,
-            Runnable::run, false);
+            Runnable::run, new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(), false);
 
     @Test
     @DisplayName("a non-default scoring policy survives snapshot resolution: check-scorecard rubrics score byCheck, not the dimension default")
