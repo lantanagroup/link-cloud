@@ -9,8 +9,6 @@ import com.lantanagroup.link.validation.entities.CategorySeverity;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricVersion;
-import com.lantanagroup.link.validation.enums.CategoryMatchStrategy;
-import com.lantanagroup.link.validation.enums.CategoryOverrideScope;
 import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
@@ -102,8 +100,6 @@ class RubricExecutionServiceCategoryOverrideTest {
     @DisplayName("an error a category declares acceptable is downgraded end to end: status, score, and finding all reflect the override")
     void acceptableCategoryDowngradesAnErrorEndToEnd() throws Exception {
         policyConfig.getCategoryOverride().setEnabled(true);
-        policyConfig.getCategoryOverride().setScope(CategoryOverrideScope.FHIR_ONLY);
-        policyConfig.getCategoryOverride().setMatchStrategy(CategoryMatchStrategy.WORST_OF);
 
         RubricCheck check = conformanceCheck();
         when(resolver.resolve("piqi.core", "1.0.0", false))
@@ -136,10 +132,9 @@ class RubricExecutionServiceCategoryOverrideTest {
     }
 
     @Test
-    @DisplayName("with FHIR_ONLY scope a TERMINOLOGY error is out of reach: nothing is categorized and the result still fails")
-    void outOfScopeErrorStillFails() throws Exception {
+    @DisplayName("the override engine covers every check type, not just FHIR conformance: a TERMINOLOGY error is downgraded too")
+    void nonConformanceCheckIsAlsoInReach() throws Exception {
         policyConfig.getCategoryOverride().setEnabled(true);
-        policyConfig.getCategoryOverride().setScope(CategoryOverrideScope.FHIR_ONLY);
 
         RubricCheck check = RubricCheck.builder()
                 .checkId(UUID.randomUUID())
@@ -157,11 +152,16 @@ class RubricExecutionServiceCategoryOverrideTest {
                         .severity(Severity.ERROR).code("terminology-code-invalid")
                         .message("bad code").build()));
         when(registry.get(CheckType.TERMINOLOGY)).thenReturn(executor);
+        doAnswer(invocation -> {
+            List<Result> results = invocation.getArgument(0);
+            results.forEach(r -> r.setCategories(List.of(acceptableWarning("cat-a"))));
+            return null;
+        }).when(categorizationService).categorize(anyList());
 
         ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request(), false);
 
-        assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.UNACCEPTABLE);
-        assertThat(envelope.getFindings().get(0).getAcceptable()).isNull();
-        assertThat(envelope.getFindings().get(0).getSeverity()).isEqualTo(Severity.ERROR);
+        assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+        assertThat(envelope.getFindings().get(0).getAcceptable()).isTrue();
+        assertThat(envelope.getFindings().get(0).getSeverity()).isEqualTo(Severity.WARNING);
     }
 }

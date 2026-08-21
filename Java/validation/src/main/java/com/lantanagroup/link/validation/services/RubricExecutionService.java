@@ -18,7 +18,6 @@ import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
 import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
-import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -139,10 +138,8 @@ public class RubricExecutionService {
 
         Map<String, RubricCheck> checkByLocalId = enabled.stream()
                 .collect(Collectors.toMap(RubricCheck::getCheckLocalId, c -> c, (a, b) -> a, LinkedHashMap::new));
-        Map<String, CheckType> checkTypeByLocalId = new LinkedHashMap<>();
-        checkByLocalId.forEach((localId, c) -> checkTypeByLocalId.put(localId, c.getType()));
 
-        List<EvaluatedFinding> evaluated = categoryOverrideEngine.apply(allFindings, checkTypeByLocalId);
+        List<EvaluatedFinding> evaluated = categoryOverrideEngine.apply(allFindings);
         if (evaluated.size() != allFindings.size()) {
             throw new IllegalStateException(String.format(
                     "Category override returned %d finding(s) for %d input(s); slices would be misaligned",

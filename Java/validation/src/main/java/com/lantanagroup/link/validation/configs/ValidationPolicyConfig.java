@@ -1,7 +1,5 @@
 package com.lantanagroup.link.validation.configs;
 
-import com.lantanagroup.link.validation.enums.CategoryMatchStrategy;
-import com.lantanagroup.link.validation.enums.CategoryOverrideScope;
 import com.lantanagroup.link.validation.enums.RollupStrategy;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,10 +21,6 @@ public class ValidationPolicyConfig {
     public static class CategoryOverride {
 
         private boolean enabled = false;
-
-        private CategoryOverrideScope scope = CategoryOverrideScope.ALL_CHECKS;
-
-        private CategoryMatchStrategy matchStrategy = CategoryMatchStrategy.WORST_OF;
     }
 
     @Getter
