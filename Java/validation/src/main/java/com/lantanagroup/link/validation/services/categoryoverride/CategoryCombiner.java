@@ -2,7 +2,6 @@ package com.lantanagroup.link.validation.services.categoryoverride;
 
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySeverity;
-import com.lantanagroup.link.validation.enums.CategoryMatchStrategy;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
@@ -14,24 +13,18 @@ public final class CategoryCombiner {
     private CategoryCombiner() {
     }
 
-    public static EvaluatedFinding combine(RawFinding raw, List<Category> matched, CategoryMatchStrategy strategy) {
+    /**
+     * Combines every matching category, per field, taking the worst value of each:
+     * {@code acceptable=false} beats {@code acceptable=true}, and a higher severity beats a
+     * lower one. The two fields are combined independently, so the resulting pair may be a
+     * combination that no single matching category declares — that is intentional, and is the
+     * conservative reading of "worst of".
+     */
+    public static EvaluatedFinding combine(RawFinding raw, List<Category> matched) {
         if (matched == null || matched.isEmpty()) {
             return EvaluatedFinding.identity(raw);
         }
-        return switch (strategy) {
-            case FIRST_MATCH -> single(raw, matched.get(0));
-            case WORST_OF -> worstOf(raw, matched);
-        };
-    }
-
-    private static EvaluatedFinding single(RawFinding raw, Category category) {
-        return new EvaluatedFinding(
-                raw,
-                raw.getSeverity(),
-                toSeverity(category.getSeverity(), raw.getSeverity()),
-                category.isAcceptable(),
-                List.of(category.getId()),
-                category.getId());
+        return worstOf(raw, matched);
     }
 
     private static EvaluatedFinding worstOf(RawFinding raw, List<Category> matched) {

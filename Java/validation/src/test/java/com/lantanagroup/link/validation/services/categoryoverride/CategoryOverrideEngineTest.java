@@ -5,9 +5,6 @@ import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySeverity;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.enums.CategoryMatchStrategy;
-import com.lantanagroup.link.validation.enums.CategoryOverrideScope;
-import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.RawFinding;
@@ -20,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -74,9 +70,8 @@ class CategoryOverrideEngineTest {
         }).when(categorizationService).categorize(anyList());
     }
 
-    private void enable(CategoryMatchStrategy strategy) {
+    private void enable() {
         config.getCategoryOverride().setEnabled(true);
-        config.getCategoryOverride().setMatchStrategy(strategy);
     }
 
     // ------------------------------------------------------------------
@@ -86,8 +81,7 @@ class CategoryOverrideEngineTest {
     @Test
     void disabledLeavesEveryFindingUntouchedAndNeverCategorizes() {
         List<EvaluatedFinding> evaluated = engine.apply(
-                List.of(finding("c1", Severity.ERROR), finding("c2", Severity.WARNING)),
-                Map.of("c1", CheckType.FHIR_CONFORMANCE, "c2", CheckType.TERMINOLOGY));
+                List.of(finding("c1", Severity.ERROR), finding("c2", Severity.WARNING)));
 
         assertEquals(2, evaluated.size());
         assertEquals(Severity.ERROR, evaluated.get(0).effectiveSeverity());
@@ -99,11 +93,10 @@ class CategoryOverrideEngineTest {
 
     @Test
     void enabledWithNoMatchesBehavesExactlyLikeDisabled() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         categorizeWith();
 
-        List<EvaluatedFinding> evaluated = engine.apply(
-                List.of(finding("c1", Severity.ERROR)), Map.of("c1", CheckType.FHIR_CONFORMANCE));
+        List<EvaluatedFinding> evaluated = engine.apply(List.of(finding("c1", Severity.ERROR)));
 
         assertEquals(Severity.ERROR, evaluated.get(0).effectiveSeverity());
         assertNull(evaluated.get(0).acceptable());
@@ -111,20 +104,19 @@ class CategoryOverrideEngineTest {
 
     @Test
     void noFindingsProducesNoDecisions() {
-        assertTrue(engine.apply(List.of(), Map.of()).isEmpty());
+        assertTrue(engine.apply(List.of()).isEmpty());
     }
 
     // ------------------------------------------------------------------
-    // WORST_OF
+    // WORST_OF -- the engine's only (fixed) match strategy
     // ------------------------------------------------------------------
 
     @Test
     void aSingleCategoryAppliesItsSeverityAndAcceptability() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         categorizeWith(category("cat-a", CategorySeverity.WARNING, true));
 
-        EvaluatedFinding evaluated = engine.apply(
-                List.of(finding("c1", Severity.ERROR)), Map.of("c1", CheckType.FHIR_CONFORMANCE)).get(0);
+        EvaluatedFinding evaluated = applyOne();
 
         assertEquals(Severity.ERROR, evaluated.originalSeverity());
         assertEquals(Severity.WARNING, evaluated.effectiveSeverity());
@@ -136,7 +128,7 @@ class CategoryOverrideEngineTest {
 
     @Test
     void unacceptableBeatsAcceptableInEitherDeclarationOrder() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
 
         categorizeWith(category("a-yes", CategorySeverity.WARNING, true),
                 category("b-no", CategorySeverity.WARNING, false));
@@ -149,7 +141,7 @@ class CategoryOverrideEngineTest {
 
     @Test
     void theHighestSeverityWins() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         categorizeWith(category("a", CategorySeverity.INFORMATION, true),
                 category("b", CategorySeverity.ERROR, true),
                 category("c", CategorySeverity.WARNING, true));
@@ -163,7 +155,7 @@ class CategoryOverrideEngineTest {
      */
     @Test
     void severityAndAcceptabilityAreCombinedIndependently() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         categorizeWith(category("a-loud-but-fine", CategorySeverity.ERROR, true),
                 category("b-quiet-but-fatal", CategorySeverity.WARNING, false));
 
@@ -180,7 +172,7 @@ class CategoryOverrideEngineTest {
      */
     @Test
     void tiesFallBackToCategoryIdOrder() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         categorizeWith(category("zulu", CategorySeverity.WARNING, true),
                 category("alpha", CategorySeverity.WARNING, true));
 
@@ -188,51 +180,19 @@ class CategoryOverrideEngineTest {
     }
 
     // ------------------------------------------------------------------
-    // FIRST_MATCH
+    // Scope -- the engine always considers every finding, regardless of check type
     // ------------------------------------------------------------------
 
     @Test
-    void firstMatchUsesOneCategoryOnly() {
-        enable(CategoryMatchStrategy.FIRST_MATCH);
-        categorizeWith(category("zulu", CategorySeverity.ERROR, false),
-                category("alpha", CategorySeverity.INFORMATION, true));
-
-        EvaluatedFinding evaluated = applyOne();
-
-        assertEquals(List.of("alpha"), evaluated.categoryIds(), "lowest sequence, then id");
-        assertEquals(Severity.INFORMATION, evaluated.effectiveSeverity());
-        assertEquals(Boolean.TRUE, evaluated.acceptable());
-    }
-
-    // ------------------------------------------------------------------
-    // Scope
-    // ------------------------------------------------------------------
-
-    @Test
-    void fhirOnlyScopeSkipsFindingsFromOtherCheckTypes() {
-        enable(CategoryMatchStrategy.WORST_OF);
-        config.getCategoryOverride().setScope(CategoryOverrideScope.FHIR_ONLY);
+    void everyFindingIsConsideredRegardlessOfCheckType() {
+        enable();
         categorizeWith(category("cat-a", CategorySeverity.INFORMATION, true));
 
         List<EvaluatedFinding> evaluated = engine.apply(
-                List.of(finding("c-conformance", Severity.ERROR), finding("c-terminology", Severity.ERROR)),
-                Map.of("c-conformance", CheckType.FHIR_CONFORMANCE, "c-terminology", CheckType.TERMINOLOGY));
+                List.of(finding("c-conformance", Severity.ERROR), finding("c-terminology", Severity.ERROR)));
 
         assertEquals(Severity.INFORMATION, evaluated.get(0).effectiveSeverity());
-        assertEquals(Severity.ERROR, evaluated.get(1).effectiveSeverity(), "terminology finding untouched");
-        assertNull(evaluated.get(1).acceptable());
-    }
-
-    @Test
-    void fhirOnlyScopeWithNothingInScopeSkipsCategorizationEntirely() {
-        enable(CategoryMatchStrategy.WORST_OF);
-        config.getCategoryOverride().setScope(CategoryOverrideScope.FHIR_ONLY);
-
-        List<EvaluatedFinding> evaluated = engine.apply(
-                List.of(finding("c-terminology", Severity.ERROR)), Map.of("c-terminology", CheckType.TERMINOLOGY));
-
-        assertNull(evaluated.get(0).acceptable());
-        verifyNoInteractions(categorizationService);
+        assertEquals(Severity.INFORMATION, evaluated.get(1).effectiveSeverity());
     }
 
     // ------------------------------------------------------------------
@@ -242,28 +202,17 @@ class CategoryOverrideEngineTest {
     /** One unusable rule in the category table must not fail the whole evaluation. */
     @Test
     void aCategorizationFailureFallsBackToUntouchedFindings() {
-        enable(CategoryMatchStrategy.WORST_OF);
+        enable();
         doThrow(new IllegalStateException("No pattern specified"))
                 .when(categorizationService).categorize(anyList());
 
-        List<EvaluatedFinding> evaluated = engine.apply(
-                List.of(finding("c1", Severity.ERROR)), Map.of("c1", CheckType.FHIR_CONFORMANCE));
+        List<EvaluatedFinding> evaluated = engine.apply(List.of(finding("c1", Severity.ERROR)));
 
         assertEquals(Severity.ERROR, evaluated.get(0).effectiveSeverity());
         assertNull(evaluated.get(0).acceptable());
     }
 
-    @Test
-    void aNullCheckTypeMapIsToleratedUnderAllChecks() {
-        enable(CategoryMatchStrategy.WORST_OF);
-        categorizeWith(category("cat-a", CategorySeverity.INFORMATION, true));
-
-        List<EvaluatedFinding> evaluated = engine.apply(List.of(finding("c1", Severity.ERROR)), null);
-
-        assertEquals(Severity.INFORMATION, evaluated.get(0).effectiveSeverity());
-    }
-
     private EvaluatedFinding applyOne() {
-        return engine.apply(List.of(finding("c1", Severity.ERROR)), Map.of("c1", CheckType.FHIR_CONFORMANCE)).get(0);
+        return engine.apply(List.of(finding("c1", Severity.ERROR))).get(0);
     }
 }

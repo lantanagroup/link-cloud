@@ -3,9 +3,6 @@ package com.lantanagroup.link.validation.services.categoryoverride;
 import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.enums.CategoryMatchStrategy;
-import com.lantanagroup.link.validation.enums.CategoryOverrideScope;
-import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
@@ -29,7 +26,7 @@ public class CategoryOverrideEngine {
     private final CategorySequenceProvider sequenceProvider;
     private final ValidationPolicyConfig config;
 
-    public List<EvaluatedFinding> apply(List<RawFinding> findings, Map<String, CheckType> checkTypeByLocalId) {
+    public List<EvaluatedFinding> apply(List<RawFinding> findings) {
         if (findings == null || findings.isEmpty()) {
             return List.of();
         }
@@ -39,28 +36,10 @@ public class CategoryOverrideEngine {
             return identity(findings);
         }
 
-        CategoryOverrideScope scope = settings.getScope();
-        Map<String, CheckType> checkTypes = checkTypeByLocalId != null ? checkTypeByLocalId : Map.of();
-
-        // Index-aligned with `findings`; null means the finding is out of scope and stays untouched.
-        List<Result> views = new ArrayList<>(findings.size());
-        List<Result> toCategorize = new ArrayList<>(findings.size());
-        for (RawFinding finding : findings) {
-            if (!inScope(scope, checkTypes.get(finding.getCheckLocalId()))) {
-                views.add(null);
-                continue;
-            }
-            Result view = FindingResultAdapter.toTransientResult(finding);
-            views.add(view);
-            toCategorize.add(view);
-        }
-        if (toCategorize.isEmpty()) {
-            log.debug("Category override enabled but no finding is within scope {}", scope);
-            return identity(findings);
-        }
+        List<Result> views = findings.stream().map(FindingResultAdapter::toTransientResult).toList();
 
         try {
-            categorizationService.categorize(toCategorize);
+            categorizationService.categorize(views);
         } catch (Exception e) {
             // A single unusable matcher in the category table must not fail the whole evaluation;
             // falling back to identity scores exactly as the disabled path would.
@@ -68,14 +47,12 @@ public class CategoryOverrideEngine {
             return identity(findings);
         }
 
-        CategoryMatchStrategy strategy = settings.getMatchStrategy();
         List<EvaluatedFinding> evaluated = new ArrayList<>(findings.size());
         int matchedCount = 0;
         int overriddenCount = 0;
         for (int i = 0; i < findings.size(); i++) {
-            Result view = views.get(i);
-            List<Category> matched = view != null ? inSequenceOrder(view.getCategories()) : List.of();
-            EvaluatedFinding decision = CategoryCombiner.combine(findings.get(i), matched, strategy);
+            List<Category> matched = inSequenceOrder(views.get(i).getCategories());
+            EvaluatedFinding decision = CategoryCombiner.combine(findings.get(i), matched);
             evaluated.add(decision);
             if (decision.hasCategories()) {
                 matchedCount++;
@@ -84,7 +61,7 @@ public class CategoryOverrideEngine {
                 overriddenCount++;
             }
         }
-        log.debug("Category override matched {} of {} finding(s) using {}", matchedCount, findings.size(), strategy);
+        log.debug("Category override matched {} of {} finding(s)", matchedCount, findings.size());
         if (overriddenCount > 0) {
             // From->to breakdown, e.g. {ERROR->WARNING=5}, so the log shows exactly which
             // severities were overridden — comparable against the legacy path, which never overrides.
@@ -93,12 +70,11 @@ public class CategoryOverrideEngine {
                     .collect(Collectors.groupingBy(
                             d -> d.originalSeverity() + "->" + d.effectiveSeverity(),
                             TreeMap::new, Collectors.counting()));
-            log.info("Category override changed the severity of {} of {} finding(s): {} (scope {}, strategy {})",
-                    overriddenCount, findings.size(), transitions, scope, strategy);
-            //remove these logs durign final merge
+            log.info("Category override changed the severity of {} of {} finding(s): {}",
+                    overriddenCount, findings.size(), transitions);
         } else {
-            log.info("Category override changed no severities ({} of {} finding(s) matched a category; scope {}, strategy {})",
-                    matchedCount, findings.size(), scope, strategy);
+            log.info("Category override changed no severities ({} of {} finding(s) matched a category)",
+                    matchedCount, findings.size());
         }
         return evaluated;
     }
@@ -111,13 +87,6 @@ public class CategoryOverrideEngine {
                 .sorted(Comparator.comparingInt((Category c) -> sequenceProvider.sequenceOf(c.getId()))
                         .thenComparing(Category::getId))
                 .toList();
-    }
-
-    private boolean inScope(CategoryOverrideScope scope, CheckType checkType) {
-        if (scope == CategoryOverrideScope.ALL_CHECKS) {
-            return true;
-        }
-        return checkType != null && scope.includes(checkType);
     }
 
     private static List<EvaluatedFinding> identity(List<RawFinding> findings) {

@@ -112,20 +112,12 @@ authentication:
 
 link:
   info-route: /api/validation/info
-  # Link Terminology service ROOT (no path) — consumers append /api/terminology/fhir.
-  # Overridden in docker by the compose environment (http://terminology:8076).
   terminology-service-url: 'http://localhost:8076'
   rubric:
-    # Max rubric definition payload size (256 KiB). Checked against Content-Length before
-    # body binding, and against the parsed body for chunked requests.
     max-payload-bytes: 262144
     dry-run:
-      # When true, publishing a rubric version requires a completed dry run with status
-      # ACCEPTABLE or ACCEPTABLE_WITH_WARNINGS. Outcomes are recorded by the $dry-run endpoint.
       required-for-publish: false
-  # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
-  # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy
-  # "503 no healthy upstream" during a terminology-service rollout). 4xx never retries.
+
   fhir-client-retry:
     max-attempts: 5
     backoff-millis: 5000
@@ -161,39 +153,12 @@ vaas:
     rubric-id: measure-report-submission-v1
 
 validation:
-  # Behavioural knobs for rubric (v2) category override and scoring, bound to ValidationPolicyConfig.
-  # Every key below is stated explicitly rather than left to the code default, so the whole policy is
-  # readable in one place. Values here match the code defaults except categoryOverride.scope.
-  #
-  # NOTE ON ENUM VALUES: these bind via Spring relaxed binding, which uses the enum CONSTANT NAME
-  # (WORST_OF, FHIR_ONLY). The kebab-case forms seen in rubric JSON ("worst-of") come from the
-  # enum's JSON value and apply to Jackson only -- they will NOT bind here.
   categoryOverride:
-    # Master switch. When false the override engine short-circuits before reading any category, and
-    # every finding keeps its own severity -- i.e. scoring behaves exactly as it did before the
-    # override engine existed.
     enabled: true
 
-    # Which findings the override engine may touch. ALL_CHECKS | FHIR_ONLY.
-    # FHIR_ONLY restricts it to CheckType.FHIR_CONFORMANCE findings, so COMPLETENESS / PLAUSIBILITY /
-    # TERMINOLOGY errors are filtered out before any category is consulted and can never be
-    # downgraded.
-    scope: FHIR_ONLY
-
-    # How several matching categories collapse into one decision. WORST_OF | FIRST_MATCH.
-    # WORST_OF combines severity and acceptable independently, each taking the worst value:
-    # any acceptable=false wins, and the highest severity wins.
-    matchStrategy: WORST_OF
-
   scoring:
-    # Fallback rollup, used ONLY when a rubric version's own scoringPolicy.rollup is absent.
-    # A rubric's persisted rollup always wins over this -- see ScoringPolicyResolver.
-    # WORST_OF | BEST_OF | PASS_FAIL | MAJORITY | ALL_MUST_PASS.
     rollup: WORST_OF
 
   response:
-    # Diagnostic fields only -- neither of these ever affects a score.
-    # Emit originalSeverity / overriddenSeverity on each finding a category matched.
     includeOriginalSeverity: true
-    # Emit categoryIds / governingCategoryId on each finding a category matched.
     includeCategoryIds: true
