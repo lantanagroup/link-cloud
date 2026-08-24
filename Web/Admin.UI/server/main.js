@@ -121,7 +121,11 @@ function buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests } = {
         'connect-src': ["'self'", ...extraConnectOrigins],
         'upgrade-insecure-requests': upgradeInsecureRequests ? [] : null
       }
-    }
+    },
+    // Helmet defaults to Referrer-Policy: no-referrer. The BFF /api/login challenge
+    // builds its post-auth redirect from the Referer header (UI host + /dashboard)
+    // and falls back to /api/info when Referer is missing.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
   };
 }
 
