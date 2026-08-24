@@ -654,9 +654,10 @@ with:
   semantics across the patient's qualifying measures).
 
 That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` for
-strict prediction-vs-actual comparison. The Report service's `ReportEntry.ReportingStatus`
-rows feed the `OperationOutcome` count prediction (one OO per `FailedValidation` patient)
-when Validation's `pre-qualification.write-pre-qual-operation-outcome` flag is on.
+strict prediction-vs-actual comparison. Generation does not predict `OperationOutcome`.
+The ABS validator expects one only when Validation's
+`pre-qualification.write-pre-qual-operation-outcome` flag is on **and** the patient
+`FailedValidation`. Passing patients are not required to have one.
 
 The CQL simulator is resource-aware, not just type-aware. In addition to checking that a
 resource type is acquired and referenced by CQL, it applies known SDE `where` predicates per

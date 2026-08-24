@@ -16,9 +16,9 @@ public sealed class GenerationManifest
     /// They appear in ABS as a deterministic function of the pipeline, not of generated input:
     /// <list type="bullet">
     ///   <item><c>MeasureReport</c> — MeasureEval writes one per submitted patient per measure.</item>
-    ///   <item><c>OperationOutcome</c> — one per failed-validation patient when Validation's
-    ///         pre-qualification flag is on. Normally 0; callers set
-    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
+    ///   <item><c>OperationOutcome</c> — not predicted at generation time. The ABS validator
+    ///         sets <see cref="ExpectedOperationOutcomeCountByPatient"/> from
+    ///         <c>FailedValidation</c> report entries when the pre-qualification writer is on.</item>
     /// </list>
     /// These types are never compared key-for-key; instead a count-level prediction is added
     /// (<see cref="GetExpectedAbsCountsForPatient"/>) so strict prediction-vs-actual reconciliation works.
@@ -96,10 +96,9 @@ public sealed class GenerationManifest
     /// Per-patient count of expected <c>OperationOutcome</c> resources in ABS.
     /// Defaults to 0 (strict: no validation failures expected).
     ///
-    /// The Validation service emits one OperationOutcome per failed-validation patient when
-    /// <c>pre-qualification.write-pre-qual-operation-outcome</c> is true.
-    /// Tests or post-run validators that know which patients failed can populate this map
-    /// to keep the strict prediction-vs-actual comparison passing.
+    /// Generation leaves this empty. The ABS validator overwrites it from Report
+    /// <c>FailedValidation</c> entries when <c>pre-qualification.write-pre-qual-operation-outcome</c>
+    /// is true. Passing patients are not expected to have an OperationOutcome.
     /// </summary>
     public IDictionary<string, int> ExpectedOperationOutcomeCountByPatient { get; set; }
         = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -227,10 +226,9 @@ public sealed class GenerationManifest
     ///         (MeasureEval's CQL engine loads Patient implicitly, so it always lands in ABS).</item>
     ///   <item><c>MeasureReport</c> — one per measure the patient qualifies for
     ///         (MeasureEval writes exactly one MeasureReport per submitted patient per measure).</item>
-    ///   <item><c>OperationOutcome</c> — the caller-supplied expectation from
-    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> (default 0). Appended
-    ///         directly to the patient aggregate blob by <c>ValidationCompleteListener</c>
-    ///         for any patient whose <c>ValidationComplete.IsValid == false</c>.</item>
+    ///   <item><c>OperationOutcome</c> — from <see cref="ExpectedOperationOutcomeCountByPatient"/>
+    ///         (default 0). The ABS validator sets this to 1 only for
+    ///         <c>FailedValidation</c> patients when the pre-qualification writer is on.</item>
     /// </list>
     /// </summary>
     public Dictionary<string, int>? GetExpectedAbsCountsForPatient(string patientId)
@@ -317,9 +315,8 @@ public sealed class GenerationManifest
     /// <summary>
     /// Adds count-level predictions for pipeline-derived resource types that have no
     /// deterministic key-level prediction (IDs assigned downstream).
-    /// <c>OperationOutcome</c> is appended directly to the patient aggregate blob by
-    /// the Validation service when <c>pre-qualification.write-pre-qual-operation-outcome</c>
-    /// is true and the patient failed validation.
+    /// <c>OperationOutcome</c> is not predicted here. The ABS validator sets the count
+    /// from <c>FailedValidation</c> report entries when the pre-qualification writer is on.
     /// </summary>
     private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts)
     {

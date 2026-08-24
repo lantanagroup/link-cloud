@@ -373,4 +373,89 @@ public class BundleConfigurationGenerationTests
             m.SourceSystem == "http://hospital.example.org/locations"
             && m.CodeMaps.ContainsKey("LOC-1"));
     }
+
+    [Fact]
+    public void Normalization_builder_does_not_reuse_code_map_with_different_source_system()
+    {
+        var existingMap = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Map coding name and code",
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type.coding",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "urn:oid:1.2.840.114350.1.13.277.3.7.2.686990",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["1108-0"] = new NormalizationCodeMapEntry { Code = "1108-0", Display = "ED" } }
+                }
+            ]
+        };
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            Codings =
+            [
+                new CodingHint
+                {
+                    ResourceType = "Location",
+                    Path = "type.coding",
+                    System = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    Code = "1109-8",
+                    Display = "Pediatric Emergency Department"
+                }
+            ]
+        };
+
+        var proposal = NormalizationProposalBuilder.Build(fp, [existingMap], []);
+        var codeMap = proposal.Operations.Single(o => o.OperationType == "CodeMap");
+        codeMap.ReuseOperationId.Should().BeNull();
+        codeMap.CodeSystemMaps.Should().ContainSingle(m =>
+            m.SourceSystem == "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
+            && m.CodeMaps.ContainsKey("1109-8"));
+    }
+
+    [Fact]
+    public void Normalization_builder_reuses_code_map_when_source_system_matches()
+    {
+        var existingId = Guid.NewGuid();
+        var hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var existingMap = new NormalizationOperationDefinition
+        {
+            Id = existingId,
+            Name = "Map HSLOC type codes",
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type.coding",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = hsloc,
+                    TargetSystem = hsloc,
+                    CodeMaps = { ["1109-8"] = new NormalizationCodeMapEntry { Code = "1109-8", Display = "Pediatric Emergency Department" } }
+                }
+            ]
+        };
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            Codings =
+            [
+                new CodingHint
+                {
+                    ResourceType = "Location",
+                    Path = "type.coding",
+                    System = hsloc,
+                    Code = "1109-8"
+                }
+            ]
+        };
+
+        var proposal = NormalizationProposalBuilder.Build(fp, [existingMap], []);
+        proposal.Operations.Single(o => o.OperationType == "CodeMap").ReuseOperationId.Should().Be(existingId);
+    }
 }
