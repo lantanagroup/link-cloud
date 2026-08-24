@@ -10,8 +10,10 @@ import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
@@ -692,7 +694,7 @@ public class ReadyForValidationConsumerTest {
         when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
@@ -710,7 +712,7 @@ public class ReadyForValidationConsumerTest {
         when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
@@ -728,24 +730,29 @@ public class ReadyForValidationConsumerTest {
         when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
-                .thenReturn(List.of(mapped));
+                .thenReturn(new BridgeOutcome(List.of(mapped), RubricResultStatus.ACCEPTABLE));
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
         verify(resultRepository).saveAll(List.of(mapped));
     }
 
-    @Test
+    // -------------------------------------------------------------------------
+    // Rubric bridge: isValid derived from the rubric interpretation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Runs the bridge path with the rubric engine mapped to {@code outcome} and returns the
+     * ValidationComplete that was produced, so the isValid derivation can be asserted directly.
+     */
     @SuppressWarnings("unchecked")
-    void process_bridgeEnabled_producesValidationCompleteFromMappedResults() throws Exception {
+    private ValidationComplete captureBridgeValidationComplete(BridgeOutcome outcome) throws Exception {
         stubRestRetrieval();
         stubBundleJsonEncoding();
-        Result mapped = resultWithCategories(List.of(categoryWithAcceptable(false)));
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
         when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
-        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
-                .thenReturn(List.of(mapped));
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID)).thenReturn(outcome);
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -754,7 +761,46 @@ public class ReadyForValidationConsumerTest {
         when(future.get()).thenReturn(null);
 
         consumerWithBridgeEnabled.process(buildRecord(null));
+        return captor.getValue().value();
+    }
 
-        assertFalse(captor.getValue().value().isValid());
+    @Test
+    void process_bridgeEnabled_acceptableStatus_producesValidTrue() throws Exception {
+        assertTrue(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(), RubricResultStatus.ACCEPTABLE)).isValid());
+    }
+
+    @Test
+    void process_bridgeEnabled_acceptableWithWarningsStatus_producesValidTrue() throws Exception {
+        assertTrue(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(), RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)).isValid());
+    }
+
+    @Test
+    void process_bridgeEnabled_inconclusiveStatus_producesValidTrue() throws Exception {
+        // An unresolvable-binding "not-evaluated" verdict is neutral, not a data failure -> still valid.
+        assertTrue(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(), RubricResultStatus.INCONCLUSIVE)).isValid());
+    }
+
+    @Test
+    void process_bridgeEnabled_unacceptableStatus_producesValidFalse() throws Exception {
+        // Fails even though the mapped result carries an "acceptable" category, proving the gate now
+        // follows the rubric status rather than the legacy category rollup.
+        Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        assertFalse(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(mapped), RubricResultStatus.UNACCEPTABLE)).isValid());
+    }
+
+    @Test
+    void process_bridgeEnabled_nullStatus_fallsBackToCategoryRollup() throws Exception {
+        // No rubric status (e.g. a bridge run with no findings) -> fall back to the category rollup.
+        Result unacceptable = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        assertFalse(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(unacceptable), null)).isValid());
+
+        Result acceptable = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        assertTrue(captureBridgeValidationComplete(
+                new BridgeOutcome(List.of(acceptable), null)).isValid());
     }
 }

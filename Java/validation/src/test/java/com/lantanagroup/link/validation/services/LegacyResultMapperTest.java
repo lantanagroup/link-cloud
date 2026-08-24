@@ -2,9 +2,11 @@ package com.lantanagroup.link.validation.services;
 
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,9 +59,9 @@ class LegacyResultMapperTest {
                 .findings(Collections.emptyList())
                 .build();
 
-        List<Result> results = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+        BridgeOutcome outcome = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
 
-        assertTrue(results.isEmpty());
+        assertTrue(outcome.results().isEmpty());
         verifyNoInteractions(categoryRepository);
     }
 
@@ -67,9 +69,49 @@ class LegacyResultMapperTest {
     void toResults_nullFindings_returnsEmptyList() {
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
 
-        List<Result> results = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+        BridgeOutcome outcome = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
 
-        assertTrue(results.isEmpty());
+        assertTrue(outcome.results().isEmpty());
+    }
+
+    @Test
+    void toResults_emptyFindings_stillCarriesEnvelopeStatus() {
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder()
+                .findings(Collections.emptyList())
+                .status(RubricResultStatus.ACCEPTABLE)
+                .build();
+
+        BridgeOutcome outcome = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+
+        assertTrue(outcome.results().isEmpty());
+        assertEquals(RubricResultStatus.ACCEPTABLE, outcome.status());
+    }
+
+    @Test
+    void toResults_propagatesEnvelopeStatusIntoOutcome() {
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder()
+                .findings(List.of(finding().build()))
+                .status(RubricResultStatus.UNACCEPTABLE)
+                .build();
+
+        BridgeOutcome outcome = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+
+        assertEquals(1, outcome.results().size());
+        assertEquals(RubricResultStatus.UNACCEPTABLE, outcome.status());
+    }
+
+    @Test
+    void toResults_nullScoreWithFindings_doesNotNpeAndMapsFindings() {
+        // A hand-built envelope has no score; the mapper must not dereference getScore(), and it must
+        // still map the findings rather than silently discarding them.
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder()
+                .findings(List.of(finding().build()))
+                .build();
+
+        BridgeOutcome outcome = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+
+        assertEquals(1, outcome.results().size());
+        assertNull(outcome.status());
     }
 
     @Test
@@ -79,7 +121,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(findingDto))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertEquals(OperationOutcome.IssueSeverity.ERROR, result.getSeverity());
         assertEquals("some message", result.getMessage());
@@ -93,7 +135,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(finding().build()))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertEquals(FACILITY_ID, result.getFacilityId());
         assertEquals(PATIENT_ID, result.getPatientId());
@@ -109,7 +151,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(findingDto))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertEquals(OperationOutcome.IssueType.NULL, result.getCode());
     }
@@ -121,7 +163,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(findingDto))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertEquals(OperationOutcome.IssueType.CODEINVALID, result.getCode());
     }
@@ -132,7 +174,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(finding().build()))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertNotNull(result.getCategories());
         assertTrue(result.getCategories().isEmpty());
@@ -150,7 +192,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(findingDto))
                 .build();
 
-        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).get(0);
+        Result result = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results().get(0);
 
         assertEquals(List.of(known), result.getCategories());
     }
@@ -166,7 +208,7 @@ class LegacyResultMapperTest {
                 .findings(List.of(first, second))
                 .build();
 
-        List<Result> results = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID);
+        List<Result> results = mapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID).results();
 
         assertEquals(2, results.size());
         assertEquals(List.of(shared), results.get(0).getCategories());
