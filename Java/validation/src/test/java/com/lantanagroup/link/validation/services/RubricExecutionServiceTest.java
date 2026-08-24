@@ -113,7 +113,7 @@ class RubricExecutionServiceTest {
         when(registry.get(CheckType.FHIRPATH)).thenReturn(executor);
         ResultEnvelopeAssembler.AssembleOutput out = stubAssembler();
 
-        ValidationResultEnvelope result = service.evaluate("piqi.core", "1.0.0", request(), true);
+        ValidationResultEnvelope result = service.evaluate("piqi.core", "1.0.0", request(), true, "test-correlation-id");
 
         assertThat(result).isSameAs(out.envelope());
         verify(resultPersister).persist(out.resultEntity(), out.findingEntities());
@@ -128,7 +128,7 @@ class RubricExecutionServiceTest {
                 .thenReturn(new RubricVersionResolver.ResolvedRubric(version, List.of()));
         stubAssembler();
 
-        service.evaluate("piqi.core", "1.0.0", request(), false);
+        service.evaluate("piqi.core", "1.0.0", request(), false, "test-correlation-id");
 
         verify(resultPersister, never()).persist(any(), any());
         verify(versionRepository).recordDryRun(
@@ -142,7 +142,7 @@ class RubricExecutionServiceTest {
                 .thenReturn(new RubricVersionResolver.ResolvedRubric(version, List.of(check(false))));
         stubAssembler();
 
-        service.evaluate("piqi.core", "1.0.0", request(), true);
+        service.evaluate("piqi.core", "1.0.0", request(), true, "test-correlation-id");
 
         verify(registry, never()).get(any());
     }
@@ -158,7 +158,7 @@ class RubricExecutionServiceTest {
         when(registry.get(CheckType.FHIRPATH)).thenReturn(executor);
         stubAssembler();
 
-        service.evaluate("piqi.core", "1.0.0", request(), true);
+        service.evaluate("piqi.core", "1.0.0", request(), true, "test-correlation-id");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<EvaluatedFinding>> captor = ArgumentCaptor.forClass(List.class);
@@ -185,7 +185,7 @@ class RubricExecutionServiceTest {
         when(registry.get(CheckType.FHIRPATH)).thenReturn(executor);
         stubAssembler();
 
-        service.evaluate("piqi.core", "1.0.0", request(), true);
+        service.evaluate("piqi.core", "1.0.0", request(), true, "test-correlation-id");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<EvaluatedFinding>> captor = ArgumentCaptor.forClass(List.class);

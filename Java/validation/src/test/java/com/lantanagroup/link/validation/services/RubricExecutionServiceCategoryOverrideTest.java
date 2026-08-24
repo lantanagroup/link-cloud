@@ -117,7 +117,7 @@ class RubricExecutionServiceCategoryOverrideTest {
             return null;
         }).when(categorizationService).categorize(anyList());
 
-        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request(), false);
+        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request(), false, "test-correlation-id");
 
         assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
         FindingDto finding = envelope.getFindings().get(0);
@@ -158,7 +158,7 @@ class RubricExecutionServiceCategoryOverrideTest {
             return null;
         }).when(categorizationService).categorize(anyList());
 
-        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request(), false);
+        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request(), false, "test-correlation-id");
 
         assertThat(envelope.getStatus()).isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
         assertThat(envelope.getFindings().get(0).getAcceptable()).isTrue();

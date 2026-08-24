@@ -259,7 +259,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
                             .build())
                     .payload(bundleToJsonNode(bundle))
                     .build();
-            ValidationResultEnvelope envelope = rubricExecutionService.evaluate(rubricId, null, request, true);
+            ValidationResultEnvelope envelope = rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
             results = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
             _logger.debug("Rubric evaluation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
 

@@ -80,7 +80,8 @@ public class RubricExecutionService {
     }
 
 
-    public ValidationResultEnvelope evaluate(String rubricId, String semver, EvaluateRequestDto request, boolean persist) {
+    public ValidationResultEnvelope evaluate(
+            String rubricId, String semver, EvaluateRequestDto request, boolean persist, String correlationId) {
         OffsetDateTime requestedAt = OffsetDateTime.now();
 
 
@@ -108,6 +109,7 @@ public class RubricExecutionService {
 
         ExecutionContext ctx = ExecutionContext.builder()
                 .requestId(UUID.randomUUID())
+                .correlationId(correlationId)
                 .subject(subject)
                 .resource(resource)
                 .bundleEntries(bundleEntries)

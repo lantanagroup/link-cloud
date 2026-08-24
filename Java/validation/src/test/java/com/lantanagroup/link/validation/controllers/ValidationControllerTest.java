@@ -79,7 +79,7 @@ class ValidationControllerTest {
                     .rubricVersion("1.0.0")
                     .status(RubricResultStatus.ACCEPTABLE)
                     .build();
-            when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true)))
+            when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true), isNull()))
                     .thenReturn(envelope);
 
             mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$evaluate")
@@ -106,7 +106,7 @@ class ValidationControllerTest {
         @Test
         @DisplayName("uncaught exception -> 500 envelope 'An unexpected error occurred'")
         void evaluate_uncaughtException() throws Exception {
-            when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true)))
+            when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true), isNull()))
                     .thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$evaluate")
@@ -133,7 +133,7 @@ class ValidationControllerTest {
                     .rubricVersion("1.0.0")
                     .status(RubricResultStatus.ACCEPTABLE)
                     .build();
-            when(rubricExecutionService.evaluate(eq("piqi.core"), eq("1.0.0"), any(), eq(false)))
+            when(rubricExecutionService.evaluate(eq("piqi.core"), eq("1.0.0"), any(), eq(false), isNull()))
                     .thenReturn(envelope);
 
             mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/versions/1.0.0/$dry-run")
