@@ -83,7 +83,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             Mock.Of<IOrganizationResourceMapTemplateStore>(),
             new ImportedBundleExecutionResolver(Database, Mock.Of<IImportedBundleContentStore>()),
             Mock.Of<IGeneratedPatientTemplateCache>(),
-            new GeneratedTemplateCacheVersionStore(Database));
+            new GeneratedTemplateCacheVersionStore(Database),
+            Mock.Of<ILivePatientEventInjector>());
     }
 
     public async Task InitializeAsync()
@@ -101,6 +102,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     public async Task ResetAsync()
     {
         await DropCollectionIfExistsAsync("automation_runs");
+        await DropCollectionIfExistsAsync("automation_run_inputs");
+        await DropCollectionIfExistsAsync("automation_snapshots");
         await DropCollectionIfExistsAsync("automation_logs");
         await DropCollectionIfExistsAsync("automation_log_sequences");
     }

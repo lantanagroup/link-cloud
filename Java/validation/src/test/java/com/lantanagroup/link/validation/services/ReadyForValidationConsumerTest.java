@@ -156,6 +156,13 @@ public class ReadyForValidationConsumerTest {
         return category;
     }
 
+    private Category categoryWithSubmit(boolean submit) {
+        Category category = new Category();
+        category.setId(submit ? "submitted-cat" : "non-submitted-cat");
+        category.setSubmit(submit);
+        return category;
+    }
+
     // -------------------------------------------------------------------------
     // Bundle retrieval: Blob Storage
     // -------------------------------------------------------------------------
@@ -265,14 +272,39 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_savesAllResultsToRepository() throws Exception {
-        Result result = resultWithCategories(Collections.emptyList());
+    void process_savesOnlyResultsWithSubmitEnabledCategories() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(submittedResult, nonSubmittedResult, uncategorizedResult));
+
+        consumer.process(buildRecord(null));
+
+        verify(resultRepository).saveAll(List.of(submittedResult));
+    }
+
+    @Test
+    void process_multiCategoryResultWithAnySubmitEnabledCategory_savesResult() throws Exception {
+        Result result = resultWithCategories(List.of(categoryWithSubmit(false), categoryWithSubmit(true)));
         stubRestRetrieval();
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
         verify(resultRepository).saveAll(List.of(result));
+    }
+
+    @Test
+    void process_noSubmitEnabledCategories_doesNotSaveResults() throws Exception {
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(nonSubmittedResult, uncategorizedResult));
+
+        consumer.process(buildRecord(null));
+
+        verify(resultRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -492,7 +524,7 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOn_unacceptableFindings_appendsOperationOutcomeToSameBlob() throws Exception {
+    void process_flagOn_submittedFindings_appendsOperationOutcomeToSameBlob() throws Exception {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubBlobDownload();
 
@@ -501,7 +533,7 @@ public class ReadyForValidationConsumerTest {
         when(jsonParser.encodeResourceToString(any()))
                 .thenReturn("{\"resourceType\":\"OperationOutcome\"}");
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -511,10 +543,10 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOff_unacceptableFindings_doesNotAppend() throws Exception {
+    void process_flagOff_submittedFindings_doesNotAppend() throws Exception {
         stubBlobDownload(); // flag defaults to false
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
@@ -523,11 +555,11 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_flagOn_noUnacceptableFindings_doesNotAppend() throws Exception {
+    void process_flagOn_noSubmittedFindings_doesNotAppend() throws Exception {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubBlobDownload();
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(false)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
@@ -550,7 +582,7 @@ public class ReadyForValidationConsumerTest {
 
         stubBlobDownload();
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -561,13 +593,13 @@ public class ReadyForValidationConsumerTest {
 
     @Test
     void process_flagOn_bundleHasUnrelatedOperationOutcome_stillAppends() throws Exception {
-        // The Report service's legacy flat OperationOutcome carries no oo-total extension, so it must not
-        // be mistaken for ours and suppress the append.
+        // An OperationOutcome without the oo-total extension must not be mistaken for ours and
+        // suppress the append.
         preQualificationConfig.setWritePreQualOperationOutcome(true);
 
-        org.hl7.fhir.r4.model.OperationOutcome legacy = new org.hl7.fhir.r4.model.OperationOutcome();
-        legacy.addIssue().setDiagnostics("Patient has failed Validation");
-        bundle.addEntry().setResource(legacy);
+        org.hl7.fhir.r4.model.OperationOutcome unrelated = new org.hl7.fhir.r4.model.OperationOutcome();
+        unrelated.addIssue().setDiagnostics("Unrelated operation outcome");
+        bundle.addEntry().setResource(unrelated);
 
         stubBlobDownload();
 
@@ -575,7 +607,7 @@ public class ReadyForValidationConsumerTest {
         when(fhirContext.newJsonParser()).thenReturn(jsonParser);
         when(jsonParser.encodeResourceToString(any())).thenReturn("{\"resourceType\":\"OperationOutcome\"}");
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
@@ -589,7 +621,7 @@ public class ReadyForValidationConsumerTest {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubRestRetrieval(); // no blob service -> bundle comes via REST, append is skipped
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 
         consumerWithoutBlobStorage.process(buildRecord(PAYLOAD_URI));
@@ -605,7 +637,7 @@ public class ReadyForValidationConsumerTest {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubRestRetrieval(); // no payload URI -> bundle comes via REST
 
-        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
         when(validationService.validate(bundle)).thenReturn(List.of(result));
 

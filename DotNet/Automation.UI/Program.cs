@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -228,6 +229,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
 
 builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBundleContentStore>();
+builder.Services.AddSingleton<ISnapshotPayloadStore, AzureBlobSnapshotPayloadStore>();
 builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
 builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
@@ -236,6 +238,8 @@ builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddNormalizationEngine();
+builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 
 // -- API Health test suites --
@@ -247,6 +251,7 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServi
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.QueryDispatchTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.SubmissionServiceTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DmrpTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
 
@@ -309,6 +314,7 @@ builder.Services.AddControllersWithViews()
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
+builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();

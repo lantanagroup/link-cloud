@@ -1,5 +1,13 @@
 obj/
+bin/
 node_modules/
+dist/
 .angular
 .vscode
+.git
+coverage/
 src/assets/app.config.local.json
+*.md
+karma.conf.js
+tsconfig.spec.json
+src/**/*.spec.ts

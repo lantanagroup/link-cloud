@@ -151,14 +151,30 @@ namespace Tenant
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
             builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
-            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+
+            // The facility endpoints resolve this rather than calling the manager, so the DMRP module
+            // can put its own behavior in front of it when enabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
+
+            builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
 
             //Add problem details
             builder.Services.AddProblemDetails(options =>
             {
                 options.CustomizeProblemDetails = ctx =>
                 {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    var statusCode = ctx.ProblemDetails.Status ?? ctx.HttpContext.Response.StatusCode;
+
+                    // A 500 may carry a raw exception message the caller should not see. Every
+                    // other status is framework- or controller-authored and already safe to show,
+                    // so only fall back to the generic text when nothing more specific was set
+                    // (matches the pattern Terminology and MockDmrpApi already use).
+                    if (statusCode == StatusCodes.Status500InternalServerError
+                        || string.IsNullOrWhiteSpace(ctx.ProblemDetails.Detail))
+                    {
+                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    }
+
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
                         string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;

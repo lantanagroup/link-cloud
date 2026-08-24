@@ -8,6 +8,20 @@
     <p class="text-muted mb-3">Reusable templates for Data Acquisition location/encounter organization mapping conditions.</p>
 
     <div class="au-card">
+        <div class="card-header">Suggest from a patient bundle</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Upload one or more FHIR transaction bundles. We'll look for Location identifiers and types, recommend an existing map when one already covers them, or draft a multi-condition map so every Location can pass. Upload additional patients to refine the same proposal.</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @Html.AntiForgeryToken()
+                <input type="file" id="ormGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
+                <button type="button" class="btn btn-sm btn-au-action" id="btnOrmGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOrmGenerateReset">Start over</button>
+                <span id="ormGenSessionHint" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>All Templates</span>
             <button type="button" class="btn btn-sm btn-success" id="btnNewMap">New</button>
@@ -111,6 +125,7 @@
 <div id="mapBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @section Scripts {
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
 (function(){
     const modal = document.getElementById('mapModal');
@@ -462,7 +477,7 @@
             const conditions = collectConditions();
             const model={
                 id: document.getElementById('MapId').value || crypto.randomUUID(),
-                name: document.getElementById('MapName').value,
+                        name: document.getElementById('MapName').value.trim(),
                 description: document.getElementById('MapDescription').value || null,
                 conditions: conditions,
                 isSystem:false,
@@ -479,6 +494,75 @@
     document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); location.reload(); }));
     document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); location.reload(); }));
     document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); location.reload(); } }));
+
+    const analyzeUrl='@Url.Action("Analyze","ConfigurationGeneration")';
+    const applyOrmUrl='@Url.Action("ApplyOrm","ConfigurationGeneration")';
+    const applyNormUrl='@Url.Action("ApplyNormalization","ConfigurationGeneration")';
+    const ormGenKey = 'cfgGen.orm';
+    function loadOrmGenState(){
+        try { return JSON.parse(sessionStorage.getItem(ormGenKey) || '{}'); } catch { return {}; }
+    }
+    function saveOrmGenState(state){ sessionStorage.setItem(ormGenKey, JSON.stringify(state || {})); }
+    function refreshOrmGenHint(){
+        const hint = document.getElementById('ormGenSessionHint');
+        if (!hint) return;
+        const state = loadOrmGenState();
+        hint.textContent = state.fingerprint
+            ? 'Session has prior patient data. The next analyze will refine the current proposal. Use Start over to reset.'
+            : '';
+    }
+    refreshOrmGenHint();
+    document.getElementById('btnOrmGenerateReset').addEventListener('click', () => {
+        sessionStorage.removeItem(ormGenKey);
+        document.getElementById('ormGenFile').value = '';
+        refreshOrmGenHint();
+    });
+    document.getElementById('btnOrmGenerate').addEventListener('click', async () => {
+        const files = document.getElementById('ormGenFile').files;
+        if(!files.length){ alert('Choose one or more FHIR bundle JSON files first.'); return; }
+        const btn = document.getElementById('btnOrmGenerate');
+        btn.disabled = true;
+        try {
+        const sources = await window.BundleConfigGeneration.readFilesAsSources(files);
+        const state = loadOrmGenState();
+        const request = { sources, priorFingerprint: state.fingerprint || null, refineOrmId: state.lastOrmId || null, refineSuiteId: state.lastSuiteId || null };
+        function persist(idKey, id, proposal){
+            const next = loadOrmGenState();
+            if (proposal) next.fingerprint = proposal.fingerprint || proposal.Fingerprint || next.fingerprint;
+            if (idKey && id) next[idKey] = id;
+            saveOrmGenState(next);
+            refreshOrmGenHint();
+        }
+        const proposal = await window.BundleConfigGeneration.analyzeAndShow(
+            { analyze: analyzeUrl, applyOrm: applyOrmUrl, applyNorm: applyNormUrl },
+            request,
+            {
+                selectOrmLabel: 'Save new ORM',
+                selectSuiteLabel: 'Save new suite',
+                onSelectOrm: () => location.reload(),
+                onSelectSuite: () => location.reload(),
+                onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
+                onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
+                onExtendOrm: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
+                    persist('lastOrmId', saved.id || saved.Id, refined);
+                    location.reload();
+                },
+                onExtendSuite: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
+                    persist('lastSuiteId', saved.id || saved.Id, refined);
+                    location.reload();
+                }
+            });
+        persist(null, null, proposal);
+        } catch (err) {
+            alert(err.message || 'Suggestion failed.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
 })();
 </script>
 }

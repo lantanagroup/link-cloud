@@ -103,7 +103,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Report,Validation"
+				"link:consumers": "Validation,AutomationUI"
 			}
 		},
 		{
@@ -1626,6 +1626,15 @@
 		{
 			"key": "ResourceCache:Redis:MemoryThresholdPercent",
 			"value": "80.0",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "DataAcquisition,DataAcquisitionWorker,Normalization"
+			}
+		},
+		{
+			"key": "ResourceCache:Redis:CacheEntryTtlDays",
+			"value": "7",
 			"label": null,
 			"content_type": "",
 			"tags": {

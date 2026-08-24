@@ -158,7 +158,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         private Device CreateDevice()
         {
-            var device = new Device();
+            var device = new Device
+            {
+                Meta = new Meta { Profile = [ReportConstants.BundleSettings.SubmittingDeviceProfile] }
+            };
             device.DeviceName.Add(new Device.DeviceNameComponent()
             {
                 Name = "NHSNLink"
@@ -180,6 +183,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
         {
             var admittedPatients = new List();
+            admittedPatients.Meta = new Meta { Profile = [ReportConstants.BundleSettings.CensusProfileUrl] };
             admittedPatients.Status = List.ListStatus.Current;
             admittedPatients.Mode = ListMode.Snapshot;
             admittedPatients.Extension.Add(new Extension()

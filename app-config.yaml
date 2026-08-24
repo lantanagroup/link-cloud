@@ -383,25 +383,26 @@ global:
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
     consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
-  # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
-  # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
-  # .NET side puts none there. Neither failure is loud, so treat these as a single change.
-  # They are separate keys because Spring cannot bind a colon-separated key, and the Java services are
-  # being retired: a shared key would leave the surviving .NET services carrying a translation layer
-  # for a platform that no longer exists. When Validation is retired, drop the dotted key below and
-  # keep the .NET one.
-  # In Azure App Configuration these are two rows, each in its runtime's convention:
-  #   PreQualification:WritePreQualOperationOutcome        (.NET, as with other Section:Key rows)
-  #   /pre-qualification/write-pre-qual-operation-outcome  (Java, as with /link/report/base-url)
-  - key: "PreQualification:WritePreQualOperationOutcome"
-    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
+  # SYSTEM FEATURE SWITCH — one decision for the whole deployment, not a Tenant setting.
+  # It is catalogued here, unlabeled, so every service sees the same answer: today only Tenant acts
+  # on it, but the switch decides whether this deployment does NHSN measure-enrollment reporting at
+  # all, and further services are expected to read it as the workflow lands (LEGLINK-698/701).
+  #
+  # The Angular Admin UI needs the same answer and cannot read App Configuration. It is served by a
+  # container that maps LINK_DMRP_ENABLED into its runtime app.config, so the switch reaches the UI
+  # out of band. The two MUST agree, and the failure modes are not symmetric:
+  #   UI off, services on  -> the facility form asks for a schedule the Tenant API then refuses. Loud.
+  #   UI on, services off  -> the form sends an empty schedule Tenant accepts, quietly creating a
+  #                           facility with no scheduled reports and no jobs. Silent.
+  # So the UI must never be switched on ahead of the services.
+  #
+  # Expected to end up permanently on, at which point this row and LINK_DMRP_ENABLED both go away.
+  - key: "DMRP:Enabled"
+    description: "Boolean flag (default false) that turns on DMRP integration for the deployment. When enabled, facility reporting plans are sourced from the NHSN DMRP API rather than chosen per facility, the DMRP controllers are served under api/dmrp by their host service, and a facility's scheduled reports are derived from its reporting plans. When disabled, Link performs facility dQM reporting on its own and the api/dmrp routes do not exist. Must be set to the same value as the Admin UI container's LINK_DMRP_ENABLED."
     required: false
-    consumers: ["Report"]
-  - key: "pre-qualification.write-pre-qual-operation-outcome"
-    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
-    required: false
-    runtime: "java"
-    consumers: ["Report", "Validation"]
+    defaultValue: "false"
+    consumers: ["Tenant"]
+
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -522,6 +523,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -559,6 +564,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -640,6 +649,10 @@ services:
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
       sensitive: true
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -728,15 +741,15 @@ services:
       description: "Boolean flag to restrict facility IDs to numeric values only."
       required: false
       defaultValue: "false"
-    - key: "DMRP:Enabled"
-      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
-      required: false
-      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
       required: false
       defaultValue: "data/"
+    - key: "Terminology:EnableCodeUploadEndpoint"
+      description: "Enables the testing endpoints that replace a cached CodeSystem's or ValueSet's codes from an uploaded CSV (PUT /api/terminology/config/{code-systems|value-sets}/{id}/codes). The replacement is held in the memory of the single instance that served the request: nothing is written to Terminology:Path, and $reload-cache or a restart reverts it. Must remain false in production, and should only be enabled where the service runs a single instance, since an upload reaches one instance only."
+      required: false
+      defaultValue: "false"
   Validation:
     - key: "spring.datasource.url"
       description: "The SQL Server database connection URL for the validation service."
@@ -769,9 +782,9 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
-    # The master gate, pre-qualification.write-pre-qual-operation-outcome, is registered under
-    # global instead of here: the .NET Report service reads that same key (LEGLINK-466). Only the
-    # expression toggle below is Validation-only.
+    - key: "pre-qualification.write-pre-qual-operation-outcome"
+      description: "Boolean flag (default false). When true, the Validation service writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is the sole writer of that resource. When false, no OperationOutcome is written. Automation.UI reads the same key to predict ABS OperationOutcome counts for failed-validation patients."
+      required: false
     - key: "pre-qualification.write-expressions-in-operation-outcome"
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false

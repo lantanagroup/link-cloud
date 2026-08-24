@@ -1,5 +1,6 @@
 # Ignore Maven build output directory
 **/target/
+**/node_modules/
 
 # Ignore Maven configuration directory
 **/.mvn/
@@ -25,6 +26,10 @@ Thumbs.db
 
 # Ignore documentation
 **/README.md
+**/DEBUG-LOGGING.md
+
+# Tests are not packaged into the service jars
+**/src/test/
 
 # Ignore other files that might be generated during build
 **/bin/

@@ -50,10 +50,29 @@ namespace LantanaGroup.Link.DMRP.Controllers
         }
 
         /// <summary>
-        /// Get a paged list of facility reporting plans.
+        /// Gets a paged list of every facility reporting plan.
         /// </summary>
+        /// <remarks>
+        /// A reporting plan records what DMRP said a facility is enrolled to report for one measure in
+        /// one reporting period. This is the unfiltered form of <c>GET search</c>.
+        /// </remarks>
+        /// <param name="sortBy">
+        /// Column to sort by: Id, FacilityId, MeasureMappingId, ReportingMonth, ReportingYear,
+        /// IsReporting, CreateDate or ModifyDate. Defaults to Id. Any other value is refused.
+        /// </param>
+        /// <param name="sortOrder">Ascending or Descending. Defaults to Descending.</param>
+        /// <param name="pageSize">Rows per page, 1 to 100. Defaults to 10.</param>
+        /// <param name="pageNumber">One-based page number. Defaults to 1.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">A page of reporting plans with its paging metadata.</response>
+        /// <response code="400">
+        /// sortBy names a column that cannot be sorted on, or a paging argument is outside the
+        /// supported range. Out-of-range paging is refused rather than quietly clamped, so a caller
+        /// that asks for page -1 is told its request was wrong instead of being handed page 1.
+        /// </response>
+        /// <response code="500">The reporting plans could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilityReportingPlans")]
         public Task<IActionResult> GetFacilityReportingPlans(string? sortBy, SortOrder? sortOrder,
@@ -62,11 +81,37 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 pageSize, pageNumber, cancellationToken);
 
         /// <summary>
-        /// Search facility reporting plans by any combination of facility, measure mapping, reporting
+        /// Searches facility reporting plans by any combination of facility, measure mapping, reporting
         /// period and reporting state.
         /// </summary>
+        /// <remarks>
+        /// Every filter is optional and they combine with AND, so supplying none returns everything.
+        /// Use <c>facilityId</c> with <c>month</c> and <c>year</c> to answer "what is this facility
+        /// enrolled to report this period", which is the question the scheduling workflow asks.
+        /// </remarks>
+        /// <param name="filters">
+        /// Optional filters. facilityId and measureMappingId match exactly; month is 1 to 12; year is
+        /// 2000 to 2100; isReporting selects only enrolled (true) or only withdrawn (false) entries.
+        /// </param>
+        /// <param name="sortBy">
+        /// Column to sort by: Id, FacilityId, MeasureMappingId, ReportingMonth, ReportingYear,
+        /// IsReporting, CreateDate or ModifyDate. Defaults to Id. Any other value is refused.
+        /// </param>
+        /// <param name="sortOrder">Ascending or Descending. Defaults to Descending.</param>
+        /// <param name="pageSize">Rows per page, 1 to 100. Defaults to 10.</param>
+        /// <param name="pageNumber">One-based page number. Defaults to 1.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">
+        /// A page of matching reporting plans with its paging metadata. A search that matches nothing
+        /// is an empty page, not a 404.
+        /// </response>
+        /// <response code="400">
+        /// month or year is outside its range, sortBy names a column that cannot be sorted on, or a
+        /// paging argument is out of range.
+        /// </response>
+        /// <response code="500">The reporting plans could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanDto))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("search", Name = "SearchFacilityReportingPlans")]
         public async Task<IActionResult> SearchFacilityReportingPlans([FromQuery] FacilityReportingPlanSearchFilters filters,
@@ -81,18 +126,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
             var periodError = ValidatePeriodFilters(filters.Month, filters.Year);
             if (periodError is not null)
             {
-                return BadRequest(periodError);
+                return BadRequestProblem(periodError);
             }
 
             if (sortBy is not null && !SortableColumns.Contains(sortBy))
             {
-                return BadRequest($"Cannot sort by '{sortBy}'.");
+                return BadRequestProblem($"Cannot sort by '{sortBy}'.");
             }
 
             var pagingError = ValidatePaging(pageSize, pageNumber);
             if (pagingError is not null)
             {
-                return BadRequest(pagingError);
+                return BadRequestProblem(pagingError);
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Facility Reporting Plans");
@@ -108,8 +153,26 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// Gets all reporting plans for a facility, optionally narrowed to a reporting period or
         /// reporting state.
         /// </summary>
+        /// <remarks>
+        /// Unpaged: a facility holds one row per measure per period, so the result stays small. This is
+        /// the read behind the Admin UI's per-facility reporting plan view.
+        /// </remarks>
+        /// <param name="facilityId">The reporting facility, as the Tenant service knows it (the NHSN Org Id).</param>
+        /// <param name="month">Optional reporting month, 1 to 12. Omit to return every month.</param>
+        /// <param name="year">Optional reporting year, 2000 to 2100. Omit to return every year.</param>
+        /// <param name="isReporting">
+        /// Optional. True returns only measures the facility is enrolled in, false only those it has
+        /// withdrawn from. Omit to return both.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">
+        /// The matching reporting plans. A facility with none, or one that does not exist, returns an
+        /// empty list rather than a 404 - absence of enrollment is a meaningful answer here.
+        /// </response>
+        /// <response code="400">month or year is outside its range.</response>
+        /// <response code="500">The reporting plans could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityReportingPlanModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}")]
         public async Task<IActionResult> GetFacilityReportingPlansForFacility(string facilityId, int? month, int? year,
@@ -120,7 +183,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             var periodError = ValidatePeriodFilters(month, year);
             if (periodError is not null)
             {
-                return BadRequest(periodError);
+                return BadRequestProblem(periodError);
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
@@ -133,8 +196,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Gets a facility reporting plan by Id.
         /// </summary>
+        /// <param name="id">The reporting plan's own identifier, as returned by create or search.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="200">The reporting plan.</response>
+        /// <response code="404">No reporting plan has that Id.</response>
+        /// <response code="500">The reporting plan could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetFacilityReportingPlan(string id, CancellationToken cancellationToken)
@@ -145,7 +213,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (model == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility reporting plan with Id: {id} not found.");
             }
 
             return Ok(model);
@@ -154,9 +222,33 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Creates a facility reporting plan.
         /// </summary>
+        /// <remarks>
+        /// Normally these rows are written by the scheduling workflow from what the DMRP API returns.
+        /// This endpoint exists so an operator or test can seed them directly.
+        /// <para>
+        /// A plan is unique on facility, measure mapping, month and year. The uniqueness is enforced by
+        /// a database index as well as a pre-check, so two concurrent writers cannot both get through.
+        /// </para>
+        /// </remarks>
+        /// <param name="request">
+        /// The plan to create. facilityId must name a facility that exists, measureMappingId a measure
+        /// mapping that exists, reportingMonth 1 to 12 and reportingYear 2000 to 2100. Set isReporting
+        /// false to record that a facility has stopped reporting a measure rather than deleting the row,
+        /// which keeps the history of what DMRP said and when it changed.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="201">The created plan, with a Location header pointing at it.</response>
+        /// <response code="400">
+        /// A required field is missing, a value is out of range, or the facility or measure mapping
+        /// does not exist.
+        /// </response>
+        /// <response code="409">
+        /// A plan already exists for that facility, measure mapping and reporting period.
+        /// </response>
+        /// <response code="500">The reporting plan could not be created.</response>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanRequest request, CancellationToken cancellationToken)
@@ -169,11 +261,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (DuplicateReportingPlanException ex)
             {
-                return Conflict(ex.Message);
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (ReportingPlanValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -189,10 +281,30 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Updates a facility reporting plan.
         /// </summary>
+        /// <remarks>
+        /// Update only. A plan that does not exist is not created here; the response is 404.
+        /// </remarks>
+        /// <param name="id">The reporting plan to replace.</param>
+        /// <param name="request">
+        /// The replacement values. id is required in the body and must equal the id in the URL. All
+        /// other fields are validated exactly as they are on create.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="202">The updated plan.</response>
+        /// <response code="400">
+        /// The body has no id, its id does not match the URL, a value is out of range, or the facility
+        /// or measure mapping does not exist.
+        /// </response>
+        /// <response code="404">No reporting plan has that Id.</response>
+        /// <response code="409">
+        /// The change would collide with an existing plan for that facility, measure mapping and
+        /// reporting period.
+        /// </response>
+        /// <response code="500">The reporting plan could not be updated.</response>
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(FacilityReportingPlanModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFacilityReportingPlan(string id, FacilityReportingPlanUpdateRequest request, CancellationToken cancellationToken)
@@ -203,12 +315,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (string.IsNullOrWhiteSpace(requestId))
             {
-                return BadRequest("Id is required in the request body.");
+                return BadRequestProblem("Id is required in the request body.");
             }
 
             if (requestId != id)
             {
-                return BadRequest("Id in the URL must match the Id in the request body.");
+                return BadRequestProblem("Id in the URL must match the Id in the request body.");
             }
 
             try
@@ -217,15 +329,15 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundProblem(ex.Message);
             }
             catch (DuplicateReportingPlanException ex)
             {
-                return Conflict(ex.Message);
+                return Problem(ex.Message, statusCode: StatusCodes.Status409Conflict, title: "Conflict");
             }
             catch (ReportingPlanValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -241,6 +353,14 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Deletes every facility reporting plan.
         /// </summary>
+        /// <remarks>
+        /// Clears the whole table for every facility. Intended for resetting a test environment; there
+        /// is no confirmation step and no undo. To clear one facility use
+        /// <c>DELETE facilities/{facilityId}</c> instead.
+        /// </remarks>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="204">The plans were deleted. Deleting an empty table also succeeds.</response>
+        /// <response code="500">The reporting plans could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete]
@@ -264,8 +384,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Deletes a facility reporting plan.
         /// </summary>
+        /// <remarks>
+        /// Removes the row outright. To record that a facility has stopped reporting a measure while
+        /// keeping the history, set isReporting to false through update instead.
+        /// </remarks>
+        /// <param name="id">The reporting plan to delete.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="204">The plan was deleted.</response>
+        /// <response code="404">No reporting plan has that Id.</response>
+        /// <response code="500">The reporting plan could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFacilityReportingPlan(string id, CancellationToken cancellationToken)
@@ -278,7 +407,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -292,8 +421,21 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <summary>
         /// Deletes every reporting plan belonging to a facility.
         /// </summary>
+        /// <remarks>
+        /// This is what runs when a facility is deleted outright, after the facility itself is gone. A
+        /// soft-deleted facility keeps its plans, because it can be restored and the rows are the
+        /// record of what it was enrolled to report while it was active.
+        /// </remarks>
+        /// <param name="facilityId">The facility whose plans are removed.</param>
+        /// <param name="cancellationToken">Cancels the request.</param>
+        /// <response code="204">
+        /// The facility's plans were deleted. A facility with none, or one that does not exist, also
+        /// succeeds - the endpoint is idempotent.
+        /// </response>
+        /// <response code="400">facilityId is missing or blank.</response>
+        /// <response code="500">The reporting plans could not be deleted.</response>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("facilities/{facilityId}")]
         public async Task<IActionResult> DeleteFacilityReportingPlansForFacility(string facilityId, CancellationToken cancellationToken)
@@ -302,7 +444,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             if (facilityId is null)
             {
-                return BadRequest("FacilityId is required.");
+                return BadRequestProblem("FacilityId is required.");
             }
 
             try
@@ -356,6 +498,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             return null;
         }
+
+        private ObjectResult BadRequestProblem(string detail) =>
+            Problem(detail, statusCode: StatusCodes.Status400BadRequest, title: "Bad Request");
+
+        private ObjectResult NotFoundProblem(string detail) =>
+            Problem(detail, statusCode: StatusCodes.Status404NotFound, title: "Not Found");
 
         private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 

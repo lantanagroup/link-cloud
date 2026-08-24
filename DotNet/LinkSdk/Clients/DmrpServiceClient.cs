@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -54,7 +55,22 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings")
+        SearchMeasureMappingsAsync(measure: null, dqm: null, frequency: null, pageSize, pageNumber,
+            cancellationToken);
+
+    public Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(
+        string? measure,
+        string? dqm = null,
+        Frequency? frequency = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        // The searchable listing is /search; the collection route itself only accepts POST. Reading
+        // measure-mappings without the segment answers 404, which reads as "DMRP is switched off".
+        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings/search")
+            .SetQueryParam("measure", measure)
+            .SetQueryParam("dqm", dqm)
+            .SetQueryParam("frequency", frequency)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
