@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public IResult Login(HttpContext context)
         {
-            var RedirectLink = "/api/info";
+            var RedirectLink = "/dashboard";
             var referer = context.Request.Headers.Referer.ToString();
             referer = (referer.ToString().IndexOf('/') > 0) ? referer[..referer.LastIndexOf('/')] : referer;
 
