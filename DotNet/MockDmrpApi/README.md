@@ -519,7 +519,7 @@ All under the `MockDmrpApi` section, or `MockDmrpApi__<Key>` as an environment v
 
 | Setting | Type | Default | Notes |
 |---|---|---|---|
-| `Enabled` | bool | `true` | Master switch. See §6.1 |
+| `Enabled` | bool | `false` | Master switch, and it fails closed. See §6.1 |
 | `AuthClientId` | string | `link-cloud-dev` | |
 | `AuthClientSecret` | string | `link-cloud-dev-secret` | Published in docker-compose. Override anywhere deployed |
 | `SigningKey` | string | a local-dev key | **≥ 64 bytes** (HS512 needs 512 bits) or the service fails at startup. **Must be identical on every replica** |
@@ -548,20 +548,34 @@ another — an intermittent `401` that reads as a bug in the caller.
 
 ### 6.1 The availability switch
 
-Two layers, and the outer one is absolute.
+One switch, and it fails closed. `MockDmrpApi:Enabled` must be present and **true** for the
+mock to serve anything; an absent key means disabled.
 
-**Production never serves this service, whatever configuration says.** Azure App Configuration
-is appended last in the configuration chain, so a row provisioned against a production label
-would silently outrank appsettings and environment variables — and a running mock looks exactly
-like a healthy service, so the failure would be invisible. That is closed off in code.
+**Do not gate this on the environment name.** An earlier version refused unconditionally when
+`IHostEnvironment.IsProduction()` was true. That does not work here: every deployed Link
+namespace runs with `ASPNETCORE_ENVIRONMENT=Production` — dev, qa and test included — so the
+check disabled the mock in every environment it is actually deployed to, while protecting
+nothing the fail-closed default does not already protect (LEGLINK-1048).
 
-Everywhere else, `MockDmrpApi:Enabled` decides. When disabled:
+What keeps the mock out of production is two things, neither of which depends on a name:
+
+- **no `MockDmrpApi:Enabled` row is provisioned in a production App Configuration store** —
+  absent is off, so there is nothing to get wrong
+- **the image is not deployed to a production namespace at all** —
+  `Scripts/build_and_push_and_set.py` targets a `mock-dmrp-deploy` deployment, which only the
+  lower environments have
+
+The lower environments each need the row set to `true`, and `appsettings.Development.json`
+and `appsettings.Docker.json` carry it so a workstation and the local stack serve out of the
+box.
+
+When disabled:
 
 - every route answers **`503`** with problem details carrying a `traceId`
 - `/health` and `/api/mock-dmrp/info` keep answering, so the container stays healthy rather
   than looking like an outage
 - **EF migration is skipped** — a dormant deployment has no business altering a schema
-- a warning is logged naming the environment and the routes that remain
+- a warning is logged naming the environment, the key that decided it, and the routes that remain
 
 ### 6.2 Error responses
 
