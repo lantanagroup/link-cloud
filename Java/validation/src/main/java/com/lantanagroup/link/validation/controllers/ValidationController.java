@@ -224,8 +224,9 @@ public class ValidationController {
     public ResponseEntity<ApiResponse<ValidationResultEnvelope>> evaluate(
             @PathVariable String rubricId,
             @RequestParam(name = "version", required = false) String version,
+            @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
             @Valid @RequestBody EvaluateRequestDto request) {
-        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, version, request, true);
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, version, request, true, correlationId);
         return ResponseEntity.ok(ApiResponse.ok("Evaluation completed", result));
     }
 
@@ -234,8 +235,9 @@ public class ValidationController {
     public ResponseEntity<ApiResponse<ValidationResultEnvelope>> dryRun(
             @PathVariable String rubricId,
             @PathVariable String semver,
+            @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
             @Valid @RequestBody EvaluateRequestDto request) {
-        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, semver, request, false);
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, semver, request, false, correlationId);
         return ResponseEntity.ok(ApiResponse.ok("Dry-run completed", result));
     }
 }

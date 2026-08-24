@@ -689,14 +689,14 @@ public class ReadyForValidationConsumerTest {
         stubRestRetrieval();
         stubBundleJsonEncoding();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(Collections.emptyList());
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
-        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true));
+        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull());
         verify(validationService, never()).validate(any());
         verify(categorizationService, never()).categorize(any());
     }
@@ -707,7 +707,7 @@ public class ReadyForValidationConsumerTest {
         stubBundleJsonEncoding();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
         ArgumentCaptor<EvaluateRequestDto> captor = ArgumentCaptor.forClass(EvaluateRequestDto.class);
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), eq(true)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(Collections.emptyList());
@@ -725,7 +725,7 @@ public class ReadyForValidationConsumerTest {
         stubBundleJsonEncoding();
         Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(List.of(mapped));
@@ -742,7 +742,7 @@ public class ReadyForValidationConsumerTest {
         stubBundleJsonEncoding();
         Result mapped = resultWithCategories(List.of(categoryWithAcceptable(false)));
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(List.of(mapped));

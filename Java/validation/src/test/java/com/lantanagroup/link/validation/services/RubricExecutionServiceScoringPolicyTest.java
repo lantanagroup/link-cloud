@@ -101,7 +101,7 @@ class RubricExecutionServiceScoringPolicyTest {
                 .payload(payload)
                 .build();
 
-        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request, true);
+        ValidationResultEnvelope envelope = service.evaluate("piqi.core", "1.0.0", request, true, "test-correlation-id");
 
         // check-scorecard policy → per-check scores; the pre-fix behavior fell back to the
         // default dimension scorecard (byCheck null, byDimension populated)
@@ -151,7 +151,7 @@ class RubricExecutionServiceScoringPolicyTest {
                 .payload(payload)
                 .build();
 
-        ValidationResultEnvelope envelope = service.evaluate("piqi.conformance", "1.0.0", request, true);
+        ValidationResultEnvelope envelope = service.evaluate("piqi.conformance", "1.0.0", request, true, "test-correlation-id");
 
         // Only CONFORMANCE was checked, so only CONFORMANCE is scored -- the other PIQI dimensions
         // are absent from the scorecard (not phantom-ACCEPTABLE, and no NA sentinel).

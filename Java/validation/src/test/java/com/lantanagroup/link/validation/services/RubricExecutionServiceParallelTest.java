@@ -99,7 +99,7 @@ class RubricExecutionServiceParallelTest {
         RecordingExecutor executor = new RecordingExecutor(check -> sleepMillis(60 - check.getOrdinal() * 5));
         RubricExecutionService service = service(checks, executor, poolWith(6, 12, 0));
 
-        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false);
+        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(expectedLocalIds(12), checkIdsOf(envelope));
         assertEquals(expectedLocalIds(12), new ArrayList<>(envelope.getTrace().getCheckDurationsMs().keySet()));
@@ -116,7 +116,7 @@ class RubricExecutionServiceParallelTest {
         });
         RubricExecutionService service = service(checks, executor, poolWith(3, 6, 0));
 
-        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false);
+        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(List.of("check-00", "check-01", "check-02"), checkIdsOf(envelope));
         Map<String, FindingDto> byCheck = envelope.getFindings().stream()
@@ -142,7 +142,7 @@ class RubricExecutionServiceParallelTest {
         RecordingExecutor executor = new RecordingExecutor(check -> { });
         RubricExecutionService service = service(checks, executor, poolWith(4, 8, 0));
 
-        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false);
+        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(List.of("check-00", "check-01", "check-03"), checkIdsOf(envelope));
         Map<String, Long> durations = envelope.getTrace().getCheckDurationsMs();
@@ -162,7 +162,7 @@ class RubricExecutionServiceParallelTest {
         RecordingExecutor executor = new RecordingExecutor(check -> sleepMillis(60));
         RubricExecutionService service = service(checks, executor, poolWith(1, 1, 1));
 
-        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false);
+        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(expectedLocalIds(checkCount), checkIdsOf(envelope));
         assertEquals(checkCount, executor.executed().size());
@@ -184,7 +184,7 @@ class RubricExecutionServiceParallelTest {
             for (int i = 0; i < concurrency; i++) {
                 futures.add(callers.submit(() -> {
                     start.await();
-                    return service.evaluate(RUBRIC_ID, null, request(), false);
+                    return service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
                 }));
             }
             start.countDown();
@@ -207,7 +207,7 @@ class RubricExecutionServiceParallelTest {
         RecordingExecutor executor = new RecordingExecutor(check -> { });
         RubricExecutionService service = service(checks, executor, poolWith(4, 8, 0), false);
 
-        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false);
+        ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(expectedLocalIds(8), checkIdsOf(envelope));
         assertEquals(Set.of(Thread.currentThread().getName()), executor.threadNames(),
@@ -231,11 +231,11 @@ class RubricExecutionServiceParallelTest {
 
         ValidationResultEnvelope sequential = service(
                 checks(10), new RecordingExecutor(timing), poolWith(4, 8, 0), false)
-                .evaluate(RUBRIC_ID, null, request(), false);
+                .evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         ValidationResultEnvelope parallel = service(
                 checks(10), new RecordingExecutor(timing), poolWith(4, 8, 0), true)
-                .evaluate(RUBRIC_ID, null, request(), false);
+                .evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(fingerprint(sequential), fingerprint(parallel),
                 "sequential and parallel must produce the same findings in the same order");
