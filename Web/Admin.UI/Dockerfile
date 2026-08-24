@@ -1,23 +1,24 @@
+# syntax=docker/dockerfile:1
 # Build Stage: Angular App
 FROM node:23-alpine AS build
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,id=npm,sharing=locked,target=/root/.npm \
+    npm ci
 COPY . .
-RUN npm ci
 RUN npm run build
 
 # Runtime Stage: Node.js Server
 FROM node:23-alpine AS runtime
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy the Angular build output
 COPY --from=build /app/dist/admin-ui/browser ./dist
-
-# Copy the server files
-COPY server ./server
-
-# Install only server dependencies
+COPY server/package.json server/package-lock.json ./server/
 WORKDIR /app/server
-RUN npm ci
+RUN --mount=type=cache,id=npm,sharing=locked,target=/root/.npm \
+    npm ci --omit=dev
+COPY server/main.js server/blocked-paths.js ./
 
 EXPOSE 80
 CMD ["node", "main.js"]

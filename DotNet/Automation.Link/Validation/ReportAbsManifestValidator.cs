@@ -21,18 +21,16 @@ public class ReportAbsManifestValidator
 
     /// <summary>
     /// Controls expected derived OperationOutcome writes per failed-validation patient.
+    /// Validation is the sole writer, gated by
+    /// <c>pre-qualification.write-pre-qual-operation-outcome</c>.
     /// </summary>
     public sealed record OperationOutcomeExpectationSettings(
-        bool ReportWritesLegacyOperationOutcomeWhenInvalid,
         bool ValidationWritesPreQualOperationOutcomeWhenInvalid)
     {
-        public static OperationOutcomeExpectationSettings Default { get; } =
-            new(ReportWritesLegacyOperationOutcomeWhenInvalid: true,
-                ValidationWritesPreQualOperationOutcomeWhenInvalid: false);
+        public static OperationOutcomeExpectationSettings Default { get; } = new(false);
 
         public int ExpectedCountPerFailedValidationPatient =>
-            (ReportWritesLegacyOperationOutcomeWhenInvalid ? 1 : 0)
-            + (ValidationWritesPreQualOperationOutcomeWhenInvalid ? 1 : 0);
+            ValidationWritesPreQualOperationOutcomeWhenInvalid ? 1 : 0;
     }
 
     private static readonly HashSet<string> DerivedResourceTypes =
@@ -230,8 +228,8 @@ public class ReportAbsManifestValidator
         if (manifest != null)
         {
             // Populate the count-level expectation for OperationOutcome from the authoritative
-            // source: Report.ReportEntry.ReportingStatus. ValidationCompleteListener appends
-            // a runtime-flag-dependent number of OperationOutcomes per failed patient.
+            // source: Report.ReportEntry.ReportingStatus. Validation appends one
+            // OperationOutcome per failed patient when its pre-qualification flag is on.
             if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
             {
                 await PopulateExpectedOperationOutcomesFromReportEntriesAsync(
@@ -284,8 +282,7 @@ public class ReportAbsManifestValidator
             _output.WriteLine(
                 $"[ABS] OperationOutcome expectation for failed patients: " +
                 $"{expectedPerFailedPatient} each " +
-                $"(ReportLegacyWriter={(expectations.ReportWritesLegacyOperationOutcomeWhenInvalid ? "on" : "off")}, " +
-                $"ValidationPreQualWriter={(expectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}).");
+                $"(ValidationPreQualWriter={(expectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}).");
         }
         catch (Exception ex)
         {

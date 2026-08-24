@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -11,6 +12,17 @@ public interface IDmrpServiceClient
     Task<LinkApiResponse<MeasureMappingModel>> UpdateMeasureMappingAsync(string id, MeasureMappingModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteMeasureMappingAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches measure mappings by NHSN measure, dQM and frequency.
+    /// </summary>
+    /// <remarks>
+    /// Every filter is optional and they combine with AND. Answers 204 with no body when nothing
+    /// matches, so an empty result is a status code rather than an empty <c>Records</c> list.
+    /// </remarks>
+    Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(
+        string? measure, string? dqm = null, Frequency? frequency = null,
+        int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(FacilityReportingPlanRequest request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityReportingPlanModel>> GetFacilityReportingPlanAsync(string id, CancellationToken cancellationToken = default);
