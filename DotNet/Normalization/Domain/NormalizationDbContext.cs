@@ -19,6 +19,7 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<ResourceType> ResourceTypes { get; set; }
     public virtual DbSet<OperationSequence> OperationSequences { get; set; }
     public virtual DbSet<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
+    public virtual DbSet<HSLOC> HSLOCS { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -63,6 +64,12 @@ public partial class NormalizationDbContext : DbContext
             entity.HasOne(d => d.OperationResourceType).WithMany(p => p.VendorVersionOperationPresets)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_VendorOperationPreset_OperationResourceTypes");
+        });
+
+        modelBuilder.Entity<HSLOC>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.Version, e.HSLOCCode }).IsUnique();
         });
 
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
