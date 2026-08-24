@@ -17,6 +17,7 @@ import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.SubjectDto;
@@ -24,6 +25,7 @@ import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
+import com.lantanagroup.link.validation.records.BridgeOutcome;
 import io.opentelemetry.api.common.Attributes;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -39,6 +41,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation.Key, ReadyForValidation> {
@@ -58,6 +61,12 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
     private final ObjectMapper objectMapper;
     private final boolean bridgeEnabled;
     private final String rubricId;
+
+    private static final Set<RubricResultStatus> VALID_STATUSES = Set.of(
+            RubricResultStatus.ACCEPTABLE,
+            RubricResultStatus.ACCEPTABLE_WITH_WARNINGS,
+            RubricResultStatus.INCONCLUSIVE
+    );
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -111,11 +120,19 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
-        List<Result> results = bridgeEnabled
-                ? evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle)
-                : validate(correlationId, facilityId, patientId, reportId, bundle);
+        List<Result> results;
+        RubricResultStatus rubricStatus = null;
+        if (bridgeEnabled) {
+            BridgeOutcome outcome = evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle);
+            results = outcome.results();
+            rubricStatus = outcome.status();
+        } else {
+            results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        }
+
         appendPreQualOperationOutcome(bundle, results, payloadUri);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+        boolean isValid = checkIsValid(results, rubricStatus);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid);
     }
 
     /**
@@ -240,15 +257,11 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         return results;
     }
 
-    /**
-     * ADR-0003 step 2 bridge: evaluates the rubric engine in-process (synchronous call, same as the
-     * $evaluate REST endpoint) and maps its envelope back into the legacy {@link Result} shape so the
-     * rest of {@code process()} — pre-qual, ValidationComplete — is unaware of which engine ran.
-     */
-    private List<Result> evaluateViaRubricEngine(
+
+    private BridgeOutcome evaluateViaRubricEngine(
             String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
-        List<Result> results;
         Attributes attributes;
+        BridgeOutcome outcome;
 
         try (Timer timer = Timer.start()) {
             EvaluateRequestDto request = EvaluateRequestDto.builder()
@@ -260,16 +273,17 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
                     .payload(bundleToJsonNode(bundle))
                     .build();
             ValidationResultEnvelope envelope = rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
-            results = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
-            _logger.debug("Rubric evaluation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
+            outcome = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
+            _logger.debug("Rubric evaluation completed with {} results (interpretation {}) in {} seconds",
+                    outcome.results().size(), outcome.status(), String.format("%.2f", timer.getSeconds()));
 
-            attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
+            attributes = buildMetricAttributes(bundle, outcome.results(), correlationId, facilityId, patientId, reportId);
             validationMetrics.addToValidationCounter(attributes);
             validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
         }
 
-        resultRepository.saveAll(results);
-        return results;
+        resultRepository.saveAll(outcome.results());
+        return outcome;
     }
 
     private JsonNode bundleToJsonNode(Bundle bundle) {
@@ -322,13 +336,12 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             String facilityId,
             String patientId,
             String reportId,
-            List<Result> results) {
+            boolean isValid) {
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
-        value.setValid(results.stream()
-                .flatMap(result -> result.getCategories().stream())
-                .allMatch(Category::isAcceptable));
+        value.setValid(isValid);
+
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
@@ -343,5 +356,22 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             // (e.g., sending the source record to the Error topic)
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
         }
+    }
+
+    /**
+     * Derives the ValidationComplete.isValid gate. On the bridge path we trust the rubric's own
+     * verdict: ACCEPTABLE / ACCEPTABLE_WITH_WARNINGS / INCONCLUSIVE pass (an unresolvable-binding
+     * "not-evaluated" result is neutral, not a data failure), UNACCEPTABLE fails. Deriving from the
+     * status also closes the legacy gap where an uncategorized finding silently passed, because the
+     * rubric already scores an uncategorized error as UNACCEPTABLE. When there is no rubric status
+     * (legacy engine, or a bridge run with no findings) we fall back to the category rollup unchanged.
+     */
+    boolean checkIsValid(List<Result> results, RubricResultStatus status) {
+        if (bridgeEnabled && status != null) {
+            return VALID_STATUSES.contains(status);
+        }
+        return results.stream()
+                .flatMap(res -> res.getCategories().stream())
+                .allMatch(Category::isAcceptable);
     }
 }
