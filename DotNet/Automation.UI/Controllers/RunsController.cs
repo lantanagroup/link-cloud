@@ -216,9 +216,7 @@ public class RunsController(
         // Export is only meaningful once the run has stopped collecting data;
         // exporting an in-flight run would race the polling loop and yield
         // half-populated domain snapshots.
-        if (run.Status is not AutomationRunStatus.Succeeded
-                       and not AutomationRunStatus.Failed
-                       and not AutomationRunStatus.Cancelled)
+        if (!run.Status.IsTerminal())
         {
             return Conflict(new { error = "Run must be completed (Succeeded, Failed, or Cancelled) before it can be exported." });
         }
@@ -271,6 +269,139 @@ public class RunsController(
     public class RunActionRequest
     {
         public Guid Id { get; set; }
+    }
+
+    public class LiveInjectRequest
+    {
+        public Guid Id { get; set; }
+        public string? PatientId { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AdmitJson([FromBody] LiveInjectRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        try
+        {
+            var evt = await runManager.InjectAdmitAsync(request.Id, request.PatientId, "UI", request.Notes, cancellationToken);
+            return Ok(evt);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DischargeJson([FromBody] LiveInjectRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        try
+        {
+            var evt = await runManager.InjectDischargeAsync(request.Id, request.PatientId, "UI", request.Notes, cancellationToken);
+            return Ok(evt);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> LiveEvents(Guid id, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(id, cancellationToken) == null)
+            return NotFound();
+
+        return Json(await runManager.GetLiveEventsAsync(id, cancellationToken));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> LivePatientState(Guid id, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(id, cancellationToken) == null)
+            return NotFound();
+
+        return Json(await runManager.GetLivePatientStateAsync(id, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeneratePoolJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+
+        try
+        {
+            return Ok(await runManager.GenerateLivePoolPatientAsync(request.Id, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    public class LivePoolUploadRequest
+    {
+        public Guid Id { get; set; }
+        public string? Content { get; set; }
+        public string? FileName { get; set; }
+    }
+
+    public class LivePoolReferenceRequest
+    {
+        public Guid Id { get; set; }
+        public string? PatientId { get; set; }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadPoolJson([FromBody] LivePoolUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest(new { error = "Upload content is required." });
+
+        try
+        {
+            return Ok(await runManager.UploadLivePoolPatientAsync(request.Id, request.Content, request.FileName, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReferencePoolJson([FromBody] LivePoolReferenceRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { error = "Missing run ID" });
+        if (string.IsNullOrWhiteSpace(request.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        try
+        {
+            return Ok(await runManager.ReferenceLivePoolPatientAsync(request.Id, request.PatientId, "UI", cancellationToken));
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
     }
 
     [HttpGet]
@@ -516,9 +647,9 @@ public class RunsController(
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
 
         return activeRunSummaries
-            .Where(r => r is { Status: AutomationRunStatus.Queued or AutomationRunStatus.Running })
+            .Where(r => r is not null && (r.Status.IsCancellable() || r.Status.IsInProgress()))
             .Select(r => r!)
-            .Concat(activeRunsSource.Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Concat(activeRunsSource.Where(r => r.Status.IsCancellable() || r.Status.IsInProgress()))
             .GroupBy(r => r.RunId)
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)

@@ -171,9 +171,9 @@ Hypoglycemic requires patient-owned collection fully during IP.
 
   Before running, it reads `ReportEntry.ReportingStatus` rows via `PipelineDataReader` and
   populates `manifest.ExpectedOperationOutcomeCountByPatient[pid] = 1` for every patient whose
-  status is `FailedValidation`. This matches the Report service's behavior:
-  `ValidationCompleteListener.ProcessMessageAsync` appends exactly one OperationOutcome to the
-  patient ABS blob when `ValidationComplete.IsValid == false`.
+  status is `FailedValidation`, when Validation's
+  `pre-qualification.write-pre-qual-operation-outcome` flag is on. Validation is the sole
+  writer of that OperationOutcome.
 
 - **`ReportDatabaseValidator`** -- validates schedule, report entries, report types,
   populations, and report resource persistence. Uses

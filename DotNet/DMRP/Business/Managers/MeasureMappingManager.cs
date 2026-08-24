@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -30,11 +31,15 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
     {
         private readonly ILogger<MeasureMappingManager> _logger;
         private readonly IEntityRepository<MeasureMapping> _repository;
+        private readonly IEntityRepository<FacilityReportingPlan> _reportingPlanRepository;
 
-        public MeasureMappingManager(ILogger<MeasureMappingManager> logger, IEntityRepository<MeasureMapping> repository)
+        public MeasureMappingManager(ILogger<MeasureMappingManager> logger,
+            IEntityRepository<MeasureMapping> repository,
+            IEntityRepository<FacilityReportingPlan> reportingPlanRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
         }
 
         public async Task<MeasureMapping> CreateAsync(MeasureMapping newMeasureMapping, CancellationToken cancellationToken = default)
@@ -69,6 +74,26 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         private static bool IsUniqueIndexViolation(DbUpdateException exception) =>
             exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 }
             || exception.InnerException is SqlException { Number: 2601 or 2627 };
+
+        // Backstop for the window between the pre-check below and the delete. Which error the database
+        // raises depends on EF's change tracker, not just the schema: with the dependent untracked the
+        // DELETE reaches the database and the foreign key fires (SQL Server 547, SQLite 787), but with
+        // it tracked EF first tries to sever the relationship by nulling MeasureMappingId, which the
+        // NOT NULL column rejects instead (SQL Server 515, SQLite 1299). Both mean the same thing
+        // here. EF wraps the provider exception, at times several levels deep, so walk the chain.
+        private static bool IsStillReferenced(Exception exception)
+        {
+            for (Exception? current = exception; current is not null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 547 or 515 }
+                    || current is SqliteException { SqliteExtendedErrorCode: 787 or 1299 })
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         public async Task UpdateAsync(string id, MeasureMapping measureMapping, CancellationToken cancellationToken = default)
         {
@@ -119,6 +144,18 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 throw new ApplicationException($"Measure mapping with Id: {id} not found");
             }
 
+            // Asked before the delete rather than inferred from the failure afterwards: the database
+            // error is not stable enough to classify on (see IsStillReferenced), and refusing up front
+            // gives the caller a message that names the reason.
+            if (await _reportingPlanRepository.AnyAsync(p => p.MeasureMappingId == id, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Measure mapping {Id} is referenced by facility reporting plans and was not deleted",
+                    id.SanitizeForLog());
+
+                throw new MeasureMappingInUseException(id);
+            }
+
             try
             {
                 _repository.Remove(existing);
@@ -127,6 +164,12 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             catch (OperationCanceledException)
             {
                 throw;
+            }
+            catch (Exception ex) when (IsStillReferenced(ex))
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                throw new MeasureMappingInUseException(id, ex);
             }
             catch (Exception ex)
             {
@@ -140,6 +183,14 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete All Measure Mappings");
 
+            if (await _reportingPlanRepository.AnyAsync(_ => true, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Measure mappings are referenced by facility reporting plans and none were deleted");
+
+                throw new MeasureMappingInUseException();
+            }
+
             try
             {
                 var measureMappings = await _repository.GetAllAsync(cancellationToken);
@@ -152,6 +203,12 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             catch (OperationCanceledException)
             {
                 throw;
+            }
+            catch (Exception ex) when (IsStillReferenced(ex))
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                throw new MeasureMappingInUseException(ex);
             }
             catch (Exception ex)
             {

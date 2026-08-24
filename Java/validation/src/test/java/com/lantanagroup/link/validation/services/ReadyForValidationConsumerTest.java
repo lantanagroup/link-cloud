@@ -582,13 +582,13 @@ public class ReadyForValidationConsumerTest {
 
     @Test
     void process_flagOn_bundleHasUnrelatedOperationOutcome_stillAppends() throws Exception {
-        // The Report service's legacy flat OperationOutcome carries no oo-total extension, so it must not
-        // be mistaken for ours and suppress the append.
+        // An OperationOutcome without the oo-total extension must not be mistaken for ours and
+        // suppress the append.
         preQualificationConfig.setWritePreQualOperationOutcome(true);
 
-        org.hl7.fhir.r4.model.OperationOutcome legacy = new org.hl7.fhir.r4.model.OperationOutcome();
-        legacy.addIssue().setDiagnostics("Patient has failed Validation");
-        bundle.addEntry().setResource(legacy);
+        org.hl7.fhir.r4.model.OperationOutcome unrelated = new org.hl7.fhir.r4.model.OperationOutcome();
+        unrelated.addIssue().setDiagnostics("Unrelated operation outcome");
+        bundle.addEntry().setResource(unrelated);
 
         stubBlobDownload();
 

@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using Microsoft.Identity.Client;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
