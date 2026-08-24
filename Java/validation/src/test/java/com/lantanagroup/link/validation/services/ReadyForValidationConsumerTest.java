@@ -308,14 +308,14 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_withNoResults_stillCategorizesAndPersistsEmptyList() throws Exception {
+    void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
         verify(categorizationService).categorize(Collections.emptyList());
-        verify(resultRepository).saveAll(Collections.emptyList());
+        verify(resultRepository, never()).saveAll(anyList());
     }
 
     @Test
