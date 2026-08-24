@@ -17,6 +17,7 @@ public static class ApiEndPointLibrary
             ServiceNames.AdminBffAuth,
             ServiceNames.Census,
             ServiceNames.DataAcquisition,
+            ServiceNames.Dmrp,
             ServiceNames.MeasureEval,
             ServiceNames.Normalization,
             ServiceNames.QueryDispatch,
@@ -72,6 +73,7 @@ public static class ApiEndPointLibrary
             ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
             ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps), BuildDataAcquisitionMetadata()),
+            ServiceNames.Dmrp => BuildFromStepConstants(ServiceNames.Dmrp, typeof(DmrpSteps), BuildDmrpMetadata()),
             ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps), BuildMeasureEvalMetadata()),
             ServiceNames.Normalization => BuildFromStepConstants(ServiceNames.Normalization, typeof(NormalizationSteps), BuildNormalizationMetadata()),
             ServiceNames.QueryDispatch => BuildFromStepConstants(ServiceNames.QueryDispatch, typeof(QueryDispatchSteps), BuildQueryDispatchMetadata()),
@@ -152,6 +154,40 @@ public static class ApiEndPointLibrary
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildDmrpMetadata()
+    {
+        const string mappings = "/api/dmrp/measure-mappings";
+        const string plans = "/api/dmrp/reporting-plans";
+
+        return new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+        {
+            [DmrpSteps.MappingPost201] = new EndpointMeta("Creates a measure mapping.", $"POST {mappings}"),
+            [DmrpSteps.MappingPost400UnknownDqm] = new EndpointMeta("Refuses a dQM MeasureEval does not know.", $"POST {mappings}"),
+            [DmrpSteps.MappingPost400Duplicate] = new EndpointMeta("Refuses a second mapping for the same measure and dQM.", $"POST {mappings}"),
+            [DmrpSteps.MappingGet200] = new EndpointMeta("Reads a measure mapping by id.", $"GET {mappings}/{{id}}"),
+            [DmrpSteps.MappingGet404] = new EndpointMeta("Answers not-found for an unknown id.", $"GET {mappings}/{{id}}"),
+            [DmrpSteps.MappingSearch200] = new EndpointMeta("Finds a mapping by measure and dQM.", $"GET {mappings}/search"),
+            [DmrpSteps.MappingSearch204] = new EndpointMeta("Answers no-content, not an empty page, when nothing matches.", $"GET {mappings}/search"),
+            [DmrpSteps.MappingPut202] = new EndpointMeta("Updates a measure mapping.", $"PUT {mappings}/{{id}}"),
+            [DmrpSteps.MappingPut404] = new EndpointMeta("Refuses to update a mapping that does not exist.", $"PUT {mappings}/{{id}}"),
+            [DmrpSteps.PlanPost201] = new EndpointMeta("Enrolls a facility in a measure for a reporting period.", $"POST {plans}"),
+            [DmrpSteps.PlanPost409Duplicate] = new EndpointMeta("Refuses a second plan for the same facility, mapping and period.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownFacility] = new EndpointMeta("Refuses a plan for a facility that does not exist.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownMapping] = new EndpointMeta("Refuses a plan for a measure mapping that does not exist.", $"POST {plans}"),
+            [DmrpSteps.PlanGet200] = new EndpointMeta("Reads a reporting plan by id.", $"GET {plans}/{{id}}"),
+            [DmrpSteps.PlanGet404] = new EndpointMeta("Answers not-found for an unknown id.", $"GET {plans}/{{id}}"),
+            [DmrpSteps.PlansForFacilityGet200] = new EndpointMeta("Lists a facility's reporting plans.", $"GET {plans}/facilities/{{facilityId}}"),
+            [DmrpSteps.MappingDelete409InUse] = new EndpointMeta("Refuses to delete a mapping a reporting plan still references.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.PlanDelete204] = new EndpointMeta("Deletes a reporting plan.", $"DELETE {plans}/{{id}}"),
+            [DmrpSteps.PlanDelete404] = new EndpointMeta("Answers not-found when deleting a plan twice.", "DELETE /api/dmrp/reporting-plans/{id}"),
+            [DmrpSteps.MappingDelete204] = new EndpointMeta("Deletes a mapping once nothing references it.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.MappingDelete404] = new EndpointMeta("Answers not-found when deleting a mapping twice.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.FacilityPost400WithSchedule] = new EndpointMeta(
+                "Refuses a facility that carries its own schedule while DMRP is enabled; the schedule is derived from reporting plans.",
+                "POST /api/Facility")
+        };
+    }
+
     private static IReadOnlyDictionary<string, EndpointMeta> BuildMeasureEvalMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [MeasureEvalSteps.InfoGet200] = new EndpointMeta("Returns MeasureEval service information.", "GET /api/measureeval/info"),
@@ -223,6 +259,7 @@ public static class ApiEndPointLibrary
         public const string AdminBffAuth = "AdminBffAuth";
         public const string Census = "Census";
         public const string DataAcquisition = "DataAcquisition";
+        public const string Dmrp = "DMRP";
         public const string MeasureEval = "MeasureEval";
         public const string Normalization = "Normalization";
         public const string QueryDispatch = "QueryDispatch";
@@ -506,6 +543,36 @@ public static class ApiEndPointLibrary
         public const string Regenerate400NoReportId = "RegenerateReport → 400 (no report id)";
         public const string Regenerate404NonExistentFacility = "RegenerateReport → 404 (non-existent facility)";
         public const string Regenerate404NonExistentReport = "RegenerateReport → 404 (non-existent report)";
+    }
+
+    /// <summary>
+    /// DMRP is a module hosted by the Tenant service, so these run against the Tenant base address.
+    /// Order matters: the delete steps depend on what the create steps left behind.
+    /// </summary>
+    public static class DmrpSteps
+    {
+        public const string MappingPost201 = "MeasureMapping POST \u2192 201";
+        public const string MappingPost400UnknownDqm = "MeasureMapping POST \u2192 400 (dQM not in MeasureEval)";
+        public const string MappingPost400Duplicate = "MeasureMapping POST \u2192 400 (duplicate measure + dQM)";
+        public const string MappingGet200 = "MeasureMapping GET \u2192 200";
+        public const string MappingGet404 = "MeasureMapping GET \u2192 404";
+        public const string MappingSearch200 = "MeasureMappings SEARCH \u2192 200 (filtered)";
+        public const string MappingSearch204 = "MeasureMappings SEARCH \u2192 204 (no match)";
+        public const string MappingPut202 = "MeasureMapping PUT \u2192 202";
+        public const string MappingPut404 = "MeasureMapping PUT \u2192 404 (non-existent)";
+        public const string PlanPost201 = "ReportingPlan POST \u2192 201";
+        public const string PlanPost409Duplicate = "ReportingPlan POST \u2192 409 (duplicate period)";
+        public const string PlanPost400UnknownFacility = "ReportingPlan POST \u2192 400 (non-existent facility)";
+        public const string PlanPost400UnknownMapping = "ReportingPlan POST \u2192 400 (non-existent measure mapping)";
+        public const string PlanGet200 = "ReportingPlan GET \u2192 200";
+        public const string PlanGet404 = "ReportingPlan GET \u2192 404";
+        public const string PlansForFacilityGet200 = "ReportingPlans for facility GET \u2192 200";
+        public const string MappingDelete409InUse = "MeasureMapping DELETE \u2192 409 (referenced by a reporting plan)";
+        public const string PlanDelete204 = "ReportingPlan DELETE \u2192 204";
+        public const string PlanDelete404 = "ReportingPlan DELETE \u2192 404";
+        public const string MappingDelete204 = "MeasureMapping DELETE \u2192 204";
+        public const string MappingDelete404 = "MeasureMapping DELETE \u2192 404";
+        public const string FacilityPost400WithSchedule = "Facility POST \u2192 400 (schedule supplied while DMRP is enabled)";
     }
 
     public static class MeasureEvalSteps

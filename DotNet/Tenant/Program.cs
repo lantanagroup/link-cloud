@@ -151,7 +151,12 @@ namespace Tenant
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
             builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
-            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+
+            // The facility endpoints resolve this rather than calling the manager, so the DMRP module
+            // can put its own behavior in front of it when enabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
+
+            builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
 
             //Add problem details
             builder.Services.AddProblemDetails(options =>
