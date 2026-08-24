@@ -174,7 +174,9 @@ public static class NormalizationProposalBuilder
 
         var reuse = existingOps.FirstOrDefault(o =>
             string.Equals(o.OperationType, "CodeMap", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(o.CodeMapFhirPath, "type.coding", StringComparison.OrdinalIgnoreCase));
+            && string.Equals(o.CodeMapFhirPath, "type.coding", StringComparison.OrdinalIgnoreCase)
+            && o.CodeSystemMaps.Any(m =>
+                string.Equals(m.SourceSystem, sourceSystem, StringComparison.OrdinalIgnoreCase)));
 
         proposal.Operations.Add(new GeneratedNormalizationOperationProposal
         {

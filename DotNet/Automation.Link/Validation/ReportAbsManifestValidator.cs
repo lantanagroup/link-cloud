@@ -20,9 +20,11 @@ public class ReportAbsManifestValidator
     private const string PatientListProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
 
     /// <summary>
-    /// Controls expected derived OperationOutcome writes per failed-validation patient.
-    /// Validation is the sole writer, gated by
+    /// Controls expected derived OperationOutcome writes, gated by
     /// <c>pre-qualification.write-pre-qual-operation-outcome</c>.
+    /// Generation does not predict OperationOutcome. The validator expects one only when
+    /// the writer is on and the patient <c>FailedValidation</c>; passing patients are not
+    /// required to have one (and extras on those patients are ignored).
     /// </summary>
     public sealed record OperationOutcomeExpectationSettings(
         bool ValidationWritesPreQualOperationOutcomeWhenInvalid)
@@ -227,15 +229,20 @@ public class ReportAbsManifestValidator
         // generated input - no DB interrogation or baseline needed.
         if (manifest != null)
         {
-            // Populate the count-level expectation for OperationOutcome from the authoritative
-            // source: Report.ReportEntry.ReportingStatus. Validation appends one
-            // OperationOutcome per failed patient when its pre-qualification flag is on.
+            // Generation does not predict OperationOutcome. The validator overwrites any
+            // generation-time OO expectation from ReportEntry.ReportingStatus: one each for
+            // FailedValidation patients when the writer flag is on; none otherwise.
             if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
             {
                 await PopulateExpectedOperationOutcomesFromReportEntriesAsync(
                     manifest,
                     scheduleId,
                     operationOutcomeExpectations ?? OperationOutcomeExpectationSettings.Default);
+            }
+            else
+            {
+                manifest.ExpectedOperationOutcomeCountByPatient =
+                    new Dictionary<string, int>(StringComparer.Ordinal);
             }
 
             ValidateAbsResourceCountsAgainstManifest(
@@ -250,44 +257,46 @@ public class ReportAbsManifestValidator
     }
 
     /// <summary>
-    /// Populates <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
-    /// from Report DB entries and current pre-qualification writer settings.
+    /// Overwrites <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
+    /// from Report entries: one OperationOutcome per <c>FailedValidation</c> patient when
+    /// the pre-qualification writer is on. Passing patients never require one.
     /// </summary>
     private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(
         GenerationManifest manifest,
         Guid scheduleId,
         OperationOutcomeExpectationSettings expectations)
     {
+        var expected = new Dictionary<string, int>(StringComparer.Ordinal);
         try
         {
-            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
-            var expected = new Dictionary<string, int>(StringComparer.Ordinal);
             var expectedPerFailedPatient = expectations.ExpectedCountPerFailedValidationPatient;
+            if (expectedPerFailedPatient <= 0)
+            {
+                manifest.ExpectedOperationOutcomeCountByPatient = expected;
+                _output.WriteLine("[ABS] OperationOutcome expectation: 0 (ValidationPreQualWriter=off).");
+                return;
+            }
+
+            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
             foreach (var entry in entries)
             {
                 if (string.IsNullOrWhiteSpace(entry.PatientId))
                     continue;
 
                 if (string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (expectedPerFailedPatient > 0)
-                    {
-                        expected[entry.PatientId] = expectedPerFailedPatient;
-                    }
-                }
+                    expected[entry.PatientId] = expectedPerFailedPatient;
             }
 
             manifest.ExpectedOperationOutcomeCountByPatient = expected;
-
             _output.WriteLine(
-                $"[ABS] OperationOutcome expectation for failed patients: " +
-                $"{expectedPerFailedPatient} each " +
-                $"(ValidationPreQualWriter={(expectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}).");
+                $"[ABS] OperationOutcome expectation: {expectedPerFailedPatient} each for " +
+                $"{expected.Count} FailedValidation patient(s) (ValidationPreQualWriter=on).");
         }
         catch (Exception ex)
         {
-            // Do not fail the validator on a DB read hiccup - just log. The strict check
-            // will then flag any unpredicted OperationOutcomes, which is the safe default.
+            // Do not fail the validator on a DB read hiccup. Clear generation-time OO
+            // predictions so a passing patient cannot be failed for a stale expected count.
+            manifest.ExpectedOperationOutcomeCountByPatient = expected;
             _output.WriteLine($"[ABS][WARN] Could not read ReportEntry statuses to predict OperationOutcomes: {ex.Message}");
         }
     }
@@ -656,10 +665,10 @@ public class ReportAbsManifestValidator
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            // Strict prediction-vs-actual: every expected type must match exactly, and any
-            // type actually produced must have been predicted. Pipeline-derived types
-            // (MeasureReport, OperationOutcome) now contribute deterministic expectations
-            // via GenerationManifest.GetExpectedAbsCountsForPatient, so no tolerance is needed.
+            // Strict prediction-vs-actual except OperationOutcome: generation does not
+            // predict it. The validator expects one only for FailedValidation patients
+            // when the writer is on. Passing patients are not required to have one, and
+            // extras on those patients are ignored.
             var allTypes = new HashSet<string>(expectedCounts.Keys, StringComparer.OrdinalIgnoreCase);
             foreach (var t in actualCounts.Keys) allTypes.Add(t);
 
@@ -670,6 +679,16 @@ public class ReportAbsManifestValidator
 
                 if (actualCount == expectedCount)
                     continue;
+
+                if (string.Equals(resourceType, "OperationOutcome", StringComparison.OrdinalIgnoreCase)
+                    && expectedCount == 0
+                    && actualCount > 0)
+                {
+                    _output.WriteLine(
+                        $"[ABS] Ignoring OperationOutcome on patient {patientId}: " +
+                        $"expected=0 (not FailedValidation), actual={actualCount}.");
+                    continue;
+                }
 
                 if (actualCount < expectedCount)
                 {
