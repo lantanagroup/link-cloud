@@ -44,10 +44,7 @@ public class PatientDataStore
     private static readonly IReadOnlyList<ProfiledMeasureType> MockMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
 
-    private IPatientEntryGenerator PatientGenerator =>
-        _settings.UseThetisEngine
-            ? ThetisPatientEntryGenerator.Shared
-            : ClassicPatientEntryGenerator.Shared;
+    private static IPatientEntryGenerator PatientGenerator => ThetisPatientEntryGenerator.Shared;
 
     public PatientDataStore(IOptions<MockFhirServerSettings> settings)
     {
@@ -254,9 +251,9 @@ public class PatientDataStore
     /// <summary>
     /// Returns a <see cref="FhirGenerationConfig"/> whose distribution contains only the
     /// requested resource type, using its normal fraction from the default config.
-    /// All other bulk resource types are skipped, so <see cref="FhirBundleGenerator"/>
-    /// only fans out resources of the requested type. Anchor resources (Patient, Encounter,
-    /// Condition, Device, CareTeam, CarePlan) are always generated regardless.
+    /// All other bulk resource types are skipped so Thetis only fans out the
+    /// requested type. Anchor resources (Patient, Encounter, Condition, Device,
+    /// CareTeam, CarePlan) are always generated regardless.
     /// </summary>
     private FhirGenerationConfig ConfigForType(string resourceType)
     {
@@ -267,8 +264,7 @@ public class PatientDataStore
         // an empty distribution is fine: anchor resources are always produced.
         return new FhirGenerationConfig
         {
-            ResourceDistribution = distribution,
-            UseThetisEngine = _settings.UseThetisEngine
+            ResourceDistribution = distribution
         };
     }
 

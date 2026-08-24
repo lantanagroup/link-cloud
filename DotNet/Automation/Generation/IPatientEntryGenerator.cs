@@ -4,8 +4,8 @@ using LantanaGroup.Automation.Helpers;
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Per-patient FHIR synthesis. Default implementation is the classic factory path.
-/// Thetis adapter compiles a <c>PatientGenerationSpec</c> and executes the Engine.
+/// Per-patient FHIR synthesis. Default implementation is Thetis Engine
+/// (<see cref="Thetis.ThetisPatientEntryGenerator"/>).
 /// </summary>
 public interface IPatientEntryGenerator
 {
@@ -13,7 +13,7 @@ public interface IPatientEntryGenerator
 }
 
 /// <summary>
-/// Shared Org/Loc/Pract/Med/facility-Device upload. v1 Thetis path still uses factories (KD21).
+/// Shared Org/Loc/Pract/Med/facility-Device upload. Built by factories until a shared-infra graph exists.
 /// </summary>
 public interface ISharedInfrastructureGenerator
 {
@@ -49,8 +49,8 @@ public sealed class PatientEntryRequest
 }
 
 /// <summary>
-/// Factory-backed Org/Loc/Pract/Med/facility-Device (KD21). Used by both the
-/// classic and Thetis pipeline paths until a shared-infra graph exists.
+/// Factory-backed Org/Loc/Pract/Med/facility-Device. Used by the Thetis
+/// pipeline until a shared-infra graph exists.
 /// </summary>
 public sealed class FactorySharedInfrastructureGenerator : ISharedInfrastructureGenerator
 {

@@ -1,11 +1,10 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace Automation.UI.Controllers;
 
@@ -18,6 +17,7 @@ public class RunsController(
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
+    GeneratedTemplateCacheVersionStore templateCacheVersionStore,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -159,14 +159,13 @@ public class RunsController(
     [HttpGet]
     public async Task<IActionResult> Details(
         Guid id,
-        [FromServices] IOptions<AutomationConfig> automationConfig,
         CancellationToken cancellationToken)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
         if (run == null)
             return NotFound();
 
-        ViewBag.UseThetisEngine = automationConfig.Value.FhirGeneration?.UseThetisEngine ?? true;
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
         return View(run);
     }
 
@@ -183,6 +182,10 @@ public class RunsController(
 
         ViewBag.Run = run;
         ViewBag.RunId = id;
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.LatestTemplateCacheVersionNumber = await GetLatestTemplateCacheVersionAsync(
+            run.GeneratedTemplateCacheScenarioKey,
+            cancellationToken);
         return View("Manifest", manifest);
     }
 
@@ -200,6 +203,42 @@ public class RunsController(
         var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
         if (abs == null) return NoContent();
         return Json(abs);
+    }
+
+    /// <summary>
+    /// Replays a patient's generated FHIR collection from the ABS template cache
+    /// (the same templates used during the run), substituting this run's resource IDs.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> DownloadGeneratedBundle(
+        Guid id,
+        string patientId,
+        [FromServices] GeneratedPatientBundleReplayService replayService,
+        CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(patientId))
+            return BadRequest("Patient ID is required.");
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        var result = await replayService.ReplayAsync(run, manifest, patientId.Trim(), cancellationToken);
+        if (!result.Found || string.IsNullOrWhiteSpace(result.BundleJson))
+            return NotFound(result.Error ?? "Generated bundle is not available for this patient.");
+
+        if (result.RunCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Version"] = result.RunCacheVersion.Value.ToString();
+        if (result.LatestCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Latest"] = result.LatestCacheVersion.Value.ToString();
+        if (result.GenerationChanged)
+            Response.Headers["X-Generation-Template-Stale"] = "true";
+
+        return File(
+            Encoding.UTF8.GetBytes(result.BundleJson),
+            "application/fhir+json",
+            result.FileName);
     }
 
     [HttpGet]
@@ -660,5 +699,11 @@ public class RunsController(
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
             .ToList();
+    }
+
+    private async Task<int?> GetLatestTemplateCacheVersionAsync(string? scenarioKey, CancellationToken cancellationToken)
+    {
+        var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
+        return latest?.VersionNumber;
     }
 }

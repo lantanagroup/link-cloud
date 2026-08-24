@@ -22,7 +22,8 @@ internal sealed class LivePatientProvisioner(
     FhirGenerationConfig? generationConfig,
     GenerationRequirementsPlan? generationRequirementsPlan,
     FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
-    ISnapshotStore snapshotStore) : ILivePatientProvisioner
+    ISnapshotStore snapshotStore,
+    IGeneratedPatientTemplateCache? generatedTemplateCache = null) : ILivePatientProvisioner
 {
     public async Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
     {
@@ -43,7 +44,8 @@ internal sealed class LivePatientProvisioner(
             generationSeed,
             generationConfig,
             generationRequirementsPlan,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            generatedTemplateCache: generatedTemplateCache);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);

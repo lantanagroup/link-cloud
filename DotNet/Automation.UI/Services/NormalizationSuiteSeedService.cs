@@ -60,6 +60,9 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        // Kept as a reusable operation for custom suites. Not on System Default:
+        // MeasureReports are written by MeasureEval after Normalization, so this
+        // op never runs on the acquired-resource path the default suite exercises.
         var removeMeasureReportExtensions = new NormalizationOperationDefinition
         {
             Id = OpRemoveMeasureReportExtensionsId,
@@ -170,8 +173,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
                 new NormalizationSequenceEntry { OperationId = OpRemoveExtensionsId, Sequence = 1 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveEncounterEpicExtensionsId, Sequence = 2 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveObservationDatetimeExtensionId, Sequence = 3 },
-                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 },
-                new NormalizationSequenceEntry { OperationId = OpRemoveMeasureReportExtensionsId, Sequence = 5 }
+                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 }
             ],
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -188,7 +190,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             Id = SuiteSystemDefaultId,
             Name = "System Default",
             Description = "Built-in normalization suite that applies location normalization and extension cleanup.",
-            OperationIds = [OpRemoveMeasureReportExtensionsId],
+            OperationIds = [],
             SequenceIds = [SeqDefaultLocationId, SeqDefaultCleanupId],
             IsSystem = true,
             IsDefault = true,

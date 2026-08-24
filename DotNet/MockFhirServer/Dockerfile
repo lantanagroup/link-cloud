@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_XMLDOC_MODE=skip
@@ -12,11 +12,15 @@ WORKDIR /src
 COPY ["Directory.Packages.props", "./"]
 COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/MockFhirServer.csproj", "DotNet/MockFhirServer/"]
+COPY --from=thetis ["Thetis.Generation.Abstractions/Thetis.Generation.Abstractions.csproj", "/thetis/Thetis.Generation.Abstractions/"]
+COPY --from=thetis ["Thetis.Generation.Engine/Thetis.Generation.Engine.csproj", "/thetis/Thetis.Generation.Engine/"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     dotnet restore "DotNet/MockFhirServer/MockFhirServer.csproj" /p:RestorePackagesWithLockFile=false
 
 COPY ["DotNet/Automation/", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/", "DotNet/MockFhirServer/"]
+COPY --from=thetis ["Thetis.Generation.Abstractions/", "/thetis/Thetis.Generation.Abstractions/"]
+COPY --from=thetis ["Thetis.Generation.Engine/", "/thetis/Thetis.Generation.Engine/"]
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
 using System.Reflection;
@@ -14,7 +13,7 @@ namespace LantanaGroup.Automation.Generation;
 /// <summary>
 /// A streaming generation-and-upload pipeline that processes one patient at a time to
 /// prevent OOM conditions with large patient counts. Each patient's FHIR data is:
-///   1. Generated in-memory (reusing <see cref="FhirBundleGenerator"/>'s per-patient logic)
+///   1. Generated in-memory by Thetis Engine (plus Automation fixture overlays)
 ///   2. Manifest metadata accumulated from the in-memory objects
 ///   3. Serialized into transaction bundle chunks
 ///   4. Uploaded sequentially to the FHIR server (preserving resource dependency order)
@@ -325,7 +324,8 @@ public static class FhirGenerationPipeline
         GenerationRequirementsPlan? generationRequirementsPlan = null,
         AcquisitionSimulationConfig? acquisitionSimulation = null,
         IPatientEntryGenerator? patientEntryGenerator = null,
-        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null)
+        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null,
+        IGeneratedPatientTemplateCache? generatedTemplateCache = null)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(profile);
@@ -373,7 +373,7 @@ public static class FhirGenerationPipeline
             config,
             generationRequirementsPlan,
             ids,
-            generatedTemplateCache: null,
+            generatedTemplateCache,
             patientEntryGenerator);
 
         var slice = sliceBuilder.Build(measures);
@@ -457,6 +457,22 @@ public static class FhirGenerationPipeline
         return max;
     }
 
+    /// <summary>
+    /// Replays a cached generation template into a collection Bundle, substituting
+    /// this run's resource-ID tag for the placeholder stored in ABS.
+    /// </summary>
+    public static string MaterializeTemplateCollection(GeneratedPatientTemplate template, string runTag)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        if (string.IsNullOrWhiteSpace(runTag))
+            throw new ArgumentException("Run tag is required to materialize a generated bundle.", nameof(runTag));
+
+        var materialized = template.BundleJson
+            .Select(json => ReplaceRunTag(json, template.TemplateRunTag, runTag))
+            .ToList();
+        return GeneratedPatientBundleJson.MergeToCollection(materialized);
+    }
+
     private static (DateTime? Start, DateTime? End) ParseClinicalPeriod(AcquisitionSimulationConfig? acquisitionSimulation)
     {
         DateTime? start = null;
@@ -534,6 +550,7 @@ public static class FhirGenerationPipeline
             generationClinicalPeriodEnd,
             config,
             generationRequirementsPlan);
+        manifestBuilder.SetTemplateCacheKey(patientId, templateCacheKey);
 
         List<Bundle.EntryComponent> entries;
         List<(string Name, string Json)> bundles;
@@ -544,35 +561,23 @@ public static class FhirGenerationPipeline
 
         if (cachedTemplate == null)
         {
-            var generator = patientEntryGenerator
-                ?? ((config?.UseThetisEngine ?? true) ? ThetisPatientEntryGenerator.Shared : null);
-
-            if (generator != null)
+            var generator = patientEntryGenerator ?? ThetisPatientEntryGenerator.Shared;
+            entries = await generator.GenerateAsync(new PatientEntryRequest
             {
-                entries = await generator.GenerateAsync(new PatientEntryRequest
-                {
-                    Profile = profile,
-                    PatientIndex = patientIndex,
-                    BaseSeed = baseSeed,
-                    TotalResourcesPerPatient = effectiveResourcesPerPatient,
-                    SharedPractitionerIds = sharedPractitionerIds,
-                    SharedMedicationIds = sharedMedicationIds,
-                    Measures = measures,
-                    ClinicalPeriodStart = generationClinicalPeriodStart,
-                    ClinicalPeriodEnd = generationClinicalPeriodEnd,
-                    Config = config,
-                    RequirementsPlan = generationRequirementsPlan,
-                    Ids = ids,
-                    Output = output
-                });
-            }
-            else
-            {
-                entries = GeneratePatientEntries(
-                    profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
-                    sharedPractitionerIds, sharedMedicationIds, measures,
-                    generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
-            }
+                Profile = profile,
+                PatientIndex = patientIndex,
+                BaseSeed = baseSeed,
+                TotalResourcesPerPatient = effectiveResourcesPerPatient,
+                SharedPractitionerIds = sharedPractitionerIds,
+                SharedMedicationIds = sharedMedicationIds,
+                Measures = measures,
+                ClinicalPeriodStart = generationClinicalPeriodStart,
+                ClinicalPeriodEnd = generationClinicalPeriodEnd,
+                Config = config,
+                RequirementsPlan = generationRequirementsPlan,
+                Ids = ids,
+                Output = output
+            });
 
             bundles = ChunkEntries(entries, patientId, 0);
 
@@ -907,99 +912,6 @@ public static class FhirGenerationPipeline
         return profile with { MeasureEligibilities = adjusted };
     }
 
-    /// <summary>
-    /// Generates all FHIR bundle entries for a single patient using the same logic as
-    /// Builds a single patient's FHIR bundle entries (profile-driven scenario + measure eligibility).
-    /// </summary>
-    /// <param name="generationClinicalPeriodStart">
-    /// Optional clinical-period start. When provided together with <paramref name="generationClinicalPeriodEnd"/>,
-    /// the encounter window is bound inside the period so resources spread across the encounter LOS
-    /// remain inside any downstream consumer's date filter. Null falls back to the seed-only encounter scheme.
-    /// </param>
-    /// <param name="generationClinicalPeriodEnd">Companion to <paramref name="generationClinicalPeriodStart"/>.</param>
-    private static List<Bundle.EntryComponent> GeneratePatientEntries(
-        PatientProfile profile,
-        int patientIndex,
-        int baseSeed,
-        int totalResourcesPerPatient,
-        List<string> sharedPractitionerIds,
-        List<string> sharedMedicationIds,
-        IReadOnlyList<ProfiledMeasureType> measures,
-        DateTime? generationClinicalPeriodStart,
-        DateTime? generationClinicalPeriodEnd,
-        FhirGenerationConfig? config,
-        GenerationRequirementsPlan? generationRequirementsPlan,
-        FhirBundleGenerator.SharedIds ids)
-    {
-        var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
-        var patientId = ids.PatientId(patientIndex);
-        var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
-                       ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
-        var anchors = ScenarioResourceGeneration.ComputePatientAnchors(patientId, patientSeed, sharedPractitionerIds);
-
-        // Same helper used by the post-generation manifest log block, so the two
-        // computations can never drift. When no period is provided the helpers
-        // fall back to the legacy seed-only schemes so existing callers keep
-        // their stable 2023-anchored (inpatient) and 2020-anchored (outpatient) dates.
-        DateTime encStart, encEnd;
-        (encStart, encEnd) = DeriveEncounterWindowForProfile(
-            profile,
-            patientSeed,
-            generationClinicalPeriodStart,
-            generationClinicalPeriodEnd);
-
-        var entries = new List<Bundle.EntryComponent>();
-
-        Resource encounter;
-        if (profile.RequiresInpatientEncounter())
-        {
-            if (profile.RequiresHypoglycemicMedication())
-            {
-                encounter = EncounterFactory.Create(
-                    anchors.EncounterId, patientId, encStart, encEnd,
-                    anchors.AttendingPractId, anchors.AdmittingPractId,
-                    ids.EdLocation, ids.IcuLocation,
-                    ids.StepDownLocation, ids.Organization,
-                    anchors.PrimaryDxId,
-                    "32485007", "Hospital admission (procedure)",
-                    scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd,
-                    scenario.AdmitSourceCode, scenario.AdmitSourceDisplay,
-                    scenario.DischargeDispositionCode, scenario.DischargeDispositionDisplay,
-                    scenario.ServiceTypeCode, scenario.ServiceTypeDisplay,
-                    "EM", "emergency");
-            }
-            else
-            {
-                encounter = EncounterFactory.Generate(
-                    anchors.EncounterId, patientId, encStart, encEnd,
-                    anchors.AttendingPractId, anchors.AdmittingPractId,
-                    ids.EdLocation, ids.IcuLocation,
-                    ids.StepDownLocation, ids.Organization,
-                    anchors.PrimaryDxId, scenario);
-            }
-        }
-        else
-        {
-            encounter = EncounterFactory.CreateAmbulatory(
-                anchors.EncounterId, patientId, encStart, encEnd,
-                anchors.AttendingPractId, ids.OutpatientLocation,
-                ids.Organization,
-                anchors.PrimaryDxId,
-                scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd);
-        }
-
-        ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
-            entries, patientId, patientSeed, patientIndex, baseSeed, totalResourcesPerPatient,
-            encStart, encEnd, scenario, anchors, encounter,
-            sharedPractitionerIds, sharedMedicationIds, config, ids,
-            generationRequirementsPlan,
-            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication(),
-            measurementPeriodStart: generationClinicalPeriodStart,
-            measurementPeriodEnd: generationClinicalPeriodEnd);
-
-        return entries;
-    }
-
     // ------------------------------------------------------------------
     //  Shared infrastructure generation
     // ------------------------------------------------------------------
@@ -1042,7 +954,7 @@ public static class FhirGenerationPipeline
             PeriodEnd = periodEnd,
             Config = config,
             Requirements = requirements,
-            Generator = (config?.UseThetisEngine ?? true) ? "thetis" : "classic",
+            Generator = "thetis",
             GeneratorDependencyFingerprint = GeneratorDependencyFingerprint.Value
         });
 

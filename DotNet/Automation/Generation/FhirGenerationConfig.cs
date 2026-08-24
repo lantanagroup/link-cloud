@@ -51,10 +51,4 @@ public class FhirGenerationConfig
     /// </summary>
     public bool IncludeLowValueOptionalReferences { get; set; } = true;
 
-    /// <summary>
-    /// When true, per-patient resources are produced by Thetis Engine
-    /// (spec → compile → execute). Default true. Set false to roll back to
-    /// classic factories. Shared infrastructure remains factory-built (KD21).
-    /// </summary>
-    public bool UseThetisEngine { get; set; } = true;
 }

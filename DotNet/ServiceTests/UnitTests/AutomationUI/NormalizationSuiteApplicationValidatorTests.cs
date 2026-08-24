@@ -10,6 +10,49 @@ namespace UnitTests.AutomationUI;
 public class NormalizationSuiteApplicationValidatorTests
 {
     [Fact]
+    public async Task RemoveExtensions_NoLokiEvidence_FailsValidation()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildRemoveExtensionsSuite("Remove Observation Datetime Extension", "Observation");
+        var abs = new Dictionary<string, object>
+        {
+            ["patient.ndjson"] = "{\"resourceType\":\"Observation\",\"id\":\"obs-1\",\"status\":\"final\"}\n"
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ValidateAllAsync(abs, suite, []));
+    }
+
+    [Fact]
+    public async Task RemoveExtensions_SuccessEvidence_PassesWithoutScanningEveryResource()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildRemoveExtensionsSuite("Remove Observation Datetime Extension", "Observation");
+        var abs = new Dictionary<string, object>
+        {
+            ["patient.ndjson"] =
+                "{\"resourceType\":\"Observation\",\"id\":\"obs-1\",\"status\":\"final\"}\n" +
+                "{\"resourceType\":\"Observation\",\"id\":\"obs-2\",\"status\":\"final\"}\n"
+        };
+        var logs = new List<string>
+        {
+            "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Observation, ResourceId=obs-1, Steps=[1:RemoveExtensions:Remove Observation Datetime Extension:Success]"
+        };
+
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("Evidence found", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("Success=1", StringComparison.Ordinal));
+        output.Lines.Should().NotContain(l => l.Contains("no forbidden extensions remained", StringComparison.Ordinal));
+        output.Lines.Should().NotContain(l => l.Contains("did not include all ABS candidates", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task NonOptionalOperation_NoEvidence_FailsValidation()
     {
         var output = new CapturingOutput();
@@ -303,6 +346,27 @@ public class NormalizationSuiteApplicationValidatorTests
 
         output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
         output.Lines.Should().Contain(l => l.Contains("runtime Location#1", StringComparison.Ordinal));
+    }
+
+    private static NormalizationSuiteResolution BuildRemoveExtensionsSuite(string name, string resourceType)
+    {
+        var op = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            OperationType = "RemoveExtensions",
+            ResourceTypes = [resourceType],
+            ExtensionUrls = ["http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime"]
+        };
+        return new NormalizationSuiteResolution(
+            "Test Suite",
+            [op],
+            [
+                new NormalizationSuiteSequenceResolution(
+                    "Cleanup",
+                    [new NormalizationSuiteSequenceOperationResolution(1, op)])
+            ],
+            []);
     }
 
     private static NormalizationOperationDefinition BuildCopyPropertyOperation(string name, string operationType = "CopyProperty") => new()

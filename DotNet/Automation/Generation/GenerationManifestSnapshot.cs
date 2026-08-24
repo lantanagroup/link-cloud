@@ -57,4 +57,10 @@ public sealed class GenerationManifestSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, int> ExpectedAbsTotalCountsByType { get; init; }
         = new Dictionary<string, int>();
+
+    /// <summary>
+    /// Per-patient ABS template-cache key used to replay generated FHIR for download.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
 }

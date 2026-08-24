@@ -9,8 +9,7 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Automation;
 
 /// <summary>
-/// A3: Thetis-path invariants. Classic factory tests stay in
-/// <see cref="FhirBundleGeneratorTests"/>. Do not bitwise-compare generators.
+/// Thetis-path generation invariants.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class ThetisGenerationInvariantTests
@@ -31,12 +30,6 @@ public class ThetisGenerationInvariantTests
     ];
 
     [Fact]
-    public void UseThetisEngine_defaults_true()
-    {
-        Assert.True(new FhirGenerationConfig().UseThetisEngine);
-    }
-
-    [Fact]
     public async Task Thetis_two_patients_satisfy_deprecation_invariants()
     {
         var (ids, shared, patients) = await GenerateThetisPatientsAsync();
@@ -49,6 +42,21 @@ public class ThetisGenerationInvariantTests
             AssertEncounterInsideReportWindow(generated.Encounter);
             Assert.Contains(generated.Encounter.Class?.Code, InpatientClasses);
             AssertAllIdsEmbedRunTag(generated.Entries, ids.RunTag);
+            Assert.Equal(3, generated.Encounter.Location.Count);
+            Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.EdLocation, StringComparison.Ordinal) == true);
+            Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.IcuLocation, StringComparison.Ordinal) == true);
+            Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.StepDownLocation, StringComparison.Ordinal) == true);
+            Assert.Contains(generated.Entries.Select(e => e.Resource).OfType<MedicationRequest>(),
+                mr => mr.Requester != null);
+            Assert.True(
+                generated.Entries.Count >= (int)(ResourcesPerPatient * 0.8),
+                $"Thetis should honor resources-per-patient (~{ResourcesPerPatient}); got {generated.Entries.Count}");
+            var obsCodes = generated.Entries.Select(e => e.Resource).OfType<Observation>()
+                .Select(o => o.Code?.Coding?.FirstOrDefault()?.Code)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Distinct()
+                .ToList();
+            Assert.True(obsCodes.Count >= 2, $"observations should mix clinically appropriate LOINCs, got {string.Join(",", obsCodes)}");
         }
 
         var hypo = patients[0];
@@ -74,35 +82,7 @@ public class ThetisGenerationInvariantTests
     }
 
     [Fact]
-    public async Task Classic_and_Thetis_share_anchor_invariants_not_json()
-    {
-        var (ids, _, thetisPatients) = await GenerateThetisPatientsAsync();
-        var thetis = thetisPatients[1];
-
-        var classic = FhirBundleGenerator.GeneratePatientEntries(
-            thetis.PatientId,
-            ids,
-            thetis.Request.SharedPractitionerIds,
-            thetis.Request.SharedMedicationIds,
-            ResourcesPerPatient,
-            FrozenSeed + 1,
-            new FhirGenerationConfig { UseThetisEngine = false },
-            clinicalPeriodStart: PeriodStartUtc,
-            clinicalPeriodEnd: PeriodEndUtc);
-
-        Assert.Contains(classic, e => e.Resource is Patient);
-        Assert.Contains(classic, e => e.Resource is Encounter);
-        Assert.Contains(thetis.Entries, e => e.Resource is Patient);
-        Assert.Contains(thetis.Entries, e => e.Resource is Encounter);
-
-        var options = LinkFhirSerializerOptions.ForFhirWithoutValidation();
-        var classicJson = JsonSerializer.Serialize(classic.Single(e => e.Resource is Patient).Resource, options);
-        var thetisJson = JsonSerializer.Serialize(thetis.Entries.Single(e => e.Resource is Patient).Resource, options);
-        Assert.NotEqual(classicJson, thetisJson);
-    }
-
-    [Fact]
-    public async Task PatientId_override_is_honored_by_both_generators()
+    public async Task PatientId_override_is_honored()
     {
         const string overrideId = "mock-patient-0007";
         var (ids, _, practitionerIds, medicationIds) =
@@ -125,12 +105,124 @@ public class ThetisGenerationInvariantTests
         };
 
         var thetis = await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
-        var classic = await ClassicPatientEntryGenerator.Shared.GenerateAsync(request);
 
         Assert.Equal(overrideId, Assert.Single(thetis.Select(e => e.Resource).OfType<Patient>()).Id);
-        Assert.Equal(overrideId, Assert.Single(classic.Select(e => e.Resource).OfType<Patient>()).Id);
         Assert.Contains(thetis, e => e.Resource is Encounter enc && enc.Id == $"{overrideId}-Enc-001");
-        Assert.Contains(classic, e => e.Resource is Encounter enc && enc.Id == $"{overrideId}-Enc-001");
+    }
+
+    [Fact]
+    public async Task Pneumonia_uses_antibiotics_and_thoracentesis_not_insulin()
+    {
+        var entries = await GenerateThetisForScenarioAsync(ClinicalScenarioIds.Pneumonia, hypo: false);
+        var medCodes = MedicationCodes(entries);
+        var insulin = new[] { "274783", "1116635" };
+
+        Assert.Contains(medCodes, c => c is "197696" or "312961");
+        Assert.DoesNotContain(medCodes, c => insulin.Contains(c));
+        Assert.Contains(entries.Select(e => e.Resource).OfType<Procedure>(), p => p.Code?.Coding?.Any(c => c.Code == "173171007") == true);
+        Assert.Contains(entries, e => e.Resource is DiagnosticReport or Observation);
+    }
+
+    [Fact]
+    public async Task HeartFailure_uses_diuretic_or_beta_blocker()
+    {
+        var entries = await GenerateThetisForScenarioAsync(ClinicalScenarioIds.HeartFailure, hypo: false);
+        var medCodes = MedicationCodes(entries);
+        Assert.Contains(medCodes, c => c is "197361" or "313002" or "308460");
+        Assert.Contains(entries.Select(e => e.Resource).OfType<Procedure>(),
+            p => p.Code?.Coding?.Any(c => c.Code is "34068001" or "392230005") == true);
+    }
+
+    [Fact]
+    public async Task Hypoglycemia_still_has_insulin()
+    {
+        var entries = await GenerateThetisForScenarioAsync(ClinicalScenarioIds.DiabeticHypoglycemia, hypo: true);
+        var medCodes = MedicationCodes(entries);
+        Assert.True(
+            entries.Select(e => e.Resource).OfType<MedicationRequest>().Any(mr => IsInsulin(mr, "HypoInsulin"))
+            || medCodes.Any(c => c is "274783" or "1116635" or "1649592" or "245247"),
+            $"hypo patient meds: {string.Join(",", medCodes)}");
+    }
+
+    [Fact]
+    public async Task Thetis_stamps_normalization_opportunities_without_engine_knowing_the_suite()
+    {
+        const string commonUrl = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";
+        const string obsDtUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime";
+        const string epicIdUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id";
+
+        var plan = new GenerationRequirementsPlan
+        {
+            PlanName = "System Default",
+            Requirements =
+            [
+                new GenerationRequirement
+                {
+                    Name = "Remove Common Extensions",
+                    RequirementType = "RemoveExtensions",
+                    ResourceTypes = ["Patient", "Encounter", "Condition", "MedicationRequest", "Observation"],
+                    ExtensionUrls = [commonUrl]
+                },
+                new GenerationRequirement
+                {
+                    Name = "Remove Observation Datetime Extension",
+                    RequirementType = "RemoveExtensions",
+                    ResourceTypes = ["Observation"],
+                    ExtensionUrls = [obsDtUrl]
+                },
+                new GenerationRequirement
+                {
+                    Name = "Remove Encounter Epic Extensions",
+                    RequirementType = "RemoveExtensions",
+                    ResourceTypes = ["Encounter"],
+                    ExtensionUrls = [epicIdUrl]
+                }
+            ]
+        };
+
+        var (ids, _, practitionerIds, medicationIds) =
+            FactorySharedInfrastructureGenerator.Shared.Generate(null, RunTag);
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>
+            {
+                [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+            }, ClinicalScenarioId: ClinicalScenarioIds.Pneumonia.ToString()),
+            PatientIndex = 0,
+            BaseSeed = FrozenSeed,
+            TotalResourcesPerPatient = ResourcesPerPatient,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            ClinicalPeriodStart = PeriodStartUtc,
+            ClinicalPeriodEnd = PeriodEndUtc,
+            Config = new FhirGenerationConfig(),
+            RequirementsPlan = plan,
+            Ids = ids,
+            Output = new NullOutputHelper()
+        };
+
+        var entries = await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
+
+        static bool HasUrl(DomainResource resource, string url) =>
+            resource.Extension.Any(e => string.Equals(e.Url, url, StringComparison.Ordinal));
+
+        var patient = Assert.Single(entries.Select(e => e.Resource).OfType<Patient>());
+        Assert.True(HasUrl(patient, commonUrl));
+
+        var encounter = Assert.Single(entries.Select(e => e.Resource).OfType<Encounter>());
+        Assert.True(HasUrl(encounter, commonUrl));
+        Assert.True(HasUrl(encounter, epicIdUrl));
+        Assert.Equal(3, encounter.Location.Count);
+
+        var observations = entries.Select(e => e.Resource).OfType<Observation>().ToList();
+        Assert.NotEmpty(observations);
+        Assert.All(observations, o => Assert.True(HasUrl(o, commonUrl)));
+        Assert.All(observations, o => Assert.True(HasUrl(o, obsDtUrl)));
+
+        var conditions = entries.Select(e => e.Resource).OfType<Condition>().ToList();
+        Assert.NotEmpty(conditions);
+        Assert.All(conditions, c => Assert.True(HasUrl(c, commonUrl)));
     }
 
     private static async Task<(
@@ -173,7 +265,7 @@ public class ThetisGenerationInvariantTests
                 Measures = AchAndHypo,
                 ClinicalPeriodStart = PeriodStartUtc,
                 ClinicalPeriodEnd = PeriodEndUtc,
-                Config = new FhirGenerationConfig { UseThetisEngine = true },
+                Config = new FhirGenerationConfig(),
                 Ids = ids,
                 Output = new NullOutputHelper()
             };
@@ -183,6 +275,56 @@ public class ThetisGenerationInvariantTests
         }
 
         return (ids, shared, patients);
+    }
+
+    private static async Task<List<Bundle.EntryComponent>> GenerateThetisForScenarioAsync(Guid scenarioId, bool hypo)
+    {
+        var (ids, _, practitionerIds, medicationIds) =
+            FactorySharedInfrastructureGenerator.Shared.Generate(null, RunTag);
+        var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
+        {
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
+            [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] =
+                hypo ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying
+        };
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(eligibilities, SeedOffset: 0, ClinicalScenarioId: scenarioId.ToString()),
+            PatientIndex = 0,
+            BaseSeed = FrozenSeed,
+            TotalResourcesPerPatient = ResourcesPerPatient,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = AchAndHypo,
+            ClinicalPeriodStart = PeriodStartUtc,
+            ClinicalPeriodEnd = PeriodEndUtc,
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            Output = new NullOutputHelper()
+        };
+        return await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
+    }
+
+    private static List<string> MedicationCodes(IEnumerable<Bundle.EntryComponent> entries)
+    {
+        var codes = new List<string>();
+        foreach (var mr in entries.Select(e => e.Resource).OfType<MedicationRequest>())
+        {
+            switch (mr.Medication)
+            {
+                case CodeableConcept concept:
+                    codes.AddRange(concept.Coding.Where(c => c.Code != null).Select(c => c.Code!));
+                    break;
+                case ResourceReference reference:
+                    if (!string.IsNullOrWhiteSpace(reference.Display))
+                        codes.Add(reference.Display);
+                    if (!string.IsNullOrWhiteSpace(reference.Reference))
+                        codes.Add(reference.Reference);
+                    break;
+            }
+        }
+
+        return codes;
     }
 
     private static void AssertPatientEncounterAndAnchors(GeneratedPatient generated, string runTag)

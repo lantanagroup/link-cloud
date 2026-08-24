@@ -20,6 +20,8 @@ internal static class ThetisEngineHost
         {
             o.SeedConditions = NhsnRegistrySeed.Conditions;
             o.SeedMedications = NhsnRegistrySeed.Medications;
+            o.SeedLabPanels = NhsnRegistrySeed.LabPanels;
+            o.SeedProcedures = NhsnRegistrySeed.Procedures;
         });
         return services.BuildServiceProvider();
     }

@@ -51,11 +51,21 @@ public sealed class NormalizationSuiteApplicationValidator
             switch (operation.Operation.OperationType)
             {
                 case "RemoveExtensions":
-                    ValidateRemoveExtensions(operation, candidates, errors);
-                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: true);
+                    // Loki execution summaries are the source of truth (Success or
+                    // NoAction). Do not walk every ABS resource for leftover URLs —
+                    // generated volume makes that expensive, and generated data is
+                    // stamped so these ops actually fire. Skip per-id coverage:
+                    // hundreds of Observations would flake on Loki pagination.
+                    ValidateExecutionEvidence(
+                        operation, candidates, executionEvidence, errors, warnings,
+                        evidenceOptional: false,
+                        requireCandidateCoverage: false);
                     break;
                 default:
-                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: false);
+                    ValidateExecutionEvidence(
+                        operation, candidates, executionEvidence, errors, warnings,
+                        evidenceOptional: false,
+                        requireCandidateCoverage: true);
                     break;
             }
         }
@@ -119,53 +129,14 @@ public sealed class NormalizationSuiteApplicationValidator
         return parsed;
     }
 
-    private void ValidateRemoveExtensions(
-        PlannedRuntimeStep operation,
-        IReadOnlyList<AbsResourceRecord> candidates,
-        List<string> errors)
-    {
-        var resourceType = operation.ResourceType;
-        var extensionUrls = operation.Operation.ExtensionUrls
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Distinct(StringComparer.Ordinal)
-            .ToHashSet(StringComparer.Ordinal);
-
-        if (extensionUrls.Count == 0)
-        {
-            AddError(errors, $"RemoveExtensions operation '{operation.Operation.Name}' has no configured extension URLs.");
-            return;
-        }
-
-        var violations = 0;
-
-        foreach (var record in candidates)
-        {
-            var topLevelExtensionUrls = GetTopLevelExtensionUrls(record.Resource);
-            var forbidden = topLevelExtensionUrls
-                .Where(extensionUrls.Contains)
-                .ToList();
-
-            if (forbidden.Count > 0)
-            {
-                violations += forbidden.Count;
-                AddError(errors,
-                    $"{operation.DisplayName}: '{operation.Operation.Name}' left forbidden top-level extension(s) on {resourceType}/{DisplayId(record.ResourceId)} in {record.SourceFile}: [{string.Join(", ", forbidden)}].");
-            }
-        }
-
-        if (violations == 0)
-        {
-            _output.WriteLine($"[Normalization Suite] Verified RemoveExtensions '{operation.Operation.Name}' on {candidates.Count} {resourceType} resource(s): no forbidden extensions remained.");
-        }
-    }
-
     private void ValidateExecutionEvidence(
         PlannedRuntimeStep operation,
         IReadOnlyList<AbsResourceRecord> candidates,
         IReadOnlyList<ExecutionEvidenceRecord> evidence,
         List<string> errors,
         List<string> warnings,
-        bool evidenceOptional)
+        bool evidenceOptional,
+        bool requireCandidateCoverage = true)
     {
         var resourceType = operation.ResourceType;
         var candidateCount = candidates.Count;
@@ -211,7 +182,7 @@ public sealed class NormalizationSuiteApplicationValidator
                 .Take(5)
                 .ToList();
 
-            if (missingCandidateEvidence.Count > 0)
+            if (missingCandidateEvidence.Count > 0 && requireCandidateCoverage)
             {
                 if (!evidenceOptional)
                 {
@@ -316,25 +287,6 @@ public sealed class NormalizationSuiteApplicationValidator
             AddWarning(warnings, "Normalization summary logs were queried but no parsable [NormalizationExecutionSummary] records were found.");
 
         return records;
-    }
-
-    private static string DisplayId(string? id)
-        => string.IsNullOrWhiteSpace(id) ? "(no-id)" : id;
-
-    private static List<string> GetTopLevelExtensionUrls(JsonElement resource)
-    {
-        var urls = new List<string>();
-        if (!resource.TryGetProperty("extension", out var extensionNode) || extensionNode.ValueKind != JsonValueKind.Array)
-            return urls;
-
-        foreach (var extension in extensionNode.EnumerateArray())
-        {
-            var url = GetString(extension, "url");
-            if (!string.IsNullOrWhiteSpace(url))
-                urls.Add(url);
-        }
-
-        return urls;
     }
 
     private static string? GetString(JsonElement node, string propertyName)

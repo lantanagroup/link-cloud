@@ -216,7 +216,7 @@ internal sealed class RunExecutor
             output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
-            output.WriteLine($"FHIR generator: {(generationConfig.UseThetisEngine ? "Thetis Engine" : "classic factories")}");
+            output.WriteLine("FHIR generator: Thetis Engine");
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
@@ -336,25 +336,7 @@ internal sealed class RunExecutor
 
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
-
-                var cacheBinding = await _generatedTemplateVersionStore.BindRunAsync(
-                    state.RunId,
-                    state.ScenarioId,
-                    state.RunNameOverride,
-                    pipelineResult.GeneratedTemplateKeys,
-                    state.RunCancellation.Token);
-                if (cacheBinding != null)
-                {
-                    lock (state.Sync)
-                    {
-                        state.GeneratedTemplateCacheVersionId = cacheBinding.VersionId;
-                        state.GeneratedTemplateCacheVersionNumber = cacheBinding.VersionNumber;
-                        state.GeneratedTemplateCacheScenarioKey = cacheBinding.ScenarioKey;
-                        state.GeneratedTemplateSetHash = cacheBinding.TemplateSetHash;
-                    }
-
-                    output.WriteLine($"[cache-version] Bound run to {cacheBinding.ScenarioKey} v{cacheBinding.VersionNumber} ({cacheBinding.VersionId}).");
-                }
+                await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
 
                 // Manifest carries explicit patient/profile pairs. Build the initial expected
                 // submitted set from those pairs; scheduled runs are recomputed later after
@@ -371,7 +353,8 @@ internal sealed class RunExecutor
                     state.Options.SelectedMeasures,
                     state.Options.PatientCount,
                     state.Options.ResourcesPerPatient,
-                    state.Options.Seed);
+                    state.Options.Seed,
+                    _generatedTemplateCache);
 
                 var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
@@ -390,6 +373,7 @@ internal sealed class RunExecutor
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
                 expectedSubmittedPatientIds = patientIds.ToList();
+                await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
@@ -863,12 +847,8 @@ internal sealed class RunExecutor
             var normalizationSummaryMarker = "[NormalizationExecutionSummary]";
             var evidenceRequiredResourceTypes = normalizationResolution.Sequences
                 .SelectMany(s => s.Operations)
-                .Where(s => !string.Equals(s.Operation.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
                 .SelectMany(s => s.Operation.ResourceTypes)
-                .Concat(
-                    normalizationResolution.StandaloneOperations
-                        .Where(o => !string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
-                        .SelectMany(o => o.ResourceTypes))
+                .Concat(normalizationResolution.StandaloneOperations.SelectMany(o => o.ResourceTypes))
                 .Where(rt => !string.IsNullOrWhiteSpace(rt))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -1074,7 +1054,8 @@ internal sealed class RunExecutor
         IReadOnlyList<ProfiledMeasureType> selectedMeasures,
         int patientCount,
         int resourcesPerPatient,
-        int seed)
+        int seed,
+        IGeneratedPatientTemplateCache? generatedTemplateCache = null)
     {
         var syntheticCohorts = new List<PatientCohortDefinition>
         {
@@ -1091,7 +1072,32 @@ internal sealed class RunExecutor
             SelectedMeasures: selectedMeasures,
             Profiles: syntheticProfiles,
             ImportedPatients: null,
-            GeneratedTemplateCache: null);
+            GeneratedTemplateCache: generatedTemplateCache);
+    }
+
+    private async Task BindGeneratedTemplateCacheAsync(
+        MutableRunState state,
+        IReadOnlyList<string> generatedTemplateKeys,
+        IAutomationOutput output)
+    {
+        var cacheBinding = await _generatedTemplateVersionStore.BindRunAsync(
+            state.RunId,
+            state.ScenarioId,
+            state.RunNameOverride,
+            generatedTemplateKeys,
+            state.RunCancellation.Token);
+        if (cacheBinding == null)
+            return;
+
+        lock (state.Sync)
+        {
+            state.GeneratedTemplateCacheVersionId = cacheBinding.VersionId;
+            state.GeneratedTemplateCacheVersionNumber = cacheBinding.VersionNumber;
+            state.GeneratedTemplateCacheScenarioKey = cacheBinding.ScenarioKey;
+            state.GeneratedTemplateSetHash = cacheBinding.TemplateSetHash;
+        }
+
+        output.WriteLine($"[cache-version] Bound run to {cacheBinding.ScenarioKey} v{cacheBinding.VersionNumber} ({cacheBinding.VersionId}).");
     }
 
     private static IReadOnlyList<PatientProfile> AlignProfilesToPatientIds(
@@ -1333,7 +1339,8 @@ internal sealed class RunExecutor
                 generationConfig,
                 generationRequirementsPlan,
                 acquisitionSimulation,
-                _snapshotStore);
+                _snapshotStore,
+                _generatedTemplateCache);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,
@@ -1453,15 +1460,13 @@ internal sealed class RunExecutor
         if (distribution == null || distribution.Count == 0)
             return new FhirGenerationConfig
             {
-                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
-                UseThetisEngine = automationConfig.FhirGeneration?.UseThetisEngine ?? true
+                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences
             };
 
         return new FhirGenerationConfig
         {
             IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
-            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase),
-            UseThetisEngine = automationConfig.FhirGeneration?.UseThetisEngine ?? true
+            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
         };
     }
 

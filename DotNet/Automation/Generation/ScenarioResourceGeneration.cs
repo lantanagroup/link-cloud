@@ -6,32 +6,10 @@ using System.Text.Json;
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Shared scenario-driven FHIR resource generation logic, used by both
-/// <see cref="FhirBundleGenerator"/> (single-pass bulk bundle assembly) and
-/// <see cref="FhirGenerationPipeline"/> (streaming per-patient generation + upload).
-///
-/// Centralises:
-/// <list type="bullet">
-///   <item>Bundle entry construction + serialization helpers (<see cref="Entry"/>, <see cref="Serialize"/>).</item>
-///   <item>The shared-infrastructure block — Organization, 5 Locations, 3 Devices,
-///     all Practitioners, and the formulary Medications — built once per run via
-///     <see cref="BuildSharedInfrastructure"/>.</item>
-///   <item>The scenario-driven per-patient resource fan-out
-///     (<see cref="GenerateScenarioDrivenResources"/>) including scenario-appropriate
-///     code/value selection and the natural reference chains
-///     (ServiceRequest → Specimen → Observation → DiagnosticReport,
-///     MedicationRequest → Medication, MedicationAdministration → MedicationRequest, etc.).</item>
-/// </list>
-///
-/// Anything tied to a specific consumer's orchestration model — bulk bundle
-/// chunking in <see cref="FhirBundleGenerator"/>, profile-driven encounter-class
-/// branching and Hypoglycemic-qualifying medication pairs in
-/// <see cref="FhirGenerationPipeline"/> — stays in the consumer.
-///
-/// Extracting this class removed roughly 250 lines of verbatim duplication
-/// between the two consumers; both previously kept their own copy of every
-/// generator below, drifting only in <c>SharedIds</c> qualification and access
-/// modifiers. Future scenario additions land in exactly one place.
+/// Automation-owned FHIR fixture helpers used after Thetis synthesizes a patient:
+/// shared org/location/practitioner/medication infrastructure, per-patient
+/// anchors, Hypoglycemic insulin overlay, and generation-requirement stamps.
+/// Per-patient clinical resources come from Thetis Engine.
 /// </summary>
 internal static class ScenarioResourceGeneration
 {
@@ -116,23 +94,6 @@ internal static class ScenarioResourceGeneration
     }
 
     // ------------------------------------------------------------------
-    //  Resource-type distribution
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Resolves the (resourceType, fraction) distribution from the supplied
-    /// <see cref="FhirGenerationConfig"/>, falling back to the default
-    /// distribution when none is supplied. Order is preserved so callers that
-    /// rely on resource-creation order (reference chains require certain
-    /// resources to exist before their referrers) get stable behaviour.
-    /// </summary>
-    internal static (string ResourceType, double Fraction)[] ResolveDistribution(FhirGenerationConfig? config)
-    {
-        var dict = (config ?? new FhirGenerationConfig()).ResourceDistribution;
-        return dict.Select(kv => (kv.Key, kv.Value)).ToArray();
-    }
-
-    // ------------------------------------------------------------------
     //  Shared infrastructure (Organization / Locations / Devices /
     //  Practitioners / formulary)
     // ------------------------------------------------------------------
@@ -210,266 +171,6 @@ internal static class ScenarioResourceGeneration
         return medIds;
     }
 
-    // ------------------------------------------------------------------
-    //  Per-patient scenario-driven fan-out
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Generates all bulk resources for a single patient using scenario-driven
-    /// resource selection. Resources are picked from clinically appropriate
-    /// subsets of the global pools so a pneumonia patient gets antibiotics and
-    /// chest X-rays, not insulin and echocardiograms.
-    ///
-    /// Also builds natural clinical reference chains during generation:
-    /// ServiceRequest → Specimen → Observation → DiagnosticReport,
-    /// MedicationRequest → Medication, MedicationAdministration → MedicationRequest.
-    ///
-    /// Effective-date stamping spreads each resource evenly across
-    /// <c>[encStart, encEnd]</c>; bound the encounter window inside any clinical
-    /// period (via <see cref="FhirBundleGenerator.DeriveInpatientEncounterWindow"/>
-    /// or <see cref="FhirBundleGenerator.DeriveOutpatientEncounterWindow"/>) before
-    /// calling, otherwise late-encounter resources can spill past a downstream
-    /// consumer's date filter.
-    /// </summary>
-    internal static void GenerateScenarioDrivenResources(
-        List<Bundle.EntryComponent> entries,
-        int scenarioIdx,
-        string patientId,
-        string encounterId,
-        DateTime encStart,
-        DateTime encEnd,
-        string primaryDxId,
-        string attendingPractId,
-        string careTeamId,
-        int totalResourcesPerPatient,
-        int baseSeed,
-        int patientOrdinal,
-        List<string> sharedPractitionerIds,
-        List<string> sharedMedicationIds,
-        FhirGenerationConfig? config,
-        FhirBundleGenerator.SharedIds ids)
-    {
-        // Build scenario-appropriate index subsets
-        var medIndices = ScenarioResourceMap.GetMergedIndices(
-            ScenarioResourceMap.UniversalMedicationIndices, ScenarioResourceMap.ScenarioMedicationIndices,
-            scenarioIdx, FhirGenerationCodes.Medications.Length);
-        var obsIndices = ScenarioResourceMap.GetMergedIndices(
-            ScenarioResourceMap.UniversalObservationIndices, ScenarioResourceMap.ScenarioObservationIndices,
-            scenarioIdx, FhirGenerationCodes.Observations.Length);
-        var procIndices = ScenarioResourceMap.ScenarioProcedureIndices[
-            FhirBundleGenerator.Mod(scenarioIdx, ScenarioResourceMap.ScenarioProcedureIndices.Length)];
-        var specIndices = ScenarioResourceMap.GetMergedIndices(
-            ScenarioResourceMap.UniversalSpecimenIndices, ScenarioResourceMap.ScenarioSpecimenIndices,
-            scenarioIdx, FhirGenerationCodes.Specimens.Length);
-        var imgIndices = ScenarioResourceMap.ScenarioImagingIndices[
-            FhirBundleGenerator.Mod(scenarioIdx, ScenarioResourceMap.ScenarioImagingIndices.Length)];
-        var srIndices = ScenarioResourceMap.GetMergedIndices(
-            ScenarioResourceMap.UniversalServiceRequestIndices, ScenarioResourceMap.ScenarioServiceRequestIndices,
-            scenarioIdx, FhirGenerationCodes.ServiceRequests.Length);
-        var condIndices = ScenarioResourceMap.GetMergedIndices(
-            ScenarioResourceMap.UniversalConditionIndices, ScenarioResourceMap.ScenarioConditionIndices,
-            scenarioIdx, FhirGenerationCodes.Conditions.Length);
-
-        var medicationRequestIds = new List<string>();
-        var specimenIds = new List<string>();
-        var observationIds = new List<string>();
-        var conditionIds = new List<string> { primaryDxId };
-        var serviceRequestIds = new List<string>();
-        var diagnosticReportIds = new List<string>();
-        var resourceIndex = 0;
-        var distribution = ResolveDistribution(config);
-        var includeLowValueOptionalReferences = config?.IncludeLowValueOptionalReferences ?? true;
-
-        foreach (var (resourceType, fraction) in distribution)
-        {
-            var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
-
-            for (var i = 0; i < count; i++)
-            {
-                resourceIndex++;
-                var seed = baseSeed + (patientOrdinal * 31 + i);
-                var resourceId = $"{patientId}-{FhirBundleGenerator.AbbreviateResourceType(resourceType)}-{resourceIndex:D3}";
-                var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
-                var effectiveDate = encStart.Add(offset);
-                var practId = sharedPractitionerIds[FhirBundleGenerator.Mod(seed, sharedPractitionerIds.Count)];
-
-                Resource resource = resourceType switch
-                {
-                    "Observation" => GenerateScenarioObservation(resourceId, patientId, encounterId, effectiveDate, seed, obsIndices, specimenIds, observationIds, ids),
-                    "Condition" => GenerateScenarioCondition(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, condIndices, conditionIds),
-                    "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds, ids),
-                    "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, sharedMedicationIds, medicationRequestIds),
-                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, sharedMedicationIds, medicationRequestIds, practId, includeLowValueOptionalReferences),
-                    "DiagnosticReport" => GenerateScenarioDiagnosticReport(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId, diagnosticReportIds),
-                    "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds, ids),
-                    "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
-                    "Specimen" => GenerateScenarioSpecimen(resourceId, patientId, effectiveDate, seed, specIndices, specimenIds, practId),
-                    "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                    "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, ids.HospitalLocation, ids.Organization),
-                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId, includeLowValueOptionalReferences, ids),
-                    "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, ids.Organization),
-                    "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                    "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, ids.Organization, attendingPractId),
-                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds, includeLowValueOptionalReferences, ids),
-                    _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
-                };
-
-                entries.Add(Entry($"{resourceType}/{resourceId}", resource));
-            }
-        }
-
-        var listId = $"SyntheticList-{patientId}";
-        entries.Add(Entry($"List/{listId}",
-            CensusListFactory.Generate(listId, patientId, encStart)));
-    }
-
-    // ------------------------------------------------------------------
-    //  Scenario-aware resource generators — pick from scenario subsets
-    //  and wire up reference chains during creation
-    // ------------------------------------------------------------------
-
-    private static Observation GenerateScenarioObservation(
-        string id, string patientId, string encounterId, DateTime effective, int seed,
-        int[] obsIndices, List<string> specimenIds, List<string> observationIds, FhirBundleGenerator.SharedIds ids)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(obsIndices, seed, FhirGenerationCodes.Observations.Length);
-        var v = FhirGenerationCodes.Observations[poolIdx];
-        observationIds.Add(id);
-        return ObservationFactory.Create(id, patientId, encounterId, effective,
-            v.Code, v.Display, v.Category, v.Unit,
-            v.CritLow, v.NormLow, v.NormHigh, v.CritHigh, seed, specimenIds, ids.Organization);
-    }
-
-    private static Condition GenerateScenarioCondition(
-        string id, string patientId, string encounterId, DateTime onset, DateTime abatement, int seed,
-        int[] condIndices, List<string> conditionIds)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(condIndices, seed, FhirGenerationCodes.Conditions.Length);
-        var v = FhirGenerationCodes.Conditions[poolIdx];
-        conditionIds.Add(id);
-        return ConditionFactory.Create(id, patientId, encounterId, onset, abatement, seed,
-            v.Code, v.Display, v.IcdCode, v.Category);
-    }
-
-    private static Procedure GenerateScenarioProcedure(
-        string id, string patientId, string encounterId, DateTime performed, int seed, string practId,
-        int[] procIndices, List<string> conditionIds, FhirBundleGenerator.SharedIds ids)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(procIndices, seed, FhirGenerationCodes.Procedures.Length);
-        var v = FhirGenerationCodes.Procedures[poolIdx];
-        return ProcedureFactory.Create(id, patientId, encounterId, performed, seed, practId,
-            ids.HospitalLocation, ids.Organization,
-            v.Code, v.Display, v.BodySiteCode, v.BodySiteDisplay,
-            v.OutcomeCode, v.OutcomeDisplay,
-            conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null);
-    }
-
-    private static MedicationRequest GenerateScenarioMedicationRequest(
-        string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
-        int[] medIndices, List<string> conditionIds, List<string> sharedMedicationIds, List<string> medicationRequestIds)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
-        var v = FhirGenerationCodes.Medications[poolIdx];
-        var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
-        // Reference the shared formulary Medication that matches this drug.
-        var medicationRefId = poolIdx < sharedMedicationIds.Count ? sharedMedicationIds[poolIdx] : null;
-        var req = MedicationRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
-            v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
-            v.DoseValue, v.DoseUnit, v.FreqPerDay, v.Prn,
-            v.IndicationSnomed, v.IndicationDisplay, reasonConditionId, medicationRefId);
-        medicationRequestIds.Add(id);
-        return req;
-    }
-
-    private static MedicationAdministration GenerateScenarioMedicationAdministration(
-        string id, string patientId, string encounterId, DateTime effective, int seed,
-        int[] medIndices, List<string> sharedMedicationIds, List<string> medicationRequestIds, string practId,
-        bool includeLowValueOptionalReferences)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
-        var v = FhirGenerationCodes.Medications[poolIdx];
-        // Reference the shared formulary Medication that matches this drug.
-        var medRefId = poolIdx < sharedMedicationIds.Count ? sharedMedicationIds[poolIdx] : null;
-        var isIv = v.RouteCode == "47625008";
-        var admin = MedicationAdministrationFactory.Create(id, patientId, encounterId, effective, seed, practId,
-            v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
-            v.DoseValue, v.DoseUnit, v.IndicationSnomed, v.IndicationDisplay, isIv, medRefId);
-        // Optional link: MedicationAdministration.request → MedicationRequest
-        if (includeLowValueOptionalReferences && medicationRequestIds.Count > 0)
-            admin.Request = new ResourceReference($"MedicationRequest/{medicationRequestIds[seed % medicationRequestIds.Count]}");
-        return admin;
-    }
-
-    private static Specimen GenerateScenarioSpecimen(
-        string id, string patientId, DateTime collected, int seed,
-        int[] specIndices, List<string> specimenIds, string practId)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(specIndices, seed, FhirGenerationCodes.Specimens.Length);
-        specimenIds.Add(id);
-        var v = FhirGenerationCodes.Specimens[poolIdx];
-        return SpecimenFactory.Create(id, patientId, collected, seed,
-            v.TypeCode, v.TypeDisplay, v.TypeSystem,
-            v.ContainerCode, v.ContainerDisplay,
-            v.CollectionMethod, v.BodySiteCode, v.BodySiteDisplay, practId);
-    }
-
-    private static DiagnosticReport GenerateScenarioDiagnosticReport(
-        string id, string patientId, string encounterId, DateTime effective, int seed,
-        List<string> observationIds, List<string> specimenIds, string practId,
-        List<string> diagnosticReportIds)
-    {
-        var report = DiagnosticReportFactory.Generate(id, patientId, encounterId, effective, seed,
-            observationIds, specimenIds, practId);
-        diagnosticReportIds.Add(id);
-        return report;
-    }
-
-    private static ServiceRequest GenerateScenarioServiceRequest(
-        string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
-        int[] srIndices, List<string> conditionIds, List<string> serviceRequestIds, FhirBundleGenerator.SharedIds ids)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(srIndices, seed, FhirGenerationCodes.ServiceRequests.Length);
-        var v = FhirGenerationCodes.ServiceRequests[poolIdx];
-        var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
-        var sr = ServiceRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
-            v.Code, v.Display, v.IsLab, v.System, reasonConditionId, ids.Organization);
-        serviceRequestIds.Add(id);
-        return sr;
-    }
-
-    private static ImagingStudy GenerateScenarioImagingStudy(
-        string id, string patientId, string encounterId, DateTime started, int seed,
-        int[] imgIndices, List<string> serviceRequestIds, string practId,
-        bool includeLowValueOptionalReferences, FhirBundleGenerator.SharedIds ids)
-    {
-        var poolIdx = ScenarioResourceMap.PickIndex(imgIndices, seed, FhirGenerationCodes.ImagingStudies.Length);
-        var v = FhirGenerationCodes.ImagingStudies[poolIdx];
-        var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, ids.HospitalLocation, practId,
-            v.SnomedCode, v.Display, v.Modality,
-            v.BodySiteCode, v.BodySiteDisplay, v.ReasonCode, v.ReasonDisplay);
-        // Optional link: ImagingStudy.basedOn → ServiceRequest
-        if (includeLowValueOptionalReferences && serviceRequestIds.Count > 0)
-        {
-            study.BasedOn ??= [];
-            study.BasedOn.Add(new ResourceReference($"ServiceRequest/{serviceRequestIds[seed % serviceRequestIds.Count]}"));
-        }
-        return study;
-    }
-
-    private static Provenance GenerateScenarioProvenance(
-        string id, string patientId, string encounterId, DateTime recorded, string practId,
-        List<string> diagnosticReportIds,
-        bool includeLowValueOptionalReferences, FhirBundleGenerator.SharedIds ids)
-    {
-        var prov = ProvenanceFactory.Create(id, patientId, encounterId, recorded, practId, ids.Organization);
-        // Optional link: Provenance.target to DiagnosticReport
-        if (includeLowValueOptionalReferences && diagnosticReportIds.Count > 0)
-        {
-            prov.Target ??= [];
-            prov.Target.Add(new ResourceReference($"DiagnosticReport/{diagnosticReportIds[^1]}"));
-        }
-        return prov;
-    }
 
     // ------------------------------------------------------------------
     //  Per-patient core-anchor composition — shared by the bulk
@@ -516,86 +217,11 @@ internal static class ScenarioResourceGeneration
     }
 
     /// <summary>
-    /// Emits the per-patient core anchor entries shared by both the bulk
-    /// (<see cref="FhirBundleGenerator"/>) and streaming
-    /// (<see cref="FhirGenerationPipeline"/>) paths, in their canonical order
-    /// (Patient → Device → primary Condition → Encounter → CareTeam → CarePlan
-    /// → optional Hypoglycemic-qualifying medication pair → scenario fan-out).
-    ///
-    /// The Encounter is built by the caller and passed in because each path
-    /// has its own encounter variants (bulk uses the standard inpatient form;
-    /// the pipeline switches between standard inpatient, Hypoglycemic-flavoured
-    /// inpatient, and ambulatory based on the patient profile).
-    /// </summary>
-    internal static void AddPatientCoreAndScenarioResources(
-        List<Bundle.EntryComponent> entries,
-        string patientId,
-        int patientSeed,
-        int patientIndex,
-        int baseSeed,
-        int totalResourcesPerPatient,
-        DateTime encStart,
-        DateTime encEnd,
-        FhirGenerationCodes.ClinicalScenarioDefinition scenario,
-        PatientAnchorContext anchors,
-        Resource encounter,
-        List<string> sharedPractitionerIds,
-        List<string> sharedMedicationIds,
-        FhirGenerationConfig? config,
-        FhirBundleGenerator.SharedIds ids,
-        GenerationRequirementsPlan? generationRequirementsPlan = null,
-        bool addHypoglycemicMedicationPair = false,
-        DateTime? measurementPeriodStart = null,
-        DateTime? measurementPeriodEnd = null)
-    {
-        // Core anchors — order matters: Patient → Device → primary Condition →
-        // Encounter → CareTeam → CarePlan → (optional hypo meds) → scenario fan-out.
-        var patient = PatientFactory.Generate(patientId, patientSeed, anchors.GpPractId);
-        patient.ManagingOrganization = new ResourceReference($"Organization/{ids.Organization}", "General Test Hospital");
-        entries.Add(Entry($"Patient/{patientId}", patient));
-
-        entries.Add(Entry($"Device/{anchors.PatientDeviceId}",
-            DeviceFactory.Generate(anchors.PatientDeviceId, patientSeed, patientId)));
-
-        entries.Add(Entry($"Condition/{anchors.PrimaryDxId}",
-            ConditionFactory.CreatePrimary(
-                anchors.PrimaryDxId, patientId, anchors.EncounterId, encStart,
-                scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd)));
-
-        entries.Add(Entry($"Encounter/{anchors.EncounterId}", encounter));
-
-        entries.Add(Entry($"CareTeam/{anchors.CareTeamId}",
-            CareTeamFactory.Generate(anchors.CareTeamId, patientId, anchors.EncounterId,
-                anchors.AttendingPractId, encStart, ids.Organization)));
-
-        entries.Add(Entry($"CarePlan/{anchors.CarePlanId}",
-            CarePlanFactory.Generate(anchors.CarePlanId, patientId, anchors.EncounterId,
-                anchors.CareTeamId, encStart, patientSeed)));
-
-        if (addHypoglycemicMedicationPair)
-        {
-            AddHypoglycemicQualifyingMedicationEntries(entries, patientId, anchors.EncounterId,
-                anchors.AttendingPractId, patientSeed, encStart, encEnd, ids,
-                measurementPeriodStart, measurementPeriodEnd);
-        }
-
-        var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
-        GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, anchors.EncounterId,
-            encStart, encEnd, anchors.PrimaryDxId, anchors.AttendingPractId, anchors.CareTeamId,
-            totalResourcesPerPatient, baseSeed, patientIndex,
-            sharedPractitionerIds, sharedMedicationIds, config, ids);
-
-        ApplyGenerationRequirements(entries, generationRequirementsPlan);
-    }
-
-    /// <summary>
     /// Emits the Hypoglycemic-measure-qualifying MedicationRequest +
     /// MedicationAdministration pair (insulin glargine, RxNorm 274783) that
     /// references the run-scoped shared <c>HypoInsulinGlargineMedication</c>.
-    /// Only the streaming path uses this today (driven by
-    /// <c>PatientProfile.RequiresHypoglycemicMedication</c>) but it lives here
-    /// so any future caller can opt in via
-    /// <see cref="AddPatientCoreAndScenarioResources"/>.
+    /// Used when Thetis does not already emit a qualifying insulin pair
+    /// (<c>PatientProfile.RequiresHypoglycemicMedication</c>).
     /// </summary>
     internal static void AddHypoglycemicQualifyingMedicationEntries(
         List<Bundle.EntryComponent> entries,
@@ -657,18 +283,27 @@ internal static class ScenarioResourceGeneration
                 false, ids.HypoInsulinGlargineMedication)));
     }
 
-    internal static void ApplyGenerationRequirements(
+    /// <summary>
+    /// Stamps consumer-owned test-fixture opportunities onto already-generated FHIR
+    /// (extensions the suite will remove, identifiers org-location maps match, etc.).
+    /// Thetis/classic synthesis stays clinical; this pass is how Automation aligns
+    /// payload shape to the selected normalization suite and organization resource map
+    /// without teaching the engine those products.
+    /// </summary>
+    /// <returns>Number of resource/requirement applications performed.</returns>
+    internal static int ApplyGenerationRequirements(
         List<Bundle.EntryComponent> entries,
         GenerationRequirementsPlan? generationRequirementsPlan)
     {
         if (generationRequirementsPlan == null || generationRequirementsPlan.Requirements.Count == 0)
-            return;
+            return 0;
 
         var resourcesByType = entries
             .Where(e => e.Resource != null)
             .GroupBy(e => e.Resource!.TypeName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Select(e => e.Resource!).ToList(), StringComparer.OrdinalIgnoreCase);
 
+        var applied = 0;
         foreach (var requirement in generationRequirementsPlan.Requirements)
         {
             foreach (var resourceType in requirement.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase))
@@ -676,22 +311,34 @@ internal static class ScenarioResourceGeneration
                 if (!resourcesByType.TryGetValue(resourceType, out var candidates) || candidates.Count == 0)
                     continue;
 
-                // Most requirement types only need one representative resource to ensure
-                // an opportunity exists (normalization scaffolding). Organization location
-                // mapping requirements, however, must be applied to every candidate Location
-                // so org-mapping predicates can match across the generated encounter graph.
-                if (string.Equals(requirement.RequirementType, "OrganizationLocationMapping", StringComparison.OrdinalIgnoreCase))
+                // Stamp every candidate for ops that must fire per acquired resource
+                // (RemoveExtensions, Location copy/map). A single first-of-type stamp is
+                // lost when that resource is not acquired (e.g. an Observation dated
+                // before the report window).
+                if (AppliesToEveryCandidate(requirement.RequirementType))
                 {
                     foreach (var candidate in candidates)
+                    {
                         ApplyRequirement(requirement, candidate);
+                        applied++;
+                    }
                 }
                 else
                 {
                     ApplyRequirement(requirement, candidates[0]);
+                    applied++;
                 }
             }
         }
+
+        return applied;
     }
+
+    private static bool AppliesToEveryCandidate(string requirementType) =>
+        string.Equals(requirementType, "OrganizationLocationMapping", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(requirementType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(requirementType, "CopyLocation", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(requirementType, "CopyProperty", StringComparison.OrdinalIgnoreCase);
 
     private static void ApplyRequirement(GenerationRequirement requirement, Resource resource)
     {

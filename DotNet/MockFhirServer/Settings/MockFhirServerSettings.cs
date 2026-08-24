@@ -37,10 +37,4 @@ public class MockFhirServerSettings
     /// </summary>
     public string? ClinicalPeriodEnd { get; set; }
 
-    /// <summary>
-    /// When true, per-patient resources are compiled through Thetis Engine.
-    /// Default false keeps classic factories (A5). Shared infrastructure is
-    /// always factory-built.
-    /// </summary>
-    public bool UseThetisEngine { get; set; }
 }

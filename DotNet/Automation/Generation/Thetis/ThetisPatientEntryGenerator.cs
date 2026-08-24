@@ -34,12 +34,8 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
         (encStart, encEnd) = FhirGenerationPipeline.DeriveEncounterWindowForProfile(
             request.Profile, patientSeed, request.ClinicalPeriodStart, request.ClinicalPeriodEnd);
 
-        var observationFraction = 0.30;
-        if (request.Config?.ResourceDistribution.TryGetValue("Observation", out var fraction) == true)
-            observationFraction = fraction;
-        var observationCount = Math.Max(1, (int)(request.TotalResourcesPerPatient * observationFraction));
-
-        var spec = PatientSpecFactory.From(request.Profile, scenario, observationCount);
+        var spec = PatientSpecFactory.From(
+            request.Profile, scenario, request.TotalResourcesPerPatient, request.Config);
 
         using var scope = ThetisEngineHost.Services.CreateScope();
         var compiler = scope.ServiceProvider.GetRequiredService<IPatientGraphCompiler>();
@@ -48,7 +44,8 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
         var definition = compiler.Compile(spec);
         request.Output?.WriteLine(
             $"[Thetis] compiled dag nodes={definition.Nodes.Count} edges={definition.Edges.Count} " +
-            $"class={spec.EncounterClass} obs={spec.ObservationCount} hypo={spec.IncludeMedicationRequest}");
+            $"class={spec.EncounterClass} obs={spec.ObservationCount} medReq={spec.MedicationRequestCount} " +
+            $"hypo={spec.IncludeMedicationRequest}");
 
         var run = new GenerationRunRequest
         {
@@ -69,8 +66,18 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
                 ["stepDownLocationId"] = request.Ids.StepDownLocation,
                 ["attendingPractitionerId"] = anchors.AttendingPractId,
                 ["admittingPractitionerId"] = anchors.AdmittingPractId,
+                ["practitionerId"] = anchors.AttendingPractId,
+                [PatientSpecFactory.LocationIdVar] = request.Ids.IcuLocation,
                 [PatientSpecFactory.HypoInsulinMedicationIdVar] = request.Ids.HypoInsulinGlargineMedication,
-                ["observationCount"] = observationCount.ToString()
+                ["observationCount"] = spec.ObservationCount.ToString(),
+                ["medicationRequestCount"] = spec.MedicationRequestCount.ToString(),
+                ["medicationAdministrationCount"] = spec.MedicationAdministrationCount.ToString(),
+                ["additionalConditionCount"] = spec.AdditionalConditionCount.ToString(),
+                ["procedureCount"] = spec.ProcedureCount.ToString(),
+                ["coverageCount"] = spec.CoverageCount.ToString(),
+                ["serviceRequestCount"] = spec.ServiceRequestCount.ToString(),
+                ["specimenCount"] = spec.SpecimenCount.ToString(),
+                ["diagnosticReportCount"] = spec.DiagnosticReportCount.ToString()
             }
         };
 
@@ -91,8 +98,123 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
                 request.ClinicalPeriodStart, request.ClinicalPeriodEnd);
         }
 
-        ScenarioResourceGeneration.ApplyGenerationRequirements(entries, request.RequirementsPlan);
+        AlignEncounterToSharedStay(entries, anchors, request.Ids, encStart, encEnd);
+
+        var stamped = ScenarioResourceGeneration.ApplyGenerationRequirements(entries, request.RequirementsPlan);
+        request.Output?.WriteLine(
+            $"[Thetis] automation fixture overlay: stay locations=ED/ICU/step-down, " +
+            $"generation-requirement applications={stamped}");
+
         return entries;
+    }
+
+    /// <summary>
+    /// Overlay the Automation shared-stay graph (ED → ICU → step-down, attending,
+    /// serviceProvider) onto the Thetis Encounter. The engine mints one location
+    /// reference; org-location mapping and Location reference queries need the
+    /// full stay that factories already emit.
+    /// </summary>
+    private static void AlignEncounterToSharedStay(
+        List<Bundle.EntryComponent> entries,
+        ScenarioResourceGeneration.PatientAnchorContext anchors,
+        FhirBundleGenerator.SharedIds ids,
+        DateTime encStart,
+        DateTime encEnd)
+    {
+        var encounter = entries.Select(e => e.Resource).OfType<Encounter>().FirstOrDefault();
+        if (encounter is null)
+            return;
+
+        encounter.Location =
+        [
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.EdLocation}") { Display = "Emergency Department" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = new Period
+                {
+                    StartElement = new FhirDateTime(encStart),
+                    EndElement = new FhirDateTime(encStart.AddHours(4))
+                }
+            },
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.IcuLocation}") { Display = "Intensive Care Unit" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = new Period
+                {
+                    StartElement = new FhirDateTime(encStart.AddHours(4)),
+                    EndElement = new FhirDateTime(encEnd.AddDays(-1))
+                }
+            },
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.StepDownLocation}") { Display = "Step-Down Unit" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = new Period
+                {
+                    StartElement = new FhirDateTime(encEnd.AddDays(-1)),
+                    EndElement = new FhirDateTime(encEnd)
+                }
+            }
+        ];
+
+        if (encounter.ServiceProvider is null || string.IsNullOrWhiteSpace(encounter.ServiceProvider.Reference))
+        {
+            encounter.ServiceProvider = new ResourceReference($"Organization/{ids.Organization}")
+            {
+                Display = "General Test Hospital"
+            };
+        }
+
+        if (encounter.Participant is not { Count: > 0 })
+        {
+            encounter.Participant =
+            [
+                new Encounter.ParticipantComponent
+                {
+                    Type =
+                    [
+                        new CodeableConcept
+                        {
+                            Coding =
+                            [
+                                new Coding("http://terminology.hl7.org/CodeSystem/v3-ParticipationType", "ATND", "attender")
+                            ],
+                            Text = "Attending"
+                        }
+                    ],
+                    Period = encounter.Period,
+                    Individual = new ResourceReference($"Practitioner/{anchors.AttendingPractId}")
+                    {
+                        Display = "Attending Physician"
+                    }
+                },
+                new Encounter.ParticipantComponent
+                {
+                    Type =
+                    [
+                        new CodeableConcept
+                        {
+                            Coding =
+                            [
+                                new Coding("http://terminology.hl7.org/CodeSystem/v3-ParticipationType", "ADM", "admitter")
+                            ],
+                            Text = "Admitting"
+                        }
+                    ],
+                    Period = new Period
+                    {
+                        StartElement = encounter.Period?.StartElement,
+                        EndElement = new FhirDateTime(encStart.AddHours(2))
+                    },
+                    Individual = new ResourceReference($"Practitioner/{anchors.AdmittingPractId}")
+                    {
+                        Display = "Admitting Physician"
+                    }
+                }
+            ];
+        }
     }
 
     private static List<Bundle.EntryComponent> ExtractEntries(string bundleJson)

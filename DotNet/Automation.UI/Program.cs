@@ -232,6 +232,8 @@ builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBund
 builder.Services.AddSingleton<ISnapshotPayloadStore, AzureBlobSnapshotPayloadStore>();
 builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
 builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
+builder.Services.AddSingleton<IGeneratedTemplateCacheVersionLookup>(sp => sp.GetRequiredService<GeneratedTemplateCacheVersionStore>());
+builder.Services.AddSingleton<GeneratedPatientBundleReplayService>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();

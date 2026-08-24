@@ -88,6 +88,15 @@ public class RunExecutorGenerationBranchTests
         request.SelectedMeasures.Should().BeSameAs(selectedMeasures);
         request.ImportedPatients.Should().BeNull();
         request.GeneratedTemplateCache.Should().BeNull();
+
+        var cache = new Mock<IGeneratedPatientTemplateCache>(MockBehavior.Strict).Object;
+        var withCache = RunExecutor.BuildNonProfileGenerationRequest(
+            selectedMeasures,
+            patientCount: 4,
+            resourcesPerPatient: 123,
+            seed: 20260812,
+            cache);
+        withCache.GeneratedTemplateCache.Should().BeSameAs(cache);
         request.Profiles.Should().HaveCount(4);
         request.Profiles.Should().OnlyContain(profile =>
             selectedMeasures.All(profile.QualifiesFor)

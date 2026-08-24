@@ -724,6 +724,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Automation.UI/Dockerfile
+      additional_contexts:
+        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
     networks:
@@ -1010,6 +1012,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/MockFhirServer/Dockerfile
+      additional_contexts:
+        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
     networks:
