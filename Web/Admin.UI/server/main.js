@@ -30,9 +30,19 @@ console.log(`Using dist folder: ${distFolder}`);
 
 const config = getConfig();
 
-// Add security middleware for production use
+// Helmet is gated on NODE_ENV=production (set in the runtime image), not on
+// app.config.json "production". Defaults are too tight for this SPA: connect-src
+// inherits default-src 'self', which blocks XHR to LINK_BASE_API_URL when that
+// is a different origin (Docker: UI :8066, BFF :8063), and upgrade-insecure-requests
+// rewrites those http://localhost URLs to https:// which nothing serves.
 if (config.production || process.env.NODE_ENV === 'production') {
-  app.use(helmet());
+  const extraConnectOrigins = extraConnectOriginsFromConfig(config);
+  if (extraConnectOrigins.length) {
+    console.log('Helmet connect-src extra origins:', extraConnectOrigins.join(', '));
+  }
+  const httpHelmet = helmet(buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests: false }));
+  const httpsHelmet = helmet(buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests: true }));
+  app.use((req, res, next) => (req.secure ? httpsHelmet : httpHelmet)(req, res, next));
 }
 
 app.use(apiLimiter);
@@ -72,6 +82,48 @@ app.all('/{*any}', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+function originFromAbsoluteUrl(value) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.origin;
+    }
+  } catch {
+    // Relative paths such as /api stay same-origin and do not need a CSP exception.
+  }
+
+  return null;
+}
+
+function uniqueOrigins(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function extraConnectOriginsFromConfig(config) {
+  return uniqueOrigins([
+    originFromAbsoluteUrl(config.baseApiUrl),
+    originFromAbsoluteUrl(config.oauth2 && config.oauth2.issuer),
+    originFromAbsoluteUrl(config.grafanaUrl),
+    originFromAbsoluteUrl(config.kafkaUrl)
+  ]);
+}
+
+function buildHelmetOptions(extraConnectOrigins, { upgradeInsecureRequests } = { upgradeInsecureRequests: false }) {
+  return {
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'connect-src': ["'self'", ...extraConnectOrigins],
+        'upgrade-insecure-requests': upgradeInsecureRequests ? [] : null
+      }
+    }
+  };
+}
 
 function getDistFolder() {
   let folder;
