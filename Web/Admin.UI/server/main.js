@@ -32,7 +32,13 @@ const config = getConfig();
 
 // Add security middleware for production use
 if (config.production || process.env.NODE_ENV === 'production') {
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        connectSrc: getConnectSources(config.baseApiUrl)
+      }
+    }
+  }));
 }
 
 app.use(apiLimiter);
@@ -95,6 +101,28 @@ function getDistFolder() {
   }
 
   return folder;
+}
+
+function getConnectSources(baseApiUrl) {
+  const connectSources = ["'self'"];
+
+  if (!baseApiUrl) {
+    return connectSources;
+  }
+
+  try {
+    const apiUrl = new URL(baseApiUrl);
+
+    if (apiUrl.protocol === 'http:' || apiUrl.protocol === 'https:') {
+      connectSources.push(apiUrl.origin);
+    } else {
+      console.warn(`Ignoring non-HTTP(S) base API URL in CSP: ${baseApiUrl}`);
+    }
+  } catch {
+    console.warn(`Ignoring invalid base API URL in CSP: ${baseApiUrl}`);
+  }
+
+  return connectSources;
 }
 
 function getConfig() {
