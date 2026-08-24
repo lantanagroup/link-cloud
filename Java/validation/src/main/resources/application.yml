@@ -53,6 +53,14 @@ spring:
       group-id: validation
     producer:
       client-id: validation-service
+    retry:
+      # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
+      # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
+      consumer-retry-duration:
+        - PT20S
+        - PT60S
+        - PT120S
+      disable-retry-consumer: false
     #properties:
       #security.protocol: SASL_SSL
       #sasl.mechanism: PLAIN
