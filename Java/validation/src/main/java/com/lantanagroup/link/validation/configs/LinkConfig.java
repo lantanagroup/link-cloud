@@ -38,4 +38,11 @@ public class LinkConfig {
 
     @Getter @Setter
     private List<String> whiteListValueSetRegex = new ArrayList<>();
+
+    /**
+     * Configured validation-result rules whose matches should be dropped before categorization,
+     * persistence, and downstream validity calculations.
+     */
+    @Getter @Setter
+    private List<ValidationResultIgnoreRuleConfig> validationResultIgnoreRules = new ArrayList<>();
 }
