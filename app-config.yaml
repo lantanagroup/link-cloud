@@ -383,25 +383,26 @@ global:
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
     consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
-  # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
-  # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
-  # .NET side puts none there. Neither failure is loud, so treat these as a single change.
-  # They are separate keys because Spring cannot bind a colon-separated key, and the Java services are
-  # being retired: a shared key would leave the surviving .NET services carrying a translation layer
-  # for a platform that no longer exists. When Validation is retired, drop the dotted key below and
-  # keep the .NET one.
-  # In Azure App Configuration these are two rows, each in its runtime's convention:
-  #   PreQualification:WritePreQualOperationOutcome        (.NET, as with other Section:Key rows)
-  #   /pre-qualification/write-pre-qual-operation-outcome  (Java, as with /link/report/base-url)
-  - key: "PreQualification:WritePreQualOperationOutcome"
-    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
+  # SYSTEM FEATURE SWITCH — one decision for the whole deployment, not a Tenant setting.
+  # It is catalogued here, unlabeled, so every service sees the same answer: today only Tenant acts
+  # on it, but the switch decides whether this deployment does NHSN measure-enrollment reporting at
+  # all, and further services are expected to read it as the workflow lands (LEGLINK-698/701).
+  #
+  # The Angular Admin UI needs the same answer and cannot read App Configuration. It is served by a
+  # container that maps LINK_DMRP_ENABLED into its runtime app.config, so the switch reaches the UI
+  # out of band. The two MUST agree, and the failure modes are not symmetric:
+  #   UI off, services on  -> the facility form asks for a schedule the Tenant API then refuses. Loud.
+  #   UI on, services off  -> the form sends an empty schedule Tenant accepts, quietly creating a
+  #                           facility with no scheduled reports and no jobs. Silent.
+  # So the UI must never be switched on ahead of the services.
+  #
+  # Expected to end up permanently on, at which point this row and LINK_DMRP_ENABLED both go away.
+  - key: "DMRP:Enabled"
+    description: "Boolean flag (default false) that turns on DMRP integration for the deployment. When enabled, facility reporting plans are sourced from the NHSN DMRP API rather than chosen per facility, the DMRP controllers are served under api/dmrp by their host service, and a facility's scheduled reports are derived from its reporting plans. When disabled, Link performs facility dQM reporting on its own and the api/dmrp routes do not exist. Must be set to the same value as the Admin UI container's LINK_DMRP_ENABLED."
     required: false
-    consumers: ["Report"]
-  - key: "pre-qualification.write-pre-qual-operation-outcome"
-    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
-    required: false
-    runtime: "java"
-    consumers: ["Report", "Validation"]
+    defaultValue: "false"
+    consumers: ["Tenant"]
+
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -592,9 +593,9 @@ services:
   # only where the mock is deployed, and never in a production store.
   MockDmrpApi:
     - key: "MockDmrpApi:Enabled"
-      description: "Master switch for the mock DMRP surface. When false, every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped. Absent means enabled, so provision a row only where the mock should be off. A production row would be misleading rather than effective: the service refuses to serve in the Production environment regardless of configuration."
+      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped, so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
       required: false
-      defaultValue: "true"
+      defaultValue: "false"
     - key: "MockDmrpApi:AuthClientId"
       description: "Client id the mock's token endpoint accepts. Provision per environment to move off the shipped non-production value."
       required: false
@@ -756,10 +757,6 @@ services:
       description: "Boolean flag to restrict facility IDs to numeric values only."
       required: false
       defaultValue: "false"
-    - key: "DMRP:Enabled"
-      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
-      required: false
-      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
@@ -801,9 +798,9 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
-    # The master gate, pre-qualification.write-pre-qual-operation-outcome, is registered under
-    # global instead of here: the .NET Report service reads that same key (LEGLINK-466). Only the
-    # expression toggle below is Validation-only.
+    - key: "pre-qualification.write-pre-qual-operation-outcome"
+      description: "Boolean flag (default false). When true, the Validation service writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is the sole writer of that resource. When false, no OperationOutcome is written. Automation.UI reads the same key to predict ABS OperationOutcome counts for failed-validation patients."
+      required: false
     - key: "pre-qualification.write-expressions-in-operation-outcome"
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false

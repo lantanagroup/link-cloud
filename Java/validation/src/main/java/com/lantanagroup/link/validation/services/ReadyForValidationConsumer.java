@@ -119,8 +119,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         // failure after this append - producing ValidationComplete, say - sends the record to the retry
         // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
         // pre-qual OperationOutcome already present in it means we appended one previously and must not
-        // append a second. Keyed on the oo-total extension, which only this writer emits: the Report
-        // service's legacy flat OperationOutcome does not carry it and is correctly ignored here.
+        // append a second. Keyed on the oo-total extension, which only this writer emits. An unrelated
+        // OperationOutcome without that extension is ignored here.
         //
         // This narrows the window rather than closing it, and the remaining gaps are tracked in
         // LEGLINK-800: the REST fallback supplies a bundle with no previously appended OperationOutcome

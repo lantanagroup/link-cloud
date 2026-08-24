@@ -1,12 +1,40 @@
+# Compose uses context: . for most images. Anything not ignored is sent to
+# every service build and kept in BuildKit cache. artifacts/ alone is ~8GB
+# and was being copied into each of ~16 images.
+
+# Local / agent output
+artifacts/
+TestResults/
+.tmp*/
+.tmp-*/
+.agent-out/
 .docker/
+.tmp-au-build/
+.tmp-bin/
+.tmp-obj/
+.tmpbuild/
+.tmpobj/
+
+# Not needed to compile service images
 .github/
 .junie/
 Azure_Pipelines/
 docs/
 Java/
-**/*Tests/
-Scripts/
 Web/
+Scripts/
+Tests/
+**/*Tests/
+Prompt Staging/
+Config/
+dashboards/
+*.sln
+*.slnLaunch.user
+docker-compose.dcproj
+app-config.yaml
+NHSN*.txt
+smoke-test*.log
+
 **/.classpath
 **/.coderabbit.yaml
 **/.dockerignore
@@ -35,6 +63,8 @@ Web/
 **/values.dev.yaml
 **/.idea
 *.iml
+*.log
+*.user
 AGENTS.md
 LICENSE
 README.md

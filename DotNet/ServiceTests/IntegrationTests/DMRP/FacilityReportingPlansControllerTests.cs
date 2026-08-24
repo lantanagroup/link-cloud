@@ -47,21 +47,31 @@ public class FacilityReportingPlansControllerTests : IDisposable
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
 
-        // The suite shares one database, so start each test from an empty table.
-        foreach (var plan in _planRepository.GetAllAsync().GetAwaiter().GetResult())
-        {
-            _planRepository.Remove(plan);
-        }
-
-        _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
+        // The suite shares one database across all three DMRP test classes, which run serially in an
+        // unspecified order. Clearing on the way in as well as out keeps a class that failed part way
+        // through from leaking rows into whichever class runs next - and DeleteAllAsync now refuses
+        // while any reporting plan exists, so a leaked row turns an unrelated test red.
+        ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
     }
 
     public void Dispose()
     {
+        ClearReportingPlans();
+
         _fixture.ResetFacilityExistence();
         _scope.Dispose();
+    }
+
+    private void ClearReportingPlans()
+    {
+        foreach (var plan in _planRepository.GetAllAsync().GetAwaiter().GetResult())
+        {
+            _planRepository.Remove(plan);
+        }
+
+        _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
     }
 
     private async Task<string> CreateMappingAsync()

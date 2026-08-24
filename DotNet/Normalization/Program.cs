@@ -199,11 +199,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IVendorVersionOperationPresetQueries, VendorVersionOperationPresetQueries>();
     builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
+    builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+    builder.Services.AddScoped<IHSLOCManager, HSLOCManager>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 

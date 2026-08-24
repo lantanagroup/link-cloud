@@ -1,6 +1,4 @@
-﻿using Google.Protobuf.Collections;
-using Grpc.Core;
-using Hl7.Fhir.ElementModel;
+﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
