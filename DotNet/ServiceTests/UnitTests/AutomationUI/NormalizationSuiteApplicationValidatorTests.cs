@@ -40,7 +40,7 @@ public class NormalizationSuiteApplicationValidatorTests
     }
 
     [Fact]
-    public async Task NonOptionalOperation_AllNoAction_FailsValidation()
+    public async Task NonOptionalOperation_AllNoAction_PassesValidation()
     {
         var output = new CapturingOutput();
         var sut = new NormalizationSuiteApplicationValidator(output);
@@ -52,8 +52,10 @@ public class NormalizationSuiteApplicationValidatorTests
             "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CopyProperty:OpNoAction:NoAction]"
         };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            sut.ValidateAllAsync(abs, suite, logs));
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("NoAction=1", StringComparison.Ordinal));
     }
 
     [Fact]
