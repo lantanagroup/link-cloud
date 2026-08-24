@@ -3,10 +3,15 @@ import {ToastrService} from "ngx-toastr";
 import {throwError} from "rxjs/internal/observable/throwError";
 
 interface IProblemDetails {
-  title?: string;
-  status?: number;
-  detail?: string;
-  traceId?: string;
+  title?: unknown;
+  status?: unknown;
+  detail?: unknown;
+  traceId?: unknown;
+}
+
+interface INormalizedError {
+  title: string;
+  detail: string;
 }
 
 @Injectable({
@@ -14,6 +19,7 @@ interface IProblemDetails {
 })
 export class ErrorHandlingService {
 
+  private readonly normalizedErrors = new WeakMap<object, INormalizedError>();
 
   constructor(private toastr: ToastrService) {
   }
@@ -24,18 +30,41 @@ export class ErrorHandlingService {
       .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP]');
   }
 
-  private getProblemDetails(err: any): { title: string; detail: string } | undefined {
+  private getTextValue(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+  }
+
+  private sanitizeText(value: unknown, fallback: unknown): string {
+    const text = this.getTextValue(value) ?? this.getTextValue(fallback) ?? 'An unknown error occurred';
+
+    return this.sanitizeErrorMessage(text);
+  }
+
+  private getHttpStatus(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599
+      ? value
+      : undefined;
+  }
+
+  private getProblemDetails(err: any): INormalizedError | undefined {
     const problemDetails = err?.error as IProblemDetails | undefined;
 
-    if (!problemDetails || typeof problemDetails !== 'object' ||
-      (!problemDetails.title && problemDetails.status === undefined && !problemDetails.detail)) {
+    if (!problemDetails || typeof problemDetails !== 'object' || Array.isArray(problemDetails)) {
       return undefined;
     }
 
-    const title = this.sanitizeErrorMessage(problemDetails.title ?? 'Request failed');
-    const status = problemDetails.status ?? err?.status;
-    const detail = this.sanitizeErrorMessage(problemDetails.detail ?? err?.message ?? 'An unknown error occurred');
-    const traceId = problemDetails.traceId ? this.sanitizeErrorMessage(problemDetails.traceId) : undefined;
+    const titleValue = this.getTextValue(problemDetails.title);
+    const detailValue = this.getTextValue(problemDetails.detail);
+    const traceIdValue = this.getTextValue(problemDetails.traceId);
+    const status = this.getHttpStatus(problemDetails.status) ?? this.getHttpStatus(err?.status);
+
+    if (!titleValue && status === undefined && !detailValue && !traceIdValue) {
+      return undefined;
+    }
+
+    const title = this.sanitizeText(titleValue, 'Request failed');
+    const detail = this.sanitizeText(detailValue, err?.message);
+    const traceId = traceIdValue ? this.sanitizeText(traceIdValue, '') : undefined;
 
     return {
       title: status === undefined ? title : `${title} (${status})`,
@@ -43,21 +72,32 @@ export class ErrorHandlingService {
     };
   }
 
-  handleError(err: any, genericToaster: boolean = true) {
+  private normalizeError(err: any, fallbackDetail: string): INormalizedError {
     const problemDetails = this.getProblemDetails(err);
-    let errorMessage: string;
-    let errorTitle = 'Error';
 
     if (problemDetails) {
-      errorMessage = problemDetails.detail;
-      errorTitle = problemDetails.title;
-    } else {
-      if (err.message) {
-        errorMessage = this.sanitizeErrorMessage(err.message);
-      } else {
-        errorMessage = 'An unknown error occurred';
-      }
+      return problemDetails;
     }
+
+    return {
+      title: 'Error',
+      detail: this.sanitizeText(err?.message, fallbackDetail)
+    };
+  }
+
+  formatError(err: any, fallbackDetail: string): string {
+    const normalizedError = err && typeof err === 'object'
+      ? this.normalizedErrors.get(err) ?? this.normalizeError(err, fallbackDetail)
+      : this.normalizeError(err, fallbackDetail);
+
+    return `${normalizedError.title}: ${normalizedError.detail}`;
+  }
+
+  handleError(err: any, genericToaster: boolean = true) {
+    const normalizedError = this.normalizeError(err, 'An unknown error occurred');
+    const rethrownError = err && typeof err === 'object' ? err : new Error(normalizedError.detail);
+    const errorMessage = normalizedError.detail;
+    const errorTitle = normalizedError.title;
 
     if (genericToaster) {
       this.toastr.error(errorMessage, errorTitle, {
@@ -70,9 +110,11 @@ export class ErrorHandlingService {
       });
     }
 
-    err.message = errorMessage;
+    this.normalizedErrors.set(rethrownError, normalizedError);
 
-    return throwError(() => err);
+    rethrownError.message = errorMessage;
+
+    return throwError(() => rethrownError);
 
   }
 

@@ -11,6 +11,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { RouterModule } from '@angular/router';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
+import { ErrorHandlingService } from 'src/app/services/error-handling.service';
 import { OperationJsonDialogComponent } from 'src/app/components/normalization/operations/operations-list/operation-json-dialog-component';
 import { ValidationCategoryBulkImportDialogComponent } from '../validation-category-bulk-import-dialog/validation-category-bulk-import-dialog.component';
 import { DeleteConfirmationDialogComponent } from 'src/app/components/core/delete-confirmation-dialog/delete-confirmation-dialog.component';
@@ -67,6 +68,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
 
   constructor(
     private validationService: ValidationService,
+    private errorHandlingService: ErrorHandlingService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar
   ) {}
@@ -215,12 +217,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
   }
 
   private formatProblemDetails(error: any, fallbackDetail: string): string {
-    const problemDetails = error?.error;
-    const title = problemDetails?.title ?? error?.statusText ?? 'Request failed';
-    const status = problemDetails?.status ?? error?.status ?? 'Unknown status';
-    const detail = problemDetails?.detail ?? error?.message ?? fallbackDetail;
-
-    return `${title} (${status}): ${detail}`;
+    return this.errorHandlingService.formatError(error, fallbackDetail);
   }
 
   private downloadJson(data: any, fileName: string): void {
