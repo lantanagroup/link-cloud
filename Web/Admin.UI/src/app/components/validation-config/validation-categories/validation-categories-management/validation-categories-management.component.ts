@@ -102,7 +102,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.dataSource.data = categories as ICategorySnapshot[];
       },
       error: (error) => {
-        this.snackBar.open(`Failed to load categories: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, 'Failed to load categories.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -156,7 +156,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.loadCategories();
       },
       error: (error) => {
-        this.snackBar.open(`$initialize failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, '$initialize failed.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -187,7 +187,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
           this.loadCategories();
         },
         error: (error) => {
-          this.snackBar.open(`$bulk-import failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+          this.snackBar.open(this.formatProblemDetails(error, '$bulk-import failed.'), '', {
             duration: 5000,
             panelClass: 'error-snackbar',
             horizontalPosition: 'end',
@@ -204,7 +204,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.downloadJson(categories, 'validation-categories.json');
       },
       error: (error) => {
-        this.snackBar.open(`$bulk-export failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, '$bulk-export failed.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -212,6 +212,15 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         });
       }
     });
+  }
+
+  private formatProblemDetails(error: any, fallbackDetail: string): string {
+    const problemDetails = error?.error;
+    const title = problemDetails?.title ?? error?.statusText ?? 'Request failed';
+    const status = problemDetails?.status ?? error?.status ?? 'Unknown status';
+    const detail = problemDetails?.detail ?? error?.message ?? fallbackDetail;
+
+    return `${title} (${status}): ${detail}`;
   }
 
   private downloadJson(data: any, fileName: string): void {
