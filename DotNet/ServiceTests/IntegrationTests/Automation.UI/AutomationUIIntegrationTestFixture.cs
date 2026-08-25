@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.SignalR;
@@ -84,7 +85,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             new ImportedBundleExecutionResolver(Database, Mock.Of<IImportedBundleContentStore>()),
             Mock.Of<IGeneratedPatientTemplateCache>(),
             new GeneratedTemplateCacheVersionStore(Database),
-            Mock.Of<ILivePatientEventInjector>());
+            Mock.Of<ILivePatientEventInjector>(),
+            new NoOpTestRailPublisher());
     }
 
     public async Task InitializeAsync()
@@ -139,4 +141,13 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
         if (_disposed) return;
         DisposeAsync().GetAwaiter().GetResult();
     }
+}
+
+internal sealed class NoOpTestRailPublisher : ITestRailPublisher
+{
+    public Task PublishScenarioRunAsync(ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task PublishApiHealthRunAsync(ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }
