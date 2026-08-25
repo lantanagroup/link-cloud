@@ -17,9 +17,12 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -50,7 +53,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // --- Rubric-governance domain exceptions (these types are only ever thrown by governance paths) ---
+
+    private static final String MISSING_BODY_MARKER = "Required request body is missing";
+
 
     @ExceptionHandler({
             RubricNotFoundException.class,
@@ -105,8 +110,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (!isGovernance(request)) {
             return super.handleHttpMessageNotReadable(ex, headers, status, request);
         }
-        logger.warn("Rejected unreadable request body: {}", LogUtils.sanitize(ex.getMessage()));
-        return envelope(HttpStatus.BAD_REQUEST, "Malformed request body", null);
+
+        logger.warn("Rejected unreadable request body: {}", LogUtils.sanitize(ex.getMostSpecificCause().getMessage()));
+        boolean missingBody = ex.getMessage() != null && ex.getMessage().contains(MISSING_BODY_MARKER);
+        String error = missingBody ? "body should not be empty" : "body is not valid JSON";
+        return envelope(HttpStatus.BAD_REQUEST, "Request validation failed", List.of(error));
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
+            HttpMediaTypeNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (!isGovernance(request)) {
+            return super.handleHttpMediaTypeNotSupported(ex, headers, status, request);
+        }
+        MediaType contentType = ex.getContentType();
+        logger.warn("Rejected unsupported content type: {}", LogUtils.sanitize(String.valueOf(contentType)));
+        String error = (contentType == null)
+                ? "Content-Type is missing; expected application/json"
+                : "Content-Type '" + contentType + "' is not supported; expected application/json";
+        return envelope(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type", List.of(error));
     }
 
     @Override
@@ -119,6 +141,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String message = "Invalid value '" + ex.getValue() + "' for parameter '" + name + "'";
         logger.warn("Rejected request parameter: {}", LogUtils.sanitize(message));
         return envelope(HttpStatus.BAD_REQUEST, message, null);
+    }
+
+
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        if (!isGovernance(request)) {
+            return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        }
+        if (body == null && ex instanceof ErrorResponse errorResponse) {
+            body = errorResponse.getBody();
+        }
+
+        String message = (body instanceof ProblemDetail detail && detail.getDetail() != null)
+                ? detail.getDetail()
+                : "Request could not be processed";
+        logger.warn("Rejected governance request [{}]: {}", statusCode, LogUtils.sanitize(message));
+        return envelope(statusCode, message, null);
     }
 
     // --- Catch-all: envelope 500 for governance; framework-style ProblemDetail otherwise. Internal
