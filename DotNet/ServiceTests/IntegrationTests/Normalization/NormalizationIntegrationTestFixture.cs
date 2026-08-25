@@ -159,6 +159,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
             builder.Services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
             builder.Services.AddSingleton<IResourceCache, HybridResourceCache>();
+            builder.Services.AddSingleton<IResourceCachePurger, ResourceCachePurger>();
             
             builder.Services.AddMemoryCache();
 
