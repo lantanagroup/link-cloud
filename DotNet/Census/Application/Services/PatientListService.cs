@@ -152,17 +152,14 @@ public class PatientListService : IPatientListService
 
                     _metrics.IncrementPatientDischargedCounter([
                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
                         new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent,
-                            PatientEvents.Discharge.ToString()),
-                        new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, sharedCorrelationId)
+                            PatientEvents.Discharge.ToString())
                     ]);
                 }
                 else
                 {
                     _metrics.IncrementPatientAdmittedCounter([
                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
                         new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent,
                             PatientEvents.Admit.ToString())
                     ]);

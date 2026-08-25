@@ -10,6 +10,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -142,9 +143,8 @@ namespace LantanaGroup.Link.Report.Application.Core
                             writer.WriteLine(measureReportString);
 
                             _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
-                                new KeyValuePair<string, object?>("facilityId", entry.FacilityId),
-                                new KeyValuePair<string, object?>("measure.schedule.id", reportSchedule.Id),
-                                new KeyValuePair<string, object?>("measure", measureReport.Measure)
+                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, entry.FacilityId),
+                                new KeyValuePair<string, object?>("measure", NormalizeMeasureId(measureReport.Measure, reportSchedule.ReportTypes))
                             });
                         }
                     }
@@ -185,6 +185,36 @@ namespace LantanaGroup.Link.Report.Application.Core
             {
                 await appendBlobClient.AppendBlockAsync(stream);
             }
+        }
+
+        internal static string NormalizeMeasureId(string? measureCanonical, IEnumerable<string>? configuredIds)
+        {
+            if (string.IsNullOrWhiteSpace(measureCanonical))
+            {
+                return string.Empty;
+            }
+
+            if (configuredIds != null)
+            {
+                foreach (var id in configuredIds)
+                {
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        continue;
+                    }
+
+                    if (measureCanonical.Equals(id, StringComparison.OrdinalIgnoreCase)
+                        || measureCanonical.EndsWith("/" + id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return id;
+                    }
+                }
+            }
+
+            var slash = measureCanonical.LastIndexOf('/');
+            return slash >= 0 && slash < measureCanonical.Length - 1
+                ? measureCanonical[(slash + 1)..]
+                : measureCanonical;
         }
     }
 }

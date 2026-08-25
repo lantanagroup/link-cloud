@@ -150,7 +150,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         if (resultBundle != null)
         {
             yield return resultBundle;
-            IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString(), resultBundle.Id);
+            IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString());
 
             while (resultBundle.Link.Exists(x => x.Relation == "next"))
             {
@@ -187,7 +187,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 if (resultBundle != null)
                 {
                     yield return resultBundle;
-                    IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString(), resultBundle.Id);
+                    IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString());
                 }
                 else
                 {
@@ -255,7 +255,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
                 throw new TooManyRequestsException($"Too many requests for non-paging search on {request.resourceType}", retryAfter);
             }
-            IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+            IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString());
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
                 request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
@@ -263,15 +263,13 @@ public class SearchFhirCommand : ISearchFhirCommand
         }
     }
 
-    private void IncrementResourceAcquiredCounter(string? correlationId, string? patientIdReference, string? facilityId, string? reportTrackingId, string? queryType, string resourceType, string resourceId)
+    private void IncrementResourceAcquiredCounter(string? correlationId, string? patientIdReference, string? facilityId, string? queryType, string resourceType)
     {
         var tags = new List<KeyValuePair<string, object?>>
         {
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-            new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, reportTrackingId),
             new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(queryType)),
-            new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resourceType),
-            new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resourceId)
+            new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resourceType)
         };
 
         if (_telemetrySettings.CurrentValue.PatientTags)

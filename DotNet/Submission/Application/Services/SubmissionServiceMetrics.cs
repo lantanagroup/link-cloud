@@ -23,11 +23,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
         public List<KeyValuePair<string, object?>> BuildTags(string? correlationId, Guid reportScheduleId, string? patientId, string facilityId, string destinationType)
         {
+            // correlationId / reportScheduleId / patientId are retained on the signature
+            // for caller compatibility; they must not appear on Prometheus meters.
+            _ = correlationId;
+            _ = reportScheduleId;
+            _ = patientId;
             return new()
             {
-                new(DiagnosticNames.CorrelationId, correlationId ?? string.Empty),
-                new(DiagnosticNames.ReportTrackingId, reportScheduleId.ToString()),
-                new(DiagnosticNames.PatientId, patientId ?? string.Empty),
                 new(DiagnosticNames.FacilityId, facilityId),
                 new(DiagnosticNames.DestinationType, destinationType)
             };

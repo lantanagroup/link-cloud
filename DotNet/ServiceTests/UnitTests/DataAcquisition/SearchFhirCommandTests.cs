@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -232,6 +233,35 @@ public class SearchFhirCommandTests
         metrics.Verify(
             m => m.IncrementResourceAcquiredCounter(It.IsAny<List<KeyValuePair<string, object?>>>()),
             Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResourceAcquiredCounter_OmitsUnboundedIdentityLabels()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        List<KeyValuePair<string, object?>>? capturedTags = null;
+        metrics
+            .Setup(m => m.IncrementResourceAcquiredCounter(It.IsAny<List<KeyValuePair<string, object?>>>()))
+            .Callback<List<KeyValuePair<string, object?>>>(tags => capturedTags = tags);
+
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        Assert.NotNull(capturedTags);
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.FacilityId && (tag.Value?.ToString() ?? "") == "test-facility");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.ResourceType && (tag.Value?.ToString() ?? "") == "Patient");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.Phase);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ResourceId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ReportTrackingId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.PatientId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.CorrelationId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "patient_id");
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "correlation_id");
     }
 
     [Fact]

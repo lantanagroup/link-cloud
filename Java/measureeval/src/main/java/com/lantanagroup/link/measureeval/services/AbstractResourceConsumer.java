@@ -130,7 +130,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (perf) taskStopWatch.stop();
 
             if (perf) taskStopWatch.start("incrementRecordCount");
-            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
+            Attributes attributes = Attributes.builder()
+                    .put(stringKey(DiagnosticNames.FACILITY_ID), facilityId)
+                    .put(stringKey(DiagnosticNames.PHASE), DiagnosticNames.normalizePhase(value.getQueryType() != null ? value.getQueryType().toString() : null))
+                    .build();
             measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
             if (perf) taskStopWatch.stop();
 
@@ -442,9 +445,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
 
-            // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-            Attributes attributes = MeasureEvalMetrics.buildAttributes(value.getQueryType().toString(), patientStatus, report.getReportTrackingId(), null);
-            measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportable);
         }
 
         if (value.getQueryType() == QueryType.INITIAL) {
@@ -466,9 +466,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
 
         if (value.getQueryType() == QueryType.INITIAL) {
-            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+            Attributes attributes = MeasureEvalMetrics.buildPatientOutcomeAttributes(value.getQueryType().toString(), patientStatus);
             if (reportablePatient) {
                 measureEvalMetrics.IncrementPatientReportableCounter(attributes);
             } else {
@@ -482,12 +480,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report) {
         long elapsedMs = System.currentTimeMillis() - kafkaIngestTimestamp;
-        Attributes attributes = Attributes.builder()
-                .put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId())
-                .put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId())
-                .put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId())
-                .put(stringKey("report.type"), report.getReportType())
-                .build();
+        Attributes attributes = MeasureEvalMetrics.buildAttributes(
+                null,
+                patientStatus,
+                report.getReportType());
         measureEvalMetrics.recordNormalizedToReportGeneratedDuration(elapsedMs, attributes);
         logger.info("Normalized-to-MeasureReportGenerated duration: {} ms [facility={}, patient={}, correlationId={}, reportType={}]",
                 elapsedMs, patientStatus.getFacilityId(), patientStatus.getPatientId(),

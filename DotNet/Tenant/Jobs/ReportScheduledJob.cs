@@ -121,9 +121,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 _metrics.IncrementReportScheduledCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportTypes),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportTypes)
                 ]);
 
             }

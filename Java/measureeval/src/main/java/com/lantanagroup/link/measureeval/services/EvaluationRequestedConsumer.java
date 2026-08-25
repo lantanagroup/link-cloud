@@ -71,11 +71,9 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        var reportTrackingId = record.value().getReportTrackingId();
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_TRACKING_ID), reportTrackingId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-
         String facilityId = record.key();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), facilityId).build();
+        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
         var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
@@ -141,9 +139,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+        Attributes attributes = MeasureEvalMetrics.buildPatientOutcomeAttributes(null, patientStatus);
             measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportablePatient);
 
     }

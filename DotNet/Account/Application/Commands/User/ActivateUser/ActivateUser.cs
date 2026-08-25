@@ -63,14 +63,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     return false;
                 }
 
-                //generate tags for telemetry                
+                //generate tags for telemetry
+                List<KeyValuePair<string, object?>> metricTags = [];
                 foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.Facility))
                 {
                     var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, claim.ClaimValue);
-                    tagList.Add(tag);
+                    metricTags.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountActiviatedCounter(tagList);
+                _metrics.IncrementAccountActiviatedCounter(metricTags);
                 _logger.LogActivateUser(userId.ToString(), requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event

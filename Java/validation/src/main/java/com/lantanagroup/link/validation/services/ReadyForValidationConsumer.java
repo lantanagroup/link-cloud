@@ -189,9 +189,10 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             results = validationService.validate(bundle);
             _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
 
-            attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
+            attributes = buildMetricAttributes(results, facilityId);
             validationMetrics.addToValidationCounter(attributes);
             validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
+            addIssueMetrics(results, attributes);
         }
 
         for (Result result : results) {
@@ -214,40 +215,40 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         return results;
     }
 
-    private Attributes buildMetricAttributes(Bundle bundle, List<Result> results, String correlationId, String facilityId, String patientId, String reportId) {
+    private Attributes buildMetricAttributes(List<Result> results, String facilityId) {
+        int[] counts = countIssuesBySeverity(results);
+        String validationOutcome = (counts[0] == 0 && counts[1] == 0) ? "Passed" : "Failed";
+        return Attributes.builder()
+                .put(DiagnosticNames.FACILITY_ID, facilityId)
+                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
+                .build();
+    }
 
-        int resourceCount = bundle.getEntry().size();
-        int totalIssueCount = 0;
-        int uncategorizedIssueCount = 0;
-        int acceptableIssueCount = 0;
-        int unacceptableIssueCount = 0;
+    private void addIssueMetrics(List<Result> results, Attributes baseAttributes) {
+        int[] counts = countIssuesBySeverity(results);
+        validationMetrics.addIssues("uncategorized", counts[0], baseAttributes);
+        validationMetrics.addIssues("unacceptable", counts[1], baseAttributes);
+        validationMetrics.addIssues("acceptable", counts[2], baseAttributes);
+    }
+
+    /**
+     * @return [uncategorized, unacceptable, acceptable]
+     */
+    private static int[] countIssuesBySeverity(List<Result> results) {
+        int uncategorized = 0;
+        int unacceptable = 0;
+        int acceptable = 0;
         for (Result result : results) {
-            totalIssueCount++;
             List<Category> categories = result.getCategories();
             if (categories == null || categories.isEmpty()) {
-                uncategorizedIssueCount++;
+                uncategorized++;
+            } else if (categories.stream().allMatch(Category::isAcceptable)) {
+                acceptable++;
             } else {
-                if (categories.stream().allMatch(Category::isAcceptable)) {
-                    acceptableIssueCount++;
-                } else {
-                    unacceptableIssueCount++;
-                }
+                unacceptable++;
             }
         }
-        String validationOutcome = (uncategorizedIssueCount == 0 && unacceptableIssueCount == 0) ? "Passed" : "Failed";
-
-        return Attributes.builder()
-                .put(DiagnosticNames.CORRELATION_ID, correlationId)
-                .put(DiagnosticNames.FACILITY_ID, facilityId)
-                .put(DiagnosticNames.PATIENT_ID, patientId)
-                .put(DiagnosticNames.REPORT_TRACKING_ID, reportId)
-                .put(DiagnosticNames.RESOURCE_COUNT, resourceCount)
-                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
-                .put(DiagnosticNames.ISSUE_COUNT_TOTAL, totalIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNCATEGORIZED, uncategorizedIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNACCEPTABLE, unacceptableIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_ACCEPTABLE, acceptableIssueCount)
-                .build();
+        return new int[] { uncategorized, unacceptable, acceptable };
     }
 
     private void produceValidationCompleteRecord(

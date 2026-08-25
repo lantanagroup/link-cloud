@@ -52,7 +52,7 @@ public class EvaluateMeasureService {
             long timeElapsed = System.currentTimeMillis() - start;
 
             if (queryType != null) {
-                Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientStatus, report.getReportTrackingId(), bundle.getEntry().size());
+                Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientStatus, report.getReportType());
                 measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
             }
             return measureReport;
