@@ -719,6 +719,9 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Telemetry__EnableTelemetry: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
