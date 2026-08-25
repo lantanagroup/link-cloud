@@ -266,6 +266,8 @@ services:
     networks:
       - link-nw
       
+  # Kafka lag exporter is an infra proposal only (.docker/kafka-exporter.proposal.yml).
+  # It is not part of this compose file and is not shown on the Automation Metrics page.
   otel-collector:
     image: otel/opentelemetry-collector:0.88.0
     container_name: open-telemetry-collector

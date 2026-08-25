@@ -10,11 +10,15 @@ exporters:
       insecure: true
       
   prometheus:
-    endpoint: "0.0.0.0:8889"  
-    const_labels:
-      label1: value1
+    endpoint: "0.0.0.0:8889"
 
 processors:
+  # Required for docker-compose parity with QA/prod collector-svc.monitoring.
+  # Limits collector RSS so a metrics flood cannot OOM the sidecar.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+    spike_limit_mib: 100
   batch:
 
 extensions:
@@ -29,9 +33,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlp/tempo]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [prometheus]
