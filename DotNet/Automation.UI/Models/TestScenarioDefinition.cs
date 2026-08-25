@@ -120,6 +120,26 @@ public class TestScenarioDefinition
     /// </summary>
     public int ReportingWindowMinutes { get; set; } = 10;
 
+    // ----- Metrics run -----
+
+    /// <summary>
+    /// When true, Automation mints X-Metrics-Mode=performance on the ad-hoc report origin.
+    /// Lightweight (default) otherwise.
+    /// </summary>
+    public bool IsMetricsRun { get; set; }
+
+    /// <summary>Optional key used later to compare against stored benchmarks.</summary>
+    public string? BenchmarkKey { get; set; }
+
+    /// <summary>Pass/fail SLO in seconds (not a soak). Null = no duration SLO.</summary>
+    public int? TargetDurationSeconds { get; set; }
+
+    /// <summary>1–8 inclusive. Maps to DA MaxConcurrentRequests later; stored now for the editor.</summary>
+    public int? Concurrency { get; set; }
+
+    /// <summary>When true, a benchmark miss fails the Automation run. Default false.</summary>
+    public bool FailRunOnBenchmark { get; set; }
+
     // ----- Imported Patients (supplemental, separate from cohorts/random pool) -----
 
     /// <summary>

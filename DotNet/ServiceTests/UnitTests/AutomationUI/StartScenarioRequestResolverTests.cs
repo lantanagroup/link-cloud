@@ -620,4 +620,89 @@ public class StartScenarioRequestResolverTests
     {
         StartScenarioRequestResolver.NormalizeReportingWindowMinutes(input).Should().Be(expected);
     }
+
+    [Fact]
+    public void Metrics_run_flag_reads_from_typed_request()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            IsMetricsRun = true,
+            BenchmarkKey = "adhoc-10p",
+            TargetDurationSeconds = 120,
+            Concurrency = 4,
+            FailRunOnBenchmark = true
+        });
+
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("adhoc-10p");
+        options.TargetDurationSeconds.Should().Be(120);
+        options.Concurrency.Should().Be(4);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Metrics_run_flag_reads_from_run_configuration_json()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = """
+                { "isMetricsRun": true, "benchmarkKey": " json-key ", "targetDurationSeconds": 90, "concurrency": 3, "failRunOnBenchmark": true }
+                """
+        });
+
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("json-key");
+        options.TargetDurationSeconds.Should().Be(90);
+        options.Concurrency.Should().Be(3);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FromScenario_copies_metrics_run_fields()
+    {
+        var scenario = new TestScenarioDefinition
+        {
+            Name = "perf",
+            IsMetricsRun = true,
+            BenchmarkKey = "saved-key",
+            TargetDurationSeconds = 45,
+            Concurrency = 2,
+            FailRunOnBenchmark = true
+        };
+
+        var request = StartScenarioRequest.FromScenario(scenario);
+        var options = StartScenarioRequestResolver.Resolve(request);
+
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("saved-key");
+        options.TargetDurationSeconds.Should().Be(45);
+        options.Concurrency.Should().Be(2);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    [InlineData(99, 8)]
+    public void Concurrency_is_clamped_to_1_through_8(int? input, int? expected)
+    {
+        StartScenarioRequestResolver.NormalizeConcurrency(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Built_in_scenario_kinds_stay_lightweight()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.AdhocReportTest,
+            IsMetricsRun = true
+        });
+
+        options.IsMetricsRun.Should().BeFalse();
+        options.Concurrency.Should().BeNull();
+    }
 }

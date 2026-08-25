@@ -51,6 +51,11 @@ public class TestScenarioConfig
     public int LokiScrapeWindowMinutes { get; set; } = 5;
 
     /// <summary>
+    /// When true, ad-hoc report generation mints X-Metrics-Mode=performance.
+    /// </summary>
+    public bool IsMetricsRun { get; set; }
+
+    /// <summary>
     /// The maximum wall-clock time the polling loop will run.
     /// Zero or negative <see cref="MaxPollingDurationMinutes"/> indicates unlimited polling.
     /// </summary>

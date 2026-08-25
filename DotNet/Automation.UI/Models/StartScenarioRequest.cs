@@ -106,6 +106,14 @@ public class StartScenarioRequest : IValidatableObject
     [Range(1, 60)]
     public int? ReportingWindowMinutes { get; set; }
 
+    public bool IsMetricsRun { get; set; }
+    public string? BenchmarkKey { get; set; }
+    [Range(1, int.MaxValue)]
+    public int? TargetDurationSeconds { get; set; }
+    [Range(1, 8)]
+    public int? Concurrency { get; set; }
+    public bool FailRunOnBenchmark { get; set; }
+
     /// <summary>
     /// Cross-field validation. Rejects inverted report windows
     /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
@@ -145,6 +153,11 @@ public class StartScenarioRequest : IValidatableObject
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
         IsLiveSimulation = scenario.IsLiveSimulation,
         ReportingWindowMinutes = scenario.ReportingWindowMinutes,
+        IsMetricsRun = scenario.IsMetricsRun,
+        BenchmarkKey = scenario.BenchmarkKey,
+        TargetDurationSeconds = scenario.TargetDurationSeconds,
+        Concurrency = scenario.Concurrency,
+        FailRunOnBenchmark = scenario.FailRunOnBenchmark,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

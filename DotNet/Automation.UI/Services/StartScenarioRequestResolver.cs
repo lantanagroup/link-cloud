@@ -160,7 +160,16 @@ public static class StartScenarioRequestResolver
             ReportPeriodEnd = reportEnd,
             NhsnOrganizationId = nhsnOrganizationId,
             IsLiveSimulation = isLiveSimulation,
-            ReportingWindowMinutes = reportingWindowMinutes
+            ReportingWindowMinutes = reportingWindowMinutes,
+            IsMetricsRun = request.IsMetricsRun
+                || ExtractBoolFromJson(request.RunConfigurationJson, "isMetricsRun") == true,
+            BenchmarkKey = FirstNonEmpty(request.BenchmarkKey, ExtractStringFromJson(request.RunConfigurationJson, "benchmarkKey")),
+            TargetDurationSeconds = request.TargetDurationSeconds
+                ?? ExtractIntFromJson(request.RunConfigurationJson, "targetDurationSeconds"),
+            Concurrency = NormalizeConcurrency(request.Concurrency
+                ?? ExtractIntFromJson(request.RunConfigurationJson, "concurrency")),
+            FailRunOnBenchmark = request.FailRunOnBenchmark
+                || ExtractBoolFromJson(request.RunConfigurationJson, "failRunOnBenchmark") == true
         };
     }
 
@@ -175,6 +184,42 @@ public static class StartScenarioRequestResolver
             <= 10 => 10,
             _ => 15
         };
+    }
+
+    internal static int? NormalizeConcurrency(int? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        return Math.Clamp(value.Value, 1, 8);
+    }
+
+    private static string? FirstNonEmpty(string? preferred, string? fallback) =>
+        !string.IsNullOrWhiteSpace(preferred) ? preferred.Trim()
+        : !string.IsNullOrWhiteSpace(fallback) ? fallback.Trim()
+        : null;
+
+    private static string? ExtractStringFromJson(string? runConfigurationJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(runConfigurationJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(runConfigurationJson);
+            if (doc.RootElement.TryGetProperty(propertyName, out var prop)
+                && prop.ValueKind == JsonValueKind.String)
+            {
+                var value = prop.GetString();
+                return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            }
+        }
+        catch
+        {
+            // fall through
+        }
+
+        return null;
     }
 
     private static Guid? ExtractGuidFromJson(string? runConfigurationJson, string propertyName)

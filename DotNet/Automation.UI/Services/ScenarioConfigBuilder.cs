@@ -43,7 +43,8 @@ public static class ScenarioConfigBuilder
             PollingIntervalSeconds = options.PollingIntervalSeconds,
             MaxPollingDurationMinutes = options.MaxPollingDurationMinutes,
             DownloadFileName = downloadFileName,
-            LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes
+            LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes,
+            IsMetricsRun = options.IsMetricsRun
         };
     }
 }

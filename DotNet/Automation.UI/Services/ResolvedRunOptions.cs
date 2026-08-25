@@ -54,4 +54,9 @@ public record ResolvedRunOptions(
     /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
     public int ReportingWindowMinutes { get; init; } = 10;
 
+    public bool IsMetricsRun { get; init; }
+    public string? BenchmarkKey { get; init; }
+    public int? TargetDurationSeconds { get; init; }
+    public int? Concurrency { get; init; }
+    public bool FailRunOnBenchmark { get; init; }
 }

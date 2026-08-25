@@ -692,6 +692,7 @@ public class AutomationRunManager : IAutomationRunManager
                     + state.Options.ImportedPatientBundles.Count,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
+                IsMetricsRun = state.Options.IsMetricsRun,
                 RunConfigurationJson = state.RunConfigurationJson,
                 Status = state.Status,
                 CreatedAt = state.CreatedAt,

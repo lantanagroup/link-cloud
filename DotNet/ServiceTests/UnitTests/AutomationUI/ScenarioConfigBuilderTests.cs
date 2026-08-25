@@ -18,7 +18,8 @@ public class ScenarioConfigBuilderTests
         int polling = 3,
         int maxPolling = 0,
         int loki = 30,
-        string nhsnOrganizationId = "10756")
+        string nhsnOrganizationId = "10756",
+        bool isMetricsRun = false)
     {
         return new ResolvedRunOptions(
             PatientCount: 1,
@@ -36,6 +37,7 @@ public class ScenarioConfigBuilderTests
             ReportPeriodStart = start,
             ReportPeriodEnd = end,
             NhsnOrganizationId = nhsnOrganizationId,
+            IsMetricsRun = isMetricsRun,
         };
     }
 
@@ -130,5 +132,16 @@ public class ScenarioConfigBuilderTests
         config.LokiScrapeWindowMinutes.Should().Be(90);
         config.NhsnOrganizationId.Should().Be("22001");
         config.PatientIds.Should().BeEmpty();
+        config.IsMetricsRun.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsMetricsRun_passes_through_to_scenario_config()
+    {
+        var config = ScenarioConfigBuilder.Build(
+            AutomationScenarioKind.Custom,
+            OptionsWith(isMetricsRun: true));
+
+        config.IsMetricsRun.Should().BeTrue();
     }
 }

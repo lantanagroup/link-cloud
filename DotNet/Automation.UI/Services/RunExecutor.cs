@@ -613,7 +613,7 @@ internal sealed class RunExecutor
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
                 var originalReportId = reportId;
-                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
+                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId, scenarioConfig.IsMetricsRun);
                 reportId = regeneratedReportId;
                 normalizationEvidenceReportId = originalReportId;
                 lock (state.Sync)
@@ -1242,7 +1242,8 @@ internal sealed class RunExecutor
             window.Start,
             window.Duration,
             scheduleFrequency,
-            reportTrackingId: Guid.NewGuid().ToString());
+            reportTrackingId: Guid.NewGuid().ToString(),
+            isMetricsRun: scenarioConfig.IsMetricsRun);
 
         // The ReportScheduled event is processed asynchronously, so the schedule record is not
         // committed the instant StartScheduledReportAsync returns. Block until Report has persisted

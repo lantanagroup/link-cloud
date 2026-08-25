@@ -167,6 +167,33 @@
                                 <label class="form-check-label" for="CleanupServiceData">Cleanup Service Data</label>
                             </div>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label d-block">Metrics Run</label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="IsMetricsRun" />
+                                <label class="form-check-label" for="IsMetricsRun">Collect performance-depth telemetry. Ordinary runs stay lightweight (success, evidence, high-level counts).</label>
+                            </div>
+                            <div class="row g-2" id="metricsRunOptions" style="display:none;">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="BenchmarkKey">Benchmark Key</label>
+                                    <input class="form-control" id="BenchmarkKey" maxlength="120" placeholder="optional" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="TargetDurationSeconds">Target Duration (seconds)</label>
+                                    <input class="form-control" type="number" id="TargetDurationSeconds" min="1" step="1" placeholder="SLO, not a soak" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="Concurrency">Concurrency (1–8)</label>
+                                    <input class="form-control" type="number" id="Concurrency" min="1" max="8" step="1" placeholder="optional" />
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="FailRunOnBenchmark" />
+                                        <label class="form-check-label" for="FailRunOnBenchmark">Fail the run if it misses the stored benchmark</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div id="cohortBuilder" class="col-12">
                             <div class="au-cohort-card mt-1 au-help-scope">
                                 <div class="card-body">
@@ -1314,6 +1341,9 @@
             syncLiveSimulationUi();
             syncReportPeriodPolicyUi();
         });
+        document.getElementById('IsMetricsRun').addEventListener('change', function () {
+            syncMetricsRunUi();
+        });
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
             reportingWindowEl.addEventListener('change', function () {
@@ -1330,6 +1360,19 @@
             fields.style.display = scheduled ? '' : 'none';
             if (!scheduled) liveToggle.checked = false;
             options.style.display = liveToggle.checked ? '' : 'none';
+        }
+
+        function syncMetricsRunUi() {
+            var options = document.getElementById('metricsRunOptions');
+            var toggle = document.getElementById('IsMetricsRun');
+            if (!options || !toggle) return;
+            options.style.display = toggle.checked ? '' : 'none';
+        }
+
+        function parseOptionalInt(value) {
+            if (value == null || String(value).trim() === '') return null;
+            var n = parseInt(value, 10);
+            return isNaN(n) ? null : n;
         }
 
         // ---- Imported Patients ----
@@ -1918,7 +1961,12 @@
                 importedPatientIds: importedIds,
                 importedPatientBundles: importedBundles,
                 isLiveSimulation: !!document.getElementById('IsLiveSimulation').checked,
-                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10)
+                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10),
+                isMetricsRun: !!document.getElementById('IsMetricsRun').checked,
+                benchmarkKey: (document.getElementById('BenchmarkKey').value || '').trim() || null,
+                targetDurationSeconds: parseOptionalInt(document.getElementById('TargetDurationSeconds').value),
+                concurrency: parseOptionalInt(document.getElementById('Concurrency').value),
+                failRunOnBenchmark: !!document.getElementById('FailRunOnBenchmark').checked
             };
         }
 
@@ -1931,6 +1979,11 @@
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
             document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
             document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
+            document.getElementById('IsMetricsRun').checked = !!data.isMetricsRun;
+            document.getElementById('BenchmarkKey').value = data.benchmarkKey || '';
+            document.getElementById('TargetDurationSeconds').value = data.targetDurationSeconds != null ? String(data.targetDurationSeconds) : '';
+            document.getElementById('Concurrency').value = data.concurrency != null ? String(data.concurrency) : '';
+            document.getElementById('FailRunOnBenchmark').checked = !!data.failRunOnBenchmark;
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
@@ -2017,6 +2070,7 @@
             syncNhsnOrganizationFromUploadedPatients();
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
+            syncMetricsRunUi();
         }
 
         // ---- Open modal ----
@@ -2051,6 +2105,11 @@
                 document.getElementById('ReportMethod').value = 'Adhoc';
                 document.getElementById('IsLiveSimulation').checked = false;
                 document.getElementById('ReportingWindowMinutes').value = '10';
+                document.getElementById('IsMetricsRun').checked = false;
+                document.getElementById('BenchmarkKey').value = '';
+                document.getElementById('TargetDurationSeconds').value = '';
+                document.getElementById('Concurrency').value = '';
+                document.getElementById('FailRunOnBenchmark').checked = false;
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
@@ -2070,6 +2129,7 @@
                 syncNhsnOrganizationFromUploadedPatients();
                 syncReportPeriodPolicyUi();
                 syncLiveSimulationUi();
+                syncMetricsRunUi();
                 openModal();
             }
         }
@@ -2091,6 +2151,14 @@
             if (hasImported) {
                 if (!model.reportPeriodStart) { markFieldError('ReportPeriodStart', 'Report Period Start is required when imported patients are used.'); valid = false; }
                 if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
+            }
+            if (model.concurrency != null && (model.concurrency < 1 || model.concurrency > 8)) {
+                markFieldError('Concurrency', 'Concurrency must be between 1 and 8.');
+                valid = false;
+            }
+            if (model.targetDurationSeconds != null && model.targetDurationSeconds < 1) {
+                markFieldError('TargetDurationSeconds', 'Target duration must be a positive number of seconds.');
+                valid = false;
             }
             // Imported-by-ID rows must have a non-empty patient id.
             var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });

@@ -55,6 +55,12 @@ public sealed class TestScenarioDocument
     public bool IsLiveSimulation { get; set; }
     public int ReportingWindowMinutes { get; set; } = 10;
 
+    public bool IsMetricsRun { get; set; }
+    public string? BenchmarkKey { get; set; }
+    public int? TargetDurationSeconds { get; set; }
+    public int? Concurrency { get; set; }
+    public bool FailRunOnBenchmark { get; set; }
+
     /// <summary>Serialized List&lt;ImportedPatientInput&gt; for ID-based imported patients.</summary>
     public string ImportedPatientIdsJson { get; set; } = "[]";
 
