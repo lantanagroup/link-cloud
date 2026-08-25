@@ -231,6 +231,15 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 /* ===================================================================
    Details — run summary grid
    =================================================================== */
+.au-metrics-waterfall {
+  height: 1.25rem;
+}
+.au-metrics-waterfall .progress-bar {
+  background: var(--au-accent);
+  font-size: .7rem;
+  overflow: visible;
+}
+
 .au-summary-item {
   display: flex;
   flex-direction: column;

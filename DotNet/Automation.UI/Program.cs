@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
 using System.Reflection;
 
@@ -317,6 +318,23 @@ builder.Services.AddControllersWithViews()
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+    };
+});
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Automation.UI API",
+        Version = "v1",
+        Description = "Service-to-service automation run APIs. Metrics endpoints read Mongo snapshots and do not query Prometheus."
+    });
+});
 builder.Services.AddSignalR();
 
 var assemblyVersion = Assembly.GetExecutingAssembly()
@@ -344,6 +362,7 @@ builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<MetricsRunPresenter>();
 builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
@@ -390,9 +409,15 @@ else
 }
 
 // -- Middleware --
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api"),
+    api => api.UseExceptionHandler());
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Runs/Index");
+    app.UseWhen(
+        ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+        mvc => mvc.UseExceptionHandler("/Runs/Index"));
     app.UseHsts();
     app.UseHttpsRedirection();
 }
@@ -400,6 +425,12 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Automation.UI API v1");
+});
 
 app.UseAuthentication();
 

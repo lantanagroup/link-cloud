@@ -2641,6 +2641,7 @@
           "LinkSdk": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
           "Normalization.Engine": "[1.0.0, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },

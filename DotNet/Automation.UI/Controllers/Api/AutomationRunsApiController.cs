@@ -1,6 +1,8 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,6 +23,7 @@ namespace Automation.UI.Controllers.Api;
 public sealed class AutomationRunsApiController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
+    MetricsRunPresenter metricsPresenter,
     ILogger<AutomationRunsApiController> logger) : ControllerBase
 {
     /// <summary>
@@ -48,7 +51,7 @@ public sealed class AutomationRunsApiController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to start scenario {ScenarioId} via API.", request.ScenarioId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
         }
 
         return Accepted(new
@@ -58,6 +61,53 @@ public sealed class AutomationRunsApiController(
             scenarioName = scenario.Name,
             source = request.Source,
         });
+    }
+
+    /// <summary>
+    /// Lists Metrics-run snapshots from Mongo. Does not query Prometheus.
+    /// </summary>
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListMetrics(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var (records, metadata) = await metricsPresenter.ListAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    /// <summary>
+    /// Benchmark catalog. Empty until the benchmarks store is added.
+    /// </summary>
+    [HttpGet("metrics/benchmarks")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public IActionResult ListBenchmarks()
+    {
+        return Ok(new
+        {
+            records = Array.Empty<object>(),
+            metadata = new PaginationMetadata(20, 1, 0)
+        });
+    }
+
+    /// <summary>
+    /// Returns the persisted Metrics snapshot for a run. 404 if the run is missing.
+    /// When the snapshot row is missing, returns wall-clock fields with stages marked unavailable.
+    /// Does not query Prometheus.
+    /// </summary>
+    [HttpGet("{runId:guid}/metrics")]
+    [ProducesResponseType(typeof(MetricsRunDetailViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMetrics(Guid runId, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetDetailAsync(runId, cancellationToken);
+        if (detail == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Run not found",
+                detail: $"Run {runId} not found.");
+        }
+
+        return Ok(detail);
     }
 
     /// <summary>

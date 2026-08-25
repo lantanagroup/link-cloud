@@ -1,0 +1,146 @@
+@model MetricsRunDetailViewModel
+@{
+    ViewData["Title"] = "Metrics run";
+    var stageOrder = new[] { "acquisition", "dispatch", "normalization", "measureeval", "validation", "submission" };
+    string DisplayName(string key) => key switch
+    {
+        "acquisition" => "Acquisition",
+        "dispatch" => "Query Dispatch",
+        "normalization" => "Normalization",
+        "measureeval" => "Measure Eval",
+        "validation" => "Validation",
+        "submission" => "Submission",
+        _ => key
+    };
+    var availableP95 = Model.Stages.Values.Where(s => !s.Unavailable && s.P95Ms is > 0).Select(s => s.P95Ms!.Value).ToList();
+    var maxP95 = availableP95.Count > 0 ? availableP95.Max() : 0;
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="fw-bold mb-0">@Model.ScenarioName</h3>
+            <div class="small text-muted">
+                Run <code>@Model.RunId</code>
+                @if (!string.IsNullOrWhiteSpace(Model.BenchmarkKey))
+                {
+                    <span class="ms-2">Benchmark: <code>@Model.BenchmarkKey</code></span>
+                }
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Runs" asp-action="Details" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-action">
+                <i class="bi bi-clipboard-data me-1"></i>Run details
+            </a>
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
+        </div>
+    </div>
+
+    @if (Model.StagesUnavailable)
+    {
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Stage latency unavailable. Wall-clock duration and validators below still come from the Automation snapshot — Prometheus was not queried on this page.
+        </div>
+    }
+
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-clipboard-data me-2"></i>Summary</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Outcome</span><span class="au-value">@Model.Outcome</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">E2E</span><span class="au-value">@(Model.E2eDurationSeconds > 0 ? TimeSpan.FromSeconds(Model.E2eDurationSeconds).ToString(@"mm\:ss") : "—")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Patients</span><span class="au-value">@Model.PatientCount</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Patients / min</span><span class="au-value">@(Model.PatientsPerMinute?.ToString("0.00") ?? "—")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Resources / sec</span><span class="au-value">@(Model.ResourcesPerSecond?.ToString("0.00") ?? "—")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value">@(Model.FinishedAt?.ToString("u") ?? "—")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Thetis SHA</span><code class="au-value">@(string.IsNullOrWhiteSpace(Model.ThetisGitSha) ? "—" : Model.ThetisGitSha)</code></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Seed</span><span class="au-value">@Model.Seed</span></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-bar-chart-steps me-2"></i>Stage latency</div>
+        <div class="card-body">
+            @foreach (var key in stageOrder)
+            {
+                Model.Stages.TryGetValue(key, out var stage);
+                stage ??= new StageSnapshot { Unavailable = true };
+                var width = !stage.Unavailable && maxP95 > 0 && stage.P95Ms is > 0
+                    ? Math.Clamp(stage.P95Ms.Value / maxP95 * 100, 4, 100)
+                    : 0;
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div class="text-muted" style="width:9rem;">@DisplayName(key)</div>
+                    @if (stage.Unavailable)
+                    {
+                        <span class="text-warning">unavailable</span>
+                    }
+                    else
+                    {
+                        <div class="progress flex-grow-1 au-metrics-waterfall" role="img" aria-label="@DisplayName(key) p95">
+                            <div class="progress-bar" style="width:@width.ToString("0.0")%">p95 @(stage.P95Ms?.ToString("0") ?? "0") ms</div>
+                        </div>
+                        <div class="small text-muted text-nowrap">
+                            n=@stage.Count
+                            p50=@(stage.P50Ms?.ToString("0") ?? "—")
+                            p99=@(stage.P99Ms?.ToString("0") ?? "—")
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-check2-square me-2"></i>Validators</div>
+        <div class="card-body">
+            @if (Model.Validators.Count == 0)
+            {
+                <p class="text-muted mb-0">No validator results on this snapshot.</p>
+            }
+            else
+            {
+                <table class="table au-table mb-0">
+                    <thead><tr><th>Validator</th><th>Outcome</th><th>Issues</th></tr></thead>
+                    <tbody>
+                    @foreach (var validator in Model.Validators)
+                    {
+                        <tr>
+                            <td>@validator.Name</td>
+                            <td>@validator.Outcome</td>
+                            <td>@validator.IssueCount</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-flag me-2"></i>Benchmark / regression</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Pass/fail vs stored thresholds lands in a later change. This snapshot records previous same-scenario Succeeded run when present.</p>
+            <div class="row g-3">
+                <div class="col-md-4"><div class="au-summary-item"><span class="au-label">Benchmark pass</span><span class="au-value">@(Model.BenchmarkPass ? "yes" : "no")</span></div></div>
+                <div class="col-md-4">
+                    <div class="au-summary-item">
+                        <span class="au-label">Previous run</span>
+                        @if (Model.PreviousRunId is Guid previous)
+                        {
+                            <a asp-action="Details" asp-route-id="@previous" class="au-value">@previous</a>
+                        }
+                        else
+                        {
+                            <span class="au-value">—</span>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-4"><div class="au-summary-item"><span class="au-label">Regression flags</span><span class="au-value">@(Model.RegressionFlags.Count == 0 ? "—" : string.Join(", ", Model.RegressionFlags))</span></div></div>
+            </div>
+        </div>
+    </div>
+</div>
