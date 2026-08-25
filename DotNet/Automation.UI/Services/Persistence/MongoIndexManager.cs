@@ -42,6 +42,7 @@ public sealed class MongoIndexManager
         EnsurePatientConfigurationIndexes();
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
+        EnsureRunMetricsIndexes();
     }
 
     // --- automation_org_resource_map_templates ---
@@ -225,6 +226,15 @@ public sealed class MongoIndexManager
         var collection = _database.GetCollection<BsonDocument>("api_health_execution_runs");
 
         CreateIndexSafe(collection, new BsonDocument { { "IsCompleted", 1 }, { "StartedAt", -1 } }, unique: false, "idx_isCompleted_startedAt");
+    }
+
+    // --- automation_run_metrics ---
+
+    private void EnsureRunMetricsIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoRunMetricsStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioId", 1 }, { "FinishedAt", -1 } }, unique: false, "idx_scenarioId_finishedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "CreatedAt", -1 } }, unique: false, "idx_createdAt_desc");
     }
 
     // --- Helpers ---

@@ -62,6 +62,7 @@
         public const string TerminologyLookupCount = "link_terminology_lookup_count";
         public const string TerminologyLookupDuration = "link_terminology_lookup_duration";
         public const string AutomationPollerHttpCount = "link_automation_poller_http_count";
+        public const string AutomationMetricsSnapshotMissing = "link_automation_metrics_snapshot_missing";
 
         public static string NormalizePhase(string? phase)
         {

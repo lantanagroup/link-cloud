@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
@@ -329,6 +330,16 @@ builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     options.ServiceVersion = assemblyVersion;
 });
 builder.Services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
+builder.Services.AddSingleton<IRunMetricsStore, MongoRunMetricsStore>();
+builder.Services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramClient>((sp, client) =>
+{
+    var endpoint = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value.PrometheusQueryEndpoint;
+    if (!string.IsNullOrWhiteSpace(endpoint))
+        client.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotService>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();

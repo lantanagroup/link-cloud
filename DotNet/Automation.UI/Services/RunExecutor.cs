@@ -160,6 +160,9 @@ internal sealed class RunExecutor
         state.StartedAt = DateTimeOffset.UtcNow;
         await callbacks.BroadcastStatus();
 
+        GenerationManifest? generationManifest = null;
+        IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults = [];
+
         try
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
@@ -221,7 +224,6 @@ internal sealed class RunExecutor
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
-            GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
@@ -894,6 +896,8 @@ internal sealed class RunExecutor
             await RunValidator("VALIDATION RESULTS (API)", () =>
                 validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
 
+            validatorResults = validatorRunner.Results;
+
             // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
             // place for inspection.
             validatorRunner.ThrowIfAnyFailed();
@@ -916,6 +920,7 @@ internal sealed class RunExecutor
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
+            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -936,6 +941,7 @@ internal sealed class RunExecutor
             state.Error = ex.Message;
             state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
+            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
         }
@@ -943,6 +949,58 @@ internal sealed class RunExecutor
         {
             if (state.Options.IsLiveSimulation)
                 _liveInjector.CloseSession(state.RunId);
+        }
+    }
+
+    private async Task CaptureMetricsSnapshotAsync(
+        MutableRunState state,
+        IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults,
+        GenerationManifest? generationManifest,
+        CancellationToken cancellationToken)
+    {
+        if (!state.Options.IsMetricsRun)
+            return;
+
+        try
+        {
+            var service = _hostServices.GetService<IRunMetricsSnapshotService>();
+            if (service == null)
+                return;
+
+            var manifest = generationManifest?.ToSnapshot();
+            var patientCount = manifest?.PatientCount
+                ?? state.Options.PatientProfiles.Count
+                    + state.Options.ImportedPatientIds.Count
+                    + state.Options.ImportedPatientBundles.Count;
+            if (patientCount <= 0)
+                patientCount = state.Options.PatientCount;
+
+            var resourcesMin = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMin ?? state.Options.ResourcesPerPatient;
+            var resourcesMax = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? state.Options.ResourcesPerPatient;
+
+            await service.CaptureAsync(
+                new RunMetricsCaptureInput(
+                    state.RunId,
+                    state.ScenarioId,
+                    state.RunNameOverride ?? state.Scenario.ToString(),
+                    state.Options.BenchmarkKey,
+                    state.Options.IsMetricsRun,
+                    state.Status.ToString(),
+                    state.FacilityId ?? state.RunId.ToString(),
+                    state.ReportId ?? string.Empty,
+                    state.StartedAt ?? state.CreatedAt,
+                    state.FinishedAt ?? DateTimeOffset.UtcNow,
+                    state.Options.Seed,
+                    patientCount,
+                    resourcesMin,
+                    resourcesMax,
+                    manifest?.TotalResourceCount ?? 0,
+                    validatorResults),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist metrics snapshot for run {RunId}", state.RunId);
         }
     }
 
