@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -316,6 +317,18 @@ builder.Services.AddControllersWithViews()
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 builder.Services.AddSignalR();
+
+var assemblyVersion = Assembly.GetExecutingAssembly()
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+    ?? "0.0.0";
+builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+{
+    options.Environment = builder.Environment;
+    options.ServiceName = builder.Configuration["ServiceInformation:ServiceConfigName"] ?? "AutomationUI";
+    options.ServiceVersion = assemblyVersion;
+});
+builder.Services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();

@@ -82,7 +82,8 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         TimeSpan? pollInterval = null,
         bool forwardInternalLogsToOutput = true,
         PipelineDataReader? pipelineReader = null,
-        bool expectsDataAcquisition = true)
+        bool expectsDataAcquisition = true,
+        bool scrapeNormalizationResourceTypes = true)
     {
         _output = output;
         _lokiScraper = lokiScraper;
@@ -103,7 +104,13 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             eventingOutput,
             config,
             kafkaConnection);
-        var progressMonitor = new ProgressMonitor(eventingOutput, expectedPatientCount, lokiScraper, reader, expectsDataAcquisition);
+        var progressMonitor = new ProgressMonitor(
+            eventingOutput,
+            expectedPatientCount,
+            lokiScraper,
+            reader,
+            expectsDataAcquisition,
+            scrapeNormalizationResourceTypes);
         _milestoneOrchestrator = new MilestoneValidationOrchestrator(eventingOutput, reader, expectedPatientCount, expectsDataAcquisition);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);
 

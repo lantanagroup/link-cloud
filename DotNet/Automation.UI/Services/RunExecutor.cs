@@ -515,11 +515,11 @@ internal sealed class RunExecutor
             }
 
             // Register with orchestrator so store-backed pollers start automatically.
-            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId);
+            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId, scenarioConfig.IsMetricsRun);
 
-            var diagnosticsPollInterval = scenarioConfig.PatientIds.Count >= 500
-                ? TimeSpan.FromSeconds(15)
-                : TimeSpan.FromSeconds(5);
+            var diagnosticsPollInterval = AutomationRunPollingPolicy.DiagnosticsInterval(
+                scenarioConfig.IsMetricsRun,
+                scenarioConfig.PatientIds.Count);
 
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(
                 output,
@@ -529,7 +529,8 @@ internal sealed class RunExecutor
                 expectedPatientCount: scenarioConfig.PatientIds.Count,
                 pollInterval: diagnosticsPollInterval,
                 forwardInternalLogsToOutput: true,
-                pipelineReader: services.GetRequiredService<PipelineDataReader>()))
+                pipelineReader: services.GetRequiredService<PipelineDataReader>(),
+                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun)))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
                 var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
@@ -636,7 +637,8 @@ internal sealed class RunExecutor
                     pollInterval: diagnosticsPollInterval,
                     forwardInternalLogsToOutput: true,
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
-                    expectsDataAcquisition: false);
+                    expectsDataAcquisition: false,
+                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun));
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
                 var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);

@@ -16,6 +16,7 @@ public class ProgressMonitor
     private readonly PipelineDataReader _reader;
     private readonly LokiScraper? _lokiScraper;
     private readonly bool _expectsDataAcquisition;
+    private readonly bool _scrapeNormalizationResourceTypes;
 
     private string? _lastScheduleStatus;
     private int _lastReportEntryCount;
@@ -39,12 +40,19 @@ public class ProgressMonitor
     /// </summary>
     public TimeSpan StallDuration => _progressTracker?.StallDuration ?? TimeSpan.Zero;
 
-    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, PipelineDataReader reader, bool expectsDataAcquisition = true)
+    public ProgressMonitor(
+        IAutomationOutput output,
+        int expectedPatientCount,
+        LokiScraper? lokiScraper,
+        PipelineDataReader reader,
+        bool expectsDataAcquisition = true,
+        bool scrapeNormalizationResourceTypes = true)
     {
         _output = output;
         _lokiScraper = lokiScraper;
         _reader = reader;
         _expectsDataAcquisition = expectsDataAcquisition;
+        _scrapeNormalizationResourceTypes = scrapeNormalizationResourceTypes;
         _progressTracker = expectedPatientCount > 0
             ? new PipelineProgressTracker(output, expectedPatientCount, reader, expectsDataAcquisition)
             : null;
@@ -91,11 +99,14 @@ public class ProgressMonitor
             _lastMeasureEvalActivity = measureEvalActivity;
         }
 
-        var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
-        if (!string.IsNullOrWhiteSpace(normalizationActivity) && !string.Equals(normalizationActivity, _lastNormalizationActivity, StringComparison.Ordinal))
+        if (_scrapeNormalizationResourceTypes)
         {
-            _output.WriteLine($"[DIAG][Normalization] Active: {normalizationActivity}");
-            _lastNormalizationActivity = normalizationActivity;
+            var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
+            if (!string.IsNullOrWhiteSpace(normalizationActivity) && !string.Equals(normalizationActivity, _lastNormalizationActivity, StringComparison.Ordinal))
+            {
+                _output.WriteLine($"[DIAG][Normalization] Active: {normalizationActivity}");
+                _lastNormalizationActivity = normalizationActivity;
+            }
         }
 
         // Validation activity is meaningful only after acquisition has produced work for downstream services.

@@ -54,6 +54,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.FacilityId, meta.FacilityId)
             .Set(r => r.ReportId, meta.ReportId)
+            .Set(r => r.IsMetricsRun, meta.IsMetricsRun)
             .Set(r => r.IsActive, true)
             .Set(r => r.StartedAt, meta.StartedAt)
             .SetOnInsert(r => r.RunName, $"Run {runId}")
@@ -338,7 +339,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         FacilityId = doc.FacilityId,
         ReportId = doc.ReportId,
         StartedAt = doc.StartedAt,
-        IsActive = doc.IsActive
+        IsActive = doc.IsActive,
+        IsMetricsRun = doc.IsMetricsRun
     };
 
     private static AutomationRunSummary ToSummary(AutomationRunDocument doc)

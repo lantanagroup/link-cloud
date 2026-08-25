@@ -28,6 +28,7 @@
         public const string DestinationType = "destination.type";
         public const string RetryAttempts = "retry.attempts";
         public const string Outcome = "outcome";
+        public const string Domain = "domain";
         public const string GroupKind = "group.kind";
         public const string Cache = "cache";
         public const string From = "from";
@@ -60,6 +61,7 @@
         public const string SubmissionUploadCount = "link_submission_upload_count";
         public const string TerminologyLookupCount = "link_terminology_lookup_count";
         public const string TerminologyLookupDuration = "link_terminology_lookup_duration";
+        public const string AutomationPollerHttpCount = "link_automation_poller_http_count";
 
         public static string NormalizePhase(string? phase)
         {

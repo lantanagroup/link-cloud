@@ -21,6 +21,8 @@ public class PipelineDataReader
     // MilestoneValidationOrchestrator, StoreBackedServicePoller,
     // PipelineSnapshot) into a single call per TTL window.
     // ---------------------------------------------------------------
+    // Metrics-run pollers share this 8s window with diagnostics so five domains
+    // at 5s do not multiply HTTP. Lightweight runs poll schedule-only at 15s.
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(8);
 
     private readonly ConcurrentDictionary<string, (object? Value, DateTime ExpiresAt)> _cache = new();
