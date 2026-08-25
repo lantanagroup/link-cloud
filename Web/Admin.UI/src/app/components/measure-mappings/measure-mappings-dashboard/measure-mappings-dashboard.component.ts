@@ -19,7 +19,7 @@ import { FormMode } from '../../../models/FormMode.enum';
 import { DeleteConfirmationDialogComponent } from '../../core/delete-confirmation-dialog/delete-confirmation-dialog.component';
 import { MeasureMappingDialogComponent } from '../measure-mapping-dialog/measure-mapping-dialog.component';
 import { MeasureMappingService } from '../../../services/gateway/dmrp/measure-mapping.service';
-import { Frequency, IMeasureMapping } from '../../../interfaces/dmrp/measure-mapping.interface';
+import { Frequency, IMeasureMapping, MEASURE_MAPPING_FREQUENCIES } from '../../../interfaces/dmrp/measure-mapping.interface';
 
 @Component({
   selector: 'app-measure-mappings-dashboard',
@@ -50,7 +50,7 @@ export class MeasureMappingsDashboardComponent implements OnInit {
   dataSource = new MatTableDataSource<IMeasureMapping>([]);
   displayedColumns: string[] = ['measure', 'dqm', 'frequency', 'actions'];
 
-  readonly frequencyOptions = Object.values(Frequency);
+  readonly frequencyOptions = MEASURE_MAPPING_FREQUENCIES;
 
   filterMeasure = '';
   filterDqm = '';

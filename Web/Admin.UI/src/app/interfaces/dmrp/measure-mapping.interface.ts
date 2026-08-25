@@ -10,6 +10,14 @@ export enum Frequency {
   Adhoc = 'Adhoc'
 }
 
+// DMRP reporting plans run on a calendar cadence, so measure mappings only accept these
+// three; the other Frequency members exist for the rest of the enum's consumers.
+export const MEASURE_MAPPING_FREQUENCIES: readonly Frequency[] = [
+  Frequency.Daily,
+  Frequency.Weekly,
+  Frequency.Monthly
+];
+
 export interface IMeasureMapping {
   id: string;
   measure: string;

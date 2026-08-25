@@ -20,8 +20,17 @@
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input">
         <mat-label>dQM</mat-label>
-        <input matInput formControlName="dqm" [readonly]="viewOnly" data-testid="measure-mapping-dqm-input">
-        <mat-hint>Must match a measure definition known to MeasureEval.</mat-hint>
+        @if (dqmOptions !== null) {
+          <mat-select formControlName="dqm" [disabled]="viewOnly" data-testid="measure-mapping-dqm-select">
+            @for (dqmId of dqmOptions; track dqmId) {
+              <mat-option [value]="dqmId">{{ dqmId }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Measure definitions known to MeasureEval.</mat-hint>
+        } @else {
+          <input matInput formControlName="dqm" [readonly]="viewOnly" data-testid="measure-mapping-dqm-input">
+          <mat-hint>Must match a measure definition known to MeasureEval.</mat-hint>
+        }
         @if (dqm.hasError('required')) {
           <mat-error data-testid="measure-mapping-dqm-required-error">
             dQM is <strong>required</strong>

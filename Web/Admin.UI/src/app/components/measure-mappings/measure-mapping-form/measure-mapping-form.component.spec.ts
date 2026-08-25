@@ -6,6 +6,8 @@ import { of, throwError } from 'rxjs';
 
 import { MeasureMappingFormComponent } from './measure-mapping-form.component';
 import { MeasureMappingService } from '../../../services/gateway/dmrp/measure-mapping.service';
+import { MeasureDefinitionService } from '../../../services/gateway/measure-definition/measure.service';
+import { IMeasureDefinitionConfigModel } from '../../../interfaces/measure-definition/measure-definition-config-model.interface';
 import { FormMode } from '../../../models/FormMode.enum';
 import { Frequency, IMeasureMapping } from '../../../interfaces/dmrp/measure-mapping.interface';
 
@@ -13,15 +15,24 @@ describe('MeasureMappingFormComponent', () => {
   let component: MeasureMappingFormComponent;
   let fixture: ComponentFixture<MeasureMappingFormComponent>;
   let measureMappingService: jasmine.SpyObj<MeasureMappingService>;
+  let measureDefinitionService: jasmine.SpyObj<MeasureDefinitionService>;
 
   const ach: IMeasureMapping = { id: 'mm-1', measure: 'ACH', dqm: 'NHSNAcuteCareHospitalDailyInitialPopulation', frequency: Frequency.Monthly };
 
   beforeEach(async () => {
     measureMappingService = jasmine.createSpyObj<MeasureMappingService>('MeasureMappingService', ['createMeasureMapping', 'updateMeasureMapping']);
+    measureDefinitionService = jasmine.createSpyObj<MeasureDefinitionService>('MeasureDefinitionService', ['getMeasureDefinitionConfigurations']);
+    measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(of([
+      { id: 'NHSNAcuteCareHospitalDailyInitialPopulation' },
+      { id: 'NHSNGlycemicControlHypoglycemicInitialPopulation' }
+    ] as IMeasureDefinitionConfigModel[]));
 
     await TestBed.configureTestingModule({
       imports: [MeasureMappingFormComponent, NoopAnimationsModule, MatDialogModule, MatSnackBarModule],
-      providers: [{ provide: MeasureMappingService, useValue: measureMappingService }]
+      providers: [
+        { provide: MeasureMappingService, useValue: measureMappingService },
+        { provide: MeasureDefinitionService, useValue: measureDefinitionService }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(MeasureMappingFormComponent);
@@ -92,12 +103,52 @@ describe('MeasureMappingFormComponent', () => {
     measureMappingService.updateMeasureMapping.and.returnValue(of({} as IMeasureMapping));
     initWith(ach, FormMode.Edit);
 
-    component.frequency.setValue(Frequency.Adhoc);
+    component.frequency.setValue(Frequency.Monthly);
     component.submitConfiguration();
 
     expect(measureMappingService.updateMeasureMapping).toHaveBeenCalledWith(
-      jasmine.objectContaining({ id: 'mm-1', measure: 'ACH', frequency: Frequency.Adhoc }));
+      jasmine.objectContaining({ id: 'mm-1', measure: 'ACH', frequency: Frequency.Monthly }));
     expect(measureMappingService.createMeasureMapping).not.toHaveBeenCalled();
+  });
+
+  it('only offers the daily, weekly and monthly cadences', () => {
+    initWith(undefined, FormMode.Create);
+
+    expect(component.frequencyOptions).toEqual([Frequency.Daily, Frequency.Weekly, Frequency.Monthly]);
+  });
+
+  it('offers the MeasureEval measure definitions as dQM options, sorted', () => {
+    initWith(undefined, FormMode.Create);
+
+    expect(component.dqmOptions).toEqual([
+      'NHSNAcuteCareHospitalDailyInitialPopulation',
+      'NHSNGlycemicControlHypoglycemicInitialPopulation'
+    ]);
+  });
+
+  it('keeps a saved dQM selectable when its definition no longer exists', () => {
+    const orphaned: IMeasureMapping = { ...ach, dqm: 'RetiredMeasure' };
+    initWith(orphaned, FormMode.Edit);
+
+    expect(component.dqmOptions![0]).toBe('RetiredMeasure');
+    expect(component.dqm.value).toBe('RetiredMeasure');
+  });
+
+  it('treats the 204 empty-collection response as no options', () => {
+    measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(
+      of(null as unknown as IMeasureDefinitionConfigModel[]));
+    initWith(undefined, FormMode.Create);
+
+    expect(component.dqmOptions).toEqual([]);
+  });
+
+  it('falls back to free-text dQM entry when the definitions fetch fails', () => {
+    measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(throwError(() => new Error('down')));
+    initWith(ach, FormMode.Edit);
+
+    expect(component.dqmOptions).toBeNull();
+    const input = fixture.nativeElement.querySelector('[data-testid="measure-mapping-dqm-input"]');
+    expect(input).toBeTruthy();
   });
 
   it('emits success after a saved update', () => {

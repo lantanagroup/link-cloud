@@ -8,7 +8,8 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { FormMode } from '../../../models/FormMode.enum';
 import { IApiResponse } from '../../../interfaces/api-response.interface';
 import { MeasureMappingService } from '../../../services/gateway/dmrp/measure-mapping.service';
-import { Frequency, IMeasureMapping } from '../../../interfaces/dmrp/measure-mapping.interface';
+import { MeasureDefinitionService } from '../../../services/gateway/measure-definition/measure.service';
+import { IMeasureMapping, MEASURE_MAPPING_FREQUENCIES } from '../../../interfaces/dmrp/measure-mapping.interface';
 
 @Component({
   selector: 'app-measure-mapping-form',
@@ -42,11 +43,23 @@ export class MeasureMappingFormComponent implements OnInit {
 
   @Output() submittedConfiguration = new EventEmitter<IApiResponse>();
 
-  readonly frequencyOptions = Object.values(Frequency);
+  readonly frequencyOptions = MEASURE_MAPPING_FREQUENCIES;
+
+  /**
+   * dQM ids offered by the select, fetched from MeasureEval's measure definitions. Null until
+   * the fetch resolves; the template falls back to the free-text input while null (still
+   * loading, or the fetch failed) so the dialog never blocks a save on MeasureEval being down —
+   * the backend validates unknown dQMs anyway.
+   */
+  dqmOptions: string[] | null = null;
 
   measureMappingForm!: FormGroup;
 
-  constructor(private measureMappingService: MeasureMappingService, private fb: FormBuilder) {
+  constructor(
+    private measureMappingService: MeasureMappingService,
+    private measureDefinitionService: MeasureDefinitionService,
+    private fb: FormBuilder
+  ) {
     this.measureMappingForm = this.fb.group({
       measure: ['', [Validators.required, Validators.maxLength(255)]],
       dqm: ['', [Validators.required, Validators.maxLength(255)]],
@@ -77,6 +90,30 @@ export class MeasureMappingFormComponent implements OnInit {
 
     this.measureMappingForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.measureMappingForm.invalid);
+    });
+
+    this.loadDqmOptions();
+  }
+
+  private loadDqmOptions(): void {
+    this.measureDefinitionService.getMeasureDefinitionConfigurations().subscribe({
+      next: (definitions) => {
+        // The BFF answers an empty collection with 204 and no body, so definitions can be null.
+        const ids = (definitions ?? []).map(d => d.id).sort((a, b) => a.localeCompare(b));
+
+        // Keep a saved dQM selectable even when its definition no longer exists in MeasureEval,
+        // so opening an old mapping doesn't silently blank the field.
+        const current = this.dqm.value;
+        if (current && !ids.includes(current)) {
+          ids.unshift(current);
+        }
+
+        this.dqmOptions = ids;
+      },
+      error: () => {
+        // Leave dqmOptions null: the free-text input stays, and ErrorHandlingService has
+        // already surfaced the fetch failure.
+      }
     });
   }
 
