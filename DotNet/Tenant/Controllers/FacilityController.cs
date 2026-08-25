@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
+using LantanaGroup.Link.Tenant.Extensions;
 using LantanaGroup.Link.Tenant.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -73,6 +74,41 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
+
+        /// <summary>
+        /// A problem response carrying an explicit type, so the same status always answers with the
+        /// same one rather than depending on the framework's client-error mapping.
+        /// </summary>
+        /// <remarks>
+        /// Every client error answers through these rather than through <c>BadRequest</c> or
+        /// <c>NotFound</c>. Those take the message as a bare <c>string</c>, which the client-error
+        /// mapping does not convert, so it leaves as <c>text/plain</c> with no type, title or
+        /// traceId - the shape callers were being given before.
+        /// <para>
+        /// Validation messages are assembled as fragments and are also read from logs, so they
+        /// arrive with a trailing newline or without a terminating period. <c>detail</c> is prose,
+        /// so it is tidied here rather than at every throw site.
+        /// </para>
+        /// </remarks>
+        private ObjectResult TenantProblem(HttpStatusCode statusCode, string title, string type, string detail)
+        {
+            var sentence = detail?.Trim() ?? string.Empty;
+
+            if (sentence.Length > 0 && !sentence.EndsWith('.') && !sentence.EndsWith('?') && !sentence.EndsWith('!'))
+            {
+                sentence += ".";
+            }
+
+            return Problem(detail: sentence, statusCode: (int)statusCode, title: title, type: type);
+        }
+
+        /// <summary>Client input failed validation. RFC 9110 section 15.5.1.</summary>
+        private ObjectResult BadRequestProblem(string detail) => TenantProblem(
+            HttpStatusCode.BadRequest, "Bad Request", TenantProblemTypes.BadRequest, detail);
+
+        /// <summary>The requested facility or report does not exist. RFC 9110 section 15.5.5.</summary>
+        private ObjectResult NotFoundProblem(string detail) => TenantProblem(
+            HttpStatusCode.NotFound, "Not Found", TenantProblemTypes.NotFound, detail);
 
         /// <summary>
         /// Get facilities
@@ -183,24 +219,24 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
         {
             if (newFacility == null)
             {
-                return BadRequest();
-            }
-
-            if (newFacility.FacilityName == null)
-            {
-                return BadRequest();
+                return BadRequestProblem("A facility must be supplied.");
             }
 
             if (newFacility.FacilityId == null)
             {
-                return BadRequest();
+                return BadRequestProblem("Facility ID is required.");
+            }
+
+            if (newFacility.FacilityName == null)
+            {
+                return BadRequestProblem("Facility name is required.");
             }
 
             try
@@ -209,11 +245,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ScheduledReportsNotAcceptedException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -233,8 +269,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{facilityId}")]
         public async Task<IActionResult> GetFacility(string facilityId, CancellationToken cancellationToken)
@@ -249,7 +285,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -259,7 +295,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (facilityConfigModel == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
 
             return Ok(facilityConfigModel);
@@ -273,8 +309,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
         public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
@@ -289,7 +325,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -299,7 +335,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
 
             try
@@ -308,11 +344,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ScheduledReportsNotAcceptedException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -332,8 +368,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
@@ -344,7 +380,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return NotFound($"Facility with Id: {facilityId} Not Found");
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
 
             try
@@ -353,7 +389,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -366,8 +402,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
         [HttpDelete("softDelete/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> SoftDeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
@@ -375,7 +411,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return NotFound($"Facility with Id: {facilityId} Not Found");
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -383,7 +419,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -402,8 +438,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <returns></returns>
         [HttpPatch("restore/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> RestoreFacility(string facilityId, CancellationToken cancellationToken)
         {
@@ -411,7 +447,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return NotFound($"Facility with Id: {facilityId} Not Found");
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -419,7 +455,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -437,39 +473,39 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/AdHocReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("FacilityId must be provided.");
+                return BadRequestProblem("FacilityId must be provided.");
             }
 
             if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return NotFound("Facility does not exist.");
+                return NotFoundProblem("Facility does not exist.");
             }
 
             if (request.ReportTypes == null || request.ReportTypes.Count == 0)
             {
-                return BadRequest("ReportTypes must be provided.");
+                return BadRequestProblem("ReportTypes must be provided.");
             }
 
             if (request.StartDate == null || request.StartDate == DateTime.MinValue)
             {
-                return BadRequest("StartDate must be provided.");
+                return BadRequestProblem("StartDate must be provided.");
             }
 
             if (request.EndDate == null || request.EndDate == DateTime.MinValue)
             {
-                return BadRequest("EndDate must be provided.");
+                return BadRequestProblem("EndDate must be provided.");
             }
 
             if (request.EndDate <= request.StartDate)
             {
-                return BadRequest("EndDate must be after StartDate.");
+                return BadRequestProblem("EndDate must be after StartDate.");
             }
 
             var reportId = Guid.NewGuid();
@@ -534,25 +570,25 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("FacilityId must be provided.");
+                return BadRequestProblem("FacilityId must be provided.");
             }
 
             if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return NotFound("Facility does not exist.");
+                return NotFoundProblem("Facility does not exist.");
             }
 
             if (string.IsNullOrEmpty(request.ReportId))
             {
-                return BadRequest("ReportId must be provided.");
+                return BadRequestProblem("ReportId must be provided.");
             }
 
             var reportId = Guid.NewGuid();
@@ -580,7 +616,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    return NotFound($"Report schedule {request.ReportId} not found.");
+                    return NotFoundProblem($"Report schedule {request.ReportId} not found.");
                 }
 
                 if (!response.IsSuccessStatusCode)

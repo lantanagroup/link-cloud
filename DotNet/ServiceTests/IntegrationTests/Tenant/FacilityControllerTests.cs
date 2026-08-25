@@ -17,6 +17,7 @@ using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,6 +40,21 @@ public class FacilityControllerTests : IDisposable
     private readonly IServiceScope _scope;
     private readonly FacilityController _controller;
     private readonly TenantDbContext _dbContext;
+
+    /// <summary>
+    /// Real MVC services, so the controller's problem responses are built by the actual
+    /// <see cref="ProblemDetailsFactory"/>. The fixture registers no MVC services of its own, and
+    /// <c>ControllerBase.Problem</c> resolves the factory rather than constructing one.
+    /// </summary>
+    private static readonly IServiceProvider MvcServices = BuildMvcServices();
+
+    private static IServiceProvider BuildMvcServices()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddControllers();
+        return services.BuildServiceProvider();
+    }
 
     public FacilityControllerTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
     {
@@ -77,6 +93,7 @@ public class FacilityControllerTests : IDisposable
         {
             HttpContext = httpContext
         };
+        _controller.ProblemDetailsFactory = MvcServices.GetRequiredService<ProblemDetailsFactory>();
 
         Quartz.Logging.LogProvider.SetCurrentLogProvider(new NoOpQuartzLogProvider());
 
@@ -250,6 +267,23 @@ public class FacilityControllerTests : IDisposable
         Assert.IsType<NoContentResult>(result);
     }
 
+    /// <summary>
+    /// Every client error answers with RFC 7807 problem details rather than a bare string, so the
+    /// assertion has to look at <see cref="ProblemDetails.Detail"/>. A result whose value is still a
+    /// string would satisfy a <c>Contains</c> on <c>Value.ToString()</c> and hide the regression.
+    /// </summary>
+    private static ProblemDetails AssertProblem(IActionResult? result, int expectedStatusCode, string expectedDetail)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(expectedStatusCode, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(expectedStatusCode, problem.Status);
+        Assert.Contains(expectedDetail, problem.Detail);
+
+        return problem;
+    }
+
     [Fact]
     public async Task SoftDeleteFacility_FacilityNotFound_ReturnsNotFound()
     {
@@ -257,8 +291,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -291,8 +324,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -312,8 +344,7 @@ public class FacilityControllerTests : IDisposable
         // Try to restore a facility that is not deleted
         var result = await _controller.RestoreFacility(facilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("is not deleted", badRequestResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status400BadRequest, "is not deleted");
     }
 
     /// <summary>
@@ -447,8 +478,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.GenerateAdHocReport(facilityId, request);
         var actionResult = result.Result as IActionResult;
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
-        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+        AssertProblem(actionResult, StatusCodes.Status400BadRequest, "FacilityId must be provided");
     }
 
     [Fact]
@@ -465,7 +495,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.GenerateAdHocReport(Guid.NewGuid().ToString(), request);
         var actionResult = result.Result as IActionResult;
-        Assert.IsType<NotFoundObjectResult>(actionResult);
+        AssertProblem(actionResult, StatusCodes.Status404NotFound, "Facility does not exist");
     }
 
     [Theory]
@@ -477,8 +507,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RegenerateReport(facilityId, request);
         var actionResult = result.Result as IActionResult;
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
-        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+        AssertProblem(actionResult, StatusCodes.Status400BadRequest, "FacilityId must be provided");
     }
 
     [Fact]
@@ -488,7 +517,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RegenerateReport(Guid.NewGuid().ToString(), request);
         var actionResult = result.Result as IActionResult;
-        Assert.IsType<NotFoundObjectResult>(actionResult);
+        AssertProblem(actionResult, StatusCodes.Status404NotFound, "Facility does not exist");
     }
 
     private class StubHttpMessageHandler : HttpMessageHandler
