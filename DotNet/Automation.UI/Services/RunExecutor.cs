@@ -165,12 +165,13 @@ internal sealed class RunExecutor
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
             var isLiveSimulation = state.Options.IsLiveSimulation;
-            var usesScheduledWorkflow = isLiveSimulation
-                || state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+            var usesScheduledWorkflow = ReportExecution.UsesCensusScheduleKickoff(state.Options.ReportMethod);
 
-            // For scheduled-style runs, compute the active window immediately so generation
-            // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
-            if (isLiveSimulation || usesScheduledWorkflow)
+            // Short Kafka window so EOP jobs fire during the test. Applies to Scheduled
+            // (including live) and to regenerate's prerequisite Scheduled report. The
+            // regenerated report itself is Adhoc in Report. This clock is for generation;
+            // live inject uses a later countdown, and StartScheduledReport reconciles dates.
+            if (usesScheduledWorkflow)
             {
                 var now = DateTimeOffset.UtcNow;
                 var alignedNow = new DateTimeOffset(
@@ -179,7 +180,7 @@ internal sealed class RunExecutor
                     TimeSpan.Zero);
                 var closeMinutes = isLiveSimulation
                     ? StartScenarioRequestResolver.NormalizeReportingWindowMinutes(state.Options.ReportingWindowMinutes)
-                    : 2;
+                    : ReportExecution.NonLiveScheduledCloseMinutes;
                 var end = alignedNow.AddMinutes(closeMinutes);
                 var start = state.Options.ReportPeriodStart ?? alignedNow.AddDays(-5);
                 if (start > end)
@@ -258,123 +259,95 @@ internal sealed class RunExecutor
             if (encounterQueryCount == 0)
                 output.WriteLine("WARNING: Query plan has no Encounter query entries; encounter mapping checks will be limited for this run.");
 
-            if (state.Options.PatientProfiles is { Count: > 0 }
-                || state.Options.ImportedPatientIds.Count > 0
-                || state.Options.ImportedPatientBundles.Count > 0)
+            var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
+            var profiles = state.Options.PatientProfiles;
+            var importedPatients = new List<ImportedPatientInput>(
+                state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
+            importedPatients.AddRange(state.Options.ImportedPatientIds);
+            importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
+                state.Options.ImportedPatientBundles,
+                state.RunCancellation.Token));
+
+            if (profiles.Count == 0 && importedPatients.Count == 0)
             {
-                var profiles = state.Options.PatientProfiles;
-                var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
-                var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
-                var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
-                var mixedCount = profiles.Count - qualAllCount - nqAllCount;
-                var importedTotal = state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count;
-                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed" +
-                                 (importedTotal > 0 ? $" + {importedTotal} imported patient(s)" : string.Empty));
-
-                var importedPatients = new List<ImportedPatientInput>(
-                    state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
-                importedPatients.AddRange(state.Options.ImportedPatientIds);
-                importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
-                    state.Options.ImportedPatientBundles,
-                    state.RunCancellation.Token));
-
-                // Pre-load imported patient FHIR data so the pipeline can reuse it without
-                // re-fetching, and surface — but do NOT enforce — whether each imported
-                // encounter sits inside the scenario's configured reporting period. A
-                // mismatched scenario is a legitimate test case (proper disqualification by
-                // measure-eval); the run continues either way.
-                if (importedPatients.Count > 0)
-                {
-                    output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
-                    await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
-
-                    var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
-                    if (impStart.HasValue || impEnd.HasValue)
-                    {
-                        var periodStart = TryParseUtc(scenarioConfig.StartDate);
-                        var periodEnd = TryParseUtc(scenarioConfig.EndDate);
-
-                        var beforeStart = periodStart.HasValue && impStart.HasValue && impStart.Value < periodStart.Value;
-                        var afterEnd = periodEnd.HasValue && impEnd.HasValue && impEnd.Value > periodEnd.Value;
-
-                        if (beforeStart || afterEnd)
-                        {
-                            output.WriteLine($"  WARNING: Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] fall " +
-                                             $"{(beforeStart ? "before" : "")}{(beforeStart && afterEnd ? "/" : "")}{(afterEnd ? "after" : "")} " +
-                                             "the configured Report Period. Affected resources will be filtered by measure-eval / CQL " +
-                                             "and may cause the patient to be classified non-qualifying.");
-                        }
-                        else
-                        {
-                            output.WriteLine($"  Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] sit inside the report period.");
-                        }
-                    }
-                }
-
-                // Use the streaming pipeline: generate ? upload ? dispose per patient.
-                // The pipeline builds the manifest incrementally and runs acquisition
-                // simulation per-patient, so no serialized FHIR JSON is retained.
-                var generationRequest = BuildProfileGenerationRequest(
+                // Safety net for hand-built ResolvedRunOptions (built-in scenario kinds
+                // now expand in StartScenarioRequestResolver). Same All-Qualifying shape
+                // the old non-profile executor branch synthesized.
+                var fallback = BuildNonProfileGenerationRequest(
                     selectedMeasures,
-                    profiles,
-                    importedPatients,
-                    _generatedTemplateCache);
-
-                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
-                    output,
-                    fhirDataLoader,
-                    generationRequest.SelectedMeasures,
-                    generationRequest.Profiles,
-                    state.Options.ResourcesPerPatient,
-                    state.Options.Seed,
-                    generationConfig,
-                    generationRequirementsPlan,
-                    acquisitionSimulation: acquisitionSimulation,
-                    importedPatients: generationRequest.ImportedPatients,
-                    generatedTemplateCache: generationRequest.GeneratedTemplateCache,
-                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
-
-                patientIds = pipelineResult.PatientIds;
-                generationManifest = pipelineResult.Manifest;
-                await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
-
-                // Manifest carries explicit patient/profile pairs. Build the initial expected
-                // submitted set from those pairs; scheduled runs are recomputed later after
-                // profiles are aligned to the canonical patient ID order.
-                expectedSubmittedPatientIds = generationManifest.PatientIds
-                    .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
-                    .ToList();
-
-            }
-            else
-            {
-                var generationRequest = BuildNonProfileGenerationRequest(
-                    state.Options.SelectedMeasures,
                     state.Options.PatientCount,
                     state.Options.ResourcesPerPatient,
                     state.Options.Seed,
                     _generatedTemplateCache);
-
-                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
-                    output,
-                    fhirDataLoader,
-                    generationRequest.SelectedMeasures,
-                    generationRequest.Profiles,
-                    state.Options.ResourcesPerPatient,
-                    state.Options.Seed,
-                    generationConfig,
-                    generationRequirementsPlan,
-                    acquisitionSimulation: acquisitionSimulation,
-                    importedPatients: generationRequest.ImportedPatients,
-                    generatedTemplateCache: generationRequest.GeneratedTemplateCache,
-                    maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
-
-                patientIds = pipelineResult.PatientIds;
-                generationManifest = pipelineResult.Manifest;
-                expectedSubmittedPatientIds = patientIds.ToList();
-                await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
+                profiles = fallback.Profiles.ToList();
             }
+
+            var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
+            var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
+            var mixedCount = profiles.Count - qualAllCount - nqAllCount;
+            output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed" +
+                             (importedPatients.Count > 0 ? $" + {importedPatients.Count} imported patient(s)" : string.Empty));
+
+            // Prefetch imported FHIR once. The pipeline reuses PreLoadedEntries and does
+            // not fetch $everything again. Dates outside the period are a warning only:
+            // out-of-period imports are a legitimate NQ test case and we do not widen
+            // the report window here.
+            if (importedPatients.Count > 0)
+            {
+                output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
+                await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
+
+                var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
+                if (impStart.HasValue || impEnd.HasValue)
+                {
+                    var periodStart = TryParseUtc(scenarioConfig.StartDate);
+                    var periodEnd = TryParseUtc(scenarioConfig.EndDate);
+
+                    var beforeStart = periodStart.HasValue && impStart.HasValue && impStart.Value < periodStart.Value;
+                    var afterEnd = periodEnd.HasValue && impEnd.HasValue && impEnd.Value > periodEnd.Value;
+
+                    if (beforeStart || afterEnd)
+                    {
+                        output.WriteLine($"  WARNING: Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] fall " +
+                                         $"{(beforeStart ? "before" : "")}{(beforeStart && afterEnd ? "/" : "")}{(afterEnd ? "after" : "")} " +
+                                         "the configured Report Period. Affected resources will be filtered by measure-eval / CQL " +
+                                         "and may cause the patient to be classified non-qualifying.");
+                    }
+                    else
+                    {
+                        output.WriteLine($"  Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] sit inside the report period.");
+                    }
+                }
+            }
+
+            var generationRequest = BuildProfileGenerationRequest(
+                selectedMeasures,
+                profiles,
+                importedPatients,
+                _generatedTemplateCache);
+
+            var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+                output,
+                fhirDataLoader,
+                generationRequest.SelectedMeasures,
+                generationRequest.Profiles,
+                state.Options.ResourcesPerPatient,
+                state.Options.Seed,
+                generationConfig,
+                generationRequirementsPlan,
+                acquisitionSimulation: acquisitionSimulation,
+                importedPatients: generationRequest.ImportedPatients,
+                generatedTemplateCache: generationRequest.GeneratedTemplateCache,
+                maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
+
+            patientIds = pipelineResult.PatientIds;
+            generationManifest = pipelineResult.Manifest;
+            await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
+
+            expectedSubmittedPatientIds = generationManifest.PatientIds
+                .Where((_, idx) => idx < generationManifest.Profiles.Count
+                                   && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
+                .ToList();
 
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
@@ -760,7 +733,6 @@ internal sealed class RunExecutor
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
-            // For non-profile runs (no pipeline), generationManifest remains null.
 
             // Failures are collected and re-thrown together once every validator has run — see
             // ValidatorRunner for why failing on the first one destroyed the evidence needed to
@@ -1152,7 +1124,16 @@ internal sealed class RunExecutor
         IReadOnlyList<PatientProfile> profiles,
         CancellationToken cancellationToken)
     {
-        var window = DeriveScheduledReportWindow(scenarioConfig);
+        var scheduled = await StartAndReconcileScheduledReportAsync(
+            reportHelper,
+            output,
+            facilityId,
+            measureIds,
+            selectedMeasures,
+            scenarioConfig,
+            cancellationToken);
+
+        var reportTrackingId = scheduled.ReportTrackingId;
 
         // Resolve each patient's census behavior from its scheduled inpatient pattern.
         // ScheduledInpatientPattern.GetCensusBehavior() is the single source of truth shared
@@ -1197,35 +1178,9 @@ internal sealed class RunExecutor
                 remainInpatient.Add(patientIds[i]);
         }
 
-        var scheduleFrequency = selectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
-            ? Frequency.Monthly
-            : Frequency.Daily;
-
-        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
-            facilityId,
-            measureIds,
-            window.Start,
-            window.Duration,
-            scheduleFrequency,
-            reportTrackingId: Guid.NewGuid().ToString());
-
         output.WriteLine(
             $"Scheduled inpatient patterns resolved: admit-in-period={admitDuringWindow.Count}, " +
             $"remain-inpatient={remainInpatient.Count}, discharge-in-period={dischargeDuringWindow.Count}.");
-
-        // The ReportScheduled event is processed asynchronously, so the schedule record is not
-        // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
-        // it: otherwise the admit snapshot below produces PatientEvents that reach Report's
-        // PatientEventListener before the schedule exists, throwing "No Scheduled Reports found".
-        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
-
-        // Reconcile to persisted report-period dates (single source of truth). This keeps
-        // validators aligned with real schedule boundaries even when the scheduler/broker path
-        // normalizes or computes end-date differently than the original request payload.
-        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
-        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
-        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
-        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
 
         // --- Census snapshot 1: admit every in-period patient. ---
         // Each admit produces a PatientEvent that the Report service turns into a
@@ -1264,6 +1219,41 @@ internal sealed class RunExecutor
         if (remainInpatient.Count > 0)
             output.WriteLine($"{remainInpatient.Count} patient(s) remain inpatient; they will be acquired by the end-of-report-period job.");
 
+        return new ScheduledWorkflowState(reportTrackingId, scheduled.Frequency);
+    }
+
+    private static async Task<ScheduledWorkflowState> StartAndReconcileScheduledReportAsync(
+        ReportApiHelper reportHelper,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        TestScenarioConfig scenarioConfig,
+        CancellationToken cancellationToken)
+    {
+        var window = DeriveScheduledReportWindow(scenarioConfig);
+        var scheduleFrequency = selectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            ? Frequency.Monthly
+            : Frequency.Daily;
+
+        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
+            facilityId,
+            measureIds,
+            window.Start,
+            window.Duration,
+            scheduleFrequency,
+            reportTrackingId: Guid.NewGuid().ToString());
+
+        // The ReportScheduled event is processed asynchronously, so the schedule record is not
+        // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
+        // it: otherwise census PatientEvents can reach Report before the schedule exists.
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+
+        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
+        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
+        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
+        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
+
         return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
     }
 
@@ -1284,24 +1274,15 @@ internal sealed class RunExecutor
         FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
         CancellationToken cancellationToken)
     {
-        var window = DeriveScheduledReportWindow(scenarioConfig);
-        var scheduleFrequency = state.Options.SelectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
-            ? Frequency.Monthly
-            : Frequency.Daily;
-
-        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
+        var scheduled = await StartAndReconcileScheduledReportAsync(
+            reportHelper,
+            output,
             facilityId,
             measureIds,
-            window.Start,
-            window.Duration,
-            scheduleFrequency,
-            reportTrackingId: Guid.NewGuid().ToString());
-
-        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
-        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
-        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
-        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
-        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
+            state.Options.SelectedMeasures,
+            scenarioConfig,
+            cancellationToken);
+        var reportTrackingId = scheduled.ReportTrackingId;
 
         var minutes = StartScenarioRequestResolver.NormalizeReportingWindowMinutes(state.Options.ReportingWindowMinutes);
         var windowStart = DateTimeOffset.UtcNow;
@@ -1326,6 +1307,8 @@ internal sealed class RunExecutor
             .ToHashSet(StringComparer.Ordinal);
         var seeds = LivePatientPoolBuilder.Build(patientIds, profiles, importedIds, expectedFromManifest);
         var censusPublisher = new LiveCensusPublisher(reportHelper, facilityId, reportTrackingId, output);
+        var liveShape = (profiles ?? []).FirstOrDefault(p => p.IsExpectedToBeSubmitted(state.Options.SelectedMeasures))
+            ?? (profiles ?? []).FirstOrDefault();
         ILivePatientProvisioner? patientProvisioner = generationManifest == null
             ? null
             : new LivePatientProvisioner(
@@ -1340,7 +1323,8 @@ internal sealed class RunExecutor
                 generationRequirementsPlan,
                 acquisitionSimulation,
                 _snapshotStore,
-                _generatedTemplateCache);
+                _generatedTemplateCache,
+                liveShape);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,
@@ -1386,7 +1370,7 @@ internal sealed class RunExecutor
         output.WriteLine(
             $"Live window closed. Report inclusion expected={expected.Count} (data/pattern, not census). Finalizing report.");
 
-        return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
+        return new ScheduledWorkflowState(reportTrackingId, scheduled.Frequency);
     }
 
     private sealed class LiveCensusPublisher(

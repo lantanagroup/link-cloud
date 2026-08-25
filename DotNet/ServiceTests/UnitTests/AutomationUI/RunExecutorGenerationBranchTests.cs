@@ -102,4 +102,18 @@ public class RunExecutorGenerationBranchTests
             selectedMeasures.All(profile.QualifiesFor)
             && profile.ResourcesPerPatient == 123);
     }
+
+    [Theory]
+    [InlineData(ReportMethod.Adhoc, false, false)]
+    [InlineData(ReportMethod.Adhoc, true, false)]
+    [InlineData(ReportMethod.ScheduledReport, false, true)]
+    [InlineData(ReportMethod.ScheduledReport, true, true)]
+    [InlineData(ReportMethod.RegenerateReport, false, true)]
+    public void Census_schedule_kickoff_is_scheduled_or_regenerate_prerequisite(ReportMethod method, bool live, bool expected)
+    {
+        ReportExecution.UsesCensusScheduleKickoff(method).Should().Be(expected);
+        ReportExecution.IsScheduledLike(method, live).Should().Be(expected);
+        ReportExecution.IsLiveAllowed(method).Should().Be(method == ReportMethod.ScheduledReport);
+        ReportExecution.NonLiveScheduledCloseMinutes.Should().Be(2);
+    }
 }

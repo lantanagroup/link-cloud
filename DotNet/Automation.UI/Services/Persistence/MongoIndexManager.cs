@@ -39,6 +39,7 @@ public sealed class MongoIndexManager
         EnsureQueryPlanTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
+        EnsurePatientConfigurationIndexes();
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
     }
@@ -181,6 +182,12 @@ public sealed class MongoIndexManager
         var collection = _database.GetCollection<BsonDocument>("automation_query_plan_templates");
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    private void EnsurePatientConfigurationIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_patient_configurations");
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 

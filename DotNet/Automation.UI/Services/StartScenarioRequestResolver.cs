@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automation.UI.Services;
 
@@ -16,6 +17,13 @@ public static class StartScenarioRequestResolver
     private const string AdhocReportTestNhsnOrganizationId = "10756";
     private const string MultiPatientTestNhsnOrganizationId = "10758";
     private const string MegaPatientTestNhsnOrganizationId = "10759";
+
+    private static readonly JsonSerializerOptions CohortJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     /// <summary>
     /// Resolves the run options for a request. For non-Custom scenarios the static
@@ -48,7 +56,24 @@ public static class StartScenarioRequestResolver
         };
 
         if (request.Scenario != AutomationScenarioKind.Custom)
-            return defaults;
+        {
+            // Built-in kinds still exist for API/history and to mirror BackendE2ETests.
+            // Expand the same All-Qualifying cohort the executor used to synthesize so
+            // generation has a single profile+import path.
+            var kindCohorts = new List<PatientCohortDefinition>
+            {
+                BuildDefaultCohort(
+                    defaultMeasures,
+                    defaults.PatientCount,
+                    defaults.ResourcesPerPatient,
+                    defaults.ResourcesPerPatient)
+            };
+            return defaults with
+            {
+                PatientCohorts = kindCohorts,
+                PatientProfiles = PatientCohortDefinition.ExpandProfiles(kindCohorts, defaults.Seed)
+            };
+        }
 
         var effectiveMeasures = request.SelectedMeasures is { Count: > 0 }
             ? request.SelectedMeasures
@@ -88,8 +113,13 @@ public static class StartScenarioRequestResolver
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
         var isLiveSimulation = request.IsLiveSimulation
             || ExtractBoolFromJson(request.RunConfigurationJson, "isLiveSimulation") == true;
-        var scheduledLike = isLiveSimulation
-            || request.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+        if (isLiveSimulation && !ReportExecution.IsLiveAllowed(request.ReportMethod))
+        {
+            throw new InvalidOperationException(
+                "Live simulation is only valid for Scheduled reports. Adhoc uses a set patient list; Regenerate is an all-at-once Adhoc copy of a previous schedule.");
+        }
+
+        var scheduledLike = ReportExecution.UsesCensusScheduleKickoff(request.ReportMethod);
         if (hasImportedPatients && !scheduledLike && (!reportStart.HasValue || !reportEnd.HasValue))
         {
             throw new InvalidOperationException(
@@ -98,9 +128,7 @@ public static class StartScenarioRequestResolver
         var reportingWindowMinutes = NormalizeReportingWindowMinutes(
             request.ReportingWindowMinutes
             ?? ExtractIntFromJson(request.RunConfigurationJson, "reportingWindowMinutes"));
-        var reportMethod = isLiveSimulation && request.ReportMethod == ReportMethod.Adhoc
-            ? ReportMethod.ScheduledReport
-            : request.ReportMethod;
+        var reportMethod = request.ReportMethod;
 
         return defaults with
         {
@@ -381,83 +409,20 @@ public static class StartScenarioRequestResolver
 
             foreach (var item in cohortsEl.EnumerateArray())
             {
-                var count = item.TryGetProperty("patientCount", out var pc) ? pc.GetInt32() : 0;
-                var min = item.TryGetProperty("resourcesPerPatientMin", out var rmin) ? rmin.GetInt32() : 50;
-                var max = item.TryGetProperty("resourcesPerPatientMax", out var rmax) ? rmax.GetInt32() : min;
+                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(item.GetRawText(), CohortJsonOptions);
+                if (cohort == null)
+                    continue;
 
-                var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>();
-                if (item.TryGetProperty("measureEligibilities", out var meEl) && meEl.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in meEl.EnumerateObject())
-                    {
-                        if (Enum.TryParse<ProfiledMeasureType>(prop.Name, ignoreCase: true, out var mt))
-                        {
-                            MeasureEligibility eligibility;
-                            if (prop.Value.ValueKind == JsonValueKind.String)
-                            {
-                                eligibility = Enum.TryParse<MeasureEligibility>(prop.Value.GetString(), ignoreCase: true, out var parsed)
-                                    ? parsed
-                                    : MeasureEligibility.Qualifying;
-                            }
-                            else if (prop.Value.ValueKind == JsonValueKind.Number)
-                            {
-                                eligibility = prop.Value.GetInt32() == 0
-                                    ? MeasureEligibility.Qualifying
-                                    : MeasureEligibility.NonQualifying;
-                            }
-                            else
-                            {
-                                eligibility = MeasureEligibility.Qualifying;
-                            }
-                            eligibilities[mt] = eligibility;
-                        }
-                    }
-                }
-
-                // Ensure every selected measure has an entry (default to qualifying).
                 foreach (var m in measures)
-                {
-                    eligibilities.TryAdd(m, MeasureEligibility.Qualifying);
-                }
+                    cohort.MeasureEligibilities.TryAdd(m, MeasureEligibility.Qualifying);
 
-                var scenarioIds = new List<string>();
-                if (item.TryGetProperty("eligibleClinicalScenarioIds", out var sEl) && sEl.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var s in sEl.EnumerateArray())
-                    {
-                        var sv = s.GetString();
-                        if (!string.IsNullOrEmpty(sv))
-                            scenarioIds.Add(sv);
-                    }
-                }
+                var hasExplicitQualification = item.ValueKind == JsonValueKind.Object
+                    && item.EnumerateObject().Any(p =>
+                        string.Equals(p.Name, "cohortQualification", StringComparison.OrdinalIgnoreCase));
+                if (!hasExplicitQualification)
+                    cohort.CohortQualification = InferCohortQualification(item, cohort.MeasureEligibilities, measures);
 
-                ScheduledInpatientPattern? scheduledPattern = null;
-                if (item.TryGetProperty("scheduledInpatientPattern", out var spEl))
-                {
-                    if (spEl.ValueKind == JsonValueKind.String
-                        && Enum.TryParse<ScheduledInpatientPattern>(spEl.GetString(), ignoreCase: true, out var parsedPattern))
-                    {
-                        scheduledPattern = parsedPattern;
-                    }
-                    else if (spEl.ValueKind == JsonValueKind.Number
-                             && Enum.IsDefined(typeof(ScheduledInpatientPattern), spEl.GetInt32()))
-                    {
-                        scheduledPattern = (ScheduledInpatientPattern)spEl.GetInt32();
-                    }
-                }
-
-                var cohortQualification = InferCohortQualification(item, eligibilities, measures);
-
-                cohorts.Add(new PatientCohortDefinition
-                {
-                    PatientCount = count,
-                    CohortQualification = cohortQualification,
-                    MeasureEligibilities = eligibilities,
-                    EligibleClinicalScenarioIds = scenarioIds,
-                    ResourcesPerPatientMin = min,
-                    ResourcesPerPatientMax = max,
-                    ScheduledInpatientPattern = scheduledPattern
-                });
+                cohorts.Add(cohort);
             }
 
             return cohorts.Count > 0 ? cohorts : null;

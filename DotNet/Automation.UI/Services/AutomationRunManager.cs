@@ -24,6 +24,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly IPatientConfigurationStore _patientConfigurationStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -40,7 +41,8 @@ public class AutomationRunManager : IAutomationRunManager
         ImportedBundleExecutionResolver importedBundleResolver,
         LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
-        ILivePatientEventInjector liveInjector)
+        ILivePatientEventInjector liveInjector,
+        IPatientConfigurationStore patientConfigurationStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -53,6 +55,7 @@ public class AutomationRunManager : IAutomationRunManager
         _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _liveInjector = liveInjector;
+        _patientConfigurationStore = patientConfigurationStore;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -72,7 +75,10 @@ public class AutomationRunManager : IAutomationRunManager
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
-        var options = StartScenarioRequestResolver.Resolve(request);
+        var options = await PatientConfigurationHydrator.HydrateAsync(
+            StartScenarioRequestResolver.Resolve(request),
+            _patientConfigurationStore,
+            cancellationToken);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);

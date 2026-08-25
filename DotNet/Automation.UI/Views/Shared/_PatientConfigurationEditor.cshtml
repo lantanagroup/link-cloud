@@ -1,0 +1,443 @@
+@using LantanaGroup.Automation.Generation
+<div id="pcEditorRoot" class="au-help-scope">
+    <input type="hidden" id="PcId" />
+    <input type="hidden" id="PcIsSystem" value="false" />
+
+    <details class="au-help-panel pc-library-only">
+        <summary><i class="bi bi-info-circle"></i> How this configuration is used</summary>
+        <div class="au-help-body">
+            <p>A Patient Configuration is the <strong>shape</strong> of the generated patient. A scenario cohort is <strong>how many</strong> of them appear in a test, plus Q/NQ and inpatient timing.</p>
+            <ul>
+                <li><strong>Blank fields inherit</strong> the clinical story pack. You do not need to fill this form to get a valid patient.</li>
+                <li><strong>Default qualification, measures, resources, and story packs</strong> are applied when you pick this configuration in a scenario. The cohort can still change count, Q/NQ, and inpatient pattern.</li>
+                <li>Saved configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Use <strong>Clone</strong> to freeze a copy.</li>
+                <li>System configurations are view-only. Clone them to customize.</li>
+            </ul>
+        </div>
+    </details>
+
+    <details class="au-help-panel pc-cohort-only">
+        <summary><i class="bi bi-info-circle"></i> How Customize applies</summary>
+        <div class="au-help-body">
+            <p>Only set the details this test needs. Empty fields inherit the clinical story pack, or the selected Patient Configuration if one is chosen.</p>
+            <ul>
+                <li><strong>Apply to cohort</strong> stores overlays on this cohort only. It does not change the library item.</li>
+                <li><strong>Save as configuration</strong> creates a reusable library item (merged with the selected prefab, if any) and points this cohort at it.</li>
+                <li>Count, Qualifying/Non-Qualifying, and inpatient pattern stay on the cohort row — they are about the test, not the clinical story.</li>
+            </ul>
+        </div>
+    </details>
+
+    <div class="pc-cohort-only alert alert-info py-2 small mb-3" id="pcCohortBanner">
+        <i class="bi bi-info-circle me-1"></i><span id="pcCohortBannerText">Empty fields inherit the clinical story pack (or the selected configuration). Customize only what this test needs.</span>
+    </div>
+
+    <div class="row g-3 pc-library-only">
+        <div class="col-md-6">
+            <label class="form-label" for="PcName">Name</label>
+            <input class="form-control" id="PcName" maxlength="120" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="PcDescription">Description</label>
+            <input class="form-control" id="PcDescription" maxlength="500" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="PcQualification">
+                Default qualification
+                <button type="button" class="au-info-toggle" data-help="pcHelpQualification" aria-label="About default qualification" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            </label>
+            <select class="form-select" id="PcQualification">
+                <option value="Qualifying">Qualifying</option>
+                <option value="NonQualifying">Non-Qualifying</option>
+            </select>
+            <div id="pcHelpQualification" class="au-help-text" hidden>
+                Applied when you insert this configuration into a scenario. The cohort can still change Qualifying / Non-Qualifying afterward. Qualification drives report prediction, not which clinical story packs are available.
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="PcResMin">
+                Resources min
+                <button type="button" class="au-info-toggle" data-help="pcHelpResources" aria-label="About resource range" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            </label>
+            <input type="number" min="1" class="form-control" id="PcResMin" value="50" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="PcResMax">Resources max</label>
+            <input type="number" min="1" class="form-control" id="PcResMax" value="100" />
+            <div id="pcHelpResources" class="au-help-text" hidden>
+                Target FHIR resources per patient. The mix follows the default distribution (observations fill most of the remainder). Patient, Encounter, primary Condition, Device, CareTeam, CarePlan, and census List are always generated. Use Volume mix to pin exact counts per type instead.
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="form-label">
+                Default measure eligibility
+                <button type="button" class="au-info-toggle" data-help="pcHelpMeasures" aria-label="About measure eligibility" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            </label>
+            <div class="d-flex flex-wrap gap-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="PcMeasureAch" />
+                    <label class="form-check-label" for="PcMeasureAch">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="PcMeasureDaily" />
+                    <label class="form-check-label" for="PcMeasureDaily">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="PcMeasureHypo" />
+                    <label class="form-check-label" for="PcMeasureHypo">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)</label>
+                </div>
+            </div>
+            <div id="pcHelpMeasures" class="au-help-text" hidden>
+                These checkboxes are defaults for inserting the configuration into a scenario. Hypoglycemic eligibility requires ACH Monthly. The cohort row can still change measure checkboxes after insert. Non-Qualifying clears them.
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="form-label">
+                Clinical story pack(s)
+                <button type="button" class="au-info-toggle" data-help="pcHelpStories" aria-label="About clinical story packs" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            </label>
+            <div id="PcStories" class="border rounded p-2" style="max-height:160px;overflow:auto;"></div>
+            <div id="pcHelpStories" class="au-help-text" hidden>
+                A story pack is a starter kit: primary diagnosis, discharge, and clinically matching labs, meds, and procedures. Leave all checked (or none) to rotate through every pack. Customize below can override codes without changing the pack list. Story pack is independent of Qualifying / Non-Qualifying.
+            </div>
+        </div>
+    </div>
+
+    <div class="pc-cohort-only row g-3 mb-3">
+        <div class="col-12">
+            <label class="form-label" for="PcSaveAsName">
+                Save as configuration
+                <button type="button" class="au-info-toggle" data-help="pcHelpSaveAs" aria-label="About save as configuration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            </label>
+            <input class="form-control" id="PcSaveAsName" maxlength="120" placeholder="Optional name — leave blank to apply overlays on this cohort only" />
+            <div id="pcHelpSaveAs" class="au-help-text" hidden>
+                Optional. Use <strong>Save as configuration</strong> in the header when you want this shape reused in other tests. Leave the name blank and click <strong>Apply to cohort</strong> if this overlay is only for the current scenario.
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion mt-3" id="pcCustomize">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pcDemo">
+                    Demographics
+                    <span id="pcBadgeDemo" class="pc-section-badge bg-light text-muted border ms-2">Using story defaults</span>
+                </button>
+            </h2>
+            <div id="pcDemo" class="accordion-collapse collapse" data-bs-parent="#pcCustomize">
+                <div class="accordion-body row g-3">
+                    <div class="col-12 d-flex justify-content-between align-items-start gap-2">
+                        <details class="au-help-panel mb-0 flex-grow-1">
+                            <summary><i class="bi bi-info-circle"></i> About demographics</summary>
+                            <div class="au-help-body">
+                                <p>Leave these blank unless the test needs a specific person. Default age is 18–80 and gender is random. Birth date is derived from age at generation time — exact date of birth, legal name, MRN, address, race, and language are not configurable yet.</p>
+                            </div>
+                        </details>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="demo">Reset</button>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcGender">
+                            Gender
+                            <button type="button" class="au-info-toggle" data-help="pcHelpGender" aria-label="About gender" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcGender">
+                            <option value="">Story default (random)</option>
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <div id="pcHelpGender" class="au-help-text" hidden>Blank keeps a random gender. A set value is used for every patient generated from this configuration.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcMinAge">
+                            Min age
+                            <button type="button" class="au-info-toggle" data-help="pcHelpAge" aria-label="About age range" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <input type="number" min="0" max="120" class="form-control" id="PcMinAge" placeholder="18" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcMaxAge">Max age</label>
+                        <input type="number" min="0" max="120" class="form-control" id="PcMaxAge" placeholder="80" />
+                        <div id="pcHelpAge" class="au-help-text" hidden>Inclusive years. Set min and max to the same value to pin an exact age. Blank uses 18–80.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pcEnc">
+                    Encounter
+                    <span id="pcBadgeEnc" class="pc-section-badge bg-light text-muted border ms-2">Using story defaults</span>
+                </button>
+            </h2>
+            <div id="pcEnc" class="accordion-collapse collapse" data-bs-parent="#pcCustomize">
+                <div class="accordion-body row g-3">
+                    <div class="col-12 d-flex justify-content-between align-items-start gap-2">
+                        <details class="au-help-panel mb-0 flex-grow-1">
+                            <summary><i class="bi bi-info-circle"></i> About the encounter</summary>
+                            <div class="au-help-body">
+                                <p>These fields describe the clinical stay. Admit/discharge <em>relative to the report period</em> is the Inpatient Pattern on the cohort row, not here. Automation still overlays ED → ICU → step-down locations on inpatient stays.</p>
+                            </div>
+                        </details>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="enc">Reset</button>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcEncClass">
+                            Class
+                            <button type="button" class="au-info-toggle" data-help="pcHelpEncClass" aria-label="About encounter class" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcEncClass">
+                            <option value="">From measures (ACH → inpatient)</option>
+                            <option value="IMP">Inpatient</option>
+                            <option value="AMB">Ambulatory</option>
+                            <option value="EMER">Emergency</option>
+                        </select>
+                        <div id="pcHelpEncClass" class="au-help-text" hidden>Blank follows the measures: ACH qualifying patients are inpatient (IMP). Use this only when the test needs a specific class regardless of measure checkboxes.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcEncStatus">
+                            Status
+                            <button type="button" class="au-info-toggle" data-help="pcHelpEncStatus" aria-label="About encounter status" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcEncStatus">
+                            <option value="">Story default (finished)</option>
+                            <option value="finished">Finished</option>
+                            <option value="in-progress">In progress</option>
+                        </select>
+                        <div id="pcHelpEncStatus" class="au-help-text" hidden>In-progress stays omit discharge disposition and hospitalization because the patient has not left.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcDuration">
+                            Duration (minutes)
+                            <button type="button" class="au-info-toggle" data-help="pcHelpDuration" aria-label="About duration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <input type="number" min="1" class="form-control" id="PcDuration" placeholder="Story / report period" />
+                        <div id="pcHelpDuration" class="au-help-text" hidden>Used when admit/discharge are not already set by the report period and inpatient pattern. Leave blank for scheduled/live runs that time the stay from the reporting window.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="PcDischarge">
+                            Discharge
+                            <button type="button" class="au-info-toggle" data-help="pcHelpDischarge" aria-label="About discharge" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcDischarge">
+                            <option value="">From story pack</option>
+                            <option value="home">Home</option>
+                            <option value="snf">Skilled nursing facility</option>
+                            <option value="rehab">Inpatient rehabilitation</option>
+                            <option value="exp">Expired</option>
+                            <option value="oth">Other</option>
+                        </select>
+                        <div id="pcHelpDischarge" class="au-help-text" hidden>Blank uses the story pack (for example pneumonia → home, heart failure → SNF). Only applied on finished inpatient encounters.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="PcHospitalization">
+                            Hospitalization
+                            <button type="button" class="au-info-toggle" data-help="pcHelpHosp" aria-label="About hospitalization" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcHospitalization">
+                            <option value="">Story default (on for finished stays)</option>
+                            <option value="true">Include</option>
+                            <option value="false">Omit</option>
+                        </select>
+                        <div id="pcHelpHosp" class="au-help-text" hidden>Writes Encounter.hospitalization, including discharge disposition. Automatically omitted for in-progress encounters.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pcClinical">
+                    Clinical content
+                    <span id="pcBadgeClinical" class="pc-section-badge bg-light text-muted border ms-2">Using story defaults</span>
+                </button>
+            </h2>
+            <div id="pcClinical" class="accordion-collapse collapse" data-bs-parent="#pcCustomize">
+                <div class="accordion-body row g-3">
+                    <div class="col-12 d-flex justify-content-between align-items-start gap-2">
+                        <details class="au-help-panel mb-0 flex-grow-1">
+                            <summary><i class="bi bi-info-circle"></i> About clinical content</summary>
+                            <div class="au-help-body">
+                                <p>The story pack already chooses a coherent diagnosis, labs, meds, and procedures. Use these pickers only when the test needs specific codes.</p>
+                                <ul>
+                                    <li><strong>Inherit</strong> — keep the story pack (your picker is ignored until you switch mode).</li>
+                                    <li><strong>Replace</strong> — emit only the codes you selected.</li>
+                                    <li><strong>Append</strong> — story pack plus your extra codes.</li>
+                                </ul>
+                                <p>Selecting codes automatically switches Inherit to Replace. Legal name, MRN, race, exact lab numbers, and medication dose/route/timing are not available yet.</p>
+                            </div>
+                        </details>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="clinical">Reset</button>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Primary diagnosis
+                            <button type="button" class="au-info-toggle" data-help="pcHelpPrimaryDx" aria-label="About primary diagnosis" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcPrimaryDxPicker" class="pc-picker" data-catalog="conditions" data-multiple="false" data-placeholder="Search conditions…"></div>
+                        <div id="pcHelpPrimaryDx" class="au-help-text" hidden>Overrides the story pack’s admitting diagnosis. Leave as “From story pack” unless the test is about a specific SNOMED. Comorbidities are separate from this primary condition.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="PcAllergy">
+                            Allergy
+                            <button type="button" class="au-info-toggle" data-help="pcHelpAllergy" aria-label="About allergy" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcAllergy">
+                            <option value="">Story default (off)</option>
+                            <option value="true">Include</option>
+                            <option value="false">Omit</option>
+                        </select>
+                        <div id="pcHelpAllergy" class="au-help-text" hidden>Adds an AllergyIntolerance. Off by default because most measure tests do not need one.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="PcLabs">
+                            Condition-driven labs
+                            <button type="button" class="au-info-toggle" data-help="pcHelpLabs" aria-label="About condition-driven labs" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcLabs">
+                            <option value="">Story default (on)</option>
+                            <option value="true">On</option>
+                            <option value="false">Off</option>
+                        </select>
+                        <div id="pcHelpLabs" class="au-help-text" hidden>When on, the primary condition can enqueue matching lab service requests so the chart stays clinically aligned. Turn off for a thinner patient.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcHypoInsulin">
+                            Hypoglycemic insulin pair
+                            <button type="button" class="au-info-toggle" data-help="pcHelpHypo" aria-label="About hypoglycemic insulin" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcHypoInsulin">
+                            <option value="">From Hypo eligibility</option>
+                            <option value="true">Force on</option>
+                            <option value="false">Force off</option>
+                        </select>
+                        <div id="pcHelpHypo" class="au-help-text" hidden>Blank follows the cohort’s Hypoglycemic measure checkbox. Force on if this configuration must always include the insulin pair, even when the cohort is not marked Hypo-qualifying.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcConditionMeds">
+                            Condition-driven medications
+                            <button type="button" class="au-info-toggle" data-help="pcHelpCondMeds" aria-label="About condition-driven medications" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcConditionMeds">
+                            <option value="">Story default (on)</option>
+                            <option value="true">On</option>
+                            <option value="false">Off</option>
+                        </select>
+                        <div id="pcHelpCondMeds" class="au-help-text" hidden>When on, MedicationRequests match the diagnosis (for example antibiotics for pneumonia). Off omits that story-driven medication set.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcSpreadObs">
+                            Spread observations across stay
+                            <button type="button" class="au-info-toggle" data-help="pcHelpSpread" aria-label="About spreading observations" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <select class="form-select" id="PcSpreadObs">
+                            <option value="">Story default (on for inpatient)</option>
+                            <option value="true">On</option>
+                            <option value="false">Off</option>
+                        </select>
+                        <div id="pcHelpSpread" class="au-help-text" hidden>On spaces vitals/labs across the encounter interval. Off clusters them near admit. Default is on for inpatient stays.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="PcAdditionalConditions">
+                            Additional comorbidities
+                            <button type="button" class="au-info-toggle" data-help="pcHelpAddlDx" aria-label="About additional comorbidities" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <input type="number" min="0" class="form-control" id="PcAdditionalConditions" placeholder="From resource mix" />
+                        <div id="pcHelpAddlDx" class="au-help-text" hidden>How many extra Condition resources besides the primary diagnosis. Codes come from the comorbidity palette. Blank lets the resource mix decide.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">
+                            Comorbidities
+                            <button type="button" class="au-info-toggle" data-help="pcHelpComorbid" aria-label="About comorbidities palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcConditionPicker" class="pc-picker" data-catalog="conditions" data-multiple="true" data-with-mode="true" data-placeholder="Search conditions…"></div>
+                        <div id="pcHelpComorbid" class="au-help-text" hidden>Secondary conditions cycled onto extra Condition resources. Inherit keeps the story pack; Replace uses only your list; Append adds yours on top of the story pack.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">
+                            Observations
+                            <button type="button" class="au-info-toggle" data-help="pcHelpObs" aria-label="About observations palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcObservationPicker" class="pc-picker" data-catalog="observations" data-multiple="true" data-with-mode="true" data-placeholder="Search LOINCs…"></div>
+                        <div id="pcHelpObs" class="au-help-text" hidden>LOINCs for vitals and labs. Values are drawn from each code’s normal range — you cannot pin an exact numeric result yet. Use Volume mix to control how many Observation resources are generated.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">
+                            Procedures
+                            <button type="button" class="au-info-toggle" data-help="pcHelpProc" aria-label="About procedures palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcProcedurePicker" class="pc-picker" data-catalog="procedures" data-multiple="true" data-with-mode="true" data-placeholder="Search procedures…"></div>
+                        <div id="pcHelpProc" class="au-help-text" hidden>SNOMED procedures that fit the story (for example thoracentesis with pneumonia). Same inherit / replace / append modes as comorbidities.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Medication administration
+                            <button type="button" class="au-info-toggle" data-help="pcHelpMedAdmin" aria-label="About medication administration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcMedAdminPicker" class="pc-picker" data-catalog="medications" data-multiple="false" data-placeholder="Search RxNorm…"></div>
+                        <div id="pcHelpMedAdmin" class="au-help-text" hidden>RxNorm used when a MedicationAdministration is generated. Dose, route, and timing follow the engine defaults and cannot be set here yet.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Service request
+                            <button type="button" class="au-info-toggle" data-help="pcHelpSR" aria-label="About service request" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcServiceRequestPicker" class="pc-picker" data-catalog="serviceRequests" data-multiple="false" data-placeholder="Search service requests…"></div>
+                        <div id="pcHelpSR" class="au-help-text" hidden>Primary ServiceRequest code (usually a lab panel). Count is controlled by Volume mix or the default resource distribution.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Specimen type
+                            <button type="button" class="au-info-toggle" data-help="pcHelpSpec" aria-label="About specimen type" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcSpecimenPicker" class="pc-picker" data-catalog="specimens" data-multiple="false" data-placeholder="Search specimens…"></div>
+                        <div id="pcHelpSpec" class="au-help-text" hidden>Specimen.type when specimens are generated. Blank keeps the story pack (for example blood or sputum that matches the diagnosis).</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Diagnostic report
+                            <button type="button" class="au-info-toggle" data-help="pcHelpDR" aria-label="About diagnostic report" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </label>
+                        <div id="PcDiagnosticReportPicker" class="pc-picker" data-catalog="serviceRequests" data-multiple="false" data-placeholder="Search diagnostic reports…"></div>
+                        <div id="pcHelpDR" class="au-help-text" hidden>DiagnosticReport code. Defaults to the same panel as the service request unless you pick a different one.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pcMix">
+                    Volume mix
+                    <span id="pcBadgeMix" class="pc-section-badge bg-light text-muted border ms-2">Using story defaults</span>
+                </button>
+            </h2>
+            <div id="pcMix" class="accordion-collapse collapse" data-bs-parent="#pcCustomize">
+                <div class="accordion-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <details class="au-help-panel mb-0 flex-grow-1">
+                            <summary><i class="bi bi-info-circle"></i> About volume mix</summary>
+                            <div class="au-help-body">
+                                <p><strong>Total resources</strong> uses the cohort/config min–max and a default mix (observations usually fill the remainder). <strong>Pin per-type counts</strong> sets exact Observation, Condition, Procedure, and similar counts.</p>
+                                <p>Always generated regardless of mix: Patient, Encounter, primary Condition, Device, CareTeam, CarePlan, and census List.</p>
+                            </div>
+                        </details>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="mix">Reset</button>
+                    </div>
+                    <div class="d-flex gap-4 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pcVolumeMode" id="PcVolumeTotal" checked />
+                            <label class="form-check-label" for="PcVolumeTotal">Total resources (min/max)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pcVolumeMode" id="PcVolumeExact" />
+                            <label class="form-check-label" for="PcVolumeExact">Pin per-type counts</label>
+                        </div>
+                    </div>
+                    <div class="row g-2" id="pcTypeCounts"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

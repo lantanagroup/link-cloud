@@ -137,6 +137,9 @@
 
     const runId = '@runId';
     const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(run.RunConfigurationJson ?? string.Empty));
+    const patientConfigurationCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        ((List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? []).Select(c => new { c.Id, c.Name }),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     const manifestDataUrl = '@Url.Action("ManifestData", "Runs")';
     const absDataUrl = '@Url.Action("AbsUploadData", "Runs")';
     const downloadBundleUrl = '@Url.Action("DownloadGeneratedBundle", "Runs")';
@@ -575,6 +578,7 @@
                         </button>
                     </th>
                 <th>Inpatient Pattern</th>
+                <th>Patient config</th>
                 <th class="text-end">Total</th>
                 <th>Resource Types</th>
                 <th class="text-end">Bundle</th>
@@ -592,6 +596,7 @@
             html += `<tr>
                 <td><code>${escapeHtml(pid)}</code></td>
                 <td>${formatScheduledPattern(inpatientPattern)}</td>
+                <td>${escapeHtml(patientConfigLabelForId(pid))}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
                 <td style="max-width:500px;">${types}</td>
                 <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
@@ -652,6 +657,30 @@
         }
 
         return map;
+    }
+
+    function patientConfigLabelForId(patientId) {
+        try {
+            const cfg = runConfigurationJson ? JSON.parse(runConfigurationJson) : null;
+            const cohorts = Array.isArray(cfg?.patientCohorts) ? cfg.patientCohorts : [];
+            if (!cohorts.length || !manifestData?.patientIds) return 'Quick setup';
+            const index = manifestData.patientIds.indexOf(patientId);
+            if (index < 0) return 'Quick setup';
+            let cursor = 0;
+            for (const c of cohorts) {
+                const count = Number.parseInt(String(c?.patientCount ?? 0), 10);
+                const safe = Number.isFinite(count) && count > 0 ? count : 0;
+                if (index < cursor + safe) {
+                    const id = c?.patientConfigurationId;
+                    if (!id) return c?.intent ? 'Quick setup (customized)' : 'Quick setup';
+                    const hit = (patientConfigurationCatalog || []).find(x => x.id === id);
+                    const name = hit ? hit.name : String(id).slice(0, 8);
+                    return c?.intent ? name + ' + overlays' : name;
+                }
+                cursor += safe;
+            }
+        } catch { /* ignore */ }
+        return 'Quick setup';
     }
 
     // ─── COMPARISON TAB ────────────────────────────────────────────

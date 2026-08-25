@@ -33,7 +33,8 @@ public static class PatientSpecFactory
 
         var inpatient = profile.RequiresInpatientEncounter();
         var hypo = profile.RequiresHypoglycemicMedication();
-        return FromScenario(scenario, inpatient, hypo, totalResourcesPerPatient, config);
+        var spec = FromScenario(scenario, inpatient, hypo, totalResourcesPerPatient, config);
+        return ApplyIntent(spec, profile.Intent, hypo);
     }
 
     public static PatientGenerationSpec FromScenario(
@@ -130,6 +131,178 @@ public static class PatientSpecFactory
             DiagnosticReportLoinc = srLoinc,
             DiagnosticReportDisplay = srDisplay
         };
+    }
+
+    internal static PatientGenerationSpec ApplyIntent(
+        PatientGenerationSpec spec,
+        PatientGenerationIntent? intent,
+        bool hypoFromEligibility)
+    {
+        if (intent == null)
+            return spec;
+
+        var observationPalette = CombinePalette(
+            spec.ObservationPalette,
+            intent.ObservationPalette,
+            intent.ObservationPaletteMode);
+        var conditionPalette = CombineCoded(
+            spec.ConditionPalette,
+            intent.ConditionPalette,
+            intent.ConditionPaletteMode);
+        var procedurePalette = CombineCoded(
+            spec.ProcedurePalette,
+            intent.ProcedurePalette,
+            intent.ProcedurePaletteMode);
+
+        int Count(string type, int current)
+        {
+            if (intent.ResourceTypeCounts != null
+                && intent.ResourceTypeCounts.TryGetValue(type, out var n)
+                && n >= 0)
+            {
+                return n;
+            }
+
+            return current;
+        }
+
+        var observationCount = Count("Observation", spec.ObservationCount);
+        var additionalConditions = intent.AdditionalConditionCount
+            ?? spec.AdditionalConditionCount;
+        if (intent.ResourceTypeCounts != null
+            && intent.ResourceTypeCounts.TryGetValue("Condition", out var conditionTotal)
+            && conditionTotal >= 0)
+        {
+            additionalConditions = Math.Max(0, conditionTotal - 1);
+        }
+
+        var includeHypo = intent.IncludeHypoglycemicInsulin ?? (hypoFromEligibility && spec.IncludeMedicationRequest);
+        var encounterClass = string.IsNullOrWhiteSpace(intent.EncounterClass)
+            ? spec.EncounterClass
+            : intent.EncounterClass!;
+        var encounterStatus = string.IsNullOrWhiteSpace(intent.EncounterStatus)
+            ? spec.EncounterStatus
+            : intent.EncounterStatus!;
+        var includeHospitalization = intent.IncludeHospitalization
+            ?? spec.IncludeHospitalization;
+        if (string.Equals(encounterStatus, "in-progress", StringComparison.OrdinalIgnoreCase))
+            includeHospitalization = false;
+
+        return new PatientGenerationSpec
+        {
+            EncounterClass = encounterClass,
+            EncounterStatus = encounterStatus,
+            DurationMinutes = intent.DurationMinutes ?? spec.DurationMinutes,
+            LocationIdVar = spec.LocationIdVar,
+            DischargeDisposition = string.IsNullOrWhiteSpace(intent.DischargeDisposition)
+                ? spec.DischargeDisposition
+                : intent.DischargeDisposition,
+            IncludeHospitalization = includeHospitalization,
+            PatientGender = string.IsNullOrWhiteSpace(intent.Gender) || string.Equals(intent.Gender, "random", StringComparison.OrdinalIgnoreCase)
+                ? spec.PatientGender
+                : intent.Gender,
+            PatientMinAge = intent.MinAge ?? spec.PatientMinAge,
+            PatientMaxAge = intent.MaxAge ?? spec.PatientMaxAge,
+            PrimaryConditionSnomed = string.IsNullOrWhiteSpace(intent.PrimaryConditionSnomed)
+                ? spec.PrimaryConditionSnomed
+                : intent.PrimaryConditionSnomed,
+            PrimaryConditionDisplay = string.IsNullOrWhiteSpace(intent.PrimaryConditionDisplay)
+                ? spec.PrimaryConditionDisplay
+                : intent.PrimaryConditionDisplay,
+            ConditionCategory = string.IsNullOrWhiteSpace(intent.ConditionCategory)
+                ? spec.ConditionCategory
+                : intent.ConditionCategory!,
+            GenerateLabWork = intent.GenerateLabWork ?? spec.GenerateLabWork,
+            ConditionPalette = conditionPalette,
+            AdditionalConditionCount = additionalConditions,
+            ObservationType = spec.ObservationType,
+            ObservationCount = Math.Max(0, observationCount),
+            ObservationPalette = observationPalette,
+            SpreadObservationsAcrossEncounter = intent.SpreadObservationsAcrossEncounter ?? spec.SpreadObservationsAcrossEncounter,
+            IncludeConditionDrivenMedications = intent.IncludeConditionDrivenMedications ?? spec.IncludeConditionDrivenMedications,
+            MedicationRequestCount = Count("MedicationRequest", spec.MedicationRequestCount),
+            MedicationAdministrationCount = Count("MedicationAdministration", spec.MedicationAdministrationCount),
+            MedicationAdministrationRxNorm = string.IsNullOrWhiteSpace(intent.MedicationAdministrationRxNorm)
+                ? spec.MedicationAdministrationRxNorm
+                : intent.MedicationAdministrationRxNorm,
+            MedicationAdministrationDisplay = string.IsNullOrWhiteSpace(intent.MedicationAdministrationDisplay)
+                ? spec.MedicationAdministrationDisplay
+                : intent.MedicationAdministrationDisplay,
+            IncludeMedicationRequest = includeHypo,
+            MedicationIdVar = includeHypo ? HypoInsulinMedicationIdVar : null,
+            IncludeProcedure = procedurePalette.Count > 0 || spec.IncludeProcedure,
+            ProcedureCount = Count("Procedure", spec.ProcedureCount),
+            ProcedurePalette = procedurePalette,
+            ProcedureSnomed = procedurePalette.Count > 0 ? procedurePalette[0].Code : spec.ProcedureSnomed,
+            ProcedureDisplay = procedurePalette.Count > 0 ? procedurePalette[0].Display : spec.ProcedureDisplay,
+            CoverageCount = Count("Coverage", spec.CoverageCount),
+            ServiceRequestCount = Count("ServiceRequest", spec.ServiceRequestCount),
+            ServiceRequestLoinc = string.IsNullOrWhiteSpace(intent.ServiceRequestLoinc)
+                ? spec.ServiceRequestLoinc
+                : intent.ServiceRequestLoinc,
+            ServiceRequestDisplay = string.IsNullOrWhiteSpace(intent.ServiceRequestDisplay)
+                ? spec.ServiceRequestDisplay
+                : intent.ServiceRequestDisplay,
+            SpecimenCount = Count("Specimen", spec.SpecimenCount),
+            SpecimenTypeCode = string.IsNullOrWhiteSpace(intent.SpecimenTypeCode)
+                ? spec.SpecimenTypeCode
+                : intent.SpecimenTypeCode,
+            SpecimenTypeDisplay = string.IsNullOrWhiteSpace(intent.SpecimenTypeDisplay)
+                ? spec.SpecimenTypeDisplay
+                : intent.SpecimenTypeDisplay,
+            DiagnosticReportCount = Count("DiagnosticReport", spec.DiagnosticReportCount),
+            DiagnosticReportLoinc = string.IsNullOrWhiteSpace(intent.DiagnosticReportLoinc)
+                ? spec.DiagnosticReportLoinc
+                : intent.DiagnosticReportLoinc,
+            DiagnosticReportDisplay = string.IsNullOrWhiteSpace(intent.DiagnosticReportDisplay)
+                ? spec.DiagnosticReportDisplay
+                : intent.DiagnosticReportDisplay,
+            IncludeAllergy = intent.IncludeAllergy ?? spec.IncludeAllergy
+        };
+    }
+
+    private static IReadOnlyList<ObservationPaletteItem> CombinePalette(
+        IReadOnlyList<ObservationPaletteItem> baseline,
+        IReadOnlyList<ObservationPaletteItem>? overlay,
+        PaletteMode mode)
+    {
+        if (overlay is not { Count: > 0 })
+            return baseline;
+        // Inherit + empty list = story default. Inherit + codes is treated as Replace,
+        // matching the configurator UI which auto-promotes Inherit → Replace on pick.
+        if (mode is PaletteMode.Replace or PaletteMode.Inherit)
+            return overlay.ToList();
+
+        var merged = baseline.ToList();
+        var seen = new HashSet<string>(merged.Select(i => i.LoincCode), StringComparer.OrdinalIgnoreCase);
+        foreach (var item in overlay)
+        {
+            if (seen.Add(item.LoincCode))
+                merged.Add(item);
+        }
+
+        return merged;
+    }
+
+    private static IReadOnlyList<CodedPaletteItem> CombineCoded(
+        IReadOnlyList<CodedPaletteItem> baseline,
+        IReadOnlyList<CodedPaletteItem>? overlay,
+        PaletteMode mode)
+    {
+        if (overlay is not { Count: > 0 })
+            return baseline;
+        if (mode is PaletteMode.Replace or PaletteMode.Inherit)
+            return overlay.ToList();
+
+        var merged = baseline.ToList();
+        var seen = new HashSet<string>(merged.Select(i => i.Code), StringComparer.OrdinalIgnoreCase);
+        foreach (var item in overlay)
+        {
+            if (seen.Add(item.Code))
+                merged.Add(item);
+        }
+
+        return merged;
     }
 
     private static List<ObservationPaletteItem> BuildObservationPalette(int scenarioIdx)

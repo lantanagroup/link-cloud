@@ -508,12 +508,81 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
-    public void Live_simulation_forces_scheduled_report_and_extends_polling()
+    public void Non_custom_scenarios_expand_all_qualifying_profiles()
+    {
+        var options = StartScenarioRequestResolver.Resolve(
+            new StartScenarioRequest { Scenario = AutomationScenarioKind.AdhocReportTest });
+
+        options.PatientProfiles.Should().HaveCount(1);
+        options.PatientProfiles.Should().OnlyContain(p =>
+            p.QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation));
+        options.PatientCohorts.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Custom_json_cohorts_preserve_patient_configuration_id_and_intent()
+    {
+        var configId = Guid.Parse("00000000-0000-0000-3000-000000000001");
+        var json = $$"""
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 50,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        },
+                        "patientConfigurationId": "{{configId}}",
+                        "intent": {
+                            "gender": "female",
+                            "minAge": 70,
+                            "conditionPaletteMode": "Replace"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        var cohort = options.PatientCohorts.Should().ContainSingle().Subject;
+        cohort.PatientConfigurationId.Should().Be(configId);
+        cohort.Intent.Should().NotBeNull();
+        cohort.Intent!.Gender.Should().Be("female");
+        cohort.Intent.MinAge.Should().Be(70);
+        cohort.Intent.ConditionPaletteMode.Should().Be(PaletteMode.Replace);
+        options.PatientProfiles.Should().ContainSingle()
+            .Which.Intent!.Gender.Should().Be("female");
+    }
+
+    [Theory]
+    [InlineData(ReportMethod.Adhoc)]
+    [InlineData(ReportMethod.RegenerateReport)]
+    public void Live_simulation_is_only_valid_for_scheduled_reports(ReportMethod method)
+    {
+        var act = () => StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = method,
+            IsLiveSimulation = true
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Live simulation is only valid for Scheduled reports*");
+    }
+
+    [Fact]
+    public void Live_simulation_on_scheduled_extends_polling()
     {
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = AutomationScenarioKind.Custom,
-            ReportMethod = ReportMethod.Adhoc,
+            ReportMethod = ReportMethod.ScheduledReport,
             IsLiveSimulation = true,
             ReportingWindowMinutes = 15
         });
@@ -530,6 +599,7 @@ public class StartScenarioRequestResolverTests
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.ScheduledReport,
             RunConfigurationJson = """{ "isLiveSimulation": true, "reportingWindowMinutes": 7 }"""
         });
 

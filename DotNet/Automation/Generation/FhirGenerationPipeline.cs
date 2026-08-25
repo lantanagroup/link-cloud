@@ -178,7 +178,10 @@ public static class FhirGenerationPipeline
                          (generationSeed.HasValue ? $", seed={generationSeed.Value}" : string.Empty) + "...");
 
         // ------------------------------------------------------------------
-        // Shared infrastructure — generated once, uploaded first
+        // Shared infrastructure — generated once, uploaded first.
+        // Uploaded even for imported-only runs: acquisition simulation and
+        // org-location prediction treat these as run-scoped fixtures. Skipping
+        // the POST would predict ABS keys that were never created.
         // ------------------------------------------------------------------
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) =
             GenerateSharedInfrastructure(generationRequirementsPlan, effectiveRunId, sharedInfrastructureGenerator);
@@ -622,73 +625,22 @@ public static class FhirGenerationPipeline
         // measure's MeasureReport does not contain the patient's resources, so its SDE
         // semantics do not contribute to the intersection of exclusions that determines
         // whether a resource reaches ABS.
-        HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        var effectiveProfile = profile;
-
-        if (cqlInput != null)
-        {
-            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
-                patientId,
-                profile,
-                measures,
-                cqlInput,
-                generationClinicalPeriodStart,
-                generationClinicalPeriodEnd,
-                output);
-
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
-
-        var measureEligibilityLabel = string.Join(", ", measures.Select(m =>
-        {
-            var shortName = m switch
-            {
-                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "ACH",
-                ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "ACH-Daily",
-                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
-                _ => m.ToString()
-            };
-            var eligible = effectiveProfile.QualifiesFor(m) ? "Q" : "NQ";
-            return $"{shortName}={eligible}";
-        }));
+        var effectiveProfile = IndexPatientEntries(
+            manifestBuilder,
+            patientId,
+            profile,
+            entries,
+            measures,
+            sharedSimEntries,
+            acquisitionSimulation,
+            generationClinicalPeriodStart,
+            generationClinicalPeriodEnd,
+            output);
 
         if (ShouldEmitDetailedPatientLog(patientIndex))
         {
-            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{measureEligibilityLabel}] | scenario={scenario.PrimaryDxDisplay} | " +
+            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{FormatMeasureEligibilityLabel(measures, effectiveProfile)}] | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
-        }
-
-        // Record patient in manifest builder
-        manifestBuilder.AddPatient(patientId, effectiveProfile);
-        manifestBuilder.AddEntries(patientId, entries);
-
-        // Run acquisition simulation BEFORE we serialize and discard
-        if (acquisitionSimulation != null)
-        {
-            var patientSimEntries = BuildResourceIndex(entries);
-            var acquiredKeys = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
-                patientId,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.QueryPlan,
-                acquisitionSimulation.ClinicalPeriodStart,
-                acquisitionSimulation.ClinicalPeriodEnd,
-                output,
-                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
-            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
-                acquiredKeys,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
-                cqlFilteredKeys);
-            manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
-            // patientSimEntries (JsonElement clones) are now eligible for GC
         }
 
         // Entries list is no longer needed — allow GC before upload
@@ -783,67 +735,19 @@ public static class FhirGenerationPipeline
 
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
-        // 3. CQL filter simulation + period-aware eligibility prediction
-        HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        var effectiveProfile = profile;
-        if (cqlInput != null)
-        {
-            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
-                patientId,
-                profile,
-                measures,
-                cqlInput,
-                generationClinicalPeriodStart,
-                generationClinicalPeriodEnd,
-                output);
+        var effectiveProfile = IndexPatientEntries(
+            manifestBuilder,
+            patientId,
+            profile,
+            entries,
+            measures,
+            sharedSimEntries,
+            acquisitionSimulation,
+            generationClinicalPeriodStart,
+            generationClinicalPeriodEnd,
+            output);
 
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
-
-        var measureLabel = string.Join(", ", measures.Select(m =>
-        {
-            var shortName = m switch
-            {
-                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "ACH",
-                ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "ACH-Daily",
-                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
-                _ => m.ToString()
-            };
-            return $"{shortName}={(effectiveProfile.QualifiesFor(m) ? "Q" : "NQ")}";
-        }));
-        output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{measureLabel}] | source={imported.Source}");
-
-        // 4. Manifest
-        manifestBuilder.AddPatient(patientId, effectiveProfile);
-        manifestBuilder.AddEntries(patientId, entries);
-
-        // 5. Acquisition simulation (same as generated path)
-        if (acquisitionSimulation != null)
-        {
-            var patientSimEntries = BuildResourceIndex(entries);
-            var acquiredKeys = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
-                patientId,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.QueryPlan,
-                acquisitionSimulation.ClinicalPeriodStart,
-                acquisitionSimulation.ClinicalPeriodEnd,
-                output,
-                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
-            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
-                acquiredKeys,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
-                cqlFilteredKeys);
-            manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
-        }
+        output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{FormatMeasureEligibilityLabel(measures, effectiveProfile)}] | source={imported.Source}");
 
         // 6. Upload (bundle imports) or mark as pre-existing (id imports)
         var bundleCount = 0;
@@ -865,6 +769,88 @@ public static class FhirGenerationPipeline
 
         return (patientId, bundleCount);
     }
+
+    /// <summary>
+    /// Shared generated/imported post-processing: period eligibility, CQL SDE keys,
+    /// acquisition simulation, and manifest rows. Callers still own materialization
+    /// (Thetis vs fetch/parse) and whether to POST the bundles.
+    /// </summary>
+    private static PatientProfile IndexPatientEntries(
+        GenerationManifest.IncrementalBuilder manifestBuilder,
+        string patientId,
+        PatientProfile profile,
+        List<Bundle.EntryComponent> entries,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
+        AcquisitionSimulationConfig? acquisitionSimulation,
+        DateTime? generationClinicalPeriodStart,
+        DateTime? generationClinicalPeriodEnd,
+        IAutomationOutput output)
+    {
+        HashSet<string>? cqlFilteredKeys = null;
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
+        manifestBuilder.AddEntries(patientId, entries);
+
+        if (acquisitionSimulation != null)
+        {
+            var patientSimEntries = BuildResourceIndex(entries);
+            var acquiredKeys = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+                patientId,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.QueryPlan,
+                acquisitionSimulation.ClinicalPeriodStart,
+                acquisitionSimulation.ClinicalPeriodEnd,
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
+                cqlFilteredKeys);
+            manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
+        }
+
+        return effectiveProfile;
+    }
+
+    private static string FormatMeasureEligibilityLabel(
+        IReadOnlyList<ProfiledMeasureType> measures,
+        PatientProfile profile)
+        => string.Join(", ", measures.Select(m =>
+        {
+            var shortName = m switch
+            {
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "ACH",
+                ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "ACH-Daily",
+                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
+                _ => m.ToString()
+            };
+            return $"{shortName}={(profile.QualifiesFor(m) ? "Q" : "NQ")}";
+        }));
 
     private static PatientProfile ApplyMeasurementPeriodEligibilityPrediction(
         string patientId,

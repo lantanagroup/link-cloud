@@ -352,6 +352,91 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 .au-info-icon:hover { opacity: 1; color: var(--au-accent); }
 
+.au-info-toggle {
+  border: 0;
+  background: none;
+  padding: 0 .2rem;
+  margin: 0;
+  color: var(--au-muted);
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  opacity: .75;
+}
+.au-info-toggle:hover,
+.au-info-toggle[aria-expanded="true"] {
+  color: var(--au-accent);
+  opacity: 1;
+}
+.au-info-toggle:focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.au-info-toggle-on-dark {
+  color: rgba(255, 255, 255, .85);
+  opacity: 1;
+}
+.au-info-toggle-on-dark:hover,
+.au-info-toggle-on-dark[aria-expanded="true"] {
+  color: #fff;
+}
+.btn.au-info-toggle {
+  padding: .15rem .4rem;
+  opacity: 1;
+}
+.pc-section-reset { flex-shrink: 0; }
+.au-help-text {
+  font-size: .78rem;
+  line-height: 1.4;
+  color: #3d4753;
+  background: #f3f7fc;
+  border-left: 3px solid var(--au-accent);
+  padding: .45rem .7rem;
+  margin: .35rem 0 .1rem;
+  border-radius: 0 var(--au-radius) var(--au-radius) 0;
+}
+.au-help-text p { margin: 0 0 .4rem; }
+.au-help-text p:last-child,
+.au-help-text ul:last-child { margin-bottom: 0; }
+.au-help-text ul {
+  margin: .2rem 0 0;
+  padding-left: 1.1rem;
+}
+.au-help-text li { margin-bottom: .15rem; }
+.au-help-panel {
+  background: #f7f9fc;
+  border: 1px solid #e3e8ef;
+  border-radius: var(--au-radius);
+  padding: .6rem .85rem;
+  margin-bottom: 1rem;
+}
+.au-help-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #2f3a46;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.au-help-panel > summary::-webkit-details-marker { display: none; }
+.au-help-panel > summary .bi { color: var(--au-accent); }
+.au-help-panel[open] > summary { margin-bottom: .5rem; }
+.au-help-panel .au-help-body {
+  font-size: .82rem;
+  color: #3d4753;
+  line-height: 1.45;
+}
+.au-help-panel .au-help-body p { margin: 0 0 .5rem; }
+.au-help-panel .au-help-body p:last-child,
+.au-help-panel .au-help-body ul:last-child { margin-bottom: 0; }
+.au-help-panel .au-help-body ul {
+  margin: 0 0 .5rem;
+  padding-left: 1.15rem;
+}
+.au-help-panel .au-help-body li { margin-bottom: .2rem; }
+
 /* ===================================================================
    Responsive helpers
    =================================================================== */
@@ -553,4 +638,53 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   text-transform: uppercase;
   letter-spacing: .04em;
   margin-top: .3rem;
+}
+
+/* ===================================================================
+   Patient configuration editor
+   =================================================================== */
+.pc-picker {
+  position: relative;
+}
+.pc-picker-toggle {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-picker-menu {
+  min-width: 100%;
+  max-width: 420px;
+}
+.pc-picker-list {
+  max-height: 220px;
+  overflow: auto;
+}
+.pc-picker-item {
+  display: flex;
+  gap: .4rem;
+  align-items: flex-start;
+  padding: .2rem .15rem;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.pc-picker-item:hover {
+  background: #f4f6f8;
+}
+.pc-section-badge {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border-radius: 999px;
+  padding: .15rem .5rem;
+}
+.pc-cohort-only { display: none; }
+.pc-cohort-config-cell {
+  min-width: 240px;
+}
+.pc-cohort-config-cell .form-select {
+  min-width: 150px;
+}
+.au-cohort-table {
+  min-width: 1280px;
 }

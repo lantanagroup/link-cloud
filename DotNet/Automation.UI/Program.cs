@@ -240,6 +240,7 @@ builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddSingleton<IPatientConfigurationStore, MongoPatientConfigurationStore>();
 builder.Services.AddNormalizationEngine();
 builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
@@ -291,6 +292,7 @@ builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
+builder.Services.AddHostedService<PatientConfigurationSeedService>();
 
 // Allow large imported-patient bundle uploads in the Automation UI.
 builder.Services.Configure<FormOptions>(options =>

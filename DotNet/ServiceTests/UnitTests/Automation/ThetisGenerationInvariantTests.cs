@@ -4,6 +4,7 @@ using LantanaGroup.Automation.Generation;
 using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Thetis.Generation.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Automation;
@@ -142,6 +143,75 @@ public class ThetisGenerationInvariantTests
             entries.Select(e => e.Resource).OfType<MedicationRequest>().Any(mr => IsInsulin(mr, "HypoInsulin"))
             || medCodes.Any(c => c is "274783" or "1116635" or "1649592" or "245247"),
             $"hypo patient meds: {string.Join(",", medCodes)}");
+    }
+
+    [Fact]
+    public async Task Intent_overlays_are_honored_on_generated_resources()
+    {
+        var (ids, _, practitionerIds, medicationIds) =
+            FactorySharedInfrastructureGenerator.Shared.Generate(null, RunTag);
+        var intent = new PatientGenerationIntent
+        {
+            Gender = "female",
+            MinAge = 70,
+            MaxAge = 70,
+            DischargeDisposition = "snf",
+            GenerateLabWork = false,
+            ObservationPaletteMode = PaletteMode.Replace,
+            ObservationPalette =
+            [
+                new ObservationPaletteItem
+                {
+                    LoincCode = "718-7",
+                    LoincDisplay = "Hemoglobin [Mass/volume] in Blood",
+                    Type = "laboratory",
+                    Unit = "g/dL",
+                    UnitCode = "g/dL",
+                    MinValue = 12,
+                    MaxValue = 17
+                }
+            ],
+            ResourceTypeCounts = new Dictionary<string, int> { ["Observation"] = 3 }
+        };
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(
+                new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+                },
+                SeedOffset: 0,
+                ClinicalScenarioId: ClinicalScenarioIds.Pneumonia.ToString(),
+                Intent: intent),
+            PatientIndex = 0,
+            BaseSeed = FrozenSeed,
+            TotalResourcesPerPatient = 20,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            ClinicalPeriodStart = PeriodStartUtc,
+            ClinicalPeriodEnd = PeriodEndUtc,
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            Output = new NullOutputHelper()
+        };
+
+        var entries = await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
+        var patient = Assert.Single(entries.Select(e => e.Resource).OfType<Patient>());
+        Assert.Equal(AdministrativeGender.Female, patient.Gender);
+
+        var birth = DateTime.Parse(patient.BirthDate);
+        var age = PeriodStartUtc.Year - birth.Year;
+        if (birth > PeriodStartUtc.AddYears(-age)) age--;
+        Assert.InRange(age, 69, 71);
+
+        var encounter = Assert.Single(entries.Select(e => e.Resource).OfType<Encounter>());
+        Assert.Contains(
+            encounter.Hospitalization?.DischargeDisposition?.Coding ?? [],
+            c => string.Equals(c.Code, "snf", StringComparison.OrdinalIgnoreCase));
+
+        var observations = entries.Select(e => e.Resource).OfType<Observation>().ToList();
+        Assert.Contains(observations, o => o.Code?.Coding?.Any(c => c.Code == "718-7") == true);
     }
 
     [Fact]

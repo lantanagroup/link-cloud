@@ -19,6 +19,7 @@ public class ScenariosController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
@@ -36,6 +37,7 @@ public class ScenariosController(
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -612,7 +614,9 @@ public class ScenariosController(
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
                     ResourcesPerPatientMax = c.ResourcesPerPatientMax,
-                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern,
+                    PatientConfigurationId = c.PatientConfigurationId,
+                    Intent = PatientGenerationIntent.Clone(c.Intent)
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,

@@ -1,0 +1,231 @@
+@model List<Automation.UI.Models.PatientConfiguration>
+@using LantanaGroup.Automation.Generation
+@{
+    ViewData["Title"] = "Patient Configurations";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-person-gear me-2"></i>Patient Configurations</h2>
+    <p class="text-muted mb-2">
+        Reusable patient shapes for scenario cohorts. <strong>Quick setup</strong> in a scenario still works without a saved configuration.
+    </p>
+    <details class="au-help-panel">
+        <summary><i class="bi bi-info-circle"></i> How Patient Configurations work</summary>
+        <div class="au-help-body">
+            <p>Split the <strong>shape of the patient</strong> from <strong>how many of them appear in a test</strong>.</p>
+            <ul>
+                <li>A <strong>Patient Configuration</strong> is a reusable clinical story plus optional detailed overlays (demographics, encounter, codes, volume mix).</li>
+                <li>A scenario <strong>cohort</strong> still owns patient count, Qualifying / Non-Qualifying, measure checkboxes, and inpatient pattern.</li>
+                <li>Most tests can stay on <strong>Quick setup</strong> in the scenario editor — no saved configuration required.</li>
+                <li>Blank overlay fields <strong>inherit the clinical story pack</strong>. You only fill the details a specific test needs.</li>
+                <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Use <strong>Clone</strong> to freeze a copy for one test.</li>
+                <li><strong>System</strong> rows are view-only starter kits (Pneumonia, Diabetic hypoglycemia, ACH Q/NQ). Clone them to customize.</li>
+            </ul>
+            <p>Open a configuration to see field-level <i class="bi bi-info-circle"></i> help. In a scenario, pick a configuration on the cohort row or click <strong>Customize</strong> for overlays that apply only to that test.</p>
+        </div>
+    </details>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>All Patient Configurations</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewPc">
+                <i class="bi bi-plus-lg"></i>
+            </button>
+        </div>
+        <div class="card-body p-0 au-help-scope">
+            <div id="pcColStory" class="au-help-text mx-3 mt-2" hidden>
+                Clinical story pack(s) used as the starter kit (diagnosis, matching labs/meds/procedures). “All stories” rotates through every pack. Story pack is independent of Qualifying / Non-Qualifying.
+            </div>
+            <div id="pcColDefaults" class="au-help-text mx-3 mt-2" hidden>
+                Default qualification applied when this configuration is inserted into a scenario. <strong>Customized</strong> means at least one overlay (gender, palettes, counts, and so on) is set. The cohort can still change Q/NQ after insert.
+            </div>
+            <div id="pcColResources" class="au-help-text mx-3 mt-2" hidden>
+                Target resources per patient (min–max). Live-referenced when a scenario cohort points at this configuration. Pin exact per-type counts in Customize → Volume mix if you need a specific Observation or Condition count.
+            </div>
+            <div id="pcColType" class="au-help-text mx-3 mt-2" hidden>
+                <strong>System</strong> configurations are seeded starter kits and cannot be edited or deleted — clone them. <strong>Custom</strong> configurations are yours. Editing a custom config updates every scenario that still points at it.
+            </div>
+            <table class="table au-table mb-0" id="pcTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>
+                            Story
+                            <button type="button" class="au-info-toggle" data-help="pcColStory" aria-label="About story column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </th>
+                        <th>
+                            Defaults
+                            <button type="button" class="au-info-toggle" data-help="pcColDefaults" aria-label="About defaults column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </th>
+                        <th>
+                            Resources
+                            <button type="button" class="au-info-toggle" data-help="pcColResources" aria-label="About resources column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </th>
+                        <th>
+                            Type
+                            <button type="button" class="au-info-toggle" data-help="pcColType" aria-label="About type column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </th>
+                        <th>Updated</th>
+                        <th style="width:220px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model)
+                    {
+                        var story = t.ClinicalScenarioIds.Count == 0
+                            ? "All stories"
+                            : $"{t.ClinicalScenarioIds.Count} pack(s)";
+                        var q = t.CohortQualification == MeasureEligibility.Qualifying ? "Qualifying" : "Non-Qualifying";
+                        var customized = t.Intent != null && t.Intent.HasOverlays();
+                        <tr data-id="@t.Id">
+                            <td>
+                                <strong>@t.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(t.Description))
+                                {
+                                    <br /><small class="text-muted">@t.Description</small>
+                                }
+                            </td>
+                            <td><small>@story</small></td>
+                            <td>
+                                <small>@q</small>
+                                @if (customized)
+                                {
+                                    <span class="badge bg-primary ms-1">Customized</span>
+                                }
+                            </td>
+                            <td><small>@t.ResourcesPerPatientMin–@t.ResourcesPerPatientMax</small></td>
+                            <td>
+                                @if (t.IsSystem)
+                                {
+                                    <span class="badge bg-dark">System</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border">Custom</span>
+                                }
+                            </td>
+                            <td class="small text-muted">@t.UpdatedAt.LocalDateTime.ToString("g")</td>
+                            <td class="text-nowrap">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-pc-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                        @(t.IsSystem ? "View" : "Edit")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pc-clone" data-id="@t.Id">Clone</button>
+                                    @if (!t.IsSystem)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-pc-delete" data-id="@t.Id">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.Count == 0)
+            {
+                <div class="text-center text-muted py-4">No patient configurations yet. Click <strong>+</strong> to create one.</div>
+            }
+        </div>
+    </div>
+</div>
+
+<div id="pcModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:980px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="pcModalTitle"><i class="bi bi-person-gear me-2"></i>Patient Configuration</h5>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-success" id="btnPcSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnPcClose">Close</button>
+                </div>
+            </div>
+            <div id="pcFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="pcModalBody">
+                @Html.AntiForgeryToken()
+                @await Html.PartialAsync("_PatientConfigurationEditor")
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/patient-configuration-editor.js" asp-append-version="true"></script>
+<script>
+(function () {
+    var saveUrl = '@Url.Action("SaveInline", "PatientConfigurations")';
+    var getUrl = '@Url.Action("GetJson", "PatientConfigurations")';
+    var cloneUrl = '@Url.Action("CloneInline", "PatientConfigurations")';
+    var deleteUrl = '@Url.Action("DeleteInline", "PatientConfigurations")';
+    var catalogUrl = '@Url.Action("Catalog", "PatientConfigurations")';
+    var editor = window.PatientConfigurationEditor;
+
+    editor.init({ catalogUrl: catalogUrl });
+
+    function token() {
+        var t = document.querySelector('input[name="__RequestVerificationToken"]');
+        return t ? t.value : '';
+    }
+    function showErr(msg) {
+        var el = document.getElementById('pcFormErrors');
+        el.textContent = msg || '';
+        el.style.display = msg ? '' : 'none';
+    }
+    function openModal() { document.getElementById('pcModal').style.display = ''; }
+    function closeModal() { document.getElementById('pcModal').style.display = 'none'; showErr(''); }
+
+    document.getElementById('btnNewPc').addEventListener('click', function () {
+        editor.ensureCatalog().then(function () {
+            editor.setMode('library');
+            editor.setReadOnly(false);
+            editor.populate({ id: crypto.randomUUID(), name: 'New patient configuration', intent: {} });
+            document.getElementById('pcModalTitle').innerHTML = '<i class="bi bi-person-gear me-2"></i>Patient Configuration';
+            document.getElementById('btnPcSave').style.display = '';
+            openModal();
+        });
+    });
+    document.getElementById('btnPcClose').addEventListener('click', closeModal);
+    document.getElementById('btnPcSave').addEventListener('click', function () {
+        var model = editor.collect();
+        if (!model.name || !model.name.trim()) { showErr('Name is required.'); return; }
+        fetch(saveUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+            body: JSON.stringify(model)
+        }).then(function (r) {
+            if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.statusText); });
+            window.location.reload();
+        }).catch(function (e) { showErr(e.message); });
+    });
+    document.querySelectorAll('.btn-pc-open').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            editor.ensureCatalog().then(function () {
+                return fetch(getUrl + '?id=' + btn.dataset.id).then(function (r) { return r.json(); });
+            }).then(function (model) {
+                editor.setMode('library');
+                editor.setReadOnly(!!model.isSystem);
+                editor.populate(model);
+                document.getElementById('btnPcSave').style.display = model.isSystem ? 'none' : '';
+                openModal();
+            });
+        });
+    });
+    document.querySelectorAll('.btn-pc-clone').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            fetch(cloneUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+                body: JSON.stringify({ id: btn.dataset.id })
+            }).then(function () { window.location.reload(); });
+        });
+    });
+    document.querySelectorAll('.btn-pc-delete').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm('Delete this patient configuration?')) return;
+            fetch(deleteUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+                body: JSON.stringify({ id: btn.dataset.id })
+            }).then(function () { window.location.reload(); });
+        });
+    });
+})();
+</script>

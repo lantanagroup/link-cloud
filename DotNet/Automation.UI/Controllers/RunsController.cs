@@ -15,6 +15,7 @@ public class RunsController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     GeneratedTemplateCacheVersionStore templateCacheVersionStore,
@@ -43,6 +44,7 @@ public class RunsController(
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -166,6 +168,7 @@ public class RunsController(
             return NotFound();
 
         ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
         return View(run);
     }
 
@@ -182,6 +185,7 @@ public class RunsController(
 
         ViewBag.Run = run;
         ViewBag.RunId = id;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
         ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
         ViewBag.LatestTemplateCacheVersionNumber = await GetLatestTemplateCacheVersionAsync(
             run.GeneratedTemplateCacheScenarioKey,
