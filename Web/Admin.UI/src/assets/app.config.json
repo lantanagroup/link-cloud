@@ -9,5 +9,6 @@
     "responseType": "code"
   },
   "grafanaUrl": "http://localhost:3000",
-  "kafkaUrl": "http://localhost:9095"
+  "kafkaUrl": "http://localhost:9095",
+  "dmrpEnabled": true
 }

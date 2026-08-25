@@ -18,6 +18,8 @@ export interface AppConfig {
   },
   kafkaUrl?: string;
   grafanaUrl?: string;
+  // Mirrors the backend's DMRP:Enabled flag; gates the DMRP screens (measure mappings).
+  dmrpEnabled?: boolean;
 }
 
 @Injectable({

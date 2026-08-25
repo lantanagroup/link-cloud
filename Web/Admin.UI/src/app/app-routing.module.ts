@@ -2,6 +2,7 @@ import {RouterModule, Routes} from '@angular/router';
 
 import {NgModule} from '@angular/core';
 import {AuthGuard} from './services/security/auth.guard'; // adjust the path
+import {DmrpGuard} from './services/security/dmrp.guard';
 
 
 const routes: Routes = [
@@ -22,7 +23,7 @@ const routes: Routes = [
   { path: 'audit', loadComponent: () => import('./components/audit/audit-dashboard/audit-dashboard.component').then(mod => mod.AuditDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'account', loadComponent: () => import('./components/account/account-dashboard/account-dashboard.component').then(mod => mod.AccountDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'vendor', loadComponent: () => import('./components/vendor/vendor-dashboard/vendor-dashboard.component').then(mod => mod.VendorDashboardComponent), canActivate: [AuthGuard] },
-  { path: 'measure-mappings', loadComponent: () => import('./components/measure-mappings/measure-mappings-dashboard/measure-mappings-dashboard.component').then(mod => mod.MeasureMappingsDashboardComponent), canActivate: [AuthGuard] },
+  { path: 'measure-mappings', loadComponent: () => import('./components/measure-mappings/measure-mappings-dashboard/measure-mappings-dashboard.component').then(mod => mod.MeasureMappingsDashboardComponent), canActivate: [AuthGuard, DmrpGuard] },
   { path: 'integration-test', loadComponent: () => import('./components/testing/integration-test/integration-test.component').then(mod => mod.IntegrationTestComponent), canActivate: [AuthGuard] },
   { path: 'validation-config', loadComponent: () => import('./components/validation-config/validation-config.component').then(mod => mod.ValidationConfigComponent), canActivate: [AuthGuard]  },
   { path: 'monitor/health', loadComponent: () => import('./components/monitor/link-health-check/link-health-check.component').then(mod => mod.LinkHealthCheckComponent), canActivate: [AuthGuard]  },

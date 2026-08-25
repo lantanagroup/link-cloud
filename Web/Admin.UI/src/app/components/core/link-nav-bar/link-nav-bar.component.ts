@@ -40,7 +40,8 @@ export class LinkNavBarComponent {
       children: [
         { label: 'Implementation Guides', path: '/validation-config' },
         { label: 'Measure Definitions', path: '/measure-def' },
-        { label: 'Measure Mappings', path: '/measure-mappings' },
+        // DMRP screens only exist while the module is enabled (DmrpGuard covers direct URLs).
+        ...(this.appConfig?.config?.dmrpEnabled ? [{ label: 'Measure Mappings', path: '/measure-mappings' }] : []),
         { label: 'Normalization Operations', path: '/tenant/operations' },
         { label: 'Query Plans', path: '/query-plans' },
         { label: 'Terminology', path: '/terminology-config' },
