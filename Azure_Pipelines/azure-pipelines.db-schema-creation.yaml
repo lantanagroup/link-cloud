@@ -23,35 +23,48 @@ parameters:
   type: object
   default:
     - name: account
+      alias: account
       artifact: account-db
       file: accountDb.sql
     - name: audit
+      alias: audit
       artifact: audit-db
       file: auditDb.sql
     - name: census
+      alias: census
       artifact: census-db
       file: censusDb.sql
     - name: data
+      alias: data
       artifact: data-db
       file: dataDb.sql
+    - name: mock-dmrp
+      alias: mockdmrp
+      artifact: MockDmrpApi-db
+      file: MockDmrpApiDb.sql
     - name: normalization
+      alias: normalization
       artifact: normalization-db
       file: normalizationDb.sql
     - name: querydispatch
+      alias: querydispatch
       artifact: querydispatch-db
       file: querydispatchDb.sql
     - name: report
+      alias: report
       artifact: report-db
       file: reportDb.sql
     - name: submission
+      alias: submission
       artifact: submission-db
       file: submissionDb.sql
     - name: tenant
+      alias: tenant
       artifact: tenant-db
       file: tenantDb.sql
     - name: validation
+      alias: validation
       artifact: validation-db
-      file: V20241101__Initial_schema.sql
 
 #####################
 
@@ -101,7 +114,7 @@ stages:
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
             # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
+            $dotnetServices = @("Account", "Audit", "Census", "MockDmrpApi", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
             $javaServices = @("validation" )
             $dataAcquisition = @("DataAcquisition" )
 
@@ -256,6 +269,29 @@ stages:
          publishLocation: 'container'
         displayName: Publish Data Acquisition SQL Script  
   ###
+  # Mock-DMRP
+  - job: Mock_DMRP
+    displayName: "Generate Mock_DMRP Schema Script"
+    steps:
+      - script: |
+          cd DotNet/MockDmrpApi
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/MockDmrpApi
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportingPlanDbContext -s $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -p $(build.sourcesdirectory)/DotNet/MockDmrpApi/MockDmrpApi.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/MockDmrpApiDb.sql
+        displayName: Generate MockDmrpApi SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/MockDmrpApiDb.sql'
+         ArtifactName: 'MockDmrpApi-db'
+         publishLocation: 'container'
+        displayName: Publish MockDmrpApi SQL Script  
+  ###
   # Normalization
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
@@ -381,6 +417,7 @@ stages:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
        Contents: 'V*.sql'
+
     - task: PublishBuildArtifacts@1
       inputs:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts'
@@ -402,14 +439,18 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_TEST
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_TEST
+        displayName: Update ${{ db.alias }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
@@ -418,6 +459,86 @@ stages:
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_TEST
+    displayName: Update validation
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-test-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
 
 ############################################################################################
 # SQL Script Apply QA
@@ -432,14 +553,18 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_QA
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_QA
+        displayName: Update ${{ db.alias }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
@@ -448,6 +573,86 @@ stages:
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_QA
+    displayName: Update validation
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-qa-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
 
 ############################################################################################
 # SQL Script Apply QA2
@@ -462,14 +667,18 @@ stages:
 
   jobs:
   - ${{ each db in parameters.databases }}:
-    - job: Update_${{ db.name }}_QA
-      displayName: Update ${{ db.name }}
-      steps:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_QA2
+        displayName: Update ${{ db.aliase }}
+
+        steps:
         - download: current
           artifact: ${{ db.artifact }}
 
         - task: SqlAzureDacpacDeployment@1
-          displayName: Apply ${{ db.name }} DB Schema
+          displayName: Apply ${{ db.alias }} DB Schema
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
@@ -478,3 +687,83 @@ stages:
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_QA2
+    displayName: Update validation
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-qa2-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'

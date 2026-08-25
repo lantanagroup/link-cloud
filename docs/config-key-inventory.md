@@ -460,7 +460,7 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-138 keys.
+140 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -541,6 +541,8 @@ value set in a store can never take effect.
 | `Loki:Url` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:42` |
 | `MongoDB:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:180` |
 | `MongoDB:DatabaseName` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:181` |
+| `pre-qualification.write-pre-qual-operation-outcome` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Services/RunExecutor.cs` |
+| `/pre-qualification/write-pre-qual-operation-outcome` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Services/RunExecutor.cs` |
 | `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1455,11 +1457,10 @@ value set in a store can never take effect.
 
 ### Report
 
-129 keys.
+126 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `/pre-qualification/write-pre-qual-operation-outcome` | dotnet | - | dev, qa, test | `DotNet/Report/Application/Configs/PreQualificationFlagConsistency.cs:41` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:164` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:169` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:170` |
@@ -1524,8 +1525,6 @@ value set in a store can never take effect.
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
 | `PatientAggregator` | dotnet | - | - | `DotNet/Report/Program.cs:98` |
 | `PatientAggregator:IncludeOrganizationResource` | dotnet | yes | dev, test | `DotNet/Report/Program.cs:98` |
-| `PreQualification` | dotnet | - | - | `DotNet/Report/Program.cs:99` |
-| `PreQualification:WritePreQualOperationOutcome` | dotnet | yes | test | `DotNet/Report/Program.cs:99` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Report/Program.cs:88` |
 | `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
@@ -1859,7 +1858,7 @@ value set in a store can never take effect.
 
 ### Terminology
 
-55 keys.
+56 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1917,6 +1916,7 @@ value set in a store can never take effect.
 | `Telemetry:OtelCollectorEndpoint` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:PatientTags` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Terminology` | dotnet | - | - | `DotNet/Terminology/Program.cs:128` |
+| `Terminology:EnableCodeUploadEndpoint` | dotnet | yes | - | `DotNet/Terminology/Program.cs:128` |
 | `Terminology:Path` | dotnet | yes | - | `DotNet/Terminology/Program.cs:128` |
 
 ### Validation

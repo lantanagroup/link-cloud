@@ -448,6 +448,14 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 validationErrors.AppendLine("FacilityName must be entered.");
             }
 
+            // Checked here rather than left to the lookup below. An absent timezone reaches
+            // FindSystemTimeZoneById as "" or null, which answers with "Timezone Not Found: " or an
+            // ArgumentNullException the caller sees as a 500 - neither of which names the field.
+            if (string.IsNullOrWhiteSpace(facility.TimeZone))
+            {
+                validationErrors.AppendLine("Timezone is required.");
+            }
+
             if (!string.IsNullOrEmpty(validationErrors.ToString()))
             {
                 throw new ApplicationException(validationErrors.ToString());

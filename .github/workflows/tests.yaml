@@ -297,12 +297,23 @@ jobs:
             ${{ runner.os }}-nuget-
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
-      # spend their per-test pull budget on the cold pull.
+      # spend their per-test pull budget on the cold pull. Retry up to 3 times
+      # to handle transient MCR network timeouts.
       - name: Pull Azurite Docker image
-        run: docker pull mcr.microsoft.com/azure-storage/azurite:latest
+        run: |
+          for i in 1 2 3; do
+            docker pull mcr.microsoft.com/azure-storage/azurite:latest && break
+            echo "Pull attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
 
       - name: Pull SQL Server Docker image
-        run: docker pull mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04
+        run: |
+          for i in 1 2 3; do
+            docker pull mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04 && break
+            echo "Pull attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
 
       - name: Restore dependencies
         run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj

@@ -47,21 +47,31 @@ public class FacilityReportingPlansControllerTests : IDisposable
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
 
-        // The suite shares one database, so start each test from an empty table.
-        foreach (var plan in _planRepository.GetAllAsync().GetAwaiter().GetResult())
-        {
-            _planRepository.Remove(plan);
-        }
-
-        _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
+        // The suite shares one database across all three DMRP test classes, which run serially in an
+        // unspecified order. Clearing on the way in as well as out keeps a class that failed part way
+        // through from leaking rows into whichever class runs next - and DeleteAllAsync now refuses
+        // while any reporting plan exists, so a leaked row turns an unrelated test red.
+        ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
     }
 
     public void Dispose()
     {
+        ClearReportingPlans();
+
         _fixture.ResetFacilityExistence();
         _scope.Dispose();
+    }
+
+    private void ClearReportingPlans()
+    {
+        foreach (var plan in _planRepository.GetAllAsync().GetAwaiter().GetResult())
+        {
+            _planRepository.Remove(plan);
+        }
+
+        _planRepository.SaveChangesAsync().GetAwaiter().GetResult();
     }
 
     private async Task<string> CreateMappingAsync()
@@ -110,6 +120,18 @@ public class FacilityReportingPlansControllerTests : IDisposable
         return (FacilityReportingPlanModel)Assert.IsType<CreatedResult>(result).Value!;
     }
 
+    private static ProblemDetails AssertProblem(IActionResult result, int status, string title)
+    {
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(status, obj.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(obj.Value);
+        Assert.Equal(status, problem.Status);
+        Assert.Equal(title, problem.Title);
+
+        return problem;
+    }
+
     [Fact]
     public async Task CreateFacilityReportingPlan_ThenGet_RoundTripsEveryField()
     {
@@ -134,14 +156,18 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFacilityReportingPlan_DuplicatePeriod_ReturnsConflict()
+    public async Task CreateFacilityReportingPlan_DuplicatePeriod_ReturnsConflictProblemDetails()
     {
         var request = await ValidRequestAsync();
 
         await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
-        var second = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
+        var secondResult = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
-        Assert.IsType<ConflictObjectResult>(second);
+        var problem = AssertProblem(secondResult, StatusCodes.Status409Conflict, "Conflict");
+        Assert.Equal(
+            $"A reporting plan already exists for facility {request.FacilityId}, measure mapping " +
+            $"{request.MeasureMappingId} and period {request.ReportingMonth}/{request.ReportingYear}.",
+            problem.Detail);
     }
 
     [Fact]
@@ -152,8 +178,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("MeasureMappingId is required.", badRequest.Value);
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
+        Assert.Equal("MeasureMappingId is required.", problem.Detail);
     }
 
     [Fact]
@@ -164,7 +190,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -176,7 +202,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var result = await _controller.CreateFacilityReportingPlan(await ValidRequestAsync(), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -184,7 +210,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var result = await _controller.CreateFacilityReportingPlan(await ValidRequestAsync(month: 13), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -192,7 +218,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var result = await _controller.GetFacilityReportingPlan(Guid.NewGuid().ToString(), CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -237,7 +263,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 0, null, null, CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -277,7 +303,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.SearchFacilityReportingPlans(new FacilityReportingPlanSearchFilters(),
             sortBy: "DROP TABLE", sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Theory]
@@ -315,6 +341,29 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateFacilityReportingPlan_MovedOntoAnotherPlansPeriod_ReturnsConflictProblemDetails()
+    {
+        var first = await CreatedPlanAsync(month: 5);
+        var second = await CreatedPlanAsync(month: 6);
+
+        var result = await _controller.UpdateFacilityReportingPlan(second.Id!, new FacilityReportingPlanUpdateRequest
+        {
+            Id = second.Id,
+            FacilityId = first.FacilityId,
+            MeasureMappingId = first.MeasureMappingId,
+            ReportingMonth = first.ReportingMonth,
+            ReportingYear = first.ReportingYear,
+            IsReporting = second.IsReporting
+        }, CancellationToken.None);
+
+        var problem = AssertProblem(result, StatusCodes.Status409Conflict, "Conflict");
+        Assert.Equal(
+            $"A reporting plan already exists for facility {first.FacilityId}, measure mapping " +
+            $"{first.MeasureMappingId} and period {first.ReportingMonth}/{first.ReportingYear}.",
+            problem.Detail);
+    }
+
+    [Fact]
     public async Task UpdateFacilityReportingPlan_MismatchedId_ReturnsBadRequest()
     {
         var created = await CreatedPlanAsync();
@@ -322,7 +371,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.UpdateFacilityReportingPlan(created.Id!,
             new FacilityReportingPlanUpdateRequest { Id = Guid.NewGuid().ToString() }, CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -333,7 +382,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var result = await _controller.UpdateFacilityReportingPlan(unknownId, request, CancellationToken.None);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -344,7 +393,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.UpdateFacilityReportingPlan(created.Id!,
             await ValidUpdateRequestAsync(id: null), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -361,7 +410,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
             ReportingYear = created.ReportingYear
         }, CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
 
     [Fact]
@@ -373,7 +422,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         Assert.IsType<NoContentResult>(deleteResult);
 
         var getResult = await _controller.GetFacilityReportingPlan(created.Id!, CancellationToken.None);
-        Assert.IsType<NotFoundResult>(getResult);
+        AssertProblem(getResult, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -381,7 +430,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var result = await _controller.DeleteFacilityReportingPlan(Guid.NewGuid().ToString(), CancellationToken.None);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Reflection;
+﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -26,6 +25,7 @@ using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Extensions;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
@@ -151,30 +151,15 @@ namespace Tenant
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
             builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
-            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
+
+            // The facility endpoints resolve this rather than calling the manager, so the DMRP module
+            // can put its own behavior in front of it when enabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
+
+            builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
 
             //Add problem details
-            builder.Services.AddProblemDetails(options =>
-            {
-                options.CustomizeProblemDetails = ctx =>
-                {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-                    if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-                    {
-                        string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                        ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-                    }
-
-                    if (builder.Environment.IsDevelopment())
-                    {
-                        ctx.ProblemDetails.Extensions.Add("service", "Tenant");
-                    }
-                    else
-                    {
-                        ctx.ProblemDetails.Extensions.Remove("exception");
-                    }
-                };
-            });
+            builder.Services.AddTenantProblemDetails(builder.Environment);
 
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
@@ -249,6 +234,22 @@ namespace Tenant
             app.Logger.LogInformation("DMRP module enabled: {DmrpEnabled}", dmrpSettings.Enabled);
 
             app.AutoMigrateEF<TenantDbContext>();
+
+            app.UseStatusCodePages();
+
+            // Without a handler an unhandled exception never reaches the problem-details
+            // pipeline, so it answers with an empty body instead of a traceable problem
+            // response. The developer page only outside deployment, as Terminology does: it
+            // renders the stack trace, which is what you want on a workstation and never what
+            // a caller should receive.
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler();
+            }
 
             app.UseRouting();
             app.UseCors(CorsSettings.DefaultCorsPolicyName);

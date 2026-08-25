@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Models;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using System.Globalization;
 using System.IO.Compression;
@@ -82,7 +83,10 @@ public sealed class RunExportService : IRunExportService
                 async () => await BuildMeasureEvalSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
             await SafeWriteAsync(archive, "Normalization.txt",
-                () => Task.FromResult(BuildNormalizationSection(run.Logs, pipelineSnapshot)));
+                async () => await BuildNormalizationSectionAsync(runId, run.Logs, pipelineSnapshot, cancellationToken));
+
+            await SafeWriteAsync(archive, "LiveSimulation.json",
+                async () => await BuildLiveSimulationSectionAsync(runId, cancellationToken));
 
             await SafeWriteAsync(archive, "abs/_README.txt",
                 async () => await WriteAbsFilesAsync(archive, run, cancellationToken));
@@ -328,9 +332,11 @@ public sealed class RunExportService : IRunExportService
         return sb.ToString();
     }
 
-    private static string BuildNormalizationSection(
+    private async Task<string> BuildNormalizationSectionAsync(
+        Guid runId,
         IReadOnlyList<string> logs,
-        PipelineSummarySnapshotBuilder.PipelineSummarySnapshot? pipeline)
+        PipelineSummarySnapshotBuilder.PipelineSummarySnapshot? pipeline,
+        CancellationToken ct)
     {
         var sb = new StringBuilder();
         WriteHeader(sb, "NORMALIZATION");
@@ -340,8 +346,14 @@ public sealed class RunExportService : IRunExportService
                 n.CompletionRatePerSecond, n.ResourceCount, n.AverageResourcesPerSecond,
                 n.StatusCounts, n.FunnelCounts, n.ResourceTypeCounts, n.ThroughputBuckets, n.Errors);
 
+        var evidence = await TryGetNormalizationEvidenceAsync(runId, ct);
+        sb.Append(NormalizationDiagnosticsWriter.FormatExportAppendix(evidence));
+
         var normalizationLines = logs
-            .Where(l => l.Contains("[Normalization]", StringComparison.OrdinalIgnoreCase)
+            .Where(l => l.Contains("[Normalization Suite]", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[Snapshot][Norm", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[runtime]", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[Normalization]", StringComparison.OrdinalIgnoreCase)
                         || l.Contains("normalizing", StringComparison.OrdinalIgnoreCase)
                         || l.Contains("ResourceNormalized", StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -355,6 +367,20 @@ public sealed class RunExportService : IRunExportService
         }
 
         return sb.ToString();
+    }
+
+    private async Task<NormalizationEvidenceSnapshot?> TryGetNormalizationEvidenceAsync(Guid runId, CancellationToken ct)
+    {
+        try
+        {
+            return (await _snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
+                runId, NormalizationEvidenceSnapshot.Domain, ct))?.Data;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Export][{RunId}] Failed to read normalization evidence snapshot.", runId);
+            return null;
+        }
     }
 
     /// <summary>
@@ -672,5 +698,18 @@ public sealed class RunExportService : IRunExportService
             // Not valid JSON — return the original text so the caller still sees something.
             return json;
         }
+    }
+
+    private async Task<string> BuildLiveSimulationSectionAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        var snapshot = await _snapshotStore.GetDomainAsync<LiveSimulationDiagnostics>(
+            runId,
+            LivePatientEventInjector.SnapshotDomain,
+            cancellationToken);
+
+        if (snapshot?.Data == null)
+            return "{\n  \"message\": \"No live simulation snapshot persisted for this run.\"\n}";
+
+        return JsonSerializer.Serialize(snapshot.Data, PrettyJson);
     }
 }
