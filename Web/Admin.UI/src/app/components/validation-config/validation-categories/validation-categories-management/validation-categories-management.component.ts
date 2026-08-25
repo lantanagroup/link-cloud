@@ -11,6 +11,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { RouterModule } from '@angular/router';
 import { ValidationService } from 'src/app/services/gateway/validation/validation.service';
+import { ErrorHandlingService } from 'src/app/services/error-handling.service';
 import { OperationJsonDialogComponent } from 'src/app/components/normalization/operations/operations-list/operation-json-dialog-component';
 import { ValidationCategoryBulkImportDialogComponent } from '../validation-category-bulk-import-dialog/validation-category-bulk-import-dialog.component';
 import { DeleteConfirmationDialogComponent } from 'src/app/components/core/delete-confirmation-dialog/delete-confirmation-dialog.component';
@@ -67,6 +68,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
 
   constructor(
     private validationService: ValidationService,
+    private errorHandlingService: ErrorHandlingService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar
   ) {}
@@ -102,7 +104,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.dataSource.data = categories as ICategorySnapshot[];
       },
       error: (error) => {
-        this.snackBar.open(`Failed to load categories: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, 'Failed to load categories.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -156,7 +158,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.loadCategories();
       },
       error: (error) => {
-        this.snackBar.open(`$initialize failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, '$initialize failed.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -187,7 +189,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
           this.loadCategories();
         },
         error: (error) => {
-          this.snackBar.open(`$bulk-import failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+          this.snackBar.open(this.formatProblemDetails(error, '$bulk-import failed.'), '', {
             duration: 5000,
             panelClass: 'error-snackbar',
             horizontalPosition: 'end',
@@ -204,7 +206,7 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         this.downloadJson(categories, 'validation-categories.json');
       },
       error: (error) => {
-        this.snackBar.open(`$bulk-export failed: ${error?.message || error?.statusText || 'Unknown error'}`, '', {
+        this.snackBar.open(this.formatProblemDetails(error, '$bulk-export failed.'), '', {
           duration: 5000,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -212,6 +214,10 @@ export class ValidationCategoriesManagementComponent implements OnInit {
         });
       }
     });
+  }
+
+  private formatProblemDetails(error: any, fallbackDetail: string): string {
+    return this.errorHandlingService.formatError(error, fallbackDetail);
   }
 
   private downloadJson(data: any, fileName: string): void {
