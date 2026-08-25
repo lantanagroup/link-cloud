@@ -1,14 +1,15 @@
-package com.lantanagroup.link.measureeval.configs;
+package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.parser.DataFormatException;
+import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
+import ca.uhn.fhir.rest.server.exceptions.UnclassifiedServerFailureException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
-import com.lantanagroup.link.shared.kafka.records.ResourceKey;
+import com.lantanagroup.link.shared.kafka.Topics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Node;
@@ -20,67 +21,29 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.retrytopic.RetryTopicHeaders;
-import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.support.GenericMessage;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class KafkaConfigTest {
-
-    @Test
-    void keySerializer_ShouldHandleResourceKey() {
-        KafkaConfig kafkaConfig = new KafkaConfig();
-        ObjectMapper objectMapper = new ObjectMapper();
-        
-        Serializer<?> serializer = kafkaConfig.keySerializer(objectMapper);
-        
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof DelegatingByTypeSerializer);
-        
-        ResourceKey key = ResourceKey.builder()
-                .facilityId("test-facility")
-                .patientId("test-correlation")
-                .build();
-        
-        byte[] serialized = ((Serializer<Object>) serializer).serialize("test-topic", key);
-        
-        assertNotNull(serialized);
-        assertTrue(serialized.length > 0);
-        
-        // Verify it can be deserialized back (sanity check of the JSON format)
-        try {
-            ResourceKey deserialized = objectMapper.readValue(serialized, ResourceKey.class);
-            assertEquals(key.getFacilityId(), deserialized.getFacilityId());
-            assertEquals(key.getPatientId(), deserialized.getPatientId());
-        } catch (Exception e) {
-            fail("Failed to deserialize serialized ResourceKey: " + e.getMessage());
-        }
-    }
-
-    @Test
-    void keySerializer_ShouldHandleString() {
-        KafkaConfig kafkaConfig = new KafkaConfig();
-        ObjectMapper objectMapper = new ObjectMapper();
-        
-        Serializer<?> serializer = kafkaConfig.keySerializer(objectMapper);
-        
-        String key = "test-key";
-        byte[] serialized = ((Serializer<Object>) serializer).serialize("test-topic", key);
-        
-        assertNotNull(serialized);
-        assertEquals(key, new String(serialized));
-    }
 
     // ---- isNonRetryable: poison classification used by the retry destination resolver ------------
     //
@@ -94,7 +57,7 @@ class KafkaConfigTest {
 
     @Test
     void validationException_isNonRetryable() {
-        assertTrue(isNonRetryable(new ValidationException("Query Type is null.")));
+        assertTrue(isNonRetryable(new ValidationException("invalid message")));
     }
 
     @Test
@@ -120,16 +83,9 @@ class KafkaConfigTest {
 
     @Test
     void nestedDataFormatException_isNonRetryable() {
-        // Mirrors the observed kafka_dlt-exception-cause-fqcn: DataFormatException nested as a cause.
         Throwable nested = new RuntimeException("wrapper",
                 new IllegalStateException("middle", new DataFormatException("bad fhir")));
         assertTrue(isNonRetryable(nested));
-    }
-
-    @Test
-    void mongoLikeFailure_isRetryable() {
-        // A transient infra outage (e.g. Mongo down) must NOT be treated as poison.
-        assertFalse(isNonRetryable(new DataAccessResourceFailureException("mongo unavailable")));
     }
 
     @Test
@@ -144,10 +100,16 @@ class KafkaConfigTest {
     }
 
     @Test
-    void resourceCacheUnavailable_isRetryable() {
-        // The explicit cache-outage error RedisResourceService now throws must also be retried, not poison.
-        assertFalse(isNonRetryable(
-                new ResourceCacheUnavailableException("cache down", new RedisConnectionFailureException("x"))));
+    void databaseDown_isRetryable() {
+        assertFalse(isNonRetryable(new DataAccessResourceFailureException("database unavailable")));
+    }
+
+    @Test
+    void terminologyServiceOutage_isRetryable() {
+        // The LEGLINK-649 incident exception: HAPI wraps a terminology-service 503 ("no healthy
+        // upstream") in InternalErrorException during bundle validation. It is a transient infra
+        // outage and must be retried, not dead-lettered.
+        assertFalse(isNonRetryable(terminologyOutageException()));
     }
 
     @Test
@@ -155,15 +117,18 @@ class KafkaConfigTest {
         assertFalse(isNonRetryable(null));
     }
 
+    private static InternalErrorException terminologyOutageException() {
+        return new InternalErrorException("HAPI-2246: java.util.concurrent.ExecutionException",
+                new ExecutionException(new UnclassifiedServerFailureException(
+                        503, "HTTP 503 Service Unavailable: no healthy upstream")));
+    }
+
     // ---- Destination resolver: drive the REAL RetryTopicRecovererFactory.create() wiring and assert
     //      which topic a failed record is routed to. Covers every resolver branch (disable / poison /
     //      exhausted -> -Error; transient with attempts remaining -> -Retry), using the production set.
 
-    private static final String RETRY_TOPIC = "ResourcesNormalized-Retry";
-    private static final String ERROR_TOPIC = "ResourcesNormalized-Error";
-
     private static ConsumerRecord<String, String> record() {
-        return new ConsumerRecord<>("ResourcesNormalized", 0, 0L, "key", "value");
+        return new ConsumerRecord<>(Topics.READY_FOR_VALIDATION, 0, 0L, "key", "value");
     }
 
     /** Pre-stamp the attempts header as if {@code attempts} retries already occurred. */
@@ -195,7 +160,8 @@ class KafkaConfigTest {
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         RetryTopicRecoverer recoverer = RetryTopicRecovererFactory.create(
-                template, RETRY_TOPIC, ERROR_TOPIC, config, KafkaConfig.NON_RETRYABLE);
+                template, Topics.READY_FOR_VALIDATION_RETRY, Topics.READY_FOR_VALIDATION_ERROR,
+                config, KafkaConfig.NON_RETRYABLE);
         recoverer.accept(record, exception);
 
         ArgumentCaptor<ProducerRecord<Object, Object>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
@@ -205,21 +171,22 @@ class KafkaConfigTest {
 
     @Test
     void transientFailure_withAttemptsRemaining_routesToRetry() {
-        assertEquals(RETRY_TOPIC,
+        assertEquals(Topics.READY_FOR_VALIDATION_RETRY,
                 routedTopic(retryConfig(3, false), record(), new RuntimeException("transient boom")));
     }
 
     @Test
-    void redisDown_withAttemptsRemaining_routesToRetry() {
-        // A Redis outage must land in -Retry (transient), not -Error.
-        assertEquals(RETRY_TOPIC,
-                routedTopic(retryConfig(3, false), record(), new RedisConnectionFailureException("redis unavailable")));
+    void terminologyServiceOutage_routesToRetry() {
+        // The LEGLINK-649 incident: a terminology 503 mid-validation must land in -Retry so the
+        // record is reprocessed once the service is back, instead of dead-lettering the patient.
+        assertEquals(Topics.READY_FOR_VALIDATION_RETRY,
+                routedTopic(retryConfig(3, false), record(), terminologyOutageException()));
     }
 
     @Test
     void poisonException_routesToError() {
-        assertEquals(ERROR_TOPIC,
-                routedTopic(retryConfig(3, false), record(), new ValidationException("Query Type is null.")));
+        assertEquals(Topics.READY_FOR_VALIDATION_ERROR,
+                routedTopic(retryConfig(3, false), record(), new ValidationException("invalid message")));
     }
 
     @Test
@@ -227,22 +194,22 @@ class KafkaConfigTest {
         // Poison buried in the cause chain must still dead-letter, not retry.
         Exception nested = new RuntimeException("wrapper",
                 new IllegalStateException("middle", new DataFormatException("bad fhir")));
-        assertEquals(ERROR_TOPIC, routedTopic(retryConfig(3, false), record(), nested));
+        assertEquals(Topics.READY_FOR_VALIDATION_ERROR, routedTopic(retryConfig(3, false), record(), nested));
     }
 
     @Test
     void disableRetryConsumer_routesToError_evenForTransient() {
         // disable-retry-consumer short-circuits everything straight to -Error.
-        assertEquals(ERROR_TOPIC,
+        assertEquals(Topics.READY_FOR_VALIDATION_ERROR,
                 routedTopic(retryConfig(3, true), record(), new RuntimeException("transient boom")));
     }
 
     @Test
     void exhaustedAttempts_routesToError() {
-        // effectiveMaxAttempts = 3 (flat); a record already retried twice increments to attempt 3 == max.
+        // effectiveMaxAttempts = 3; a record already retried twice increments to attempt 3 == max.
         ConsumerRecord<String, String> record = record();
         stampAttempts(record, 2);
-        assertEquals(ERROR_TOPIC,
+        assertEquals(Topics.READY_FOR_VALIDATION_ERROR,
                 routedTopic(retryConfig(3, false), record, new RuntimeException("still failing")));
     }
 
@@ -251,7 +218,43 @@ class KafkaConfigTest {
         // Boundary: incremented attempt 2 < max 3 must still go to -Retry, not -Error.
         ConsumerRecord<String, String> record = record();
         stampAttempts(record, 1);
-        assertEquals(RETRY_TOPIC,
+        assertEquals(Topics.READY_FOR_VALIDATION_RETRY,
                 routedTopic(retryConfig(3, false), record, new RuntimeException("still failing")));
+    }
+
+    // ---- Raw-byte serialization. A record that fails deserialization reaches the dead-letter publisher
+    //      with its ORIGINAL byte[] payload rather than a bound type — there is nothing else to publish,
+    //      the bytes are precisely what could not be parsed. Without a byte[] delegate the publication
+    //      throws SerializationException, DefaultErrorHandler cannot recover the record, and the container
+    //      redelivers it forever: the partition is blocked and every message behind it is stranded.
+
+    @SuppressWarnings("unchecked")
+    private static Serializer<Object> valueSerializer() {
+        return (Serializer<Object>) new KafkaConfig().valueSerializer(new ObjectMapper());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Serializer<Object> keySerializer() {
+        return (Serializer<Object>) new KafkaConfig().keySerializer(new ObjectMapper());
+    }
+
+    @Test
+    void valueSerializer_handlesRawBytes_soDeserializationFailuresCanBeDeadLettered() {
+        byte[] unparseable = "{\"bundleId\":".getBytes(StandardCharsets.UTF_8);
+
+        byte[] serialized = valueSerializer().serialize(Topics.READY_FOR_VALIDATION_ERROR, unparseable);
+
+        assertArrayEquals(unparseable, serialized,
+                "raw payload must pass through unchanged so the dead letter preserves the original bytes");
+    }
+
+    @Test
+    void keySerializer_handlesRawBytes_soDeserializationFailuresCanBeDeadLettered() {
+        byte[] unparseable = "{\"facilityId\":".getBytes(StandardCharsets.UTF_8);
+
+        byte[] serialized = keySerializer().serialize(Topics.READY_FOR_VALIDATION_ERROR, unparseable);
+
+        assertArrayEquals(unparseable, serialized,
+                "raw key must pass through unchanged so a record with an unparseable key can be dead-lettered");
     }
 }
