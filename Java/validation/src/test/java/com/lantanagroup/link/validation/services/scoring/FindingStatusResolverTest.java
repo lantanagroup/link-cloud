@@ -73,4 +73,24 @@ class FindingStatusResolverTest {
     void aNullSeverityIsTreatedAsNoSignalRatherThanThrowing() {
         assertEquals(RubricResultStatus.ACCEPTABLE, resolver.statusOf(finding(null, null)));
     }
+
+    /**
+     * A check that could not be evaluated (e.g. an unresolvable bound value set) is INCONCLUSIVE, and
+     * that wins over any category decision — even a category that declared the finding unacceptable.
+     */
+    @Test
+    void aNotEvaluatedFindingIsInconclusiveRegardlessOfCategory() {
+        RawFinding raw = RawFinding.builder()
+                .checkLocalId("c1")
+                .dimension(PiqiDimension.TERMINOLOGY)
+                .severity(Severity.INFORMATION)
+                .notEvaluated(true)
+                .build();
+
+        assertEquals(RubricResultStatus.INCONCLUSIVE, resolver.statusOf(EvaluatedFinding.identity(raw)));
+
+        EvaluatedFinding categorizedUnacceptable =
+                new EvaluatedFinding(raw, Severity.INFORMATION, Severity.ERROR, false, List.of("cat-1"), "cat-1");
+        assertEquals(RubricResultStatus.INCONCLUSIVE, resolver.statusOf(categorizedUnacceptable));
+    }
 }

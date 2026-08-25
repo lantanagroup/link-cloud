@@ -315,4 +315,93 @@ class ScoreAggregatorTest {
         assertThat(aggregator.collapseCheckStatus(null)).isEqualTo(RubricResultStatus.ACCEPTABLE);
         assertThat(aggregator.collapseCheckStatus(List.of())).isEqualTo(RubricResultStatus.ACCEPTABLE);
     }
+
+    // ------------------------------------------------------------------
+    // INCONCLUSIVE ("not evaluated") is ignored by aggregation
+    // ------------------------------------------------------------------
+
+    private static EvaluatedFinding notEvaluated() {
+        return EvaluatedFinding.identity(RawFinding.builder()
+                .checkLocalId("c1").dimension(PiqiDimension.TERMINOLOGY)
+                .severity(Severity.INFORMATION).notEvaluated(true).build());
+    }
+
+    @Test
+    @DisplayName("a check whose findings are all not-evaluated collapses to INCONCLUSIVE")
+    void allNotEvaluatedFindingsCollapseToInconclusive() {
+        assertThat(aggregator.collapseCheckStatus(List.of(notEvaluated(), notEvaluated())))
+                .isEqualTo(RubricResultStatus.INCONCLUSIVE);
+    }
+
+    @Test
+    @DisplayName("a conclusive failure alongside a not-evaluated finding wins; INCONCLUSIVE is ignored")
+    void conclusiveFailureBeatsNotEvaluatedInCollapse() {
+        assertThat(aggregator.collapseCheckStatus(List.of(notEvaluated(), uncategorized(Severity.ERROR))))
+                .isEqualTo(RubricResultStatus.UNACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("an INCONCLUSIVE dimension is shown in the scorecard but ignored by the overall roll-up")
+    void inconclusiveDimensionIsIgnoredInRollup() {
+        ScoreCardDto score = dimScore(
+                dimResult(PiqiDimension.TERMINOLOGY, RubricResultStatus.INCONCLUSIVE),
+                dimResult(PiqiDimension.CONFORMANCE, RubricResultStatus.ACCEPTABLE));
+
+        assertThat(score.getByDimension().get(PiqiDimension.TERMINOLOGY)).isEqualTo(RubricResultStatus.INCONCLUSIVE);
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("when every scored dimension is INCONCLUSIVE the overall is INCONCLUSIVE")
+    void allInconclusiveDimensionsRollUpToInconclusive() {
+        ScoreCardDto score = dimScore(
+                dimResult(PiqiDimension.TERMINOLOGY, RubricResultStatus.INCONCLUSIVE),
+                dimResult(PiqiDimension.CONFORMANCE, RubricResultStatus.INCONCLUSIVE));
+
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.INCONCLUSIVE);
+    }
+
+    @Test
+    @DisplayName("within a dimension a conclusive status beats INCONCLUSIVE")
+    void conclusiveBeatsInconclusiveWithinDimension() {
+        ScoreCardDto score = dimScore(
+                dimResult(PiqiDimension.PLAUSIBILITY, RubricResultStatus.INCONCLUSIVE),
+                dimResult(PiqiDimension.PLAUSIBILITY, RubricResultStatus.UNACCEPTABLE));
+
+        assertThat(score.getByDimension().get(PiqiDimension.PLAUSIBILITY)).isEqualTo(RubricResultStatus.UNACCEPTABLE);
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.UNACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("check-scorecard roll-up ignores INCONCLUSIVE checks but still lists them")
+    void checkScorecardIgnoresInconclusiveInRollup() {
+        ScoreCardDto score = aggregator.aggregate(
+                List.of(checkResult("c1", RubricResultStatus.INCONCLUSIVE),
+                        checkResult("c2", RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)),
+                policy(ScoringPolicyType.PIQI_CHECK_SCORECARD, RollupStrategy.WORST_OF));
+
+        assertThat(score.getByCheck()).containsEntry("c1", RubricResultStatus.INCONCLUSIVE);
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+    }
+
+    @Test
+    @DisplayName("pass-fail ignores INCONCLUSIVE checks")
+    void passFailIgnoresInconclusive() {
+        ScoreCardDto score = aggregator.aggregate(
+                List.of(checkResult("c1", RubricResultStatus.INCONCLUSIVE),
+                        checkResult("c2", RubricResultStatus.ACCEPTABLE)),
+                policy(ScoringPolicyType.PIQI_PASS_FAIL, null));
+
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.ACCEPTABLE);
+    }
+
+    @Test
+    @DisplayName("pass-fail over only INCONCLUSIVE checks is INCONCLUSIVE")
+    void passFailOverOnlyInconclusiveIsInconclusive() {
+        ScoreCardDto score = aggregator.aggregate(
+                List.of(checkResult("c1", RubricResultStatus.INCONCLUSIVE)),
+                policy(ScoringPolicyType.PIQI_PASS_FAIL, null));
+
+        assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.INCONCLUSIVE);
+    }
 }

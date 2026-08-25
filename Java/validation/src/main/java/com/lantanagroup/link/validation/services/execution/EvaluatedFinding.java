@@ -35,4 +35,8 @@ public record EvaluatedFinding(
     public boolean hasCategories() {
         return categoryIds != null && !categoryIds.isEmpty();
     }
+
+    public boolean notEvaluated() {
+        return raw != null && raw.isNotEvaluated();
+    }
 }

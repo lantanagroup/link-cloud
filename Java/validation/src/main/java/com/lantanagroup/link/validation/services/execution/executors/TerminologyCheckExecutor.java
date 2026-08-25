@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
+import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
@@ -68,6 +69,7 @@ public class TerminologyCheckExecutor implements CheckExecutor {
 
         int checked = 0;
         int invalid = 0;
+        int notEvaluated = 0;
         int skipped = 0;
         List<RawFinding> findings = new ArrayList<>();
         for (IBaseResource resource : targets) {
@@ -104,12 +106,24 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 if (result.isOk()) {
                     log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> VALID",
                             check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource));
+                } else if (UnresolvedBindingClassifier.isUnresolvable(result)) {
+                    notEvaluated++;
+                    log.info("TERMINOLOGY check '{}': code system {} could not be resolved for code {} on {} -> NOT EVALUATED: {}",
+                            check.getCheckLocalId(), system, code, location(resource), result.getMessage());
+                    findings.add(RawFinding.builder()
+                            .checkLocalId(check.getCheckLocalId())
+                            .dimension(check.getDimension())
+                            .severity(Severity.INFORMATION)
+                            .notEvaluated(true)
+                            .code("binding-not-evaluated")
+                            .message(String.format("Code system '%s' could not be resolved; code '%s' was not evaluated", system, code))
+                            .location(location(resource))
+                            .expression(system + "|" + code)
+                            .build());
                 } else {
                     invalid++;
                     log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> INVALID: {}",
                             check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource), result.getMessage());
-                }
-                if (!result.isOk()) {
                     String detail = result.getMessage() != null ? ": " + result.getMessage() : "";
                     findings.add(RawFinding.builder()
                             .checkLocalId(check.getCheckLocalId())
@@ -123,8 +137,8 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 }
             }
         }
-        log.info("TERMINOLOGY check '{}' done: {} coding(s) validated, {} invalid, {} skipped -> {} finding(s)",
-                check.getCheckLocalId(), checked, invalid, skipped, findings.size());
+        log.info("TERMINOLOGY check '{}' done: {} coding(s) validated, {} invalid, {} not-evaluated, {} skipped -> {} finding(s)",
+                check.getCheckLocalId(), checked, invalid, notEvaluated, skipped, findings.size());
         return findings;
     }
 

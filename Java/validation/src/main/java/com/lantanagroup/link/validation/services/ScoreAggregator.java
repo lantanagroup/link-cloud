@@ -85,11 +85,14 @@ public class ScoreAggregator {
      * while an uncategorized error still does — see {@link FindingStatusResolver}.
      */
     public RubricResultStatus collapseCheckStatus(List<EvaluatedFinding> findings) {
-        RubricResultStatus status = RubricResultStatus.ACCEPTABLE;
-        if (findings != null) {
-            for (EvaluatedFinding f : findings) {
-                status = worse(status, statusResolver.statusOf(f));
-            }
+        if (findings == null || findings.isEmpty()) {
+            return RubricResultStatus.ACCEPTABLE;
+        }
+        // Seed with the neutral INCONCLUSIVE: worse() treats it as absent, so a check whose findings
+        // are all "not evaluated" stays INCONCLUSIVE, while any conclusive finding overrides it.
+        RubricResultStatus status = RubricResultStatus.INCONCLUSIVE;
+        for (EvaluatedFinding f : findings) {
+            status = worse(status, statusResolver.statusOf(f));
         }
         return status;
     }
@@ -103,29 +106,59 @@ public class ScoreAggregator {
      * are PIQI_CHECK_SCORECARD concepts.
      */
     private ScoreCardDto aggregatePassFail(List<CheckExecutionResult> checkResults) {
-        boolean anyFailed = checkResults.stream()
-                .anyMatch(r -> binarize(r.getStatus()) == RubricResultStatus.UNACCEPTABLE);
-        return ScoreCardDto.builder()
-                .interpretation(anyFailed ? RubricResultStatus.UNACCEPTABLE : RubricResultStatus.ACCEPTABLE)
-                .build();
+        // Not-evaluated checks are ignored; the result is INCONCLUSIVE only if every check was.
+        List<RubricResultStatus> conclusive = checkResults.stream()
+                .map(CheckExecutionResult::getStatus)
+                .filter(s -> s != RubricResultStatus.INCONCLUSIVE)
+                .toList();
+        RubricResultStatus interpretation;
+        if (conclusive.isEmpty()) {
+            interpretation = checkResults.isEmpty()
+                    ? RubricResultStatus.ACCEPTABLE
+                    : RubricResultStatus.INCONCLUSIVE;
+        } else {
+            boolean anyFailed = conclusive.stream()
+                    .anyMatch(s -> binarize(s) == RubricResultStatus.UNACCEPTABLE);
+            interpretation = anyFailed ? RubricResultStatus.UNACCEPTABLE : RubricResultStatus.ACCEPTABLE;
+        }
+        return ScoreCardDto.builder().interpretation(interpretation).build();
     }
 
-    /** Keeps whichever of two statuses is worse (higher severity rank). */
+    /**
+     * Keeps whichever of two statuses is worse (higher severity rank), with INCONCLUSIVE treated as
+     * neutral: a conclusive status always wins, and only two INCONCLUSIVE inputs stay INCONCLUSIVE.
+     * This is what lets "not evaluated" checks be ignored by aggregation rather than dominating it.
+     */
     private RubricResultStatus worse(RubricResultStatus current, RubricResultStatus candidate) {
+        if (current == RubricResultStatus.INCONCLUSIVE) {
+            return candidate;
+        }
+        if (candidate == RubricResultStatus.INCONCLUSIVE) {
+            return current;
+        }
         return severityRank(candidate) > severityRank(current) ? candidate : current;
     }
 
     private RubricResultStatus rollUp(Collection<RubricResultStatus> statuses, RollupStrategy rollup) {
+        // INCONCLUSIVE ("not evaluated") entries are excluded from the roll-up so they neither pass
+        // nor fail the overall. Only when nothing conclusive remains does the overall become
+        // INCONCLUSIVE; an empty scorecard stays ACCEPTABLE.
+        List<RubricResultStatus> conclusive = statuses.stream()
+                .filter(s -> s != RubricResultStatus.INCONCLUSIVE)
+                .toList();
+        if (conclusive.isEmpty()) {
+            return statuses.isEmpty() ? RubricResultStatus.ACCEPTABLE : RubricResultStatus.INCONCLUSIVE;
+        }
         RollupStrategy strategy = rollup != null ? rollup : RollupStrategy.WORST_OF;
         return switch (strategy) {
             // ALL_MUST_PASS is a documented alias of WORST_OF, not a stricter variant: "every entry
             // must pass" and "the overall status is the worst status present" are the same rule once
             // a warning is not treated as a failure. It is retained rather than removed because it
             // is a persisted value in rubric_version.scoring_policy_json.
-            case WORST_OF, ALL_MUST_PASS -> worstOf(statuses);
-            case BEST_OF -> bestOf(statuses);
-            case PASS_FAIL -> passFail(statuses);
-            case MAJORITY -> majority(statuses);
+            case WORST_OF, ALL_MUST_PASS -> worstOf(conclusive);
+            case BEST_OF -> bestOf(conclusive);
+            case PASS_FAIL -> passFail(conclusive);
+            case MAJORITY -> majority(conclusive);
         };
     }
 
@@ -164,10 +197,12 @@ public class ScoreAggregator {
 
     private static int severityRank(RubricResultStatus status) {
         return switch (status) {
+            // INCONCLUSIVE is filtered out (rollUp) or handled as neutral (worse) before ranking; the
+            // floor value is defensive so it can never outrank a conclusive status if one slips through.
+            case INCONCLUSIVE -> -1;
             case ACCEPTABLE -> 0;
             case ACCEPTABLE_WITH_WARNINGS -> 1;
             case UNACCEPTABLE -> 2;
-            case INCONCLUSIVE -> 3;
         };
     }
 }

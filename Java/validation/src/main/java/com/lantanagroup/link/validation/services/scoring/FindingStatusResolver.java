@@ -9,6 +9,12 @@ import org.springframework.stereotype.Component;
 public class FindingStatusResolver {
 
     public RubricResultStatus statusOf(EvaluatedFinding finding) {
+        // A check that could not be evaluated (e.g. an unresolvable bound value set) is neither a
+        // pass nor a failure — it is INCONCLUSIVE and is ignored by score aggregation. This wins over
+        // any category decision, so it is checked before the acceptable/severity mapping below.
+        if (finding.notEvaluated()) {
+            return RubricResultStatus.INCONCLUSIVE;
+        }
         Boolean acceptable = finding.acceptable();
         if (Boolean.FALSE.equals(acceptable)) {
             return RubricResultStatus.UNACCEPTABLE;

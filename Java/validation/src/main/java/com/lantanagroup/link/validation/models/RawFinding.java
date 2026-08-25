@@ -25,4 +25,5 @@ public class RawFinding {
     private String message;
     private String location;
     private String expression;
+    private boolean notEvaluated;
 }
