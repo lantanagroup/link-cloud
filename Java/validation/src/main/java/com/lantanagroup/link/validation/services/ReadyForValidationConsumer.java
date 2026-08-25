@@ -89,7 +89,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         }
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, record.headers());
     }
 
     /**
@@ -257,6 +257,16 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             String patientId,
             String reportId,
             List<Result> results) {
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, null);
+    }
+
+    private void produceValidationCompleteRecord(
+            String correlationId,
+            String facilityId,
+            String patientId,
+            String reportId,
+            List<Result> results,
+            org.apache.kafka.common.header.Headers inboundHeaders) {
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
@@ -267,6 +277,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         }
+        Headers.copyMetricsMode(inboundHeaders, headers);
         try {
             // Use .get() to make the send synchronous and wait for broker confirmation
             validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers)).get();

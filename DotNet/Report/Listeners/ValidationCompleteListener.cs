@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
@@ -187,7 +188,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

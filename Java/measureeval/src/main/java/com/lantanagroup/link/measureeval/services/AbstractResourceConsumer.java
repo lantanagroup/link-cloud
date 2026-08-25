@@ -205,7 +205,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             // Evaluate measures and determine reportability.
             if (perf) taskStopWatch.start("evaluateMeasures");
             long kafkaIngestTimestamp = record.timestamp();
-            boolean reportablePatient = evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp);
+            boolean reportablePatient = evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp, record.headers());
             if (perf) taskStopWatch.stop();
 
             bundle = null;
@@ -394,6 +394,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp) {
+        return evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp, null);
+    }
+
+    private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp, org.apache.kafka.common.header.Headers inboundHeaders) {
         logger.debug("Evaluating measures");
 
         logger.debug("EVALUATING MEASURES: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORT_COUNT=[{}]",
@@ -434,12 +438,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
                     if (!reportable) {
                         String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null);
+                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null, inboundHeaders);
                         recordNormalizedToReportGeneratedDuration(kafkaIngestTimestamp, patientStatus, report);
                     }
                 }
                 case SUPPLEMENTAL -> {
-                    blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
+                    blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport, inboundHeaders);
                     recordNormalizedToReportGeneratedDuration(kafkaIngestTimestamp, patientStatus, report);
                 }
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
@@ -457,7 +461,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
-            produceDataAcquisitionRequestedRecord(value, patientStatus);
+            produceDataAcquisitionRequestedRecord(value, patientStatus, inboundHeaders);
         }
 
         return reportablePatient;
@@ -490,7 +494,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 patientStatus.getCorrelationId(), report.getReportType());
     }
 
-    private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus) {
+    private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus, org.apache.kafka.common.header.Headers inboundHeaders) {
         logger.debug("Producing {}", Topics.DATA_ACQUISITION_REQUESTED);
         DataAcquisitionRequested valueDa = new DataAcquisitionRequested();
         valueDa.setPatientId(patientStatus.getPatientId());
@@ -506,6 +510,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             valueDa.getScheduledReports().add(scheduledReportDa);
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
+        Headers.copyMetricsMode(inboundHeaders, headers);
         dataAcquisitionRequestedTemplate.send(new ProducerRecord<>(
                 Topics.DATA_ACQUISITION_REQUESTED,
                 null,

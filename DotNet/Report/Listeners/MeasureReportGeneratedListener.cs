@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -242,7 +243,7 @@ namespace LantanaGroup.Link.Report.Listeners
             
             try
             {
-                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId, cancellationToken);
+                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId, cancellationToken, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
             }
             catch (Exception ex)
             {

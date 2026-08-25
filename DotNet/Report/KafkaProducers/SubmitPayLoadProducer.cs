@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null)
         {
             _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
@@ -53,10 +54,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         EndDate = schedule.ReportEndDate.UtcDateTime
                     },
 
-                    Headers = new Headers
-                    {
-                        { "X-Correlation-Id", Encoding.UTF8.GetBytes(corrId) }
-                    }
+                    Headers = CreateHeaders(corrId, metricsMode)
                 });
 
             _submitPayloadProducer.Flush();
@@ -64,5 +62,18 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return true;
         }
 
+        private static Headers CreateHeaders(string correlationId, string? metricsMode)
+        {
+            var headers = new Headers
+            {
+                { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
+            };
+            if (!string.IsNullOrWhiteSpace(metricsMode))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, metricsMode);
+            }
+
+            return headers;
+        }
     }
 }

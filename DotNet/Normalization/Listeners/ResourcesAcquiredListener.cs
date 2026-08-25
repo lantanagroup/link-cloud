@@ -397,6 +397,7 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
         };
+        KafkaHeaderHelper.CopyMetricsMode(message?.Message?.Headers, headers);
 
         var resourceNormalizedMessage = new ResourcesNormalizedValue
         {

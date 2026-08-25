@@ -6,6 +6,7 @@ using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -39,7 +40,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, CancellationToken cancellationToken = default)
+        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, CancellationToken cancellationToken = default, string? metricsMode = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -78,13 +79,24 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         ReportTrackingId = scheduleId.ToString(),
                         PayloadUri = payloadUri
                     },
-                    Headers = new Headers
-                    {
-                        { "X-Correlation-Id",  Encoding.UTF8.GetBytes(correlationId) }
-                    }
+                    Headers = CreateHeaders(correlationId, metricsMode)
                 });
 
             _readyForValidationProducer.Flush();
+        }
+
+        private static Headers CreateHeaders(string correlationId, string? metricsMode)
+        {
+            var headers = new Headers
+            {
+                { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
+            };
+            if (!string.IsNullOrWhiteSpace(metricsMode))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, metricsMode);
+            }
+
+            return headers;
         }
     }
 }

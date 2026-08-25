@@ -10,6 +10,8 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -509,7 +511,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
-                    Headers = new Headers(),
+                    Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue
                     {
                         AdhocReportId = reportId,
@@ -596,7 +598,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
-                    Headers = new Headers(),
+                    Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue()
                     {
                         ReportId = request.ReportId == null ? null : Guid.Parse(request.ReportId),
@@ -616,6 +618,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
 
             return Ok(new GenerateAdhocReportResponse(reportId));
+        }
+
+        private static Headers CreateGenerateReportHeaders(string? metricsMode)
+        {
+            var headers = new Headers();
+            if (string.Equals(metricsMode, "performance", StringComparison.OrdinalIgnoreCase))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, "performance");
+            }
+
+            return headers;
         }
     }
 }

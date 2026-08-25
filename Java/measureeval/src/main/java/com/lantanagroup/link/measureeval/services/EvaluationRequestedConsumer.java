@@ -78,7 +78,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
-            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle);
+            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle, record.headers());
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
             throw new IllegalStateException("Patient status not found for previous report ID");
@@ -86,6 +86,10 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     }
 
     private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+        evaluateMeasures(correlationId, value, patientStatus, bundle, null);
+    }
+
+    private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, org.apache.kafka.common.header.Headers inboundHeaders) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
@@ -124,10 +128,10 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
             boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
             r.setReportable(reportable);
             if (reportable) {
-                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport);
+                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport, inboundHeaders);
             } else {
                 String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null);
+                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null, inboundHeaders);
             }
         }
 
