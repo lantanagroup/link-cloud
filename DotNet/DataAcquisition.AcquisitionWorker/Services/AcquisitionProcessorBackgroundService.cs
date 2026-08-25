@@ -111,6 +111,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
     private async Task ProcessWorkItemAsync(AcquisitionWorkItem item, CancellationToken ct)
     {
+        using var metricsMode = MetricsModeScope.Begin(item.IsPerformanceMode);
         using var scope = _serviceProvider.CreateScope();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();

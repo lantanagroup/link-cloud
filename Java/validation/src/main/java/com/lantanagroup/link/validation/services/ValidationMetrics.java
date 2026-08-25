@@ -15,6 +15,7 @@ public class ValidationMetrics {
     private final LongCounter validationIssuesCounter;
     private final DoubleHistogram validationDuration;
     private final DoubleHistogram categorizationDuration;
+    private final DoubleHistogram reportFetchDuration;
 
     public ValidationMetrics(OpenTelemetry openTelemetry) {
         Meter meter = openTelemetry.getMeter(ValidationMetrics.class.getName());
@@ -29,6 +30,11 @@ public class ValidationMetrics {
                 .build();
         categorizationDuration = meter.histogramBuilder("link.validation.categorization.duration")
                 .setDescription("The duration of the categorization process, excluding persisting categorized results")
+                .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
+                .build();
+        reportFetchDuration = meter.histogramBuilder("link.validation.report_fetch_duration")
+                .setDescription("Duration of fetching the patient report bundle (blob or Report HTTP)")
                 .setUnit("ms")
                 .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
                 .build();
@@ -54,5 +60,9 @@ public class ValidationMetrics {
 
     public void recordCategorizationDuration(double millis, Attributes attributes) {
         categorizationDuration.record(millis, attributes);
+    }
+
+    public void recordReportFetchDuration(double millis, Attributes attributes) {
+        reportFetchDuration.record(millis, attributes);
     }
 }

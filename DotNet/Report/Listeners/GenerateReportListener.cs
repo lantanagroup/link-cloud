@@ -161,6 +161,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     return;
                 }
 
+                using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();

@@ -19,7 +19,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
         public static readonly string[] InstrumentNames =
         [
             DiagnosticNames.DataAcquisitionQueryDuration,
+            DiagnosticNames.DataAcquisitionSemaphoreWaitDuration,
             DiagnosticNames.NormalizationDuration,
+            DiagnosticNames.ReportPersistDuration,
+            DiagnosticNames.TerminologyLookupDuration,
             "link_submission_upload_duration",
             "link_querydispatch_dispatch_duration"
         ];

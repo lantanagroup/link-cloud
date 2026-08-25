@@ -96,6 +96,7 @@ public class PayloadSubmittedListener(
 
     public async Task ProcessMessageAsync(ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue> result, CancellationToken cancellationToken)
     {
+        using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
         if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
         {
             throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");

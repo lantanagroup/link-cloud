@@ -20,7 +20,7 @@ public class FhirServiceTests
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
         _mockLogger = new Mock<ILogger<FhirService>>();
-        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object);
+        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object, Mock.Of<ITerminologyServiceMetrics>());
 
         string valueSet1 = @"
 {

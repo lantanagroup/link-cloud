@@ -2,8 +2,10 @@ using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
+using System.Diagnostics;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
 namespace LantanaGroup.Link.Terminology.Services;
@@ -14,7 +16,7 @@ namespace LantanaGroup.Link.Terminology.Services;
  * https://build.fhir.org/codesystem-operation-validate-code.html
  * https://build.fhir.org/valueset-operation-validate-code.html
  */
-public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirService> logger)
+public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirService> logger, ITerminologyServiceMetrics metrics)
 {
     public ValueSet GetValueSetById(string id)
     {
@@ -266,6 +268,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
 
     public Parameters ValidateCodeInCodeSystem(string? url, string? id, string? code, string? display, Parameters? parameters)
     {
+        var started = Stopwatch.GetTimestamp();
+        var cache = "miss";
+        var outcome = "success";
+        try
+        {
         var urlComponent = parameters?.Get("url").FirstOrDefault();
         var codeComponent = parameters?.Get("code").FirstOrDefault();
         var displayComponent = parameters?.Get("display").FirstOrDefault();
@@ -303,8 +310,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
 
         if (codeGroup == null)
         {
+            outcome = "not_found";
             return CreateValidationParameters(false, "Code system not found");
         }
+
+        cache = "hit";
 
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
@@ -351,10 +361,25 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         return CreateValidationParameters(false, "No valid code found in parameters");
+        }
+        catch
+        {
+            outcome = "failure";
+            throw;
+        }
+        finally
+        {
+            RecordLookup("codesystem", outcome, cache, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        }
     }
 
     public Parameters ValidateCodeInValueSet(string? url, string? id, string? system, string? code, string? display, Parameters? parameters)
     {
+        var started = Stopwatch.GetTimestamp();
+        var cache = "miss";
+        var outcome = "success";
+        try
+        {
         var urlComponent = parameters?.Get("url").FirstOrDefault();
         var systemComponent = parameters?.Get("system").FirstOrDefault();
         var codeComponent = parameters?.Get("code").FirstOrDefault();
@@ -399,8 +424,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
 
         if (codeGroup == null)
         {
+            outcome = "not_found";
             return CreateValidationParameters(false, "Value set not found");
         }
+
+        cache = "hit";
 
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
@@ -457,6 +485,16 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         return CreateValidationParameters(false, "No valid code found in parameters");
+        }
+        catch
+        {
+            outcome = "failure";
+            throw;
+        }
+        finally
+        {
+            RecordLookup("valueset", outcome, cache, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        }
     }
 
     public Parameters LookupCodeInCodeSystem(string? url, string? id, string? system, string? code, string? version, Parameters? parameters)
@@ -650,6 +688,15 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
     /// omitting the parameter — JavaScript renders null and undefined this way. They are accepted as
     /// meaning "no system supplied".
     /// </summary>
+    private void RecordLookup(string groupKind, string outcome, string cache, double durationMilliseconds)
+    {
+        metrics.IncrementLookupCount(outcome, groupKind);
+        if (MetricsModeScope.IsPerformance)
+        {
+            metrics.RecordLookupDuration(durationMilliseconds, groupKind, cache);
+        }
+    }
+
     private static readonly string[] SystemPlaceholders = ["null", "undefined"];
 
     /// <summary>

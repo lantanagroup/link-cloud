@@ -42,6 +42,11 @@ public class Headers {
         return header == null ? null : getString(header.value());
     }
 
+    public static boolean isPerformanceMode(org.apache.kafka.common.header.Headers headers) {
+        String mode = getMetricsMode(headers);
+        return mode != null && mode.equalsIgnoreCase("performance");
+    }
+
     public static void copyMetricsMode(org.apache.kafka.common.header.Headers source,
                                        org.apache.kafka.common.header.Headers destination) {
         String mode = getMetricsMode(source);

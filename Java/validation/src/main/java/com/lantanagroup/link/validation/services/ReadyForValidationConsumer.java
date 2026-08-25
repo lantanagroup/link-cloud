@@ -83,9 +83,18 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
         String payloadUri = record.value().getPayloadUri();
-        Bundle bundle = getBundleFromBlobStorage(payloadUri);
-        if (bundle == null) {
-            bundle = getBundleViaRest(facilityId, patientId, reportId);
+        Bundle bundle;
+        try (Timer fetchTimer = Timer.start()) {
+            bundle = getBundleFromBlobStorage(payloadUri);
+            if (bundle == null) {
+                bundle = getBundleViaRest(facilityId, patientId, reportId);
+            }
+            if (Headers.isPerformanceMode(record.headers())) {
+                Attributes fetchAttributes = Attributes.builder()
+                        .put(DiagnosticNames.FACILITY_ID, facilityId)
+                        .build();
+                validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
+            }
         }
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);

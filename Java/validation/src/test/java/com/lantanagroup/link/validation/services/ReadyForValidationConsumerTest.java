@@ -180,6 +180,23 @@ public class ReadyForValidationConsumerTest {
 
         verify(blobStorageService).download("myfile.ndjson");
         verify(reportClient, never()).getSubmissionModel(any(), any(), any());
+        verify(validationMetrics, never()).recordReportFetchDuration(anyDouble(), any());
+    }
+
+    @Test
+    void process_withPerformanceHeader_recordsReportFetchDuration() throws Exception {
+        IParser parser = mock(IParser.class);
+        when(fhirContext.newNDJsonParser()).thenReturn(parser);
+        when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
+        when(blobStorageService.download("myfile.ndjson"))
+                .thenReturn(BinaryData.fromBytes(new byte[0]));
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
+        record.headers().add(Headers.METRICS_MODE, Headers.getBytes("performance"));
+        consumer.process(record);
+
+        verify(validationMetrics).recordReportFetchDuration(anyDouble(), any());
     }
 
     @Test

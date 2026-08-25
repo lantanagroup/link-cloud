@@ -145,6 +145,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
+            using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
+
             if (result.Message.Value == null)
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
 

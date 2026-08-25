@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -100,9 +101,11 @@ public class SearchFhirCommand : ISearchFhirCommand
         using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
+            var waitMs = (semAcquiredAt - semWaitStart).TotalMilliseconds;
             _logger.LogDebug(
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)waitMs);
+            RecordSemaphoreWait(request.facilityId, waitMs);
 
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
@@ -159,12 +162,15 @@ public class SearchFhirCommand : ISearchFhirCommand
                     _logger.LogDebug(
                         "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
                         request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
+                    var pageWaitStart = DateTime.UtcNow;
                     using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
                     {
                         var semAcquiredAt = DateTime.UtcNow;
+                        var pageWaitMs = (semAcquiredAt - pageWaitStart).TotalMilliseconds;
                         _logger.LogDebug(
                             "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)pageWaitMs);
+                        RecordSemaphoreWait(request.facilityId, pageWaitMs);
 
                         resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
 
@@ -215,9 +221,11 @@ public class SearchFhirCommand : ISearchFhirCommand
         using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
+            var waitMs = (semAcquiredAt - semWaitStart).TotalMilliseconds;
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)waitMs);
+            RecordSemaphoreWait(request.facilityId, waitMs);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = CreateInnerHttpMessageHandler();
@@ -261,6 +269,14 @@ public class SearchFhirCommand : ISearchFhirCommand
                 request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return resultBundle;
         }
+    }
+
+    private void RecordSemaphoreWait(string? facilityId, double waitMilliseconds)
+    {
+        if (!MetricsModeScope.IsPerformance || string.IsNullOrWhiteSpace(facilityId))
+            return;
+
+        _metrics.RecordSemaphoreWaitDuration(facilityId, waitMilliseconds);
     }
 
     private void IncrementResourceAcquiredCounter(string? correlationId, string? patientIdReference, string? facilityId, string? queryType, string resourceType)

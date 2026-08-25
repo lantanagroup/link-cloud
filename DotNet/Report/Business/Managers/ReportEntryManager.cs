@@ -1,11 +1,14 @@
-﻿using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -67,10 +70,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     public class ReportEntryManager : IReportEntryManager
     {
         private readonly ReportDbContext _dbContext;
+        private readonly IReportServiceMetrics _metrics;
 
-        public ReportEntryManager(ReportDbContext dbContext)
+        public ReportEntryManager(ReportDbContext dbContext, IReportServiceMetrics metrics)
         {
             _dbContext = dbContext;
+            _metrics = metrics;
         }
 
         private record ReportEntryProjection(
@@ -235,6 +240,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.ModifyDate = DateTime.UtcNow;
             entity.AggregateReportUri = model.AggregateReportUri;
             entity.AggregateReportBlobName = model.AggregateReportBlobName;
+            if (entity.ReportingStatus != model.ReportingStatus)
+            {
+                _metrics.IncrementStatusTransition(entity.FacilityId, entity.ReportingStatus.ToString(), model.ReportingStatus.ToString());
+            }
             entity.ReportingStatus = model.ReportingStatus;
             entity.SubmissionStatus = model.SubmissionStatus;
             entity.SubmitReportDateTime = model.SubmitReportDateTime;
@@ -262,6 +271,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
                 else
                 {
+                    if (existing.Status != measureModel.Status)
+                    {
+                        _metrics.IncrementStatusTransition(entity.FacilityId, existing.Status.ToString(), measureModel.Status.ToString());
+                    }
                     existing.Status = measureModel.Status;
                     existing.MeasureReportId = measureModel.MeasureReportId;
                     existing.MeasureReportUri = measureModel.MeasureReportUri;
@@ -297,7 +310,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 entity.MeasureReports.Remove(orphan);
 
             _dbContext.Update(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await PersistAsync(entity.FacilityId, cancellationToken);
             return model;
         }
 
@@ -357,7 +370,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             await _dbContext.ReportEntry.AddRangeAsync(entities, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            var facilityId = entities[0].FacilityId;
+            await PersistAsync(facilityId, cancellationToken);
 
             var entityArray = entities.ToArray();
             int index = 0;
@@ -365,6 +379,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 model.Id = entityArray[index++].Id;
             }
+        }
+
+        private async Task PersistAsync(string facilityId, CancellationToken cancellationToken)
+        {
+            if (!MetricsModeScope.IsPerformance)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
+            var started = Stopwatch.GetTimestamp();
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _metrics.RecordPersistDuration(facilityId, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
 
         public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)

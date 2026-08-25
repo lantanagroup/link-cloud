@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -381,5 +382,38 @@ public class SearchFhirCommandTests
         var captured = Assert.Single(stub.CapturedRequests);
         Assert.Equal(HttpMethod.Post, captured.Method);
         Assert.EndsWith("_search", captured.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotRecordSemaphoreWaitWhenLightweight()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration(It.IsAny<string>(), It.IsAny<double>()),
+            Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RecordsSemaphoreWaitWhenPerformanceMode()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        using var scope = MetricsModeScope.Begin(true);
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration("test-facility", It.Is<double>(d => d >= 0)),
+            Times.Once());
     }
 }
