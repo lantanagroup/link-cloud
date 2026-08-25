@@ -23,12 +23,15 @@
         @if (dqmOptions !== null) {
           <mat-select formControlName="dqm" [disabled]="viewOnly" data-testid="measure-mapping-dqm-select">
             @for (dqmId of dqmOptions; track dqmId) {
-              <mat-option [value]="dqmId">{{ dqmId }}</mat-option>
+              <mat-option [value]="dqmId">{{ dqmOptionLabel(dqmId) }}</mat-option>
             }
           </mat-select>
-          <mat-hint>Measure definitions known to MeasureEval.</mat-hint>
         } @else {
           <input matInput formControlName="dqm" [readonly]="viewOnly" data-testid="measure-mapping-dqm-input">
+        }
+        @if (dqmOptions !== null) {
+          <mat-hint>Measure definitions known to MeasureEval.</mat-hint>
+        } @else {
           <mat-hint>Must match a measure definition known to MeasureEval.</mat-hint>
         }
         @if (dqm.hasError('required')) {
@@ -39,6 +42,11 @@
         @if (dqm.hasError('maxlength')) {
           <mat-error data-testid="measure-mapping-dqm-length-error">
             dQM must be 255 characters or fewer
+          </mat-error>
+        }
+        @if (dqm.hasError('unknownDqm')) {
+          <mat-error data-testid="measure-mapping-dqm-unknown-error">
+            This dQM no longer exists in MeasureEval — choose a current measure definition
           </mat-error>
         }
       </mat-form-field>

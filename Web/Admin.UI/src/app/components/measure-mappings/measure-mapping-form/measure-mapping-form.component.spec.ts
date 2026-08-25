@@ -126,12 +126,39 @@ describe('MeasureMappingFormComponent', () => {
     ]);
   });
 
-  it('keeps a saved dQM selectable when its definition no longer exists', () => {
+  it('keeps a saved dQM visible but invalid when its definition no longer exists', () => {
     const orphaned: IMeasureMapping = { ...ach, dqm: 'RetiredMeasure' };
     initWith(orphaned, FormMode.Edit);
 
     expect(component.dqmOptions![0]).toBe('RetiredMeasure');
     expect(component.dqm.value).toBe('RetiredMeasure');
+    expect(component.dqmOptionLabel('RetiredMeasure')).toBe('RetiredMeasure (not found in MeasureEval)');
+    expect(component.dqmOptionLabel('NHSNAcuteCareHospitalDailyInitialPopulation'))
+      .toBe('NHSNAcuteCareHospitalDailyInitialPopulation');
+
+    expect(component.dqm.hasError('unknownDqm')).toBeTrue();
+    expect(component.measureMappingForm.valid).toBeFalse();
+
+    component.submitConfiguration();
+    expect(measureMappingService.updateMeasureMapping).not.toHaveBeenCalled();
+  });
+
+  it('becomes valid again once a current definition replaces the stale dQM', () => {
+    const orphaned: IMeasureMapping = { ...ach, dqm: 'RetiredMeasure' };
+    initWith(orphaned, FormMode.Edit);
+
+    component.dqm.setValue('NHSNAcuteCareHospitalDailyInitialPopulation');
+
+    expect(component.dqm.hasError('unknownDqm')).toBeFalse();
+    expect(component.measureMappingForm.valid).toBeTrue();
+  });
+
+  it('does not flag a saved dQM that still exists', () => {
+    initWith(ach, FormMode.Edit);
+
+    expect(component.staleDqm).toBeNull();
+    expect(component.dqm.hasError('unknownDqm')).toBeFalse();
+    expect(component.measureMappingForm.valid).toBeTrue();
   });
 
   it('treats the 204 empty-collection response as no options', () => {

@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -53,6 +53,13 @@ export class MeasureMappingFormComponent implements OnInit {
    */
   dqmOptions: string[] | null = null;
 
+  /**
+   * A saved dQM whose definition the fetch did not return. It stays in the options so the
+   * admin can see what the mapping pointed at, but it is labelled as missing and fails
+   * validation, so the mapping cannot be re-saved until a real definition is chosen.
+   */
+  staleDqm: string | null = null;
+
   measureMappingForm!: FormGroup;
 
   constructor(
@@ -62,7 +69,7 @@ export class MeasureMappingFormComponent implements OnInit {
   ) {
     this.measureMappingForm = this.fb.group({
       measure: ['', [Validators.required, Validators.maxLength(255)]],
-      dqm: ['', [Validators.required, Validators.maxLength(255)]],
+      dqm: ['', [Validators.required, Validators.maxLength(255), this.knownDqmValidator.bind(this)]],
       frequency: [null, Validators.required]
     });
   }
@@ -101,20 +108,47 @@ export class MeasureMappingFormComponent implements OnInit {
         // The BFF answers an empty collection with 204 and no body, so definitions can be null.
         const ids = (definitions ?? []).map(d => d.id).sort((a, b) => a.localeCompare(b));
 
-        // Keep a saved dQM selectable even when its definition no longer exists in MeasureEval,
-        // so opening an old mapping doesn't silently blank the field.
+        // Keep a saved dQM visible even when its definition no longer exists in MeasureEval,
+        // so opening an old mapping doesn't silently blank the field. knownDqmValidator keeps
+        // the form invalid until a real definition replaces it.
         const current = this.dqm.value;
-        if (current && !ids.includes(current)) {
-          ids.unshift(current);
+        this.staleDqm = current && !ids.includes(current) ? current : null;
+        if (this.staleDqm) {
+          ids.unshift(this.staleDqm);
         }
 
         this.dqmOptions = ids;
+
+        // The value didn't change, so revalidate explicitly and surface the result: the error
+        // should show without waiting for a touch, and the dialog's save-disabled state tracks
+        // formValueChanged.
+        this.dqm.updateValueAndValidity();
+        if (this.staleDqm) {
+          this.dqm.markAsTouched();
+        }
+        this.formValueChanged.emit(this.measureMappingForm.invalid);
       },
       error: () => {
         // Leave dqmOptions null: the free-text input stays, and ErrorHandlingService has
         // already surfaced the fetch failure.
       }
     });
+  }
+
+  /** Labels the stale entry so the admin can tell it apart from real definitions. */
+  dqmOptionLabel(dqmId: string): string {
+    return dqmId === this.staleDqm ? `${dqmId} (not found in MeasureEval)` : dqmId;
+  }
+
+  /**
+   * Invalid while the selected dQM is the stale one. Free-text mode (definitions not loaded)
+   * stays valid here — the backend rejects unknown dQMs on save either way.
+   */
+  private knownDqmValidator(control: AbstractControl): ValidationErrors | null {
+    if (this.staleDqm !== null && control.value === this.staleDqm) {
+      return { unknownDqm: true };
+    }
+    return null;
   }
 
   submitConfiguration(): void {
