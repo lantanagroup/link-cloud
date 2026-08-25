@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -24,6 +25,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly ITestRailPublisher _testRailPublisher;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -40,7 +42,8 @@ public class AutomationRunManager : IAutomationRunManager
         ImportedBundleExecutionResolver importedBundleResolver,
         LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
-        ILivePatientEventInjector liveInjector)
+        ILivePatientEventInjector liveInjector,
+        ITestRailPublisher testRailPublisher)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -53,6 +56,7 @@ public class AutomationRunManager : IAutomationRunManager
         _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _liveInjector = liveInjector;
+        _testRailPublisher = testRailPublisher;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -212,6 +216,23 @@ public class AutomationRunManager : IAutomationRunManager
         await _snapshotStore.UpsertRunSummaryAsync(summary, summary.FacilityId, summary.ReportId, cancellationToken);
         await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
         await _orchestrator.CompleteRunAsync(runId);
+        try
+        {
+            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            {
+                RunId = runId,
+                RunName = summary.RunName,
+                Status = summary.Status,
+                Error = summary.Error,
+                Logs = summary.Logs ?? [],
+                StartedAt = summary.StartedAt,
+                FinishedAt = summary.FinishedAt
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
+        }
 
         await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
@@ -607,6 +628,38 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
+        await TryPublishToTestRailAsync(state);
+    }
+
+    private async Task TryPublishToTestRailAsync(MutableRunState state)
+    {
+        if (!state.Status.IsTerminal())
+            return;
+        if (Interlocked.Exchange(ref state.TestRailPublished, 1) != 0)
+            return;
+
+        try
+        {
+            List<string> logs;
+            lock (state.Sync)
+                logs = state.Logs.ToList();
+
+            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            {
+                RunId = state.RunId,
+                ScenarioId = state.ScenarioId,
+                RunName = state.RunNameOverride ?? state.Scenario.ToString(),
+                Status = state.Status,
+                Error = state.Error,
+                Logs = logs,
+                StartedAt = state.StartedAt,
+                FinishedAt = state.FinishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TestRail publish failed for scenario run {RunId}.", state.RunId);
+        }
     }
 
     private async Task PersistRunSummaryAsync(MutableRunState state)
