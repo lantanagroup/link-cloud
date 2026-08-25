@@ -15,6 +15,7 @@ public class LinkDurationHistogramBucketsTests
         Assert.Contains(DiagnosticNames.DataAcquisitionQueryDuration, LinkDurationHistogramBuckets.InstrumentNames);
         Assert.Contains(DiagnosticNames.NormalizationDuration, LinkDurationHistogramBuckets.InstrumentNames);
         Assert.Contains("link_submission_upload_duration", LinkDurationHistogramBuckets.InstrumentNames);
+        Assert.Contains("link_querydispatch_dispatch_duration", LinkDurationHistogramBuckets.InstrumentNames);
         Assert.DoesNotContain("link_submission_upload_size", LinkDurationHistogramBuckets.InstrumentNames);
     }
 }

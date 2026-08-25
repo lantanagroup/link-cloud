@@ -20,7 +20,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
         [
             DiagnosticNames.DataAcquisitionQueryDuration,
             DiagnosticNames.NormalizationDuration,
-            "link_submission_upload_duration"
+            "link_submission_upload_duration",
+            "link_querydispatch_dispatch_duration"
         ];
     }
 }

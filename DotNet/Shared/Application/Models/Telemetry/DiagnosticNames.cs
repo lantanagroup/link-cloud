@@ -27,6 +27,7 @@
         public const string OperationType = "operation.type";
         public const string DestinationType = "destination.type";
         public const string RetryAttempts = "retry.attempts";
+        public const string Outcome = "outcome";
 
         //Diagnostic tags Searching
         public const string SearchParameters = "search.parameters";
