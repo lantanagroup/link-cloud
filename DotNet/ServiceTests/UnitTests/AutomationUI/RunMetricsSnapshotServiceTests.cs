@@ -74,7 +74,25 @@ public class RunMetricsSnapshotServiceTests
         saved.Stages.Values.Should().OnlyContain(s => s.Unavailable);
         saved.Thetis.Generator.Should().Be("thetis");
         saved.Thetis.Seed.Should().Be(20260329);
+        saved.Benchmark.Pass.Should().BeTrue();
         metrics.Verify(m => m.IncrementSnapshotMissing(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Capture_applies_target_duration_slo()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(store.Object, new TelemetrySettings());
+        await service.CaptureAsync(Input(isMetricsRun: true, startedAt: DateTimeOffset.UtcNow.AddMinutes(-5), targetDurationSeconds: 30));
+
+        saved.Should().NotBeNull();
+        saved!.Benchmark.Pass.Should().BeFalse();
+        saved.Benchmark.Violations.Should().Contain(v => v.Contains("e2eDurationSeconds"));
     }
 
     [Fact]
@@ -130,7 +148,8 @@ public class RunMetricsSnapshotServiceTests
     private static RunMetricsCaptureInput Input(
         bool isMetricsRun,
         int patientCount = 4,
-        DateTimeOffset? startedAt = null)
+        DateTimeOffset? startedAt = null,
+        int? targetDurationSeconds = null)
     {
         var finished = DateTimeOffset.UtcNow;
         return new RunMetricsCaptureInput(
@@ -156,7 +175,8 @@ public class RunMetricsSnapshotServiceTests
                     Outcome = "Passed",
                     IssueCount = 0
                 }
-            ]);
+            ],
+            targetDurationSeconds);
     }
 
     private sealed class ImmediateTimeProvider : TimeProvider

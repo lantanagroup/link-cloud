@@ -75,17 +75,55 @@ public sealed class AutomationRunsApiController(
     }
 
     /// <summary>
-    /// Benchmark catalog. Empty until the benchmarks store is added.
+    /// Lists stored Metrics benchmarks.
     /// </summary>
     [HttpGet("metrics/benchmarks")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    public IActionResult ListBenchmarks()
+    public async Task<IActionResult> ListBenchmarks(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        return Ok(new
+        var (records, metadata) = await metricsPresenter.ListBenchmarksAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    [HttpGet("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBenchmark(string key, CancellationToken cancellationToken)
+    {
+        var document = await metricsPresenter.GetBenchmarkAsync(key, cancellationToken);
+        if (document == null)
         {
-            records = Array.Empty<object>(),
-            metadata = new PaginationMetadata(20, 1, 0)
-        });
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Benchmark not found",
+                detail: $"Benchmark '{key}' was not found.");
+        }
+
+        return Ok(document);
+    }
+
+    [HttpPut("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PutBenchmark(
+        string key,
+        [FromBody] AutomationMetricsBenchmarkDocument body,
+        CancellationToken cancellationToken)
+    {
+        if (body == null || string.IsNullOrWhiteSpace(key)
+            || !string.Equals(body.Key, key, StringComparison.Ordinal))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Benchmark key mismatch",
+                detail: "The route key must match the body key.");
+        }
+
+        if (body.RegressionPercent <= 0)
+            body.RegressionPercent = 10;
+
+        await metricsPresenter.UpsertBenchmarkAsync(body, cancellationToken);
+        return Accepted(body);
     }
 
     /// <summary>

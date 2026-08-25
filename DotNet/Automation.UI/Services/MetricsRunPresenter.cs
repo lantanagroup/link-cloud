@@ -12,15 +12,18 @@ public sealed class MetricsRunPresenter
     private readonly IRunMetricsStore _store;
     private readonly IAutomationRunManager _runManager;
     private readonly IScenarioStore _scenarioStore;
+    private readonly IMetricsBenchmarkStore _benchmarks;
 
     public MetricsRunPresenter(
         IRunMetricsStore store,
         IAutomationRunManager runManager,
-        IScenarioStore scenarioStore)
+        IScenarioStore scenarioStore,
+        IMetricsBenchmarkStore? benchmarks = null)
     {
         _store = store;
         _runManager = runManager;
         _scenarioStore = scenarioStore;
+        _benchmarks = benchmarks ?? new EmptyBenchmarkStore();
     }
 
     public async Task<(IReadOnlyList<MetricsRunListItem> Records, PaginationMetadata Metadata)> ListAsync(
@@ -56,7 +59,7 @@ public sealed class MetricsRunPresenter
             LastRunStagesUnavailable = lastDoc == null
                 ? records.FirstOrDefault()?.StagesUnavailable ?? true
                 : AreStagesUnavailable(lastDoc),
-            RegressionFlagCount = 0,
+            RegressionFlagCount = recent.Sum(d => d.Regression.Flags.Count),
             Runs = records,
             Metadata = metadata,
             MetricsScenarios = scenarios,
@@ -83,7 +86,7 @@ public sealed class MetricsRunPresenter
             return UnavailableFromRun(run);
 
         var detail = ToDetail(snapshot);
-        if (snapshot.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
+        if (detail.PreviousRunId == null && snapshot.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
         {
             var previous = await _store.GetPreviousSucceededAsync(
                 scenarioId,
@@ -96,6 +99,21 @@ public sealed class MetricsRunPresenter
         return detail;
     }
 
+    public async Task<(IReadOnlyList<AutomationMetricsBenchmarkDocument> Records, PaginationMetadata Metadata)> ListBenchmarksAsync(
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var (records, total) = await _benchmarks.ListPageAsync(pageNumber, pageSize, cancellationToken);
+        return (records, new PaginationMetadata(Math.Clamp(pageSize, 1, 200), Math.Max(1, pageNumber), total));
+    }
+
+    public Task<AutomationMetricsBenchmarkDocument?> GetBenchmarkAsync(string key, CancellationToken cancellationToken = default) =>
+        _benchmarks.GetAsync(key, cancellationToken);
+
+    public Task UpsertBenchmarkAsync(AutomationMetricsBenchmarkDocument document, CancellationToken cancellationToken = default) =>
+        _benchmarks.UpsertAsync(document, cancellationToken);
+
     internal static MetricsRunListItem ToListItem(AutomationRunMetricsDocument document)
     {
         return new MetricsRunListItem
@@ -105,7 +123,7 @@ public sealed class MetricsRunPresenter
             ScenarioName = document.ScenarioName,
             Outcome = document.Outcome,
             E2eDurationSeconds = document.E2eDurationSeconds,
-            BenchmarkPass = true,
+            BenchmarkPass = document.Benchmark.Pass,
             StagesUnavailable = AreStagesUnavailable(document),
             FinishedAt = document.FinishedAt
         };
@@ -131,8 +149,9 @@ public sealed class MetricsRunPresenter
             ThetisGitSha = document.Thetis.GitSha,
             Seed = document.Thetis.Seed,
             Stages = ToStages(document),
-            BenchmarkViolations = [],
-            RegressionFlags = [],
+            BenchmarkViolations = document.Benchmark.Violations,
+            RegressionFlags = document.Regression.Flags,
+            PreviousRunId = document.Regression.PreviousRunId,
             Validators = document.Validators.Select(v => new ValidatorOutcomeSnapshotView
             {
                 Name = v.Name,
@@ -161,6 +180,19 @@ public sealed class MetricsRunPresenter
             BenchmarkViolations = [],
             RegressionFlags = []
         };
+    }
+
+    private sealed class EmptyBenchmarkStore : IMetricsBenchmarkStore
+    {
+        public Task UpsertAsync(AutomationMetricsBenchmarkDocument document, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<AutomationMetricsBenchmarkDocument?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AutomationMetricsBenchmarkDocument?>(null);
+
+        public Task<(IReadOnlyList<AutomationMetricsBenchmarkDocument> Records, long TotalCount)> ListPageAsync(
+            int pageNumber, int pageSize, CancellationToken cancellationToken = default) =>
+            Task.FromResult(((IReadOnlyList<AutomationMetricsBenchmarkDocument>)[], 0L));
     }
 
     internal static bool AreStagesUnavailable(AutomationRunMetricsDocument document) =>

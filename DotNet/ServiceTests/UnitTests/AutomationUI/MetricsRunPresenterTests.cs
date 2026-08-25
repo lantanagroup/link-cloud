@@ -143,6 +143,25 @@ public class MetricsRunPresenterTests
     }
 
     [Fact]
+    public async Task PutBenchmark_rejects_key_mismatch()
+    {
+        var presenter = CreatePresenter(run: null, snapshot: null);
+        var controller = new AutomationRunsApiController(
+            Mock.Of<IAutomationRunManager>(),
+            Mock.Of<IScenarioStore>(),
+            presenter,
+            NullLogger<AutomationRunsApiController>.Instance);
+
+        var result = await controller.PutBenchmark(
+            "nhsn-monthly-150",
+            new AutomationMetricsBenchmarkDocument { Key = "other" },
+            CancellationToken.None);
+
+        var problem = result.Should().BeOfType<ObjectResult>().Subject;
+        problem.StatusCode.Should().Be(400);
+    }
+
+    [Fact]
     public async Task Api_get_metrics_returns_problem_when_run_missing()
     {
         var presenter = CreatePresenter(run: null, snapshot: null);

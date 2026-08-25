@@ -406,11 +406,15 @@ public static class FacilitySetupHelper
         IDataAcquisitionServiceClient dataAcqClient,
         AutomationConfig config,
         IAutomationOutput output,
-        string facilityId)
+        string facilityId,
+        int? concurrencyOverride = null)
     {
-        // Keep concurrency high enough to avoid single-request bottlenecks,
-        // but cap it to reduce downstream service saturation in large volume runs.
-        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 1, 8);
+        // v1 concurrency is 1–8. Scenario Concurrency maps to DA MaxConcurrentRequests here.
+        // Worker AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions is a separate cap
+        // (also 8 in appsettings). Setting 16 silently becomes 8; lifting this requires changing
+        // both clamps. Do not treat this as a soak or saturation test.
+        var requested = concurrencyOverride ?? config.FhirQuery.MaxConcurrentRequests;
+        var effectiveMaxConcurrentRequests = Math.Clamp(requested, 1, 8);
 
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {

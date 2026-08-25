@@ -8,10 +8,13 @@
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <ThetisEngineProjectPath Condition="'$(ThetisEngineProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Engine\Thetis.Generation.Engine.csproj</ThetisEngineProjectPath>
     <ThetisAbstractionsProjectPath Condition="'$(ThetisAbstractionsProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Abstractions\Thetis.Generation.Abstractions.csproj</ThetisAbstractionsProjectPath>
-    <!-- Default: local Thetis project refs for the PoC. Set UseThetisProjectReference=false
-         (or omit the local Thetis repo) to restore LantanaGroup.Thetis.Generation.* from NuGet. -->
+    <!-- Default: sibling ../thetis project refs. NuGet fallback only when UseThetisProjectReference=false. -->
     <UseThetisProjectReference Condition="'$(UseThetisProjectReference)' == ''">true</UseThetisProjectReference>
   </PropertyGroup>
+
+  <Target Name="EnsureThetisSibling" BeforeTargets="ResolveProjectReferences;CollectPackageReferences" Condition="'$(UseThetisProjectReference)' == 'true'">
+    <Error Text="Thetis sibling project is required at $(ThetisEngineProjectPath). Clone ../thetis or set UseThetisProjectReference=false to use NuGet." Condition="!Exists('$(ThetisEngineProjectPath)')" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4" />
@@ -20,12 +23,12 @@
     <PackageReference Include="RestSharp" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(UseThetisProjectReference)' == 'true' And Exists('$(ThetisEngineProjectPath)')">
+  <ItemGroup Condition="'$(UseThetisProjectReference)' == 'true'">
     <ProjectReference Include="$(ThetisAbstractionsProjectPath)" />
     <ProjectReference Include="$(ThetisEngineProjectPath)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(UseThetisProjectReference)' != 'true' Or !Exists('$(ThetisEngineProjectPath)')">
+  <ItemGroup Condition="'$(UseThetisProjectReference)' != 'true'">
     <PackageReference Include="LantanaGroup.Thetis.Generation.Abstractions" />
     <PackageReference Include="LantanaGroup.Thetis.Generation.Engine" />
   </ItemGroup>

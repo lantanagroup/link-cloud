@@ -43,6 +43,7 @@ public sealed class MongoIndexManager
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
         EnsureRunMetricsIndexes();
+        EnsureMetricsBenchmarkIndexes();
     }
 
     // --- automation_org_resource_map_templates ---
@@ -235,6 +236,14 @@ public sealed class MongoIndexManager
         var collection = _database.GetCollection<BsonDocument>(MongoRunMetricsStore.CollectionName);
         CreateIndexSafe(collection, new BsonDocument { { "ScenarioId", 1 }, { "FinishedAt", -1 } }, unique: false, "idx_scenarioId_finishedAt");
         CreateIndexSafe(collection, new BsonDocument { { "CreatedAt", -1 } }, unique: false, "idx_createdAt_desc");
+    }
+
+    // --- automation_metrics_benchmarks ---
+
+    private void EnsureMetricsBenchmarkIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoMetricsBenchmarkStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioId", 1 } }, unique: false, "idx_scenarioId");
     }
 
     // --- Helpers ---

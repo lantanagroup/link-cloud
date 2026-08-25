@@ -37,6 +37,8 @@ public sealed class AutomationRunMetricsDocument
     public ThroughputSnapshot Throughput { get; set; } = new();
     public double E2eDurationSeconds { get; set; }
     public List<ValidatorOutcomeSnapshot> Validators { get; set; } = [];
+    public BenchmarkResultSnapshot Benchmark { get; set; } = new();
+    public RegressionResultSnapshot Regression { get; set; } = new();
 }
 
 public sealed class ThetisRevisionSnapshot

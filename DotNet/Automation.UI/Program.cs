@@ -349,6 +349,7 @@ builder.Services.AddLinkTelemetry(builder.Configuration, options =>
 });
 builder.Services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
 builder.Services.AddSingleton<IRunMetricsStore, MongoRunMetricsStore>();
+builder.Services.AddSingleton<IMetricsBenchmarkStore, MongoMetricsBenchmarkStore>();
 builder.Services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramClient>((sp, client) =>
 {
     var endpoint = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value.PrometheusQueryEndpoint;

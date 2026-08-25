@@ -417,7 +417,8 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
-                output, facilityId);
+                output, facilityId,
+                concurrencyOverride: state.Options.Concurrency);
             await EnsureOrganizationLocationConfigurationFromTemplateAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output,
@@ -919,8 +920,23 @@ internal sealed class RunExecutor
 
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
+            var metricsSnapshot = await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
+            if (state.Options.FailRunOnBenchmark
+                && metricsSnapshot?.Benchmark.Pass == false)
+            {
+                state.Status = AutomationRunStatus.Failed;
+                state.Error = "Benchmark failed: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                metricsSnapshot.Outcome = state.Status.ToString();
+                var store = _hostServices.GetService<IRunMetricsStore>();
+                if (store != null)
+                    await store.UpsertAsync(metricsSnapshot, cancellationToken);
+                await _orchestrator.CompleteRunAsync(state.RunId);
+                await callbacks.BroadcastStatus();
+                output.WriteLine($"Run failed: {state.Error}");
+                return;
+            }
+
             await _orchestrator.CompleteRunAsync(state.RunId);
-            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -952,20 +968,20 @@ internal sealed class RunExecutor
         }
     }
 
-    private async Task CaptureMetricsSnapshotAsync(
+    private async Task<AutomationRunMetricsDocument?> CaptureMetricsSnapshotAsync(
         MutableRunState state,
         IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults,
         GenerationManifest? generationManifest,
         CancellationToken cancellationToken)
     {
         if (!state.Options.IsMetricsRun)
-            return;
+            return null;
 
         try
         {
             var service = _hostServices.GetService<IRunMetricsSnapshotService>();
             if (service == null)
-                return;
+                return null;
 
             var manifest = generationManifest?.ToSnapshot();
             var patientCount = manifest?.PatientCount
@@ -978,7 +994,7 @@ internal sealed class RunExecutor
             var resourcesMin = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMin ?? state.Options.ResourcesPerPatient;
             var resourcesMax = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? state.Options.ResourcesPerPatient;
 
-            await service.CaptureAsync(
+            return await service.CaptureAsync(
                 new RunMetricsCaptureInput(
                     state.RunId,
                     state.ScenarioId,
@@ -995,12 +1011,14 @@ internal sealed class RunExecutor
                     resourcesMin,
                     resourcesMax,
                     manifest?.TotalResourceCount ?? 0,
-                    validatorResults),
+                    validatorResults,
+                    state.Options.TargetDurationSeconds),
                 cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to persist metrics snapshot for run {RunId}", state.RunId);
+            return null;
         }
     }
 

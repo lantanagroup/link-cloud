@@ -7,7 +7,7 @@ namespace Automation.UI.Services;
 
 public interface IRunMetricsSnapshotService
 {
-    Task CaptureAsync(RunMetricsCaptureInput input, CancellationToken cancellationToken = default);
+    Task<AutomationRunMetricsDocument?> CaptureAsync(RunMetricsCaptureInput input, CancellationToken cancellationToken = default);
 }
 
 public sealed record RunMetricsCaptureInput(
@@ -26,7 +26,8 @@ public sealed record RunMetricsCaptureInput(
     int ResourcesPerPatientMin,
     int ResourcesPerPatientMax,
     int ManifestResourceCount,
-    IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> Validators);
+    IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> Validators,
+    int? TargetDurationSeconds = null);
 
 public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 {
@@ -41,6 +42,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     ];
 
     private readonly IRunMetricsStore _store;
+    private readonly IMetricsBenchmarkStore _benchmarks;
     private readonly IPrometheusHistogramClient _prometheus;
     private readonly IAutomationUiMetrics _metrics;
     private readonly TelemetrySettings _telemetry;
@@ -53,7 +55,8 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         IAutomationUiMetrics metrics,
         IOptions<TelemetrySettings> telemetry,
         ILogger<RunMetricsSnapshotService> logger,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        IMetricsBenchmarkStore? benchmarks = null)
     {
         _store = store;
         _prometheus = prometheus;
@@ -61,12 +64,13 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         _telemetry = telemetry.Value;
         _logger = logger;
         _time = time ?? TimeProvider.System;
+        _benchmarks = benchmarks ?? new NullBenchmarkStore();
     }
 
-    public async Task CaptureAsync(RunMetricsCaptureInput input, CancellationToken cancellationToken = default)
+    public async Task<AutomationRunMetricsDocument?> CaptureAsync(RunMetricsCaptureInput input, CancellationToken cancellationToken = default)
     {
         if (!input.IsMetricsRun)
-            return;
+            return null;
 
         var e2eSeconds = Math.Max(0, (input.FinishedAt - input.StartedAt).TotalSeconds);
         var wait = ResolvePrometheusWait();
@@ -148,11 +152,57 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             }).ToList()
         };
 
+        AutomationMetricsBenchmarkDocument? benchmark = null;
+        if (!string.IsNullOrWhiteSpace(input.BenchmarkKey))
+            benchmark = await _benchmarks.GetAsync(input.BenchmarkKey, cancellationToken);
+
+        AutomationRunMetricsDocument? previous = null;
+        if (input.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
+        {
+            previous = await _store.GetPreviousSucceededAsync(
+                scenarioId,
+                input.FinishedAt,
+                input.RunId,
+                cancellationToken);
+        }
+
+        var evaluation = MetricsBenchmarkEvaluator.Evaluate(
+            document,
+            benchmark,
+            input.TargetDurationSeconds,
+            previous);
+        document.Benchmark = new BenchmarkResultSnapshot
+        {
+            Key = evaluation.Key,
+            Pass = evaluation.Pass,
+            Violations = evaluation.Violations.ToList()
+        };
+        document.Regression = new RegressionResultSnapshot
+        {
+            PreviousRunId = evaluation.PreviousRunId,
+            Flags = evaluation.RegressionFlags.ToList()
+        };
+
         await _store.UpsertAsync(document, cancellationToken);
         _logger.LogInformation(
-            "Persisted automation_run_metrics for run {RunId} (stagesUnavailable={Unavailable})",
+            "Persisted automation_run_metrics for run {RunId} (stagesUnavailable={Unavailable}, benchmarkPass={Pass})",
             input.RunId,
-            stagesUnavailable);
+            stagesUnavailable,
+            evaluation.Pass);
+        return document;
+    }
+
+    private sealed class NullBenchmarkStore : IMetricsBenchmarkStore
+    {
+        public Task UpsertAsync(AutomationMetricsBenchmarkDocument document, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<AutomationMetricsBenchmarkDocument?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AutomationMetricsBenchmarkDocument?>(null);
+
+        public Task<(IReadOnlyList<AutomationMetricsBenchmarkDocument> Records, long TotalCount)> ListPageAsync(
+            int pageNumber, int pageSize, CancellationToken cancellationToken = default) =>
+            Task.FromResult(((IReadOnlyList<AutomationMetricsBenchmarkDocument>)[], 0L));
     }
 
     private async Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
