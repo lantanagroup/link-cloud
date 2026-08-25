@@ -54,6 +54,14 @@ class TerminologyCheckExecutorTest {
                 .thenReturn(result);
     }
 
+    private void stubValidateCode(boolean ok, String message) {
+        IValidationSupport.CodeValidationResult result = mock(IValidationSupport.CodeValidationResult.class);
+        when(result.isOk()).thenReturn(ok);
+        when(result.getMessage()).thenReturn(message);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("1234-5"), any(), any()))
+                .thenReturn(result);
+    }
+
     @Test
     @DisplayName("supports TERMINOLOGY")
     void supportsTerminology() {
@@ -71,6 +79,20 @@ class TerminologyCheckExecutorTest {
         assertThat(findings.get(0).getCode()).isEqualTo("terminology-code-invalid");
         assertThat(findings.get(0).getSeverity()).isEqualTo(Severity.WARNING);
         assertThat(findings.get(0).getExpression()).isEqualTo("http://loinc.org|1234-5");
+    }
+
+    @Test
+    @DisplayName("an unresolvable code system yields a not-evaluated (INCONCLUSIVE) finding, not an invalid-code warning")
+    void unresolvableCodeSystemIsNotEvaluated() {
+        stubValidateCode(false, "Code system http://loinc.org could not be resolved");
+
+        List<RawFinding> findings = executor.execute(check(null), contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).hasSize(1);
+        RawFinding f = findings.get(0);
+        assertThat(f.getCode()).isEqualTo("binding-not-evaluated");
+        assertThat(f.getSeverity()).isEqualTo(Severity.INFORMATION);
+        assertThat(f.isNotEvaluated()).isTrue();
     }
 
     @Test

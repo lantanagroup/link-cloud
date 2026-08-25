@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
+import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
@@ -68,6 +69,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
 
         int checked = 0;
         int notMember = 0;
+        int notEvaluated = 0;
         int skipped = 0;
         List<RawFinding> findings = new ArrayList<>();
         for (IBaseResource resource : targets) {
@@ -107,13 +109,31 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                     if (result.isOk()) {
                         log.info("VALUESET check '{}': code {}|{} -> IS a member of {}",
                                 check.getCheckLocalId(), system, code, valueSet);
+                    } else if (UnresolvedBindingClassifier.isUnresolvable(result)) {
+                        // The value set (or the code system behind it) could not be resolved, so
+                        // membership was never actually tested (HAPI issue coding NOT_FOUND, or a
+                        // resolution-failure message). Emit a "not evaluated" finding (INCONCLUSIVE,
+                        // ignored by scoring) instead of a false membership error.
+                        notEvaluated++;
+                        log.info("VALUESET check '{}': value set {} could not be resolved for code {}|{} -> NOT EVALUATED{}",
+                                check.getCheckLocalId(), valueSet, system, code,
+                                result.getMessage() != null ? " (" + result.getMessage() + ")" : "");
+                        findings.add(RawFinding.builder()
+                                .checkLocalId(check.getCheckLocalId())
+                                .dimension(check.getDimension())
+                                .severity(Severity.INFORMATION)
+                                .notEvaluated(true)
+                                .code("binding-not-evaluated")
+                                .message(String.format("Value set %s could not be resolved; membership of code '%s'%s was not evaluated",
+                                        valueSet, code, system != null ? " (" + system + ")" : ""))
+                                .location(path)
+                                .expression(path)
+                                .build());
                     } else {
                         notMember++;
                         log.info("VALUESET check '{}': code {}|{} -> NOT a member of {}{}",
                                 check.getCheckLocalId(), system, code, valueSet,
                                 result.getMessage() != null ? " (" + result.getMessage() + ")" : "");
-                    }
-                    if (!result.isOk()) {
                         findings.add(RawFinding.builder()
                                 .checkLocalId(check.getCheckLocalId())
                                 .dimension(check.getDimension())
@@ -128,8 +148,8 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 }
             }
         }
-        log.info("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} skipped -> {} finding(s)",
-                check.getCheckLocalId(), checked, valueSet, notMember, skipped, findings.size());
+        log.info("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} not-evaluated, {} skipped -> {} finding(s)",
+                check.getCheckLocalId(), checked, valueSet, notMember, notEvaluated, skipped, findings.size());
         return findings;
     }
 
