@@ -361,7 +361,7 @@ class AbstractResourceConsumerTest {
     }
 
     @Test
-    void process_evaluationThrows_stillCleansUpCache() {
+    void process_evaluationThrows_leavesCacheForRetry() {
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-fail";
@@ -403,14 +403,14 @@ class AbstractResourceConsumerTest {
         RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
 
         assertEquals("evaluation failed", ex.getMessage());
-        verify(redisResourceService).cleanup(cacheKey);
+        // A failure may be routed to -Retry: the redelivered record still needs its cached
+        // resources, so process() must not clean up. Terminal (dead-letter) cleanup happens in
+        // the recoverer, which is the only place that knows the routing decision.
+        verify(redisResourceService, never()).cleanup(anyString());
     }
 
     @Test
-    void process_metricsThrowsAfterValidation_stillCleansUpCache() {
-        // The cleanup guard needs both correlationId and cacheType. Anything that throws between the
-        // two assignments - metrics, logging - must not leave a valid cache entry stranded, since
-        // nothing else will ever come back for it.
+    void process_metricsThrowsAfterValidation_leavesCacheForRetry() {
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-metrics-fail";
@@ -425,26 +425,118 @@ class AbstractResourceConsumerTest {
         RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
 
         assertEquals("metrics failed", ex.getMessage());
+        verify(redisResourceService, never()).cleanup(anyString());
+    }
+
+    @Test
+    void process_success_cleansUpRedisCache() throws Exception {
+        String facilityId = "facility-1";
+        String patientId = "patient-1";
+        String cacheKey = "cache-key-success";
+
+        ResourcesNormalized value = buildRedisValue(cacheKey);
+
+        Resource resource = new Resource();
+        resource.setFacilityId(facilityId);
+        resource.setCorrelationId(cacheKey);
+        resource.setPatientId(patientId);
+        resource.setResourceType(ResourceType.Patient);
+        resource.setResourceId("p-1");
+        resource.setResource("{}");
+
+        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
+                .thenReturn(List.of(resource));
+
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setFacilityId(facilityId);
+        patientStatus.setCorrelationId(cacheKey);
+        patientStatus.setPatientId(patientId);
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportType("TestMeasure");
+        report.setReportTrackingId("tracking-1");
+        report.setReportable(null);
+        patientStatus.setReports(Collections.singletonList(report));
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
+                .thenReturn(Optional.of(patientStatus));
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("mr-1");
+        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
+        when(reportabilityPredicate.test(any())).thenReturn(false);
+        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
+
+        BulkOperations bulkOps = mock(BulkOperations.class);
+        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
+        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
+        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
+        when(bulkResult.getModifiedCount()).thenReturn(1);
+        when(bulkOps.execute()).thenReturn(bulkResult);
+
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        consumer.process(record);
+
         verify(redisResourceService).cleanup(cacheKey);
     }
 
     @Test
-    void process_cleanupThrows_doesNotMaskOriginalException() {
+    void process_cleanupThrowsOnSuccess_doesNotFailTheRecord() throws Exception {
+        // Cleanup runs after the evaluation has fully succeeded; a cleanup failure must not turn a
+        // processed record into a retry (which would re-evaluate and double-produce downstream).
         String facilityId = "facility-1";
         String patientId = "patient-1";
-        String cacheKey = "cache-key-fail-2";
+        String cacheKey = "cache-key-cleanup-fail";
 
         ResourcesNormalized value = buildRedisValue(cacheKey);
 
+        Resource resource = new Resource();
+        resource.setFacilityId(facilityId);
+        resource.setCorrelationId(cacheKey);
+        resource.setPatientId(patientId);
+        resource.setResourceType(ResourceType.Patient);
+        resource.setResourceId("p-1");
+        resource.setResource("{}");
+
         when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenThrow(new RuntimeException("cache read failed"));
+                .thenReturn(List.of(resource));
+
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setFacilityId(facilityId);
+        patientStatus.setCorrelationId(cacheKey);
+        patientStatus.setPatientId(patientId);
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportType("TestMeasure");
+        report.setReportTrackingId("tracking-1");
+        report.setReportable(null);
+        patientStatus.setReports(Collections.singletonList(report));
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
+                .thenReturn(Optional.of(patientStatus));
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("mr-1");
+        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
+        when(reportabilityPredicate.test(any())).thenReturn(false);
+        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
+
+        BulkOperations bulkOps = mock(BulkOperations.class);
+        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
+        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
+        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
+        when(bulkResult.getModifiedCount()).thenReturn(1);
+        when(bulkOps.execute()).thenReturn(bulkResult);
+
         doThrow(new RuntimeException("cleanup failed")).when(redisResourceService).cleanup(cacheKey);
 
         ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        assertDoesNotThrow(() -> consumer.process(record));
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
-
-        assertEquals("cache read failed", ex.getMessage());
         verify(redisResourceService).cleanup(cacheKey);
     }
 

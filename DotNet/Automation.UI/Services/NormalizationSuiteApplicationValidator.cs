@@ -226,15 +226,15 @@ public sealed class NormalizationSuiteApplicationValidator
             }
         }
 
-        var hasSuccessOutcome = matches.Any(m => string.Equals(m.Outcome, "Success", StringComparison.OrdinalIgnoreCase));
-        if (!evidenceOptional && !hasSuccessOutcome)
+        var hasAppliedOutcome = matches.Any(m =>
+            string.Equals(m.Outcome, "Success", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(m.Outcome, "NoAction", StringComparison.OrdinalIgnoreCase));
+        if (!evidenceOptional && !hasAppliedOutcome)
         {
-            if (matches.All(m => string.Equals(m.Outcome, "NoAction", StringComparison.OrdinalIgnoreCase)))
-                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows NoAction outcomes.");
-            else if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
+            if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
                 AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows Failure outcomes.");
             else
-                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not show any Success outcomes.");
+                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not show any Success or NoAction outcomes.");
         }
 
         var outcomeSummary = string.Join(", ",

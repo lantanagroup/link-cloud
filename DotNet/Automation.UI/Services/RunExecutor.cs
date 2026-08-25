@@ -701,7 +701,7 @@ internal sealed class RunExecutor
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
 
             output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
-            output.WriteLine($"[ABS] OperationOutcome expectation mode: failed-patient count={_operationOutcomeExpectations.ExpectedCountPerFailedValidationPatient} ({_operationOutcomeExpectationSource}).");
+            output.WriteLine($"[ABS] OperationOutcome writer={(_operationOutcomeExpectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}; expected only for FailedValidation patients ({_operationOutcomeExpectationSource}).");
 
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
@@ -803,12 +803,11 @@ internal sealed class RunExecutor
                     manifest: generationManifest,
                     operationOutcomeExpectations: _operationOutcomeExpectations));
 
-            // The ABS manifest validator enriches the manifest with downstream-derived
-            // predictions that are not known at generation time — most notably the
-            // per-patient OperationOutcome count (Validation appends one OO to the ABS blob
-            // for every FailedValidation patient when its pre-qualification flag is on). Re-persist the
-            // snapshot so the Runs dashboard shows the final, fully-enriched predictions
-            // rather than the pre-validation snapshot taken at line ~506.
+            // The ABS manifest validator overwrites any generation-time OperationOutcome
+            // count from ReportEntry.ReportingStatus (one OO per FailedValidation patient
+            // when the writer flag is on). Re-persist the snapshot so the Runs dashboard
+            // shows the final, fully-enriched predictions rather than the pre-validation
+            // snapshot taken at line ~506.
             if (generationManifest != null)
             {
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
