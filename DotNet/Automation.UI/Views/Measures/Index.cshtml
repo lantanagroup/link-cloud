@@ -166,12 +166,15 @@
     var backdrop = document.getElementById('measureModalBackdrop');
     var modalTitle = document.getElementById('measureModalTitle');
     var btnSave = document.getElementById('btnMeasureSave');
+    var btnDownload = document.getElementById('btnMeasureDownload');
     var overlay = document.getElementById('measureSystemOverlay');
     var idInput = document.getElementById('MeasureId');
     var isSystemInput = document.getElementById('MeasureIsSystem');
     var errors = document.getElementById('measureFormErrors');
     var metaPreview = document.getElementById('measureMetaPreview');
     var customWarning = document.getElementById('customMeasureWarning');
+    var bundleContent = document.getElementById('measureBundleContent');
+    var contentHint = document.getElementById('measureContentHint');
     var pendingBundleJson = '';
 
     var saveUrl = '@Url.Action("SaveInline", "Measures")';
@@ -179,6 +182,7 @@
     var cloneUrl = '@Url.Action("CloneInline", "Measures")';
     var getJsonUrl = '@Url.Action("GetJson", "Measures")';
     var getDefaultsUrl = '@Url.Action("GetDefaults", "Measures")';
+    var downloadUrl = '@Url.Action("Download", "Measures")';
 
     function af() { var t = document.querySelector('#measureModal input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
     function showErrors(msg) { errors.style.display = ''; errors.textContent = msg; }
@@ -205,6 +209,34 @@
         metaPreview.textContent = parts.length ? parts.join(' · ') : '';
     }
 
+    function prettyJson(raw) {
+        if (!raw) return '';
+        try { return JSON.stringify(JSON.parse(raw), null, 2); }
+        catch (_) { return raw; }
+    }
+
+    function showBundle(raw) {
+        if (!raw) {
+            bundleContent.textContent = 'No bundle loaded.';
+            contentHint.textContent = '';
+            return;
+        }
+        var pretty = prettyJson(raw);
+        bundleContent.textContent = pretty;
+        var kb = Math.max(1, Math.round(raw.length / 1024));
+        contentHint.textContent = kb + ' KB';
+    }
+
+    function setDownloadHref(id) {
+        if (!id) {
+            btnDownload.style.display = 'none';
+            btnDownload.setAttribute('href', '#');
+            return;
+        }
+        btnDownload.style.display = '';
+        btnDownload.setAttribute('href', downloadUrl + '?id=' + encodeURIComponent(id));
+    }
+
     function fill(m) {
         idInput.value = m.id || '';
         isSystemInput.value = m.isSystem ? 'true' : 'false';
@@ -214,6 +246,8 @@
         pendingBundleJson = m.bundleJson || '';
         document.getElementById('MeasureBundleFile').value = '';
         setMeta(m);
+        showBundle(pendingBundleJson);
+        setDownloadHref(m.id && pendingBundleJson ? m.id : '');
     }
 
     document.getElementById('btnMeasureClose').addEventListener('click', closeModal);
@@ -226,6 +260,7 @@
         reader.onload = function () {
             pendingBundleJson = String(reader.result || '');
             metaPreview.textContent = 'Loaded ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB). Metadata is extracted on save.';
+            showBundle(pendingBundleJson);
         };
         reader.readAsText(file);
     });
