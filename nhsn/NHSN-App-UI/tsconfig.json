@@ -9,7 +9,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": "./src",
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*", "webpack.*.config.js"]
+  "include": [
+    "src/**/*",
+    "webpack.*.config.js"
+  ]
 }

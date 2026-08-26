@@ -1,0 +1,50 @@
+{
+  "shell": {
+    "tagline": "Lower-environment shell for switching among saved signed-JWT test users while exercising the shared NHSNLink UI.",
+    "savedTestUsersTitle": "Saved test users",
+    "noSavedUsers": "No test users have been saved yet. Answer \"who are you simulating?\" below.",
+    "signedJwtPrefix": "Signed JWT",
+    "updateProfileTitle": "Update test profile",
+    "createProfileTitle": "Create a lower-environment JWT test profile",
+    "selectOrCreateDescription": "The standalone shell only initializes NHSNLink after a signed-JWT test profile has been selected. Use the shell controls on the left to configure the test identity, issuer, key id, and private key used by the lower-environment harness to sign the bearer token.",
+    "form": {
+      "friendlyLabel": "Friendly label",
+      "email": "Email",
+      "name": "Name",
+      "groups": "Groups (comma separated)",
+      "groupsPlaceholder": "FACADMIN, AUTHENTICATED",
+      "facilityId": "Facility ID",
+      "jwtIssuer": "JWT Issuer",
+      "jwtKeyId": "JWT Key ID (kid)",
+      "jwtKeyIdPlaceholder": "Certificate thumbprint / key id",
+      "jwtPrivateKeyPem": "JWT Private Key PEM",
+      "jwtPrivateKeyPlaceholder": "-----BEGIN PRIVATE KEY-----"
+    },
+    "modeTitle": "Harness Mode",
+    "modeLabel": "Backend",
+    "modeMock": "Mock (offline)",
+    "modeBff": "NHSN-App-BFF (:8079)",
+    "modeMockHint": "In-memory fixtures. No backing services required.",
+    "modeBffHint": "Signs a real JWT from the active test user and calls the BFF."
+  },
+  "app": {
+    "title": "NHSN App UI Shell"
+  },
+  "state": {
+    "selectOrCreateProfile": "Select or create a test profile"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "remove": "Remove",
+    "submitRequest": "Submit a request",
+    "completeOnboarding": "Complete Onboarding",
+    "saveAndActivate": "Save and activate test profile",
+    "cancelEdit": "Cancel edit",
+    "continue": "Continue",
+    "back": "Back",
+    "reload": "Reload",
+    "download": "Download"
+  }
+}

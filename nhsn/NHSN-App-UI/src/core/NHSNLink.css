@@ -1,0 +1,330 @@
+.nhsn-link {
+  font-family: Arial, sans-serif;
+  color: #12344d;
+  background: #f5f8fa;
+  min-height: 100vh;
+}
+
+.nhsn-link__testing-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 1rem;
+  background: #fff3cd;
+  color: #663c00;
+  border-bottom: 1px solid #f0c36d;
+  font-weight: 700;
+  text-align: center;
+}
+
+.nhsn-link__layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  min-height: calc(100vh - 52px);
+  width: 100%;
+}
+
+.nhsn-link__nav,
+.nhsn-link__panel,
+.nhsn-link__content {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.nhsn-link__nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.nhsn-link__nav-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+}
+
+.nhsn-link__nav ul,
+.nhsn-link__panel ul {
+  padding-left: 1.25rem;
+}
+
+.nhsn-link__nav ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.nhsn-link__nav-sections {
+  display: grid;
+  gap: 1rem;
+}
+
+.nhsn-link__nav-section-heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: #486581;
+}
+
+.nhsn-link__nav li {
+  margin-bottom: 0.5rem;
+}
+
+.nhsn-link__nav-userinfo {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #d9e2ec;
+  color: #486581;
+}
+
+.nhsn-link__nav-userinfo p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.nhsn-link__nav-button {
+  width: 100%;
+  border: 1px solid #c5d3e0;
+  background: white;
+  color: #12344d;
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nhsn-link__nav-button--active {
+  background: #005ea2;
+  color: white;
+  border-color: #005ea2;
+}
+
+.nhsn-link__action-button {
+  border: none;
+  background: #005ea2;
+  color: white;
+  border-radius: 4px;
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+}
+
+.nhsn-link__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  background: white;
+  margin: 2rem;
+  border-radius: 8px;
+}
+
+.nhsn-link__state-card {
+  max-width: 600px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.nhsn-link__state--error,
+.nhsn-link__state--warning {
+  display: block;
+  min-height: 0;
+  margin: 0 0 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  border-left: 4px solid;
+  text-align: left;
+}
+
+.nhsn-link__state--error {
+  background: #fdf2f2;
+  border-left-color: #c52a2a;
+  color: #7a1c1c;
+}
+
+.nhsn-link__state--warning {
+  background: #fff3cd;
+  border-left-color: #f0c36d;
+  color: #663c00;
+}
+
+/* ---------------------------------------------------------- step machine */
+
+.nhsn-link__onboarding {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.nhsn-link__steps {
+  /* The step number is rendered as its own element so it can carry a
+     completion state, so the list must not also draw its own markers —
+     otherwise every row reads "1. 1 Welcome". */
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.nhsn-link__step {
+  margin: 0;
+}
+
+.nhsn-link__step-button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #12344d;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nhsn-link__step-button:hover:not(:disabled) {
+  background: #e8eff5;
+}
+
+.nhsn-link__step-button:disabled {
+  color: #829ab1;
+  cursor: not-allowed;
+}
+
+.nhsn-link__step-index {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid #c5d3e0;
+  border-radius: 50%;
+  background: white;
+  font-size: 0.8rem;
+}
+
+.nhsn-link__step-label {
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.nhsn-link__step--current .nhsn-link__step-button {
+  background: #005ea2;
+  color: white;
+  font-weight: 700;
+}
+
+.nhsn-link__step--current .nhsn-link__step-index {
+  border-color: white;
+  background: transparent;
+  color: white;
+}
+
+.nhsn-link__step--done .nhsn-link__step-index {
+  border-color: #2e8540;
+  background: #2e8540;
+  color: white;
+  font-weight: 700;
+}
+
+.nhsn-link__step-panel {
+  min-width: 0;
+}
+
+.nhsn-link__subtitle {
+  color: #486581;
+  line-height: 1.6;
+  max-width: 70ch;
+}
+
+.nhsn-link__step-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #d9e2ec;
+}
+
+.nhsn-link__saving {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  color: #486581;
+  font-size: 0.85rem;
+}
+
+.nhsn-link__grid {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.notification-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 2rem));
+}
+
+.notification-stack__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.notification-stack__item--success {
+  background: #2e8540;
+}
+
+.notification-stack__item--error {
+  background: #c52a2a;
+}
+
+.notification-stack__item--info {
+  background: #005ea2;
+}
+
+.notification-stack__message {
+  flex: 1;
+}
+
+.notification-stack__close {
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .nhsn-link__layout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .nhsn-link__onboarding {
+    grid-template-columns: 1fr;
+  }
+}
