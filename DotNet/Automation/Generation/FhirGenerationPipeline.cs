@@ -590,6 +590,15 @@ public static class FhirGenerationPipeline
 
         if (cqlInput != null)
         {
+            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
+            {
+                cqlInput = cqlInput with
+                {
+                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
+                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
+                };
+            }
+
             effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,
@@ -751,6 +760,15 @@ public static class FhirGenerationPipeline
         var effectiveProfile = profile;
         if (cqlInput != null)
         {
+            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
+            {
+                cqlInput = cqlInput with
+                {
+                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
+                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
+                };
+            }
+
             effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,

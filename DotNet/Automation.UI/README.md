@@ -611,7 +611,7 @@ Why SSE here:
      - Data Acquisition org-location configuration for the run facility, and
      - generation/prediction modeling so expected ABS counts are org-scope aware.
    - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
-   - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
+   - `CqlFilterSimulator` runs per-patient over the qualifying measures' embedded bundle CQL.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
 4. **Load measure bundles** -- `MeasureLoader.LoadAllAsync()` (supports multi-measure).
 5. **Ensure tenant/pipeline setup** -- facility, normalization config, query plans/config,
@@ -651,8 +651,8 @@ with:
 - Organization Resource Map post-filtering over simulated acquired keys
   (`OrgResourceMapPredictionFilter`).
 - CQL-referenced resource types (`CqlResourceTypeExtractor`).
-- Per-resource CQL exclusions (`CqlFilterSimulator`, measure-family profiles, intersection
-  semantics across the patient's qualifying measures).
+- Per-resource CQL exclusions (`CqlFilterSimulator`, derived from embedded measure-bundle
+  CQL, intersection semantics across the patient's qualifying measures).
 
 That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` for
 strict prediction-vs-actual comparison. Generation does not predict `OperationOutcome`.
