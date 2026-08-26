@@ -7,6 +7,7 @@ namespace Automation.UI.Services;
 /// <summary>
 /// Seeds the three system measure templates from embedded Automation bundles
 /// and overwrites them on every startup so they stay in sync with the files.
+/// ACH Daily/Monthly use the Validation NHSN 2.0.0-cibuild packages.
 /// </summary>
 public sealed class MeasureTemplateSeedService : IHostedService
 {
@@ -23,7 +24,7 @@ public sealed class MeasureTemplateSeedService : IHostedService
     {
         foreach (var (id, family) in MeasureTemplateCatalog.SystemTemplates)
         {
-            var bundleJson = MeasureTemplateCatalog.ReadEmbeddedBundle(family);
+            var bundleJson = ProfiledMeasureCatalog.ReadBundleJson(family);
             var parsed = MeasureBundleParser.Parse(bundleJson);
             var template = new MeasureTemplate
             {

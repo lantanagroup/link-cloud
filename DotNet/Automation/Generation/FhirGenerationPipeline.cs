@@ -111,7 +111,8 @@ public static class FhirGenerationPipeline
         IGeneratedPatientTemplateCache? generatedTemplateCache = null,
         int? maxConcurrentPatients = null,
         IPatientEntryGenerator? patientEntryGenerator = null,
-        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null)
+        ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
@@ -245,7 +246,8 @@ public static class FhirGenerationPipeline
                         generationRequirementsPlan,
                         ids,
                         generatedTemplateCache,
-                        patientEntryGenerator);
+                        patientEntryGenerator,
+                        measureBundleJsons);
 
                     patientIds[patientIndex] = patientId;
                     generatedTemplateKeys[patientIndex] = templateKey;
@@ -282,7 +284,8 @@ public static class FhirGenerationPipeline
                     sharedSimEntries,
                     acquisitionSimulation,
                     generationClinicalPeriodStart,
-                    generationClinicalPeriodEnd);
+                    generationClinicalPeriodEnd,
+                    measureBundleJsons);
 
                 importedPatientIds.Add(patientId);
                 totalBundlesUploaded += bundleCount;
@@ -328,7 +331,8 @@ public static class FhirGenerationPipeline
         AcquisitionSimulationConfig? acquisitionSimulation = null,
         IPatientEntryGenerator? patientEntryGenerator = null,
         ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null,
-        IGeneratedPatientTemplateCache? generatedTemplateCache = null)
+        IGeneratedPatientTemplateCache? generatedTemplateCache = null,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(profile);
@@ -377,7 +381,8 @@ public static class FhirGenerationPipeline
             generationRequirementsPlan,
             ids,
             generatedTemplateCache,
-            patientEntryGenerator);
+            patientEntryGenerator,
+            measureBundleJsons);
 
         var slice = sliceBuilder.Build(measures);
         targetManifest.AppendFrom(slice);
@@ -398,7 +403,8 @@ public static class FhirGenerationPipeline
         GenerationManifest targetManifest,
         ImportedPatientInput imported,
         IReadOnlyList<ProfiledMeasureType> measures,
-        AcquisitionSimulationConfig? acquisitionSimulation = null)
+        AcquisitionSimulationConfig? acquisitionSimulation = null,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(imported);
@@ -416,7 +422,8 @@ public static class FhirGenerationPipeline
             sharedSimEntries: null,
             acquisitionSimulation,
             periodStart,
-            periodEnd);
+            periodEnd,
+            measureBundleJsons);
 
         var slice = sliceBuilder.Build(measures);
         targetManifest.AppendFrom(slice);
@@ -534,7 +541,8 @@ public static class FhirGenerationPipeline
         GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids,
         IGeneratedPatientTemplateCache? generatedTemplateCache,
-        IPatientEntryGenerator? patientEntryGenerator)
+        IPatientEntryGenerator? patientEntryGenerator,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
@@ -635,7 +643,8 @@ public static class FhirGenerationPipeline
             acquisitionSimulation,
             generationClinicalPeriodStart,
             generationClinicalPeriodEnd,
-            output);
+            output,
+            measureBundleJsons);
 
         if (ShouldEmitDetailedPatientLog(patientIndex))
         {
@@ -675,7 +684,8 @@ public static class FhirGenerationPipeline
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
         AcquisitionSimulationConfig? acquisitionSimulation,
         DateTime? generationClinicalPeriodStart,
-        DateTime? generationClinicalPeriodEnd)
+        DateTime? generationClinicalPeriodEnd,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
@@ -745,7 +755,8 @@ public static class FhirGenerationPipeline
             acquisitionSimulation,
             generationClinicalPeriodStart,
             generationClinicalPeriodEnd,
-            output);
+            output,
+            measureBundleJsons);
 
         output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{FormatMeasureEligibilityLabel(measures, effectiveProfile)}] | source={imported.Source}");
 
@@ -785,7 +796,8 @@ public static class FhirGenerationPipeline
         AcquisitionSimulationConfig? acquisitionSimulation,
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
-        IAutomationOutput output)
+        IAutomationOutput output,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         HashSet<string>? cqlFilteredKeys = null;
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
@@ -793,6 +805,15 @@ public static class FhirGenerationPipeline
 
         if (cqlInput != null)
         {
+            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
+            {
+                cqlInput = cqlInput with
+                {
+                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
+                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
+                };
+            }
+
             effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,
@@ -805,7 +826,8 @@ public static class FhirGenerationPipeline
             var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
             if (qualifyingMeasures.Count > 0)
             {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                var bundles = ResolveMeasureBundles(measureBundleJsons, measures, qualifyingMeasures);
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(bundles, cqlInput);
                 manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
             }
         }
@@ -896,6 +918,32 @@ public static class FhirGenerationPipeline
         }
 
         return profile with { MeasureEligibilities = adjusted };
+    }
+
+    private static IReadOnlyList<string> ResolveMeasureBundles(
+        IReadOnlyList<string>? measureBundleJsons,
+        IReadOnlyList<ProfiledMeasureType> allMeasures,
+        IReadOnlyList<ProfiledMeasureType> qualifyingMeasures)
+    {
+        if (measureBundleJsons != null
+            && allMeasures.Count > 0
+            && measureBundleJsons.Count == allMeasures.Count)
+        {
+            return allMeasures
+                .Select((measure, index) => (measure, json: measureBundleJsons[index]))
+                .Where(pair => qualifyingMeasures.Contains(pair.measure) && !string.IsNullOrWhiteSpace(pair.json))
+                .Select(pair => pair.json)
+                .ToList();
+        }
+
+        if (measureBundleJsons != null
+            && measureBundleJsons.Count > 0
+            && measureBundleJsons.Count == qualifyingMeasures.Count)
+        {
+            return measureBundleJsons.Where(json => !string.IsNullOrWhiteSpace(json)).ToList();
+        }
+
+        return qualifyingMeasures.Select(measure => ProfiledMeasureCatalog.ReadBundleJson(measure)).ToList();
     }
 
     // ------------------------------------------------------------------

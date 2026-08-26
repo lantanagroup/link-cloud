@@ -61,7 +61,7 @@ public class MeasureTemplateRunBinderTests
     }
 
     [Fact]
-    public void ScenarioConfigBuilder_prefers_inline_json_over_embedded_locations()
+    public void ScenarioConfigBuilder_uses_measure_bundle_json()
     {
         var options = new ResolvedRunOptions(1, 1, 1, 3, 0, 30, false, true,
             [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation], [], [])

@@ -340,7 +340,8 @@ internal sealed class RunExecutor
                 acquisitionSimulation: acquisitionSimulation,
                 importedPatients: generationRequest.ImportedPatients,
                 generatedTemplateCache: generationRequest.GeneratedTemplateCache,
-                maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients);
+                maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients,
+                measureBundleJsons: scenarioConfig.MeasureBundleJsons);
 
             patientIds = pipelineResult.PatientIds;
             generationManifest = pipelineResult.Manifest;
@@ -394,9 +395,10 @@ internal sealed class RunExecutor
                 generationManifest.MeasureIds = measureIds;
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
-                generationManifest.CqlReferencedResourceTypes = scenarioConfig.MeasureBundleJsons.Count > 0
-                    ? CqlResourceTypeExtractor.ExtractReachableFromBundleJsons(scenarioConfig.MeasureBundleJsons)
-                    : CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                if (scenarioConfig.MeasureBundleJsons.Count == 0)
+                    throw new InvalidOperationException("Measure bundle JSON is required.");
+                generationManifest.CqlReferencedResourceTypes =
+                    CqlResourceTypeExtractor.ExtractReachableFromBundleJsons(scenarioConfig.MeasureBundleJsons);
                 generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
@@ -1405,7 +1407,8 @@ internal sealed class RunExecutor
                 acquisitionSimulation,
                 _snapshotStore,
                 _generatedTemplateCache,
-                liveShape);
+                liveShape,
+                state.Options.MeasureBundleJsons);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,

@@ -24,7 +24,8 @@ internal sealed class LivePatientProvisioner(
     FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
     ISnapshotStore snapshotStore,
     IGeneratedPatientTemplateCache? generatedTemplateCache = null,
-    PatientProfile? shapeTemplate = null) : ILivePatientProvisioner
+    PatientProfile? shapeTemplate = null,
+    IReadOnlyList<string>? measureBundleJsons = null) : ILivePatientProvisioner
 {
     public async Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
     {
@@ -54,7 +55,8 @@ internal sealed class LivePatientProvisioner(
             generationConfig,
             generationRequirementsPlan,
             acquisitionSimulation,
-            generatedTemplateCache: generatedTemplateCache);
+            generatedTemplateCache: generatedTemplateCache,
+            measureBundleJsons: measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
@@ -73,7 +75,8 @@ internal sealed class LivePatientProvisioner(
             manifest,
             imported,
             selectedMeasures,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
@@ -97,7 +100,8 @@ internal sealed class LivePatientProvisioner(
             manifest,
             imported,
             selectedMeasures,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(id, effectiveProfile);

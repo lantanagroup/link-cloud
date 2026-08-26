@@ -1,8 +1,6 @@
-﻿using System.Reflection;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Reflection;
 
 namespace LantanaGroup.Automation.Generation;
 
@@ -138,22 +136,6 @@ public static class CqlResourceTypeExtractor
     }
 
     /// <summary>
-    /// Extracts CQL-referenced resource types from an embedded measure bundle resource.
-    /// </summary>
-    public static HashSet<string> ExtractFromEmbeddedResource(string resourceName, Assembly? assembly = null)
-    {
-        assembly ??= typeof(ProfiledMeasureCatalog).Assembly;
-        using var stream = assembly.GetManifestResourceStream(resourceName)
-                           ?? throw new FileNotFoundException(
-                               $"Embedded resource '{resourceName}' not found in assembly '{assembly.GetName().Name}'.");
-        using var reader = new StreamReader(stream);
-        return ExtractFromBundleJson(reader.ReadToEnd());
-    }
-
-    /// <summary>
-    /// Returns the union of CQL-referenced resource types across multiple measures.
-    /// </summary>
-    /// <summary>
     /// Union of reachable CQL retrieve types across inline measure-bundle JSON payloads.
     /// </summary>
     public static HashSet<string> ExtractReachableFromBundleJsons(IEnumerable<string> bundleJsons)
@@ -169,47 +151,6 @@ public static class CqlResourceTypeExtractor
         }
 
         return union;
-    }
-
-    public static HashSet<string> ExtractForMeasures(IEnumerable<ProfiledMeasureType> measures, Assembly? assembly = null)
-    {
-        var union = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var measure in measures)
-        {
-            var location = ProfiledMeasureCatalog.GetBundleLocation(measure);
-            HashSet<string> types;
-
-            if (location.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
-            {
-                var resourceName = location.Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
-                types = ExtractReachableFromEmbeddedResource(resourceName, assembly);
-            }
-            else if (location.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            {
-                var filePath = location.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
-                types = ExtractReachableFromBundleJson(File.ReadAllText(filePath));
-            }
-            else
-            {
-                continue;
-            }
-
-            foreach (var t in types)
-                union.Add(t);
-        }
-
-        return union;
-    }
-
-    public static HashSet<string> ExtractReachableFromEmbeddedResource(string resourceName, Assembly? assembly = null)
-    {
-        assembly ??= typeof(ProfiledMeasureCatalog).Assembly;
-        using var stream = assembly.GetManifestResourceStream(resourceName)
-                           ?? throw new FileNotFoundException(
-                               $"Embedded resource '{resourceName}' not found in assembly '{assembly.GetName().Name}'.");
-        using var reader = new StreamReader(stream);
-        return ExtractReachableFromBundleJson(reader.ReadToEnd());
     }
 
     private static HashSet<string> ExtractMeasurePopulationExpressionNames(string bundleJson)

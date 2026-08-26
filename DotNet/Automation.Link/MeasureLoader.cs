@@ -4,7 +4,6 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using Task = System.Threading.Tasks.Task;
 
@@ -16,7 +15,6 @@ public class MeasureLoader
     private readonly IValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
-    private readonly Assembly? _resourceAssembly;
     private readonly FhirJsonDeserializer _parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
 
     public string? MeasureId { get; private set; }
@@ -35,14 +33,12 @@ public class MeasureLoader
         IMeasureEvalServiceClient measureEvalClient,
         IValidationServiceClient validationClient,
         IAutomationOutput output,
-        TestScenarioConfig config,
-        Assembly? resourceAssembly = null)
+        TestScenarioConfig config)
     {
         _measureEvalClient = measureEvalClient;
         _validationClient = validationClient;
         _output = output;
         _config = config;
-        _resourceAssembly = resourceAssembly;
     }
 
     private string? _inlineBundleJson;
@@ -57,25 +53,9 @@ public class MeasureLoader
             var filePath = _config.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
             return await File.ReadAllTextAsync(filePath);
         }
-        else if (_config.MeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
-        {
-            var resourceName = _config.MeasureBundleLocation
-                .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
 
-            // Resolve the assembly that contains the embedded resource.
-            // The Automation project owns the measure bundles; use its assembly
-            // (via ProfiledMeasureCatalog as an anchor type) by default.
-            var assembly = _resourceAssembly ?? typeof(ProfiledMeasureCatalog).Assembly;
-            await using var stream = assembly.GetManifestResourceStream(resourceName);
-
-            if (stream == null)
-                throw new FileNotFoundException($"Embedded resource '{resourceName}' not found in assembly '{assembly.GetName().Name}'.");
-
-            using var reader = new StreamReader(stream);
-            return await reader.ReadToEndAsync();
-        }
-        else if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             using var client = new HttpClient();
             return await client.GetStringAsync(_config.MeasureBundleLocation);

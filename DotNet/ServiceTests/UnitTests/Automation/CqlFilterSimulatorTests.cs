@@ -33,37 +33,58 @@ public class CqlFilterSimulatorTests
 
     // ---------- ACH (Monthly + Daily) ----------
 
-    [Theory]
-    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
-    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)]
-    public void Ach_IncludesAllSupportedCategoriesWithinEncounter(ProfiledMeasureType measure)
+    [Fact]
+    public void AchMonthly_KeepsLabAndVitals_ExcludesSocialHistoryAndSurvey()
     {
+        // Current ACH Monthly CQL comments social-history/survey out of SDE Observation Category.
         var input = InputWith(
             Obs("o-lab", "laboratory", "718-7", EncStart.AddHours(1)),
             Obs("o-vitals", "vital-signs", "8867-4", EncStart.AddHours(2)),
             Obs("o-social", "social-history", "72166-2", EncStart.AddHours(3)),
             Obs("o-survey", "survey", "44249-1", EncStart.AddHours(4)));
 
-        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
 
-        Assert.Empty(excluded);
+        Assert.DoesNotContain("Observation/o-lab", excluded);
+        Assert.DoesNotContain("Observation/o-vitals", excluded);
+        Assert.Contains("Observation/o-social", excluded);
+        Assert.Contains("Observation/o-survey", excluded);
     }
 
-    [Theory]
-    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
-    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)]
-    public void Ach_ExcludesUnsupportedCategoriesEvenWithinEncounter(ProfiledMeasureType measure)
+    [Fact]
+    public void AchDaily_SdeAllObservations_KeepsEveryObservationWhenIpExists()
+    {
+        var input = InputWith(
+            Obs("o-lab", "laboratory", "718-7", EncStart.AddHours(1)),
+            Obs("o-social", "social-history", "72166-2", EncStart.AddHours(3)),
+            Obs("o-exam", "exam", "8867-4", EncStart.AddHours(1)));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            input);
+
+        Assert.DoesNotContain("Observation/o-lab", excluded);
+        Assert.DoesNotContain("Observation/o-social", excluded);
+        Assert.DoesNotContain("Observation/o-exam", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_ExcludesUnsupportedCategoriesEvenWithinEncounter()
     {
         var input = InputWith(
             Obs("o-exam", "exam", "8867-4", EncStart.AddHours(1)),
             Obs("o-therapy", "therapy", "8867-4", EncStart.AddHours(2)),
             Obs("o-activity", "activity", "8867-4", EncStart.AddHours(3)));
 
-        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
 
-        Assert.Equal(
-            new HashSet<string> { "Observation/o-exam", "Observation/o-therapy", "Observation/o-activity" },
-            excluded);
+        Assert.Contains("Observation/o-exam", excluded);
+        Assert.Contains("Observation/o-therapy", excluded);
+        Assert.Contains("Observation/o-activity", excluded);
     }
 
     [Fact]
@@ -291,7 +312,6 @@ public class CqlFilterSimulatorTests
 
     [Theory]
     [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
-    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)]
     [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
     public void MedicationRequest_AuthoredDuringEncounter_IsKept(ProfiledMeasureType measure)
     {
@@ -300,6 +320,18 @@ public class CqlFilterSimulatorTests
         var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, InputWithMedicationRequests(mr));
 
         Assert.DoesNotContain("MedicationRequest/MR-001", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_MedicationRequest_WithoutMatchingValueSet_IsExcluded()
+    {
+        var mr = new CqlFilterSimulator.MedicationRequestContext("MR-001", EncStart.AddHours(2), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            InputWithMedicationRequests(mr));
+
+        Assert.Contains("MedicationRequest/MR-001", excluded);
     }
 
     [Theory]
@@ -351,7 +383,7 @@ public class CqlFilterSimulatorTests
     }
 
     [Fact]
-    public void Ach_MedicationAdministration_HasNoSdeRetrieve_DoesNotApply()
+    public void AchMonthly_MedicationAdministration_OutsideEncounter_IsExcluded()
     {
         var ma = new CqlFilterSimulator.MedicationAdministrationContext("MA-003", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1), "Encounter/E1");
 
@@ -364,7 +396,7 @@ public class CqlFilterSimulatorTests
         var excluded = CqlFilterSimulator.ComputeFilteredKeys(
             new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation }, input);
 
-        Assert.DoesNotContain("MedicationAdministration/MA-003", excluded);
+        Assert.Contains("MedicationAdministration/MA-003", excluded);
     }
 
     // ---------- Coverage profile ----------

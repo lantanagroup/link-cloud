@@ -1,4 +1,3 @@
-using System.Reflection;
 using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Models;
@@ -30,19 +29,4 @@ public static class MeasureTemplateCatalog
 
     public static List<Guid> SystemIdsFor(IEnumerable<ProfiledMeasureType> families) =>
         families.Select(SystemIdFor).Distinct().ToList();
-
-    public static string ReadEmbeddedBundle(ProfiledMeasureType family, Assembly? assembly = null)
-    {
-        var location = ProfiledMeasureCatalog.GetBundleLocation(family);
-        if (!location.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Expected an embedded resource location for {family}, got '{location}'.");
-
-        var resourceName = location["resource://".Length..];
-        assembly ??= typeof(ProfiledMeasureCatalog).Assembly;
-        using var stream = assembly.GetManifestResourceStream(resourceName)
-            ?? throw new FileNotFoundException(
-                $"Embedded resource '{resourceName}' not found in assembly '{assembly.GetName().Name}'.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
 }

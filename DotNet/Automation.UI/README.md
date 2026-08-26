@@ -205,9 +205,9 @@ The scenario editor lists these templates instead of three hardcoded checkboxes.
 scenarios that only stored generation-family enums map onto the three system template ids
 on read.
 
-System ACH Monthly/Daily files currently remain `1.0.0-dev` (May 2025). Validation’s NHSN
-package is `2.0.0-cibuild` (January 2026). To evaluate that newer bundle, clone the system
-measure and upload the updated transaction Bundle. Hypoglycemic has no newer file in-repo.
+System ACH Monthly/Daily templates are seeded from the Validation NHSN package
+`2.0.0-cibuild` (January 2026). Hypoglycemic remains `1.0.0-dev`; there is no newer
+file in-repo. Clone a system measure to evaluate a different bundle.
 
 ### 3.4 `QueryPlansController`
 
@@ -650,7 +650,7 @@ Why SSE here:
      - Data Acquisition org-location configuration for the run facility, and
      - generation/prediction modeling so expected ABS counts are org-scope aware.
    - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
-   - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
+   - `CqlFilterSimulator` runs per-patient over the qualifying measures' actual bundle CQL.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
 4. **Load measure bundles** -- `MeasureLoader.LoadAllAsync()` (supports multi-measure).
 5. **Ensure tenant/pipeline setup** -- facility, normalization config, query plans/config,
@@ -690,8 +690,8 @@ with:
 - Organization Resource Map post-filtering over simulated acquired keys
   (`OrgResourceMapPredictionFilter`).
 - CQL-referenced resource types (`CqlResourceTypeExtractor`).
-- Per-resource CQL exclusions (`CqlFilterSimulator`, measure-family profiles, intersection
-  semantics across the patient's qualifying measures).
+- Per-resource CQL exclusions (`CqlFilterSimulator`, derived from the run's measure-bundle
+  CQL, intersection semantics across the patient's qualifying measures).
 
 That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` for
 strict prediction-vs-actual comparison. Generation does not predict `OperationOutcome`.

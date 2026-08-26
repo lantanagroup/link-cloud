@@ -1,6 +1,4 @@
-﻿using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 
 namespace Automation.UI.Services;
 
@@ -25,14 +23,9 @@ public static class ScenarioConfigBuilder
         var inlineJsons = options.MeasureBundleJsons
             .Where(j => !string.IsNullOrWhiteSpace(j))
             .ToList();
-        var bundleLocations = inlineJsons.Count > 0
-            ? []
-            : options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetBundleLocation).ToList();
 
         return new TestScenarioConfig
         {
-            MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
-            AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
             MeasureBundleJsons = inlineJsons,
             StartDate = options.ReportPeriodStart.HasValue
                 ? options.ReportPeriodStart.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")

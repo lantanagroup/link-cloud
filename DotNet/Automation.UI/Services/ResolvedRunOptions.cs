@@ -64,8 +64,8 @@ public record ResolvedRunOptions(
     public List<Guid> SelectedMeasureIds { get; init; } = [];
 
     /// <summary>
-    /// Inline FHIR measure-bundle JSON, one per selected template, in load order.
-    /// When empty, <see cref="ScenarioConfigBuilder"/> falls back to embedded resource:// locations.
+    /// FHIR measure-bundle JSON, one per selected template, in load order.
+    /// System templates are seeded from <see cref="ProfiledMeasureCatalog.ReadBundleJson"/>.
     /// </summary>
     public List<string> MeasureBundleJsons { get; init; } = [];
 }

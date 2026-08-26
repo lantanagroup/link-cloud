@@ -68,7 +68,7 @@ Automation (no Link dependencies)
 +-- Helpers/             output abstractions, retry, monitoring, diagnostics
 +-- Configuration/       base config classes for host extension
 +-- ExtractCqlTypes/     tiny utility app for extracting CQL retrieve types from measure bundles
-+-- measures/            embedded measure definition bundles (JSON)
++-- measures/            system measure definition bundles (ACH Daily/Monthly = Validation 2.0)
 ```
 
 ---
@@ -117,8 +117,9 @@ logic in a streaming pipeline that:
    from in-memory FHIR objects before serialization.
 4. **Runs `QueryPlanAcquisitionSimulator` per-patient** (when configured) before discarding
    FHIR data.
-5. **Runs `CqlFilterSimulator` per-patient** over the patient's *qualifying* measures only, so
-   non-qualifying measure SDE rules do not falsely constrain prediction.
+5. **Runs `CqlFilterSimulator` per-patient** over the qualifying measures' actual bundle CQL
+   so instance-level ABS prediction follows the measure being evaluated, not a frozen family
+   profile. Non-qualifying measures do not constrain prediction.
 6. **Retains no serialized JSON after upload** -- memory stays proportional to
    `MaxConcurrentPatients -- resources-per-patient`, not the full run size.
 7. **Processes imported patients alongside generated ones** -- after the generated cohort
@@ -499,80 +500,34 @@ appends it directly to the ABS blob, bypassing `PatientAggregator`'s aggregation
 
 ### 8.5 CQL filter simulator semantics
 
-`CqlFilterSimulator.ComputeFilteredKeys(measures, input)` returns resources that will be
-excluded by SDE `where` semantics. The result is the **intersection** of exclusions across
-applicable measure profiles **per resource type**, because MeasureEval evaluates each
-measure independently and writes one `.mr` file per measure; `PatientAggregator` unions
-contained resources across those files into the patient NDJSON. A resource is only truly
-absent from ABS when every applicable measure for its resource type excludes it.
-Profiles for other resource types do not participate in that intersection -- an
-Observation profile has no opinion about whether a Condition belongs in ABS.
+Instance-level ABS prediction is derived from the **measure bundle CQL that this run
+will evaluate**, not from a handwritten measure-family profile.
 
-The simulator also models patient-context CQL retrieval. A DataAcquisition reference query
-can acquire a resource because some other acquired resource references it, but the measure
-CQL still evaluates `[ResourceType]` in the current patient context. Profiles therefore may
-check patient ownership/reference fields before predicting inclusion. The most important
-case today is `Specimen`: `Specimen.subject` must resolve to the evaluated patient before
-monthly ACH or Hypoglycemic specimen rules can include it, and ACH Daily additionally
-requires an included respiratory-pathogen observation to reference the specimen.
+`CqlFilterSimulator.ComputeFilteredKeys(measureBundleJsons, input)` analyzes each
+bundle's Measure population/SDE roots, strips CQL comments, and turns reachable
+`define` bodies into inclusion rules (category, status, valueset codes, IP/date
+relations, encounter linkage, specimen-from-observation). Resources of a type that
+the bundle's SDE produces, but that match none of those rules, are excluded.
 
-For multi-measure runs with per-patient eligibility, `FhirGenerationPipeline` passes only
-each patient's **qualifying** measures into `ComputeFilteredKeys`, because a measure the
-patient does not qualify for does not contribute contained resources to ABS and therefore
-must not influence the intersection.
+The result is the **intersection** of exclusions across bundles **per resource type**,
+because MeasureEval writes one `.mr` file per measure and `PatientAggregator` unions
+contained resources. A resource is absent from ABS only when every applicable measure
+for that type excludes it.
 
-#### Initial-Population windows (`MeasureInitialPopulationResolver`)
+`FhirGenerationPipeline` passes the run's uploaded/edited measure JSON when present
+(only the patient's qualifying measures). If no bundle JSON is supplied, it falls
+back to the embedded system bundles for the qualifying `ProfiledMeasureType` values.
 
-Most SDE `where` clauses have the shape
-`where exists "Initial Population" IP where Resource.X overlaps IP.period`. The simulator
-resolves the patient's IP windows once per call by walking every encounter in the input
-and keeping those whose `class.code` qualifies them for any selected measure:
+This is why uploading a new version of ACH Monthly does not require recoding a
+family profile: comment-stripping and SDE analysis read the CQL that MeasureEval
+runs. Known remaining gaps (not a full CQL engine): encounter-type and
+encounter-location IP qualification, Hypoglycemic antidiabetic-drug IP membership,
+and `HospitalizationWithObservationOrEmergency` interval expansion (approximated as
+the IP encounter period).
 
-- ACH Monthly + ACH Daily -- `class` in the NHSN inpatient set
-  {`IMP`, `ACUTE`, `NONAC`, `SS`} plus direct emergency / observation codes
-  {`EMER`, `OBSENC`}.
-- Hypoglycemic -- `class` in the NHSN inpatient set {`IMP`, `ACUTE`, `NONAC`, `SS`}.
-
-Known resolver gaps are documented in `EncounterIpClassification`: encounter type-based
-qualification, encounter-location-based qualification, and the full Hypoglycemic
-antidiabetic-medication requirement are approximated rather than fully CQL-evaluated.
-
-The resulting `IpWindow` set is then passed to every applicable filter profile via
-`PatientCqlInput.IpWindows`. The `IpWindowExtensions` helpers (`AnyOverlaps`,
-`AnyContains`, `AnyEncounterMatches`, `AnyEndStrictlyAfter`, `AnyEndOnOrAfter`) let each
-profile express its rule in terms of the resolved set rather than a single legacy
-`EncounterStart`/`EncounterEnd` pair.
-
-When a `PatientCqlInput` is built via the legacy positional constructor (no `Encounters`
-list), the simulator falls back to a single window derived from
-`EncounterId` + `EncounterStart` + `EncounterEnd` so pre-multi-encounter tests and
-single-encounter generators continue to work unchanged.
-
-#### Built-in profiles
-
-`CqlFilterSimulator` ships with profiles spanning every resource type currently retrieved
-by an SDE `define` in the supported measures:
-
-| Profile | Resource type | Measures | Rule (summary) |
-|---|---|---|---|
-| `AchConditionFilterProfile` | `Condition` | ACH Monthly + Daily | `problem-list-item` requires `active` + `recordedDate` strictly before any IP `end`; OR `encounter-diagnosis` / `health-concern` referencing any IP encounter. |
-| `HypoglycemicConditionFilterProfile` | `Condition` | Hypoglycemic | `recordedDate <= IP.end` (no active constraint). |
-| `AchObservationFilterProfile` | `Observation` | ACH Monthly + Daily | `category` in {`laboratory`, `vital-signs`, `social-history`, `survey`, `imaging`, `procedure`} AND effective overlaps any IP. |
-| `HypoglycemicObservationFilterProfile` | `Observation` | Hypoglycemic | LOINC in the blood-glucose lab/POC whitelist (2339-0, 2345-7, 41653-7) AND `start of effective during IP` (point-in-IP). |
-| `AchProcedureFilterProfile` | `Procedure` | ACH Monthly + Daily | `performed` overlaps any IP. |
-| `AchHypoMedicationRequestFilterProfile` | `MedicationRequest` | ACH + Hypoglycemic | `authoredOn` falls inside any IP. |
-| `HypoMedicationAdministrationFilterProfile` | `MedicationAdministration` | Hypoglycemic | `effective` overlaps any IP. |
-| `AchHypoCoverageFilterProfile` | `Coverage` | ACH + Hypoglycemic | `period` overlaps any IP (open ends supported). |
-| `AchHypoServiceRequestFilterProfile` | `ServiceRequest` | ACH + Hypoglycemic | `authoredOn` falls inside any IP. |
-| `AchEncounterFilterProfile` | `Encounter` | ACH Monthly + Daily + Hypoglycemic | Encounter must itself overlap an IP window (IP encounters trivially overlap themselves; ACH SDE also pulls in non-IP encounters that overlap IP). |
-| `AchMonthlySpecimenFilterProfile` | `Specimen` | ACH Monthly | `Specimen.subject` resolves to the evaluated patient AND `collection.collected` overlaps any IP. This mirrors patient-context `[Specimen]` plus the monthly SDE `overlaps IP.period` predicate. |
-| `AchDailySpecimenFilterProfile` | `Specimen` | ACH Daily | `Specimen.subject` resolves to the evaluated patient AND the specimen is referenced by a final/registered/preliminary/partial laboratory observation whose LOINC is in the respiratory pathogen (COVID-19, influenza, RSV) value sets used by the daily measure. Daily does **not** include every collected-in-period specimen. |
-| `HypoglycemicSpecimenFilterProfile` | `Specimen` | Hypoglycemic | `Specimen.subject` resolves to the evaluated patient AND `collection.collected` is fully during any IP. |
-
-All profiles are extracted from real generated FHIR content via
-`CqlFilterInputExtractor` -- the simulator never replays seeds. Adding a new family is a
-matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
-`AppliesToAny`, and `ComputeExcludedKeys`) and registering it in the `Profiles` list.
+When a `PatientCqlInput` is built via the legacy positional constructor (no
+`Encounters` list), IP falls back to `EncounterId` + `EncounterStart` +
+`EncounterEnd`.
 
 ### 8.6 Related helpers
 
