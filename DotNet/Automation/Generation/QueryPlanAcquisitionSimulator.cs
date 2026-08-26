@@ -195,13 +195,13 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
-                // Observation `date` can be represented by different effective shapes; keep
-                // a multi-shape check there. For DiagnosticReport, use effective[x] only.
-                // Including issued here can over-predict boundary resources (issued slightly
-                // after period start while effective is before it), which does not match the
-                // DataAcquisition behavior observed in scheduled runs.
+                // Observation/DiagnosticReport `date` is FHIR effective[x] only.
+                // Including issued here over-predicts boundary resources (issued slightly
+                // after period start while effective is before it) — the DxRpt-042 class of
+                // scheduled ABS misses.
                 if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
+                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
                 {
                     var matchedAny = false;
                     var recognizedAny = false;
@@ -310,8 +310,10 @@ public static class QueryPlanAcquisitionSimulator
         GeneratedResource resource,
         Dictionary<string, HashSet<string>> acquiredByType)
     {
+        // DiagnosticReport date search is effective[x] only. Encounter-anchoring DRs
+        // (including unrecognized-date fallback) over-predicts scheduled ABS
+        // (DxRpt-042 / DxRpt-043 class).
         if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
-              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
               || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
         {
             return false;

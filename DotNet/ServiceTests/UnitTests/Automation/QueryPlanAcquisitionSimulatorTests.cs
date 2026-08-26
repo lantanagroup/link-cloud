@@ -419,4 +419,65 @@ public class QueryPlanAcquisitionSimulatorTests
         Assert.Contains("Location/L-HOSP", acquired);
         Assert.DoesNotContain("Location/L-UNUSED", acquired);
     }
+
+    [Fact]
+    public void DiagnosticReport_IssuedInPeriod_EffectiveBeforePeriod_IsExcluded()
+    {
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2024-06-01T08:00:00Z", "end":"2024-06-05T08:00:00Z" } }
+            """);
+        var report = Entry("DiagnosticReport", "DxRpt-042", """
+            { "resourceType":"DiagnosticReport","id":"DxRpt-042",
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-12-01T08:00:00Z",
+              "issued":"2024-06-15T08:00:00Z" }
+            """);
+
+        var plan = new QueryPlanInput
+        {
+            EhrDescription = "Test",
+            LookBack = "P0D",
+            InitialQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Encounter",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                }
+            ],
+            SupplementalQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "DiagnosticReport",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                }
+            ]
+        };
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter, report],
+            null,
+            plan,
+            PeriodStart,
+            PeriodEnd,
+            allowEncounterAnchoredDateOverrideForOutOfRange: false);
+
+        Assert.Contains("Encounter/E1", acquired);
+        Assert.DoesNotContain("DiagnosticReport/DxRpt-042", acquired);
+    }
 }
