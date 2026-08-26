@@ -700,6 +700,18 @@ public class CqlFilterSimulatorTests
         Assert.Contains("DiagnosticReport/DR-out", excluded);
     }
 
+    [Fact]
+    public void AchMonthly_DiagnosticReport_UnknownEffectiveInterval_IsExcluded()
+    {
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-unknown", DateTime.MinValue, DateTime.MaxValue);
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.Contains("DiagnosticReport/DR-unknown", excluded);
+    }
+
     // ---------- Location SDE: GetLocation(IP.location) vs [Location] ----------
 
     private static CqlFilterSimulator.PatientCqlInput InputWithLocations(

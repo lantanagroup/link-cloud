@@ -458,6 +458,14 @@ public static class CqlFilterSimulator
         {
             case CqlInstanceFilterAnalyzer.DateRelation.None:
                 return true;
+            default:
+                if (start == DateTime.MinValue && end == DateTime.MaxValue)
+                    return false;
+                break;
+        }
+
+        switch (date)
+        {
             case CqlInstanceFilterAnalyzer.DateRelation.OverlapsIpPeriod:
                 return input.IpWindows.AnyOverlaps(start, end);
             case CqlInstanceFilterAnalyzer.DateRelation.DuringIpPeriod:
