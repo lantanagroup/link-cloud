@@ -355,6 +355,15 @@ internal sealed class RunExecutor
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
 
+            if (generationManifest != null)
+            {
+                await FhirAcquisitionReadiness.WaitAsync(
+                    fhirDataLoader,
+                    output,
+                    generationManifest,
+                    cancellationToken: state.RunCancellation.Token);
+            }
+
             IReadOnlyList<PatientProfile>? profilesAlignedToPatientIds = null;
             if (generationManifest != null)
             {
@@ -835,8 +844,9 @@ internal sealed class RunExecutor
                 .ToList();
 
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
+            var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync()
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback)
             {
                 var logs = new List<string>();
 
@@ -844,14 +854,20 @@ internal sealed class RunExecutor
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
+                        // Match ResourceType= in the summary line, not a bare type name.
+                        // "Patient" is a substring of PatientId= on every resource's log, so a
+                        // bare filter returns the whole run (and at 100+ patients can miss
+                        // the actual ResourceType=Patient lines or time out).
+                        var resourceTypeFilter = $"ResourceType={resourceType}";
                         var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
                             normalizationSummaryMarker,
-                            scenarioConfig.LokiScrapeWindow,
-                            additionalContainsFilters: [.. runScopeFilters, resourceType],
+                            lookback,
+                            additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
                             limit: 5000,
                             maxPages: 20);
 
+                        output.WriteLine($"[Normalization Suite] Loki evidence for {resourceTypeFilter}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
                     }
                 }
@@ -860,7 +876,7 @@ internal sealed class RunExecutor
                     logs = await lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
-                        scenarioConfig.LokiScrapeWindow,
+                        lookback,
                         additionalContainsFilters: runScopeFilters,
                         limit: 5000,
                         maxPages: 20);
@@ -871,7 +887,14 @@ internal sealed class RunExecutor
                     .ToList();
             }
 
-            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+            var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
+                scenarioConfig.LokiScrapeWindow,
+                evidenceRequiredResourceTypes,
+                acquiredResourceTypesForEvidence,
+                (lookback, ct) => QueryNormalizationSummaryLogsAsync(lookback),
+                (delay, ct) => Task.Delay(delay, ct),
+                output,
+                cancellationToken);
             output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
             var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -893,7 +916,11 @@ internal sealed class RunExecutor
             }
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
-                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
+                normalizationSuiteApplicationValidator.ValidateAllAsync(
+                    internalAbsResources,
+                    normalizationResolution,
+                    normalizationSummaryLogs,
+                    acquiredResourceTypesForEvidence));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));

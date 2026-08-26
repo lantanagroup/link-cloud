@@ -33,6 +33,7 @@ public class DataAcquisitionDatabaseValidator
             await ValidateFhirQueryConfiguration(facilityId, errors);
             await ValidateQueryPlans(facilityId, expectedMeasureId, errors);
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
+            await ValidateExpectedResourcesWereAcquired(facilityId, reportId, errors, expectDataAcquisitionData, manifest);
             await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateOrganizationLocationTracking(
@@ -146,6 +147,50 @@ public class DataAcquisitionDatabaseValidator
 
         if (failedLogs.Count > 10)
             AddError(errors, $"Additional failed acquisition logs omitted: {failedLogs.Count - 10}");
+    }
+
+    private async Task ValidateExpectedResourcesWereAcquired(
+        string facilityId,
+        string reportId,
+        List<string> errors,
+        bool expectDataAcquisitionData,
+        GenerationManifest? manifest)
+    {
+        if (!expectDataAcquisitionData || manifest == null)
+            return;
+
+        const int maxAttempts = 6;
+        var delay = TimeSpan.FromSeconds(5);
+        IReadOnlyList<AcquisitionEmptyResultDetector.EmptyAcquisition> findings = [];
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+            var acquiredIds = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+            findings = AcquisitionEmptyResultDetector.Find(manifest, acquiredIds, logs);
+            if (findings.Count == 0)
+                return;
+
+            if (attempt < maxAttempts)
+            {
+                _output.WriteLine(
+                    $"  Data acquisition acquired=0 vs Generation Manifest for {findings.Count} patient/type pair(s); " +
+                    $"retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{maxAttempts}).");
+                await Task.Delay(delay);
+            }
+        }
+
+        const int maxEmptyErrors = 20;
+        foreach (var finding in findings.Take(maxEmptyErrors))
+        {
+            AddError(
+                errors,
+                $"Data acquisition completed with acquired=0 for {finding.ResourceType} on expected patient {finding.PatientId} " +
+                $"(manifest expected {finding.ExpectedCount}). This is an acquisition/FHIR-readiness failure, not generated-data variance.");
+        }
+
+        if (findings.Count > maxEmptyErrors)
+            AddError(errors, $"Additional empty-acquisition findings omitted: {findings.Count - maxEmptyErrors}");
     }
 
     private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)

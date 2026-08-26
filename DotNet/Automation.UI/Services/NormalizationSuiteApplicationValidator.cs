@@ -15,7 +15,8 @@ public sealed class NormalizationSuiteApplicationValidator
     public Task ValidateAllAsync(
         IDictionary<string, object> internalAbsResources,
         NormalizationSuiteResolution suiteResolution,
-        IReadOnlyList<string>? normalizationSummaryLogs = null)
+        IReadOnlyList<string>? normalizationSummaryLogs = null,
+        IReadOnlyCollection<string>? acquiredResourceTypes = null)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
@@ -23,6 +24,9 @@ public sealed class NormalizationSuiteApplicationValidator
         var parsedResources = ParseInternalAbsResources(internalAbsResources, errors);
         var plannedOperations = NormalizationRuntimeSequencePlanner.Plan(suiteResolution);
         var executionEvidence = ParseExecutionEvidence(normalizationSummaryLogs ?? [], warnings);
+        var acquiredTypes = acquiredResourceTypes is { Count: > 0 }
+            ? new HashSet<string>(acquiredResourceTypes, StringComparer.OrdinalIgnoreCase)
+            : null;
 
         if (plannedOperations.Count == 0)
             AddError(errors, "Resolved normalization suite has no operations to validate.");
@@ -56,15 +60,18 @@ public sealed class NormalizationSuiteApplicationValidator
                     // generated volume makes that expensive, and generated data is
                     // stamped so these ops actually fire. Skip per-id coverage:
                     // hundreds of Observations would flake on Loki pagination.
+                    // Patient is the acquisition anchor, not a query-plan type, so it is
+                    // not published on ResourcesAcquired cache keys and has no Loki
+                    // summaries. Require evidence only for types the query plan acquires.
                     ValidateExecutionEvidence(
                         operation, candidates, executionEvidence, errors, warnings,
-                        evidenceOptional: false,
+                        evidenceOptional: acquiredTypes != null && !acquiredTypes.Contains(resourceType),
                         requireCandidateCoverage: false);
                     break;
                 default:
                     ValidateExecutionEvidence(
                         operation, candidates, executionEvidence, errors, warnings,
-                        evidenceOptional: false,
+                        evidenceOptional: acquiredTypes != null && !acquiredTypes.Contains(resourceType),
                         requireCandidateCoverage: true);
                     break;
             }
@@ -159,6 +166,10 @@ public sealed class NormalizationSuiteApplicationValidator
             if (!evidenceOptional)
             {
                 AddError(errors, $"No normalization execution evidence found for {operation.DisplayName} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
+            }
+            else
+            {
+                AddWarning(warnings, $"No Loki execution evidence for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}' (not an acquired query-plan type; skipping evidence requirement).");
             }
             return;
         }

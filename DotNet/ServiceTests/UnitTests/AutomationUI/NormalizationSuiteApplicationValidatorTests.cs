@@ -26,6 +26,42 @@ public class NormalizationSuiteApplicationValidatorTests
     }
 
     [Fact]
+    public async Task RemoveExtensions_PatientNotInQueryPlan_SkipsLokiEvidenceRequirement()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildRemoveExtensionsSuite("Remove Common Extensions", "Patient");
+        var abs = new Dictionary<string, object>
+        {
+            ["patient.ndjson"] = "{\"resourceType\":\"Patient\",\"id\":\"p-1\"}\n"
+        };
+
+        await sut.ValidateAllAsync(abs, suite, [], acquiredResourceTypes: ["Encounter", "Observation"]);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l =>
+            l.Contains("not an acquired query-plan type", StringComparison.Ordinal)
+            && l.Contains("Patient", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RemoveExtensions_AcquiredTypeWithoutEvidence_StillFails()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildRemoveExtensionsSuite("Remove Common Extensions", "Observation");
+        var abs = new Dictionary<string, object>
+        {
+            ["patient.ndjson"] = "{\"resourceType\":\"Observation\",\"id\":\"obs-1\"}\n"
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ValidateAllAsync(abs, suite, [], acquiredResourceTypes: ["Encounter", "Observation"]));
+    }
+
+    [Fact]
     public async Task RemoveExtensions_SuccessEvidence_PassesWithoutScanningEveryResource()
     {
         var output = new CapturingOutput();
