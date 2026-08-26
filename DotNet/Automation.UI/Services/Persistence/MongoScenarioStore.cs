@@ -399,6 +399,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             IsSystemScenario = model.IsSystemScenario,
             ReportMethod = model.ReportMethod.ToString(),
             SelectedMeasures = model.SelectedMeasures.Select(m => m.ToString()).ToList(),
+            SelectedMeasureIds = model.SelectedMeasureIds.Select(id => id.ToString()).ToList(),
             Seed = model.Seed,
             PatientCount = model.PatientCount,
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
@@ -425,7 +426,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             UpdatedAt = model.UpdatedAt
         };
 
-    private static TestScenarioDefinition ToModel(TestScenarioDocument doc) => new()
+    private static TestScenarioDefinition ToModel(TestScenarioDocument doc)
+    {
+        var model = new TestScenarioDefinition
         {
             Id = doc.Id,
             Name = doc.Name,
@@ -436,6 +439,10 @@ public sealed class MongoScenarioStore : IScenarioStore
                 .Select(s => Enum.TryParse<ProfiledMeasureType>(s, true, out var m) ? m : (ProfiledMeasureType?)null)
                 .Where(m => m.HasValue)
                 .Select(m => m!.Value)
+                .ToList(),
+            SelectedMeasureIds = (doc.SelectedMeasureIds ?? [])
+                .Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty)
+                .Where(id => id != Guid.Empty)
                 .ToList(),
             Seed = doc.Seed,
             PatientCount = doc.PatientCount,
@@ -461,6 +468,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             ImportedPatientBundles = AttachBundleReferences(doc),
             UpdatedAt = doc.UpdatedAt
         };
+        model.NormalizeMeasureSelection();
+        return model;
+    }
 
     /// <summary>
     /// Attaches each external bundle id to its scenario input without loading raw bundle

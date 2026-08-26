@@ -59,4 +59,13 @@ public record ResolvedRunOptions(
     public int? TargetDurationSeconds { get; init; }
     public int? Concurrency { get; init; }
     public bool FailRunOnBenchmark { get; init; }
+
+    /// <summary>Measure template ids selected for this run (empty = use system templates for SelectedMeasures).</summary>
+    public List<Guid> SelectedMeasureIds { get; init; } = [];
+
+    /// <summary>
+    /// Inline FHIR measure-bundle JSON, one per selected template, in load order.
+    /// When empty, <see cref="ScenarioConfigBuilder"/> falls back to embedded resource:// locations.
+    /// </summary>
+    public List<string> MeasureBundleJsons { get; init; } = [];
 }

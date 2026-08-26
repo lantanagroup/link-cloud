@@ -173,6 +173,22 @@ public sealed class RunExportService : IRunExportService
             WriteSubHeader(sb, "Expected ABS totals (generated ∩ acquired ∩ CQL-referenced)");
             foreach (var (type, count) in manifest.ExpectedAbsTotalCountsByType.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
                 sb.AppendLine($"  {type,-32} {count,8:N0}");
+
+            sb.AppendLine();
+            WriteSubHeader(sb, "Per-patient prediction");
+            WriteKvp(sb, "Expected submitted patients",
+                manifest.ExpectedSubmittedPatientIds.Count == 0
+                    ? "(none)"
+                    : string.Join(", ", manifest.ExpectedSubmittedPatientIds));
+
+            foreach (var patientId in manifest.PatientIds)
+            {
+                manifest.PatientEligibility.TryGetValue(patientId, out var qualifying);
+                manifest.PatientInpatientPatterns.TryGetValue(patientId, out var pattern);
+                var expected = manifest.ExpectedSubmittedPatientIds.Contains(patientId);
+                sb.AppendLine(
+                    $"  {patientId}  expectedSubmitted={expected}  qualifying=[{string.Join(", ", qualifying ?? [])}]  pattern={pattern ?? "-"}");
+            }
         }
 
         sb.AppendLine();
@@ -187,6 +203,8 @@ public sealed class RunExportService : IRunExportService
             WriteKvp(sb, "Patient Count", abs.PatientIds.Count.ToString(CultureInfo.InvariantCulture));
             WriteKvp(sb, "Manifest Resource Count", abs.ManifestResourceCount.ToString("N0", CultureInfo.InvariantCulture));
             WriteKvp(sb, "Manifest Resource Types", string.Join(", ", abs.ManifestResourceTypes));
+            WriteKvp(sb, "ABS patient IDs",
+                abs.PatientIds.Count == 0 ? "(none)" : string.Join(", ", abs.PatientIds));
 
             sb.AppendLine();
             WriteSubHeader(sb, "ABS totals by resource type");
@@ -212,6 +230,46 @@ public sealed class RunExportService : IRunExportService
                 abs.TotalCountsByType.TryGetValue(type, out var actual);
                 var delta = actual - expected;
                 sb.AppendLine($"  {type,-32} {expected,10:N0} {actual,10:N0} {delta,+10:+#,0;-#,0;0}");
+            }
+
+            sb.AppendLine();
+            WriteSubHeader(sb, "Expected vs actual patient artifacts");
+            var expectedPatients = manifest.ExpectedSubmittedPatientIds;
+            var actualPatients = abs.PatientIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var patientId in expectedPatients)
+            {
+                var present = actualPatients.Contains(patientId);
+                sb.AppendLine($"  patient-{patientId}.ndjson  {(present ? "PRESENT" : "MISSING")}");
+            }
+
+            var unexpected = abs.PatientIds
+                .Where(id => !expectedPatients.Contains(id, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var patientId in unexpected)
+                sb.AppendLine($"  patient-{patientId}.ndjson  UNEXPECTED");
+
+            if (expectedPatients.Count > 0 && actualPatients.Count == 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("  NOTE: Predicted patients were omitted from ABS. Typical cause is MeasureEval");
+                sb.AppendLine("  Initial Population count=0 (ReportingStatus=NotReportable), which skips");
+                sb.AppendLine("  supplemental acquisition and does not write patient-*.ndjson.");
+            }
+        }
+
+        var entriesSnap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default);
+        var entries = entriesSnap?.Data;
+        if (entries is { Count: > 0 })
+        {
+            sb.AppendLine();
+            WriteSubHeader(sb, "Report entry status vs prediction");
+            foreach (var entry in entries)
+            {
+                var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
+                var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
+                sb.AppendLine(
+                    $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
+                    (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
             }
         }
 
@@ -287,7 +345,62 @@ public sealed class RunExportService : IRunExportService
                 da.StatusCounts, funnelCounts: null, da.ResourceTypeCounts, da.ThroughputBuckets, da.Errors);
 
         await AppendRawDomainAsync(sb, runId, "acquisitionSummary", "Raw acquisition summary", ct);
+        await AppendAcquisitionLogsAsync(sb, runId, ct);
+        await AppendOrgLocationAsync(sb, runId, ct);
         return sb.ToString();
+    }
+
+    private async Task AppendAcquisitionLogsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var snap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct);
+        var logs = snap?.Data;
+        if (logs is not { Count: > 0 })
+            return;
+
+        sb.AppendLine();
+        WriteSubHeader(sb, $"Acquisition logs ({logs.Count})");
+        foreach (var log in logs)
+        {
+            var types = string.Join(",", log.FhirQueries.SelectMany(q => q.ResourceTypes).Distinct());
+            sb.AppendLine(
+                $"  log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}] acquired={log.ResourceAcquiredIds.Count}");
+            foreach (var id in log.ResourceAcquiredIds.Take(8))
+                sb.AppendLine($"    {id}");
+            if (log.ResourceAcquiredIds.Count > 8)
+                sb.AppendLine($"    ... {log.ResourceAcquiredIds.Count - 8} more resource id(s)");
+        }
+    }
+
+    private async Task AppendOrgLocationAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var snap = await _snapshotStore.GetDomainAsync<StoreBackedServicePoller.OrgLocationSnapshot>(runId, "orgLocation", ct);
+        var data = snap?.Data;
+        if (data == null)
+            return;
+
+        sb.AppendLine();
+        WriteSubHeader(sb, "Org-location mapping (post-run)");
+        sb.AppendLine($"  Configurations           : {data.Configurations.Count} (active={data.Configurations.Count(c => c.IsActive)})");
+        sb.AppendLine($"  Location mappings        : {data.LocationMappings.Count} (IsOrgLocation={data.LocationMappings.Count(m => m.IsOrgLocation)})");
+        sb.AppendLine($"  Encounter mappings       : {data.EncounterMappings.Count} (MappedToOrg={data.EncounterMappings.Count(m => m.MappedToOrg)})");
+
+        foreach (var mapping in data.LocationMappings.Take(20))
+            sb.AppendLine($"    location={mapping.LocationId} active={mapping.IsActive} isOrgLocation={mapping.IsOrgLocation}");
+
+        foreach (var mapping in data.EncounterMappings.Take(20))
+        {
+            var locations = string.Join(",", mapping.EncounterLocations.Select(l => l.LocationId));
+            sb.AppendLine($"    encounter={mapping.EncounterId} patient={mapping.PatientId} mappedToOrg={mapping.MappedToOrg} locations=[{locations}]");
+        }
+
+        if (data.Configurations.Any(c => c.IsActive)
+            && data.EncounterMappings.Count > 0
+            && data.EncounterMappings.All(m => !m.MappedToOrg))
+        {
+            sb.AppendLine();
+            sb.AppendLine("  WARNING: no encounters MappedToOrg. Data Acquisition strips those encounters");
+            sb.AppendLine("  before MeasureEval, which yields empty Initial Population and no ABS patient files.");
+        }
     }
 
     private async Task<string> BuildValidationSectionAsync(

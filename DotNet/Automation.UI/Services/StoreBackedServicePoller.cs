@@ -41,6 +41,11 @@ public sealed class StoreBackedServicePoller
     public string ReportId => _meta.ReportId;
     public bool IsMetricsRun => _meta.IsMetricsRun;
 
+    public sealed record OrgLocationSnapshot(
+        List<PipelineDataReader.OrganizationLocationConfigurationInfo> Configurations,
+        List<PipelineDataReader.OrganizationLocationMappingInfo> LocationMappings,
+        List<PipelineDataReader.EncounterMappingInfo> EncounterMappings);
+
     public async Task RunAsync(CancellationToken ct)
     {
         if (!Guid.TryParse(_meta.ReportId, out var scheduleId))
@@ -97,6 +102,8 @@ public sealed class StoreBackedServicePoller
             PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, ct)),
             PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct)),
             PollDomainAsync("acquisitionSummary", () => PollAcquisitionAsync(ct)),
+            PollDomainAsync("acquisitionLogs", () => PollAcquisitionLogsAsync(ct)),
+            PollDomainAsync("orgLocation", () => PollOrgLocationAsync(ct)),
             PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)));
     }
 
@@ -180,6 +187,21 @@ public sealed class StoreBackedServicePoller
         // Always write � even when null � so stale data from a prior report
         // (e.g., before regeneration cleared snapshots) is overwritten.
         await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, ct);
+    }
+
+    private async Task PollAcquisitionLogsAsync(CancellationToken ct)
+    {
+        var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", logs, ct);
+    }
+
+    private async Task PollOrgLocationAsync(CancellationToken ct)
+    {
+        var snapshot = new OrgLocationSnapshot(
+            await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId),
+            await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId),
+            await _reader.GetEncounterMappingsAsync(_meta.FacilityId));
+        await _store.SetDomainAsync(_meta.RunId, "orgLocation", snapshot, ct);
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)

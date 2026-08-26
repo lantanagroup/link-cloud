@@ -16,6 +16,7 @@ public class RunsController(
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IPatientConfigurationStore patientConfigurationStore,
+    IMeasureTemplateStore measureTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     GeneratedTemplateCacheVersionStore templateCacheVersionStore,
@@ -45,6 +46,7 @@ public class RunsController(
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {

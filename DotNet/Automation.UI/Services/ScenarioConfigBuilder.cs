@@ -22,14 +22,18 @@ public static class ScenarioConfigBuilder
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
         };
 
-        var bundleLocations = options.SelectedMeasures
-            .Select(ProfiledMeasureCatalog.GetBundleLocation)
+        var inlineJsons = options.MeasureBundleJsons
+            .Where(j => !string.IsNullOrWhiteSpace(j))
             .ToList();
+        var bundleLocations = inlineJsons.Count > 0
+            ? []
+            : options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetBundleLocation).ToList();
 
         return new TestScenarioConfig
         {
             MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
             AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
+            MeasureBundleJsons = inlineJsons,
             StartDate = options.ReportPeriodStart.HasValue
                 ? options.ReportPeriodStart.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 : "2023-01-01T00:00:00Z",

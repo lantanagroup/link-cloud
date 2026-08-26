@@ -655,6 +655,7 @@ public sealed class GenerationManifest
             PatientCount = PatientIds.Count,
             TotalResourceCount = TotalResourceCount,
             PatientIds = PatientIds,
+            ExpectedSubmittedPatientIds = ExpectedSubmittedPatientIds(),
             SelectedMeasures = SelectedMeasures.Select(m => m.ToString()).ToList(),
             MeasureIds = MeasureIds,
             AcquiredResourceTypes = AcquiredResourceTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),

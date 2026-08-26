@@ -28,6 +28,10 @@ pipeline tests. It provides:
 1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
 2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
+2a. **Measure management** -- create, clone, and delete FHIR measure definitions. System
+   measures are seeded from embedded NHSN bundles and cannot be edited; custom measures
+   require an Automation generation type (ACH Monthly, ACH Daily, or Hypoglycemic) plus
+   a FHIR transaction bundle that MeasureEval will evaluate.
 3. **Organization Resource Map management** -- define reusable org-location matching templates
    (FHIRPath conditions) used to scope reporting to organization-relevant encounters/resources.
 4. **Normalization suite management** -- define reusable normalization operations,
@@ -35,7 +39,7 @@ pipeline tests. It provides:
 5. **Scenario execution** -- start, cancel, and delete runs.
 6. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
 7. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
-8. **Persistent run history** -- MongoDB-backed state across restarts.
+8. **Persistent run history** -- MongoDB-compatible state (native Mongo locally/Docker; Cosmos DB for MongoDB RU in deployed environments). All collections, indexes, and CRUD in this project stay within the Cosmos Mongo API subset.
 9. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
 10. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
@@ -51,6 +55,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 +-- Controllers/
 |   +-- RunsController          dashboard, run lifecycle, snapshot/log APIs
 |   +-- ScenariosController     inline CRUD for scenario templates
+|   +-- MeasuresController      inline CRUD for measure templates
 |   +-- QueryPlansController    inline CRUD for query plan templates
 |   +-- OrganizationResourceMapsController inline CRUD for org resource map templates
 |   +-- NormalizationsController inline CRUD for normalization operations/sequences/suites
@@ -62,6 +67,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- Runs/Details.cshtml     per-run live status, logs, pipeline snapshots, DA logs
 |   +-- Runs/Manifest.cshtml    Generation-Manifest deep dive (generated / predicted / actual)
 |   +-- Scenarios/Index.cshtml  scenario list (uses shared editor modal)
+|   +-- Measures/Index.cshtml   measure list + inline modal editor
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
 |   +-- OrganizationResourceMaps/Index.cshtml organization resource map template management
 |   +-- Normalizations/Index.cshtml normalization operations/sequences/suites management
@@ -171,7 +177,39 @@ the client side:
 - Uploaded bundle files are capped at 12 MB per file. Upload is content-addressed by hash,
   so identical JSON payloads reuse the same staged bundle record.
 
-### 3.3 `QueryPlansController`
+### 3.3 `MeasuresController`
+
+Manages FHIR measure definition templates used at run start (MeasureEval PUT + Validation
+artifacts). Same System vs Custom rules as query plans: system rows are seeded from
+`Automation/measures/*.json` and cannot be edited or deleted, only cloned.
+
+Each template has an **Automation generation type** — one of the three families Automation
+can generate and predict (ACH Monthly, ACH Daily, Hypoglycemic). The uploaded file is the
+bundle MeasureEval evaluates. Custom measures of an existing type can ship a newer CQL
+bundle; they cannot invent a new generation family.
+
+CRUD uses `Find` / `ReplaceOne` upsert / `DeleteOne` only, with non-unique indexes, so it
+is compatible with Cosmos DB for MongoDB RU (the deployed store). Bundles are stored inline
+and are well under the 2 MB Cosmos document limit.
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | Measure list page with inline modal editor. |
+| `GetJson` | GET | Return a single measure template as JSON. |
+| `GetDefaults` | GET | Return a new blank custom measure. |
+| `SaveInline` | POST | Create or update a custom measure (validates Measure+Library). |
+| `CloneInline` | POST | Clone a measure (clears `IsSystem`). |
+| `DeleteInline` | POST | Delete a non-system measure. |
+
+The scenario editor lists these templates instead of three hardcoded checkboxes. Legacy
+scenarios that only stored generation-family enums map onto the three system template ids
+on read.
+
+System ACH Monthly/Daily files currently remain `1.0.0-dev` (May 2025). Validation’s NHSN
+package is `2.0.0-cibuild` (January 2026). To evaluate that newer bundle, clone the system
+measure and upload the updated transaction Bundle. Hypoglycemic has no newer file in-repo.
+
+### 3.4 `QueryPlansController`
 
 Manages FHIR query plan templates that define which resource types are acquired during data
 acquisition. Follows the same inline editing pattern as Scenarios.
@@ -190,7 +228,7 @@ acquisition. Follows the same inline editing pattern as Scenarios.
 System query plans cannot be modified or deleted. The default query plan is used for new
 scenarios unless overridden.
 
-### 3.4 `NormalizationsController`
+### 3.5 `NormalizationsController`
 
 Manages reusable normalization definitions used by scenarios:
 
@@ -358,7 +396,8 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `Name` / `Description` | User-facing identification. |
 | `IsSystemScenario` | If `true`, seeded by the system and immutable. |
 | `ReportMethod` | `Adhoc`, `ScheduledReport`, or `RegenerateReport`. |
-| `SelectedMeasures` | Which profiled measures to test. |
+| `SelectedMeasures` | Generation families (ACH Monthly / Daily / Hypoglycemic) used for patient generation and prediction. |
+| `SelectedMeasureIds` | Measure template ids whose FHIR bundles are loaded into MeasureEval. Legacy documents with only `SelectedMeasures` map onto the three system template ids. |
 | `Seed` | Deterministic generation seed. |
 | `PatientCount` | Computed from cohorts plus imported patients (read-only on the editor). |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
@@ -424,7 +463,8 @@ UI scenario and the backend test produces equivalent FHIR input:
 
 | System scenario | Seed | Patients | Resources |
 |---|---:|---:|---:|
-| Adhoc Report Test | 20260326 | 1 | 1000 |
+| Adhoc Report Test (ACH Monthly) | 20260326 | 1 | 1000 |
+| Adhoc Report Daily ACH Test | 20260825 | 1 | 1000 |
 | Multi Patient Test | 20260328 | 150 | 25-50 |
 | Mega Patient Test | 20260327 | 1 | 5000 |
 | Mega Multi Patient Test | 20260330 | 150 | 5000 / 25-50 |
@@ -781,6 +821,7 @@ Collections:
 - `automation_imported_bundles` -- staged imported bundle payloads, metadata, and
   cross-scenario reference tracking.
 - `automation_query_plan_templates` -- query plan templates.
+- `automation_measure_templates` -- measure definitions (system + custom). Indexes are non-unique (`Name`, `GenerationFamily`, `IsSystem`) so they are safe on Cosmos DB for MongoDB RU.
 - `automation_normalization_operations` -- normalization operation definitions.
 - `automation_normalization_sequences` -- normalization sequence definitions.
 - `automation_normalization_suites` -- normalization suite definitions.

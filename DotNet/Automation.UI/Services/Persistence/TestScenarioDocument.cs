@@ -24,6 +24,12 @@ public sealed class TestScenarioDocument
     public string ReportMethod { get; set; } = "Adhoc";
     public List<string> SelectedMeasures { get; set; } = [];
 
+    /// <summary>
+    /// Measure template ids as strings (Cosmos-safe; same representation as other Guid keys).
+    /// Empty on documents written before measure templates existed.
+    /// </summary>
+    public List<string> SelectedMeasureIds { get; set; } = [];
+
     public int Seed { get; set; }
     public int PatientCount { get; set; }
     public int ResourcesPerPatientMin { get; set; }

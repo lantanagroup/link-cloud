@@ -401,27 +401,7 @@ public class PipelineSummarySnapshotBuilder
             .ToList();
     }
 
-    private static bool IsErrorLike(string line)
-    {
-        if (string.IsNullOrWhiteSpace(line))
-            return false;
-
-        // Diagnostic rollup lines are telemetry, not errors.
-        if (line.Contains("[DIAG]", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        // Aggregate counters like ERROR=140 are summaries, not individual error events.
-        if (Regex.IsMatch(line, @"\b(ERROR|WARNING|INFO|FATAL)=\d+\b", RegexOptions.IgnoreCase))
-            return false;
-
-        // User intent: only actual exception logging from Loki should drive these views.
-        return line.Contains("exception", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("unhandled", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("stacktrace", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("caused by", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("System.", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("java.", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsErrorLike(string line) => LokiLogLineParser.IsErrorLike(line);
 
     private static List<LokiErrorEntry> ParseLokiErrorEntries(IReadOnlyList<string> logs)
     {
@@ -481,7 +461,8 @@ public class PipelineSummarySnapshotBuilder
     private static string MapServiceName(string component)
     {
         if (string.Equals(component, LokiScraper.Components.DataAcquisition, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorker, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorker, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorkerDev, StringComparison.OrdinalIgnoreCase))
             return "Data Acquisition";
 
         if (string.Equals(component, LokiScraper.Components.MeasureEval, StringComparison.OrdinalIgnoreCase))
@@ -504,6 +485,9 @@ public class PipelineSummarySnapshotBuilder
 
         if (string.Equals(component, LokiScraper.Components.Tenant, StringComparison.OrdinalIgnoreCase))
             return "Tenant";
+
+        if (string.Equals(component, LokiScraper.Components.Census, StringComparison.OrdinalIgnoreCase))
+            return "Census";
 
         return component;
     }

@@ -37,6 +37,7 @@ public sealed class MongoIndexManager
         EnsureImportedBundleIndexes();
         EnsureGeneratedTemplateCacheVersionIndexes();
         EnsureQueryPlanTemplateIndexes();
+        EnsureMeasureTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
         EnsurePatientConfigurationIndexes();
@@ -185,6 +186,14 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    private void EnsureMeasureTemplateIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_measure_templates");
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "GenerationFamily", 1 } }, unique: false, "idx_generationFamily");
+        CreateIndexSafe(collection, new BsonDocument { { "IsSystem", 1 } }, unique: false, "idx_isSystem");
     }
 
     private void EnsurePatientConfigurationIndexes()

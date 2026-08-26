@@ -15,6 +15,7 @@
     var normalizationSuites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
     var organizationResourceMaps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
     var patientConfigurations = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
+    var measureTemplates = (List<MeasureTemplate>?)ViewBag.MeasureTemplates ?? [];
     var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
     var scheduledPatternOptions = Enum.GetValues<ScheduledInpatientPattern>()
         .Select(p =>
@@ -87,18 +88,33 @@
                         </div>
                         <div class="col-md-8">
                             <label class="form-label">Measures</label>
-                            <div class="form-check">
-                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_monthly" value="NhsnAcuteCareHospitalMonthlyInitialPopulation" checked />
-                                <label class="form-check-label" for="measure_monthly">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_daily" value="NhsnAcuteCareHospitalDailyInitialPopulation" />
-                                <label class="form-check-label" for="measure_daily">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_hypo" value="NhsnGlycemicControlHypoglycemicInitialPopulation" />
-                                <label class="form-check-label" for="measure_hypo">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)</label>
-                            </div>
+                            @if (measureTemplates.Count == 0)
+                            {
+                                <div class="small text-muted">No measures are available yet. Add them under Configurations → Measures.</div>
+                            }
+                            @foreach (var mt in measureTemplates)
+                            {
+                                var cbId = "measure_" + mt.Id.ToString("N");
+                                var isDefaultMonthly = mt.IsSystem && mt.GenerationFamily == ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation;
+                                <div class="form-check">
+                                    <input class="form-check-input measure-checkbox" type="checkbox" id="@cbId"
+                                           value="@mt.Id"
+                                           data-family="@mt.GenerationFamily"
+                                           data-is-system="@(mt.IsSystem ? "true" : "false")"
+                                           @(isDefaultMonthly ? "checked" : null) />
+                                    <label class="form-check-label" for="@cbId">
+                                        @mt.Name
+                                        @if (mt.IsSystem)
+                                        {
+                                            <span class="badge bg-dark ms-1">System</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(mt.Version))
+                                        {
+                                            <small class="text-muted">@mt.Version</small>
+                                        }
+                                    </label>
+                                </div>
+                            }
                         </div>
                         <div class="col-md-4">
                             <label class="form-label" for="QueryPlanTemplate">Query Plan</label>
@@ -859,7 +875,21 @@
         }
 
         // ---- Measure helpers ----
-        function selectedMeasureTypes() { return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; }); }
+        function selectedMeasureTypes() {
+            var seen = {};
+            var out = [];
+            document.querySelectorAll('.measure-checkbox:checked').forEach(function (cb) {
+                var family = cb.getAttribute('data-family') || cb.value;
+                if (!seen[family]) { seen[family] = true; out.push(family); }
+            });
+            return out;
+        }
+        function selectedMeasureIds() {
+            return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; });
+        }
+        function measureCheckboxForFamily(family) {
+            return document.querySelector('.measure-checkbox[data-family="' + family + '"]');
+        }
         function sid(v) { return String(v || '').toLowerCase(); }
 
         function defaultElig(isQ) {
@@ -968,7 +998,7 @@
             var sel = selectedMeasureTypes();
             if (!sel.length) return '<span class="text-muted small">Select measures</span>';
             return sel.map(function (m) {
-                var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+                var cb = measureCheckboxForFamily(m);
                 var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
                 var cur = (Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING);
                 return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
@@ -1536,7 +1566,7 @@
             var sel = selectedMeasureTypes();
             if (!sel.length) return '<span class="text-muted small">Select measures</span>';
             return sel.map(function (m) {
-                var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+                var cb = measureCheckboxForFamily(m);
                 var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
                 var cur = (elig && Object.prototype.hasOwnProperty.call(elig, m)) ? elig[m] : NON_QUALIFYING;
                 return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input imp-elig" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
@@ -1944,6 +1974,7 @@
                 isSystemScenario: false,
                 reportMethod: document.getElementById('ReportMethod').value,
                 selectedMeasures: selectedMeasureTypes(),
+                selectedMeasureIds: selectedMeasureIds(),
                 seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
                 // Submit the cohort-only sum (NOT the displayed total). The runtime uses
                 // patientCount as a fallback cohort-generation target when no cohorts are
@@ -2008,8 +2039,18 @@
             if (data.organizationResourceMapTemplateId) orm.value = data.organizationResourceMapTemplateId;
             else selectDefaultOrganizationResourceMap();
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-            var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
-            (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
+            var ids = data.selectedMeasureIds || [];
+            if (ids.length) {
+                ids.forEach(function (id) {
+                    var cb = document.querySelector('.measure-checkbox[value="' + id + '"]');
+                    if (cb) cb.checked = true;
+                });
+            } else {
+                (data.selectedMeasures || []).forEach(function (m) {
+                    var cb = measureCheckboxForFamily(String(m));
+                    if (cb) cb.checked = true;
+                });
+            }
             cohortRows.innerHTML = '';
             if (data.patientCohorts && data.patientCohorts.length > 0) {
                 data.patientCohorts.forEach(function (c) {
@@ -2120,7 +2161,9 @@
                 selectDefaultNormalizationSuite();
                 selectDefaultOrganizationResourceMap();
                 document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-                document.getElementById('measure_monthly').checked = true;
+                var defaultMonthly = document.querySelector('.measure-checkbox[data-family="NhsnAcuteCareHospitalMonthlyInitialPopulation"][data-is-system="true"]')
+                    || document.querySelector('.measure-checkbox[data-family="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
+                if (defaultMonthly) defaultMonthly.checked = true;
                 cohortRows.innerHTML = '';
                 addDefault(10, true, 50, 100);
                 importedRows.innerHTML = '';

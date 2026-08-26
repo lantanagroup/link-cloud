@@ -28,8 +28,27 @@ public class TestScenarioDefinition
     /// <summary>How the report is triggered.</summary>
     public ReportMethod ReportMethod { get; set; } = ReportMethod.Adhoc;
 
-    /// <summary>Selected measures for the run.</summary>
+    /// <summary>
+    /// Generation families selected for the run (ACH Monthly / Daily / Hypoglycemic).
+    /// Derived from <see cref="SelectedMeasureIds"/> when templates are resolved.
+    /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
+
+    /// <summary>
+    /// Measure template ids selected in the scenario editor. Empty on legacy documents;
+    /// <see cref="NormalizeMeasureSelection"/> maps families onto the system template ids.
+    /// </summary>
+    public List<Guid> SelectedMeasureIds { get; set; } = [];
+
+    /// <summary>
+    /// Fills <see cref="SelectedMeasureIds"/> from <see cref="SelectedMeasures"/> when the
+    /// saved document predates templates (enum-only selection).
+    /// </summary>
+    public void NormalizeMeasureSelection()
+    {
+        if (SelectedMeasureIds.Count == 0 && SelectedMeasures.Count > 0)
+            SelectedMeasureIds = MeasureTemplateCatalog.SystemIdsFor(SelectedMeasures);
+    }
 
     // ----- Patient Pool -----
 

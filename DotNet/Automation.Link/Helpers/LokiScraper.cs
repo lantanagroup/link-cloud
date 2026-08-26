@@ -36,22 +36,30 @@ public class LokiScraper
         public const string Report = "Report";
         public const string DataAcquisition = "DataAcquisition";
         public const string DataAcquisitionWorker = "DataAcquisition.AcquisitionWorker";
+        /// <summary>
+        /// Development appsettings label for the acquisition worker. Docker/prod uses
+        /// <see cref="DataAcquisitionWorker"/>.
+        /// </summary>
+        public const string DataAcquisitionWorkerDev = "DataAcquisitionWorker";
         public const string Submission = "Submission";
         public const string QueryDispatch = "QueryDispatch";
         public const string Tenant = "Tenant";
+        public const string Census = "Census";
     }
 
     private static readonly string[] AllServices =
     [
         Components.DataAcquisition,
         Components.DataAcquisitionWorker,
+        Components.DataAcquisitionWorkerDev,
         Components.QueryDispatch,
         Components.Normalization,
         Components.MeasureEval,
         Components.Validation,
         Components.Report,
         Components.Submission,
-        Components.Tenant
+        Components.Tenant,
+        Components.Census
     ];
 
     private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException|UQ_LocationMapping_Facility_Location|Cannot insert duplicate key row in object 'dbo.OrganizationLocationMapping'";
@@ -116,7 +124,7 @@ public class LokiScraper
                                 var logLine = value[1]?.ToString();
                                 if (logLine != null)
                                 {
-                                    lines.Add(FormatLogLine(logLine, 0));
+                                    lines.Add(LokiLogLineParser.FormatLogLine(logLine, 0));
                                 }
                             }
                         }
@@ -381,7 +389,7 @@ public class LokiScraper
                             var logLine = value[1]?.ToString();
                             if (logLine == null) continue;
 
-                            var formatted = FormatLogLine(logLine, truncateLength);
+                            var formatted = LokiLogLineParser.FormatLogLine(logLine, truncateLength);
 
                             // Dedupe on the summary portion only (before |||)
                             var delimIdx = formatted.IndexOf("|||", StringComparison.Ordinal);
@@ -418,80 +426,6 @@ public class LokiScraper
     }
 
     /// <summary>
-    /// Attempts to parse a structured JSON log line and extract both a concise
-    /// summary and the full detail (including stack traces). The two parts are
-    /// separated by <c>|||</c> so downstream consumers can display the summary
-    /// as a header and the detail on expand.
-    /// Falls back to the raw line if it's not JSON.
-    /// </summary>
-    private static string FormatLogLine(string logLine, int truncateLength)
-    {
-        // Try to parse as JSON and extract key fields
-        if (logLine.TrimStart().StartsWith("{"))
-        {
-            try
-            {
-                var obj = JObject.Parse(logLine);
-
-                var level = obj["level"]?.ToString() ?? "";
-                var message = obj["Message"]?.ToString() ?? obj["message"]?.ToString() ?? "";
-
-                // Extract exception info if present
-                var exType = obj["Exception"]?["Type"]?.ToString()
-                    ?? obj["ExceptionDetail"]?["Type"]?.ToString();
-                var exMessage = obj["Exception"]?["Message"]?.ToString()
-                    ?? obj["ExceptionDetail"]?["Message"]?.ToString();
-                var exStackTrace = obj["Exception"]?["StackTrace"]?.ToString()
-                    ?? obj["ExceptionDetail"]?["StackTrace"]?.ToString()
-                    ?? obj["Exception"]?["StackTraceString"]?.ToString();
-                var innerException = obj["Exception"]?["InnerException"]?.ToString()
-                    ?? obj["ExceptionDetail"]?["InnerException"]?.ToString();
-
-                // Build short summary for log display and dedupe
-                var summaryParts = new List<string>();
-                if (!string.IsNullOrEmpty(level))
-                    summaryParts.Add(level.ToUpper());
-                if (!string.IsNullOrEmpty(message))
-                    summaryParts.Add(message.Length > 200 ? message[..200] + "..." : message);
-                if (!string.IsNullOrEmpty(exType))
-                    summaryParts.Add($"{exType}: {(exMessage?.Length > 150 ? exMessage[..150] + "..." : exMessage)}");
-
-                var summary = summaryParts.Count > 0 ? string.Join(" | ", summaryParts) : "";
-
-                // Build full detail for expand view
-                var detailParts = new List<string>();
-                if (!string.IsNullOrEmpty(message))
-                    detailParts.Add($"Message: {message}");
-                if (!string.IsNullOrEmpty(exType))
-                    detailParts.Add($"Exception: {exType}");
-                if (!string.IsNullOrEmpty(exMessage))
-                    detailParts.Add($"Detail: {exMessage}");
-                if (!string.IsNullOrEmpty(exStackTrace))
-                    detailParts.Add($"Stack Trace:\n{exStackTrace}");
-                if (!string.IsNullOrEmpty(innerException))
-                    detailParts.Add($"Inner Exception:\n{innerException}");
-
-                var detail = detailParts.Count > 0 ? string.Join("\n\n", detailParts) : "";
-
-                if (!string.IsNullOrEmpty(summary))
-                {
-                    return string.IsNullOrEmpty(detail) || detail == summary
-                        ? summary
-                        : $"{summary}|||{detail}";
-                }
-            }
-            catch
-            {
-                // Not valid JSON, fall through to raw truncation
-            }
-        }
-
-        // Non-JSON or parse failure: truncate raw line
-        var maxLen = truncateLength > 0 ? truncateLength : 500;
-        return logLine.Length > maxLen ? logLine[..maxLen] + "..." : logLine;
-    }
-
-    /// <summary>
     /// Queries MeasureEval's recent logs to determine processing activity.
     /// Returns a summary string or null if no activity is detected.
     /// </summary>
@@ -502,8 +436,10 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        // Query for all MeasureEval consuming lines (these are DEBUG level)
-        var query = $"{{app=\"link-cloud\", component=\"{Components.MeasureEval}\"}} |= \"Consuming\"";
+        // MeasureEval is Java/logback at INFO. Per-resource "Consuming RESOURCE=[...]" lines no longer exist.
+        // Current INFO markers: Bulk upsert complete, Normalized-to-MeasureReportGenerated, Cache empty,
+        // Compiling measure. DEBUG still emits MESSAGE RECEIVED / EVALUATING MEASURES when enabled.
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.MeasureEval}\"}} |~ \"(?i)(Bulk upsert complete|Normalized-to-MeasureReportGenerated|Cache empty for correlationId|Compiling measure|Measure evaluation failed|MESSAGE RECEIVED|EVALUATING MEASURES|Consuming)\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
@@ -514,8 +450,8 @@ public class LokiScraper
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null) return null;
 
-            var patients = new HashSet<string>();
-            var resourceCount = 0;
+            var patients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var logCount = 0;
             long maxOffset = 0;
 
             foreach (var result in results)
@@ -528,52 +464,25 @@ public class LokiScraper
                     var logLine = value[1]?.ToString();
                     if (logLine == null) continue;
 
-                    resourceCount++;
+                    logCount++;
+                    TryExtractKafkaOffset(logLine, ref maxOffset);
 
-                    // Extract Kafka offset from "ResourceNormalized-1@14612"
-                    var atIdx = logLine.IndexOf('@');
-                    if (atIdx > 0)
-                    {
-                        var colonIdx = logLine.IndexOf(':', atIdx);
-                        if (colonIdx < 0) colonIdx = logLine.IndexOf(' ', atIdx);
-                        if (colonIdx > atIdx)
-                        {
-                            var offsetStr = logLine.Substring(atIdx + 1, colonIdx - atIdx - 1);
-                            if (long.TryParse(offsetStr, out var offset) && offset > maxOffset)
-                                maxOffset = offset;
-                        }
-                    }
-
-                    // Extract patient ID from "RESOURCE=[Type/MegaPatient-003-...]"
-                    var resIdx = logLine.IndexOf("RESOURCE=[", StringComparison.Ordinal);
-                    if (resIdx >= 0)
-                    {
-                        var slashIdx = logLine.IndexOf('/', resIdx + 10);
-                        var endBracket = logLine.IndexOf(']', resIdx + 10);
-                        if (slashIdx > 0 && endBracket > slashIdx)
-                        {
-                            var resourceId = logLine.Substring(slashIdx + 1, endBracket - slashIdx - 1);
-                            // Extract patient prefix: "MegaPatient-003-Observation-01234" -> "MegaPatient-003"
-                            var parts = resourceId.Split('-');
-                            if (parts.Length >= 2)
-                            {
-                                patients.Add($"{parts[0]}-{parts[1]}");
-                            }
-                        }
-                    }
+                    foreach (var patient in ExtractLabeledValues(logLine, "PATIENT=", "patient=", "patient "))
+                        patients.Add(patient);
                 }
             }
 
-            if (resourceCount == 0)
+            if (logCount == 0)
                 return null;
 
             var patientList = patients.Count > 0
-                ? string.Join(", ", patients.OrderBy(p => p))
+                ? string.Join(", ", patients.OrderBy(p => p).Take(5))
                 : "unknown";
+            var extra = patients.Count > 5 ? $" (+{patients.Count - 5} more)" : "";
 
             var offsetInfo = maxOffset > 0 ? $", offset {maxOffset}" : "";
 
-            return $"evaluating {patientList} ({resourceCount} resources in last {lookback.TotalSeconds:F0}s{offsetInfo})";
+            return $"evaluating {patientList}{extra} ({logCount} log lines in last {lookback.TotalSeconds:F0}s{offsetInfo})";
         }
         catch
         {
@@ -591,7 +500,7 @@ public class LokiScraper
         var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
             ? $" |= \"{facilityId}\""
             : "";
-        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical|error|Failed to process event)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
         var lines = new List<string>();
 
@@ -616,7 +525,7 @@ public class LokiScraper
                     var logLine = value[1]?.ToString();
                     if (string.IsNullOrWhiteSpace(logLine)) continue;
 
-                    var formatted = FormatLogLine(logLine, 220);
+                    var formatted = LokiLogLineParser.FormatLogLine(logLine, 220);
                     if (!lines.Contains(formatted))
                         lines.Add(formatted);
                 }
@@ -637,8 +546,9 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        // Focus on ReadyForValidation processing lines emitted by the consumer.
-        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
+        // ReadyForValidation "Processing ... patient ... report" is DEBUG (not shipped at Loki INFO).
+        // Current INFO/ERROR markers: Pre-qual skip, retrieve failures, ValidationComplete produce failures.
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |~ \"(?i)(Processing .+patient|Validation completed|Failed to send ValidationComplete|Unexpected error while retrieving|Pre-qual OperationOutcome)\" !~ \"(?i)({HarmlessPatterns})\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
@@ -702,7 +612,7 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Normalization}\"}} |~ \"(?i)(\\[NormalizationExecutionSummary\\]|Normalization Operation Failed|Failed to produce ResourceNormalized|ResourceNormalized|Producing|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
@@ -732,19 +642,10 @@ public class LokiScraper
                     if (logLine.Contains("Normalization Operation Failed", StringComparison.OrdinalIgnoreCase))
                         failedOps++;
 
-                    // Extract FHIR resource type from "FhirResourceType: Observation" or similar patterns
-                    var typeMarker = "FhirResourceType:";
-                    var typeIdx = logLine.IndexOf(typeMarker, StringComparison.OrdinalIgnoreCase);
-                    if (typeIdx >= 0)
+                    if (TryExtractResourceType(logLine, out var resourceType))
                     {
-                        var tail = logLine[(typeIdx + typeMarker.Length)..].TrimStart();
-                        var endIdx = tail.IndexOfAny([',', ' ', ';', '"', ')']);
-                        var resourceType = endIdx > 0 ? tail[..endIdx] : tail;
-                        if (!string.IsNullOrWhiteSpace(resourceType) && resourceType.Length <= 40)
-                        {
-                            resourceTypes.TryGetValue(resourceType, out var count);
-                            resourceTypes[resourceType] = count + 1;
-                        }
+                        resourceTypes.TryGetValue(resourceType, out var count);
+                        resourceTypes[resourceType] = count + 1;
                     }
                 }
             }
@@ -770,6 +671,72 @@ public class LokiScraper
         {
             return null;
         }
+    }
+
+    private static void TryExtractKafkaOffset(string logLine, ref long maxOffset)
+    {
+        var atIdx = logLine.IndexOf('@');
+        if (atIdx <= 0)
+            return;
+
+        var colonIdx = logLine.IndexOf(':', atIdx);
+        if (colonIdx < 0) colonIdx = logLine.IndexOf(' ', atIdx);
+        if (colonIdx <= atIdx)
+            return;
+
+        var offsetStr = logLine.Substring(atIdx + 1, colonIdx - atIdx - 1);
+        if (long.TryParse(offsetStr, out var offset) && offset > maxOffset)
+            maxOffset = offset;
+    }
+
+    private static IEnumerable<string> ExtractLabeledValues(string logLine, params string[] markers)
+    {
+        foreach (var marker in markers)
+        {
+            var idx = 0;
+            while (idx >= 0)
+            {
+                idx = logLine.IndexOf(marker, idx, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0)
+                    break;
+
+                var start = idx + marker.Length;
+                if (start < logLine.Length && logLine[start] == '[')
+                    start++;
+
+                var end = start;
+                while (end < logLine.Length && logLine[end] is not (',' or ';' or ']' or ')' or '"' or ' ' or '}'))
+                    end++;
+
+                var value = logLine[start..end].Trim();
+                if (!string.IsNullOrWhiteSpace(value) && value.Length <= 80 && value != "unknown")
+                    yield return value;
+
+                idx = start;
+            }
+        }
+    }
+
+    private static bool TryExtractResourceType(string logLine, out string resourceType)
+    {
+        foreach (var marker in new[] { "ResourceType=", "FhirResourceType=", "FhirResourceType:" })
+        {
+            var typeIdx = logLine.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (typeIdx < 0)
+                continue;
+
+            var tail = logLine[(typeIdx + marker.Length)..].TrimStart();
+            var endIdx = tail.IndexOfAny([',', ' ', ';', '"', ')', ']']);
+            var value = endIdx > 0 ? tail[..endIdx] : tail;
+            if (!string.IsNullOrWhiteSpace(value) && value.Length <= 40)
+            {
+                resourceType = value;
+                return true;
+            }
+        }
+
+        resourceType = "";
+        return false;
     }
 
     private async Task<(HttpStatusCode StatusCode, string? Content)> ExecuteQueryRangeAsync(

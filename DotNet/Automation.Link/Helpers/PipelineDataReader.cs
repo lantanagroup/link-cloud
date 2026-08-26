@@ -391,7 +391,7 @@ public class PipelineDataReader
     public async Task<List<QueryPlanInfo>> GetQueryPlansAsync(string facilityId)
     {
         var list = new List<QueryPlanInfo>();
-        foreach (var type in new[] { "Discharge", "Monthly" })
+        foreach (var type in new[] { "Discharge", "Daily", "Monthly", "Weekly" })
         {
             var response = await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
             if (response.IsSuccessStatusCode)

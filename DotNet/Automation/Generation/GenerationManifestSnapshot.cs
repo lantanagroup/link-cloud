@@ -12,6 +12,12 @@ public sealed class GenerationManifestSnapshot
     /// <summary>Ordered patient IDs.</summary>
     public IReadOnlyList<string> PatientIds { get; init; } = [];
 
+    /// <summary>
+    /// Patient IDs predicted to be submitted (qualify for at least one selected measure
+    /// and are included by cohort/inpatient-pattern rules).
+    /// </summary>
+    public IReadOnlyList<string> ExpectedSubmittedPatientIds { get; init; } = [];
+
     /// <summary>Selected measure type names.</summary>
     public IReadOnlyList<string> SelectedMeasures { get; init; } = [];
 

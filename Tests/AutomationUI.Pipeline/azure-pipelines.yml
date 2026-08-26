@@ -7,7 +7,8 @@
 #
 #  Supported suites (selectable via pipeline parameters):
 #    - API Stability Suite          -> POST /api/api-health-runs/start-all-for-pipeline
-#    - Ad Hoc Report Generation     -> system scenario "Adhoc Report Test"
+#    - Ad Hoc Report Generation     -> system scenario "Adhoc Report Test" (ACH Monthly)
+#    - Ad Hoc Daily ACH Report      -> system scenario "Adhoc Report Daily ACH Test"
 #    - Ad Hoc Report Re-generation  -> system scenario "Regenerate Report Test"
 #    - Scheduled Report Generation  -> system scenario "Scheduled Report Test"
 #
@@ -28,7 +29,7 @@
 #         c. Extend Normalize-EnvironmentName if the name needs aliasing.
 #
 #  2. Which suites to run
-#     - Four boolean parameters control the suites. Defaults are all true.
+#     - Five boolean parameters control the suites. Defaults are all true.
 #     - Uncheck any suite you want to skip for a particular run.
 #
 #  3. Scheduling
@@ -99,6 +100,11 @@ parameters:
     type: boolean
     default: true
 
+  - name: runAdHocDailyAchReportSuite
+    displayName: "Run Ad Hoc Daily ACH Report Generation Suite"
+    type: boolean
+    default: true
+
   - name: runRegenerateReportSuite
     displayName: "Run Ad Hoc Report Re-generation Suite"
     type: boolean
@@ -134,9 +140,10 @@ variables:
 
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
-  SCENARIO_ID_AdHocReport:       "00000000-0000-0000-0000-000000000001"
-  SCENARIO_ID_ScheduledReport:   "00000000-0000-0000-0000-000000000004"
-  SCENARIO_ID_RegenerateReport:  "00000000-0000-0000-0000-000000000005"
+  SCENARIO_ID_AdHocReport:            "00000000-0000-0000-0000-000000000001"
+  SCENARIO_ID_AdHocDailyAchReport:    "00000000-0000-0000-0000-000000000009"
+  SCENARIO_ID_ScheduledReport:        "00000000-0000-0000-0000-000000000004"
+  SCENARIO_ID_RegenerateReport:       "00000000-0000-0000-0000-000000000005"
 
   # Slack webhook is fetched at runtime from Azure App Configuration so the
   # value never lives in source. Key 'Automation:SlackWebhookUrl' (label
@@ -200,6 +207,7 @@ stages:
 
                 # Surface the deterministic scenario IDs so later steps can use them
                 Write-Host "##vso[task.setvariable variable=SCENARIO_ID_AdHocReport]$(SCENARIO_ID_AdHocReport)"
+                Write-Host "##vso[task.setvariable variable=SCENARIO_ID_AdHocDailyAchReport]$(SCENARIO_ID_AdHocDailyAchReport)"
                 Write-Host "##vso[task.setvariable variable=SCENARIO_ID_ScheduledReport]$(SCENARIO_ID_ScheduledReport)"
                 Write-Host "##vso[task.setvariable variable=SCENARIO_ID_RegenerateReport]$(SCENARIO_ID_RegenerateReport)"
 
@@ -289,6 +297,7 @@ stages:
                 Write-Host "Requested suites:"
                 Write-Host "  API Stability          : ${{ parameters.runApiStabilitySuite }}"
                 Write-Host "  Ad Hoc Report          : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Ad Hoc Daily ACH Report: ${{ parameters.runAdHocDailyAchReportSuite }}"
                 Write-Host "  Regenerate Report      : ${{ parameters.runRegenerateReportSuite }}"
                 Write-Host "  Scheduled Report       : ${{ parameters.runScheduledReportSuite }}"
 
@@ -501,6 +510,16 @@ stages:
                     Name     = "Ad Hoc Report Generation Suite"
                     Type     = "Scenario"
                     ScenarioId = "$(SCENARIO_ID_AdHocReport)"
+                    StartPath  = "/api/runs/start"
+                    StatusPathTemplate = "/api/runs/{0}/status"
+                    DetailsPathTemplate = "/Runs/Details/{0}"
+                  }
+                }
+                if ("${{ parameters.runAdHocDailyAchReportSuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "Ad Hoc Daily ACH Report Generation Suite"
+                    Type     = "Scenario"
+                    ScenarioId = "$(SCENARIO_ID_AdHocDailyAchReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
                     DetailsPathTemplate = "/Runs/Details/{0}"
@@ -855,10 +874,11 @@ stages:
                 Write-Host "Skipped     : $env:SKIP_RUN"
                 Write-Host ""
                 Write-Host "Suite flags:"
-                Write-Host "  API Stability     : ${{ parameters.runApiStabilitySuite }}"
-                Write-Host "  Ad Hoc Report     : ${{ parameters.runAdHocReportSuite }}"
-                Write-Host "  Regenerate Report : ${{ parameters.runRegenerateReportSuite }}"
-                Write-Host "  Scheduled Report  : ${{ parameters.runScheduledReportSuite }}"
+                Write-Host "  API Stability          : ${{ parameters.runApiStabilitySuite }}"
+                Write-Host "  Ad Hoc Report          : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Ad Hoc Daily ACH Report: ${{ parameters.runAdHocDailyAchReportSuite }}"
+                Write-Host "  Regenerate Report      : ${{ parameters.runRegenerateReportSuite }}"
+                Write-Host "  Scheduled Report       : ${{ parameters.runScheduledReportSuite }}"
                 Write-Host ""
 
                 $resultsJson = $env:SUITE_RESULTS_JSON

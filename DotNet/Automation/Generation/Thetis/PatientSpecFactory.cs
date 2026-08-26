@@ -92,6 +92,7 @@ public static class PatientSpecFactory
         return new PatientGenerationSpec
         {
             EncounterClass = inpatient ? "IMP" : "AMB",
+            EncounterType = inpatient ? "32485007" : null,
             EncounterStatus = "finished",
             LocationIdVar = LocationIdVar,
             DischargeDisposition = string.IsNullOrWhiteSpace(scenario.DischargeDispositionCode)
@@ -188,9 +189,15 @@ public static class PatientSpecFactory
         if (string.Equals(encounterStatus, "in-progress", StringComparison.OrdinalIgnoreCase))
             includeHospitalization = false;
 
+        var inpatientClass = encounterClass.Equals("IMP", StringComparison.OrdinalIgnoreCase)
+            || encounterClass.Equals("ACUTE", StringComparison.OrdinalIgnoreCase)
+            || encounterClass.Equals("NONAC", StringComparison.OrdinalIgnoreCase)
+            || encounterClass.Equals("SS", StringComparison.OrdinalIgnoreCase);
+
         return new PatientGenerationSpec
         {
             EncounterClass = encounterClass,
+            EncounterType = inpatientClass ? (spec.EncounterType ?? "32485007") : spec.EncounterType,
             EncounterStatus = encounterStatus,
             DurationMinutes = intent.DurationMinutes ?? spec.DurationMinutes,
             LocationIdVar = spec.LocationIdVar,

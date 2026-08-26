@@ -32,6 +32,7 @@ public class PatientSpecFactoryIntentTests
 
         Assert.Equal(scenario.PrimaryDxSnomed, withNull.PrimaryConditionSnomed);
         Assert.Equal("IMP", withNull.EncounterClass);
+        Assert.Equal("32485007", withNull.EncounterType);
         Assert.Equal(withNull.PrimaryConditionSnomed, explicitEmpty.PrimaryConditionSnomed);
         Assert.Equal(withNull.ObservationCount, explicitEmpty.ObservationCount);
         Assert.Equal(withNull.DischargeDisposition, explicitEmpty.DischargeDisposition);

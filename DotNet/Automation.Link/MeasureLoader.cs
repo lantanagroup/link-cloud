@@ -45,8 +45,13 @@ public class MeasureLoader
         _resourceAssembly = resourceAssembly;
     }
 
+    private string? _inlineBundleJson;
+
     private async Task<string> GetMeasureBundleJsonAsync()
     {
+        if (!string.IsNullOrWhiteSpace(_inlineBundleJson))
+            return _inlineBundleJson;
+
         if (_config.MeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
             var filePath = _config.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
@@ -282,6 +287,28 @@ public class MeasureLoader
     /// </summary>
     public async Task LoadAllAsync()
     {
+        if (_config.MeasureBundleJsons.Count > 0)
+        {
+            foreach (var json in _config.MeasureBundleJsons)
+            {
+                if (string.IsNullOrWhiteSpace(json))
+                    continue;
+
+                _inlineBundleJson = json;
+                _output.WriteLine($"Loading inline measure bundle [{MeasureIds.Count + 1}/{_config.MeasureBundleJsons.Count}]");
+                await LoadAsync();
+                if (MeasureId != null && !MeasureIds.Contains(MeasureId))
+                    MeasureIds.Add(MeasureId);
+            }
+
+            _inlineBundleJson = null;
+            MeasureId = MeasureIds.Count > 0 ? MeasureIds[0] : null;
+            if (MeasureIds.Count == 0)
+                throw new InvalidOperationException("No measure bundles configured.");
+            _output.WriteLine($"Loaded {MeasureIds.Count} measure(s): [{string.Join(", ", MeasureIds)}]");
+            return;
+        }
+
         var locations = _config.AllMeasureBundleLocations;
         if (locations.Count == 0)
             throw new InvalidOperationException("No measure bundle locations configured.");

@@ -50,6 +50,9 @@ public class StartScenarioRequest : IValidatableObject
     /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
+    /// <summary>Measure template ids. Empty on legacy payloads; families then map to system templates.</summary>
+    public List<Guid> SelectedMeasureIds { get; set; } = [];
+
     public List<PatientCohortDefinition>? PatientCohorts { get; set; }
 
     /// <summary>
@@ -142,6 +145,7 @@ public class StartScenarioRequest : IValidatableObject
         CleanupServiceData = scenario.CleanupServiceData,
         CleanupFhirData = scenario.CleanupFhirData,
         SelectedMeasures = scenario.SelectedMeasures,
+        SelectedMeasureIds = [.. scenario.SelectedMeasureIds],
         PatientCohorts = scenario.PatientCohorts,
         ImportedPatientIds = scenario.ImportedPatientIds,
         ImportedPatientBundles = scenario.ImportedPatientBundles,

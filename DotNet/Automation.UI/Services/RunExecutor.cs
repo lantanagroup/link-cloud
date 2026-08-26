@@ -394,7 +394,9 @@ internal sealed class RunExecutor
                 generationManifest.MeasureIds = measureIds;
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
-                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                generationManifest.CqlReferencedResourceTypes = scenarioConfig.MeasureBundleJsons.Count > 0
+                    ? CqlResourceTypeExtractor.ExtractReachableFromBundleJsons(scenarioConfig.MeasureBundleJsons)
+                    : CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
                 generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 

@@ -25,6 +25,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly RunExecutor _runExecutor;
     private readonly ILivePatientEventInjector _liveInjector;
     private readonly IPatientConfigurationStore _patientConfigurationStore;
+    private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -42,7 +43,8 @@ public class AutomationRunManager : IAutomationRunManager
         LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         ILivePatientEventInjector liveInjector,
-        IPatientConfigurationStore patientConfigurationStore)
+        IPatientConfigurationStore patientConfigurationStore,
+        IMeasureTemplateStore measureTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -56,6 +58,7 @@ public class AutomationRunManager : IAutomationRunManager
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _liveInjector = liveInjector;
         _patientConfigurationStore = patientConfigurationStore;
+        _measureTemplateStore = measureTemplateStore;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -75,8 +78,10 @@ public class AutomationRunManager : IAutomationRunManager
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
+        var resolved = StartScenarioRequestResolver.Resolve(request);
+        resolved = await MeasureTemplateRunBinder.AttachBundlesAsync(resolved, _measureTemplateStore, cancellationToken);
         var options = await PatientConfigurationHydrator.HydrateAsync(
-            StartScenarioRequestResolver.Resolve(request),
+            resolved,
             _patientConfigurationStore,
             cancellationToken);
 

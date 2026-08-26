@@ -25,6 +25,12 @@ public class TestScenarioConfig
             ? [.. AdditionalMeasureBundleLocations]
             : [MeasureBundleLocation, .. AdditionalMeasureBundleLocations];
 
+    /// <summary>
+    /// Inline FHIR measure-bundle JSON payloads. When non-empty, <c>MeasureLoader</c>
+    /// loads these instead of <see cref="AllMeasureBundleLocations"/>.
+    /// </summary>
+    public List<string> MeasureBundleJsons { get; set; } = [];
+
     public string StartDate { get; set; } = "2023-01-01T00:00:00Z";
     public string EndDate { get; set; } = "2023-12-31T23:59:59Z";
     public string NhsnOrganizationId { get; set; } = string.Empty;

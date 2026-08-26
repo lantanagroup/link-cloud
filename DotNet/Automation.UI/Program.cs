@@ -241,6 +241,7 @@ builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<IMeasureTemplateStore, MongoMeasureTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
 builder.Services.AddSingleton<IPatientConfigurationStore, MongoPatientConfigurationStore>();
@@ -292,6 +293,7 @@ builder.Services.AddScoped<PipelineDataReader>();
 
 // -- Seed system scenarios and query plan templates --
 builder.Services.AddHostedService<ScenarioSeedService>();
+builder.Services.AddHostedService<MeasureTemplateSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();

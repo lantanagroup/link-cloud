@@ -71,7 +71,8 @@ public static class StartScenarioRequestResolver
             return defaults with
             {
                 PatientCohorts = kindCohorts,
-                PatientProfiles = PatientCohortDefinition.ExpandProfiles(kindCohorts, defaults.Seed)
+                PatientProfiles = PatientCohortDefinition.ExpandProfiles(kindCohorts, defaults.Seed),
+                SelectedMeasureIds = MeasureTemplateCatalog.SystemIdsFor(defaultMeasures)
             };
         }
 
@@ -79,6 +80,11 @@ public static class StartScenarioRequestResolver
             ? request.SelectedMeasures
             : ExtractSelectedMeasuresFromJson(request.RunConfigurationJson)
               ?? defaults.SelectedMeasures;
+
+        var effectiveMeasureIds = request.SelectedMeasureIds is { Count: > 0 }
+            ? request.SelectedMeasureIds
+            : ExtractSelectedMeasureIdsFromJson(request.RunConfigurationJson)
+              ?? MeasureTemplateCatalog.SystemIdsFor(effectiveMeasures);
 
         var cohorts = request.PatientCohorts is { Count: > 0 }
             ? request.PatientCohorts
@@ -148,6 +154,7 @@ public static class StartScenarioRequestResolver
             CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
             CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
             SelectedMeasures = effectiveMeasures,
+            SelectedMeasureIds = effectiveMeasureIds,
             PatientProfiles = profiles,
             PatientCohorts = cohorts,
             ReportMethod = reportMethod,
@@ -400,6 +407,36 @@ public static class StartScenarioRequestResolver
     /// Returns null on any parse failure or when the array is missing/empty so the
     /// caller can fall back to defaults.
     /// </summary>
+    private static List<Guid>? ExtractSelectedMeasureIdsFromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("selectedMeasureIds", out var arr)
+                || arr.ValueKind != JsonValueKind.Array
+                || arr.GetArrayLength() == 0)
+                return null;
+
+            var ids = new List<Guid>();
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String)
+                    continue;
+                if (Guid.TryParse(item.GetString(), out var id) && id != Guid.Empty)
+                    ids.Add(id);
+            }
+
+            return ids.Count > 0 ? ids : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static List<ProfiledMeasureType>? ExtractSelectedMeasuresFromJson(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
