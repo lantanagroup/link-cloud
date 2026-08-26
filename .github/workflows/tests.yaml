@@ -174,11 +174,19 @@ jobs:
         working-directory: Web/Admin.UI
         run: npm ci
 
+      # Key the browser cache on the Playwright version, not the whole lockfile: the
+      # cached browsers only change when @playwright/test does, so unrelated dependency
+      # bumps should not force a ~150MB Chromium re-download.
+      - name: Get Playwright version
+        id: playwright-version
+        working-directory: Web/Admin.UI
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright Chromium
         working-directory: Web/Admin.UI
@@ -384,11 +392,17 @@ jobs:
       - name: Install Admin UI dependencies
         run: npm ci
 
+      # Same rationale as the live tier: key on the Playwright version so only a real
+      # @playwright/test upgrade rotates the browser cache.
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
