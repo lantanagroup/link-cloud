@@ -800,7 +800,7 @@ public static class FhirGenerationPipeline
         IReadOnlyList<string>? measureBundleJsons = null)
     {
         HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
         var effectiveProfile = profile;
 
         if (cqlInput != null)

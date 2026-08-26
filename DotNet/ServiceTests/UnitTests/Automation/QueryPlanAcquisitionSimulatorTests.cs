@@ -358,4 +358,65 @@ public class QueryPlanAcquisitionSimulatorTests
         // bounds the date check is vacuous; resource is included.
         Assert.Contains("Observation/O-NoDate3", acquired);
     }
+
+    [Fact]
+    public void Location_ReferenceQuery_FollowsPartOfParent()
+    {
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2024-06-01T08:00:00Z", "end":"2024-06-05T08:00:00Z" },
+              "location":[{"location":{"reference":"Location/L-ROOM"}}] }
+            """);
+        var room = Entry("Location", "L-ROOM", """
+            { "resourceType":"Location","id":"L-ROOM",
+              "partOf":{"reference":"Location/L-HOSP"} }
+            """);
+        var hospital = Entry("Location", "L-HOSP", """
+            { "resourceType":"Location","id":"L-HOSP" }
+            """);
+        var unused = Entry("Location", "L-UNUSED", """
+            { "resourceType":"Location","id":"L-UNUSED",
+              "partOf":{"reference":"Location/L-HOSP"} }
+            """);
+
+        var plan = new QueryPlanInput
+        {
+            EhrDescription = "Test",
+            LookBack = "P0D",
+            InitialQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Encounter",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                },
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Location",
+                    QueryConfigType = "Reference",
+                    OperationType = 1,
+                    Paged = 100
+                }
+            ]
+        };
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter],
+            [room, hospital, unused],
+            plan,
+            PeriodStart,
+            PeriodEnd);
+
+        Assert.Contains("Encounter/E1", acquired);
+        Assert.Contains("Location/L-ROOM", acquired);
+        Assert.Contains("Location/L-HOSP", acquired);
+        Assert.DoesNotContain("Location/L-UNUSED", acquired);
+    }
 }

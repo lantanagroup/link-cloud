@@ -357,7 +357,50 @@ public static class QueryPlanAcquisitionSimulator
             }
         }
 
+        if (string.Equals(targetType, "Location", StringComparison.OrdinalIgnoreCase))
+            ExpandReferencedLocationParents(result, typeMap);
+
         return result;
+    }
+
+    /// <summary>
+    /// Data Acquisition follows <c>Location.partOf</c> when resolving referenced locations
+    /// (ward → hospital). Expand the referenced-id set so the Hospital parent is acquired
+    /// along with encounter stay locations.
+    /// </summary>
+    private static void ExpandReferencedLocationParents(
+        HashSet<string> referencedIds,
+        Dictionary<string, List<GeneratedResource>> typeMap)
+    {
+        if (!typeMap.TryGetValue("Location", out var locations) || locations.Count == 0)
+            return;
+
+        var byId = new Dictionary<string, GeneratedResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var location in locations)
+        {
+            if (!string.IsNullOrWhiteSpace(location.ResourceId))
+                byId[location.ResourceId] = location;
+        }
+
+        var pending = new Queue<string>(referencedIds);
+        while (pending.Count > 0)
+        {
+            var id = pending.Dequeue();
+            if (!byId.TryGetValue(id, out var location))
+                continue;
+
+            foreach (var reference in EnumerateReferences(location.Resource))
+            {
+                if (!reference.StartsWith("Location/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var parentId = reference["Location/".Length..];
+                if (string.IsNullOrWhiteSpace(parentId))
+                    continue;
+                if (referencedIds.Add(parentId))
+                    pending.Enqueue(parentId);
+            }
+        }
     }
 
     private static IEnumerable<string> EnumerateReferences(JsonElement element)
