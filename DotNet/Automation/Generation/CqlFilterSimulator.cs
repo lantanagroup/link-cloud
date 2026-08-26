@@ -251,6 +251,13 @@ public static class CqlFilterSimulator
                             included.Add($"Specimen/{s.ResourceId}");
                     }
                     break;
+                case "Location":
+                    foreach (var loc in input.Locations)
+                    {
+                        if (MatchesLocation(loc, rule, input))
+                            included.Add($"Location/{loc.ResourceId}");
+                    }
+                    break;
             }
         }
 
@@ -301,6 +308,7 @@ public static class CqlFilterSimulator
         "ServiceRequest" => input.ServiceRequests.Select(s => $"ServiceRequest/{s.ResourceId}").ToHashSet(StringComparer.OrdinalIgnoreCase),
         "Encounter" => EffectiveEncounters(input).Select(e => $"Encounter/{e.EncounterId}").ToHashSet(StringComparer.OrdinalIgnoreCase),
         "Specimen" => input.Specimens.Select(s => $"Specimen/{s.ResourceId}").ToHashSet(StringComparer.OrdinalIgnoreCase),
+        "Location" => input.Locations.Select(l => $"Location/{l.ResourceId}").ToHashSet(StringComparer.OrdinalIgnoreCase),
         _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     };
 
@@ -376,6 +384,29 @@ public static class CqlFilterSimulator
         return PassesCommon(rule, input, s.CollectionStart, s.CollectionEnd, null, categories: [], status: null, codes: []);
     }
 
+    private static bool MatchesLocation(LocationContext loc, CqlInstanceFilterAnalyzer.CqlInclusionRule rule, PatientCqlInput input)
+    {
+        if (rule.RequireIpExists && input.IpWindows.Count == 0)
+            return false;
+        if (!rule.LocationFromIpEncounterLocations)
+            return true;
+
+        var ipLocationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enc in EffectiveEncounters(input))
+        {
+            if (!input.IpWindows.AnyEncounterMatches(enc.EncounterId))
+                continue;
+            foreach (var reference in enc.LocationReferences)
+            {
+                var id = ReferenceId(reference);
+                if (!string.IsNullOrWhiteSpace(id))
+                    ipLocationIds.Add(id);
+            }
+        }
+
+        return ipLocationIds.Contains(loc.ResourceId);
+    }
+
     private static bool PassesCommon(
         CqlInstanceFilterAnalyzer.CqlInclusionRule rule,
         PatientCqlInput input,
@@ -390,6 +421,8 @@ public static class CqlFilterSimulator
         if (rule.RequireIpExists && input.IpWindows.Count == 0)
             return false;
         if (rule.CategoryAnyOf is { Count: > 0 } && !categories.Any(c => rule.CategoryAnyOf.Contains(c)))
+            return false;
+        if (rule.CategoryNoneOf is { Count: > 0 } && categories.Any(c => rule.CategoryNoneOf.Contains(c)))
             return false;
         if (rule.StatusAnyOf is { Count: > 0 }
             && (string.IsNullOrWhiteSpace(status)
@@ -468,6 +501,7 @@ public static class CqlFilterSimulator
         public IReadOnlyList<CoverageContext> Coverages { get; init; } = Array.Empty<CoverageContext>();
         public IReadOnlyList<ServiceRequestContext> ServiceRequests { get; init; } = Array.Empty<ServiceRequestContext>();
         public IReadOnlyList<SpecimenContext> Specimens { get; init; } = Array.Empty<SpecimenContext>();
+        public IReadOnlyList<LocationContext> Locations { get; init; } = Array.Empty<LocationContext>();
         public IReadOnlyList<EncounterContext> Encounters { get; init; } = Array.Empty<EncounterContext>();
         public DateTime MeasurementPeriodStart { get; init; } = DateTime.MinValue;
         public DateTime MeasurementPeriodEnd { get; init; } = DateTime.MaxValue;
@@ -480,7 +514,12 @@ public static class CqlFilterSimulator
         DateTime PeriodStart,
         DateTime PeriodEnd,
         string ClassCode,
-        string Status);
+        string Status)
+    {
+        public IReadOnlyList<string> LocationReferences { get; init; } = Array.Empty<string>();
+    }
+
+    public sealed record LocationContext(string ResourceId);
 
     public sealed record ConditionContext(
         string ResourceId,

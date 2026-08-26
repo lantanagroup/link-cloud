@@ -647,4 +647,119 @@ public class CqlFilterSimulatorTests
 
         Assert.DoesNotContain("Specimen/S-mixed", excluded);
     }
+
+    // ---------- DiagnosticReport SDE Others (`not` category) ----------
+
+    private static CqlFilterSimulator.PatientCqlInput InputWithDiagnosticReports(
+        params CqlFilterSimulator.DiagnosticReportContext[] reports)
+        => new(
+            PatientId: "P1",
+            EncounterId: "E1",
+            EncounterStart: EncStart,
+            EncounterEnd: EncEnd,
+            Conditions: Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Observations: Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { DiagnosticReports = reports };
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_EmptyCategoryOverlappingIp_IsKeptByOthers()
+    {
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-empty", EncStart.AddHours(1), EncStart.AddHours(2));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.DoesNotContain("DiagnosticReport/DR-empty", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_LabCategoryOverlappingIp_IsKept()
+    {
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-lab", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LAB"]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.DoesNotContain("DiagnosticReport/DR-lab", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_EmptyCategoryOutsideIp_IsExcluded()
+    {
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-out", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.Contains("DiagnosticReport/DR-out", excluded);
+    }
+
+    // ---------- Location SDE: GetLocation(IP.location) vs [Location] ----------
+
+    private static CqlFilterSimulator.PatientCqlInput InputWithLocations(
+        CqlFilterSimulator.EncounterContext encounter,
+        params CqlFilterSimulator.LocationContext[] locations)
+        => new(
+            PatientId: "P1",
+            EncounterId: encounter.EncounterId,
+            EncounterStart: encounter.PeriodStart,
+            EncounterEnd: encounter.PeriodEnd,
+            Conditions: Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Observations: Array.Empty<CqlFilterSimulator.ObservationContext>())
+        {
+            Encounters = [encounter],
+            Locations = locations
+        };
+
+    [Fact]
+    public void AchMonthly_Location_ExcludesHospitalNotOnIpEncounter()
+    {
+        var encounter = new CqlFilterSimulator.EncounterContext("E1", EncStart, EncEnd, "IMP", "finished")
+        {
+            LocationReferences = ["Location/ED", "Location/ICU", "Location/StepDown"]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithLocations(
+                encounter,
+                new CqlFilterSimulator.LocationContext("ED"),
+                new CqlFilterSimulator.LocationContext("ICU"),
+                new CqlFilterSimulator.LocationContext("StepDown"),
+                new CqlFilterSimulator.LocationContext("Hospital")));
+
+        Assert.DoesNotContain("Location/ED", excluded);
+        Assert.DoesNotContain("Location/ICU", excluded);
+        Assert.DoesNotContain("Location/StepDown", excluded);
+        Assert.Contains("Location/Hospital", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_Location_KeepsAllLocationsWhenIpExists()
+    {
+        var encounter = new CqlFilterSimulator.EncounterContext("E1", EncStart, EncEnd, "IMP", "finished")
+        {
+            LocationReferences = ["Location/ED", "Location/ICU", "Location/StepDown"]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            InputWithLocations(
+                encounter,
+                new CqlFilterSimulator.LocationContext("ED"),
+                new CqlFilterSimulator.LocationContext("ICU"),
+                new CqlFilterSimulator.LocationContext("StepDown"),
+                new CqlFilterSimulator.LocationContext("Hospital")));
+
+        Assert.DoesNotContain("Location/ED", excluded);
+        Assert.DoesNotContain("Location/ICU", excluded);
+        Assert.DoesNotContain("Location/StepDown", excluded);
+        Assert.DoesNotContain("Location/Hospital", excluded);
+    }
 }

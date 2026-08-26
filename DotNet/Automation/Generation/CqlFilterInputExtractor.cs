@@ -22,7 +22,8 @@ public static class CqlFilterInputExtractor
     /// </summary>
     public static CqlFilterSimulator.PatientCqlInput? ExtractFromEntries(
         string patientId,
-        IEnumerable<Bundle.EntryComponent> entries)
+        IEnumerable<Bundle.EntryComponent> entries,
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries = null)
     {
         var encounters = new List<Encounter>();
         var conditions = new List<Condition>();
@@ -34,6 +35,7 @@ public static class CqlFilterInputExtractor
         var coverages = new List<Coverage>();
         var serviceRequests = new List<ServiceRequest>();
         var specimens = new List<Specimen>();
+        var locations = new List<CqlFilterSimulator.LocationContext>();
 
         foreach (var entry in entries)
         {
@@ -69,7 +71,21 @@ public static class CqlFilterInputExtractor
                 case Specimen specimen:
                     specimens.Add(specimen);
                     break;
+                case Location location:
+                    locations.Add(new CqlFilterSimulator.LocationContext(location.Id ?? string.Empty));
+                    break;
             }
+        }
+
+        foreach (var loc in ExtractLocations(sharedResourceEntries))
+        {
+            if (locations.Any(existing =>
+                    string.Equals(existing.ResourceId, loc.ResourceId, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            locations.Add(loc);
         }
 
         if (encounters.Count == 0)
@@ -109,8 +125,30 @@ public static class CqlFilterInputExtractor
             MedicationAdministrations = medicationAdministrationContexts,
             Coverages = coverageContexts,
             ServiceRequests = serviceRequestContexts,
-            Specimens = specimenContexts
+            Specimens = specimenContexts,
+            Locations = locations
         };
+    }
+
+    internal static List<CqlFilterSimulator.LocationContext> ExtractLocations(
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? entries)
+    {
+        var locations = new List<CqlFilterSimulator.LocationContext>();
+        if (entries == null)
+            return locations;
+
+        foreach (var (resourceType, resourceId, _, _) in entries)
+        {
+            if (!string.Equals(resourceType, "Location", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(resourceId))
+            {
+                continue;
+            }
+
+            locations.Add(new CqlFilterSimulator.LocationContext(resourceId));
+        }
+
+        return locations;
     }
 
     private static CqlFilterSimulator.EncounterContext BuildEncounterContext(Encounter enc)
@@ -119,7 +157,16 @@ public static class CqlFilterInputExtractor
         var end = ParseFhirDateTime(enc.Period?.End) ?? DateTime.MaxValue;
         var classCode = enc.Class?.Code ?? string.Empty;
         var status = enc.Status?.ToString() ?? string.Empty;
-        return new CqlFilterSimulator.EncounterContext(enc.Id ?? string.Empty, start, end, classCode, status);
+        var locationRefs = (enc.Location ?? [])
+            .Select(loc => loc.Location?.Reference)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Select(reference => reference!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new CqlFilterSimulator.EncounterContext(enc.Id ?? string.Empty, start, end, classCode, status)
+        {
+            LocationReferences = locationRefs
+        };
     }
 
     private static CqlFilterSimulator.ConditionContext BuildConditionContext(Condition cond)

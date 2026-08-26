@@ -585,7 +585,7 @@ public static class FhirGenerationPipeline
         // semantics do not contribute to the intersection of exclusions that determines
         // whether a resource reaches ABS.
         HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
         var effectiveProfile = profile;
 
         if (cqlInput != null)
@@ -756,7 +756,7 @@ public static class FhirGenerationPipeline
 
         // 3. CQL filter simulation + period-aware eligibility prediction
         HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
         var effectiveProfile = profile;
         if (cqlInput != null)
         {

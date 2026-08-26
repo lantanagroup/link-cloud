@@ -44,6 +44,7 @@ internal static class CqlInstanceFilterAnalyzer
         ["SpecimenResource"] = "Specimen",
         ["DiagnosticReportLabResource"] = "DiagnosticReport",
         ["DiagnosticReportResource"] = "DiagnosticReport",
+        ["GetLocation"] = "Location",
         ["LocationResource"] = "Location",
         ["DeviceResource"] = "Device",
         ["PatientResource"] = "Patient",
@@ -62,6 +63,7 @@ internal static class CqlInstanceFilterAnalyzer
     {
         public string ResourceType { get; init; } = string.Empty;
         public HashSet<string>? CategoryAnyOf { get; init; }
+        public HashSet<string>? CategoryNoneOf { get; init; }
         public HashSet<string>? StatusAnyOf { get; init; }
         public HashSet<string>? IntentAnyOf { get; init; }
         public HashSet<string>? CodeAnyOf { get; init; }
@@ -69,6 +71,7 @@ internal static class CqlInstanceFilterAnalyzer
         public bool RequireIpExists { get; init; }
         public bool RequireEncounterLinkedToIp { get; init; }
         public bool MustBeIpEncounter { get; init; }
+        public bool LocationFromIpEncounterLocations { get; init; }
         public bool SubjectMustBePatient { get; init; }
         public bool SpecimenFromMatchingObservations { get; init; }
         public List<CqlInclusionRule> ObservationSourceRules { get; init; } = [];
@@ -145,6 +148,8 @@ internal static class CqlInstanceFilterAnalyzer
         var whereClause = CqlText.ExtractTopLevelWhere(body);
         var returnClause = CqlText.ExtractTopLevelReturn(body);
         var predicates = ParseWhere(model, whereClause);
+        if (LooksLikeLocationFromIpEncounter(body))
+            predicates.LocationFromIpEncounter = true;
         var returnType = InferReturnType(returnClause);
 
         if (LooksLikeSpecimenFromObservation(body, returnClause)
@@ -241,6 +246,7 @@ internal static class CqlInstanceFilterAnalyzer
         {
             ResourceType = returnType ?? source.ResourceType,
             CategoryAnyOf = IntersectOrReplace(source.CategoryAnyOf, predicates.CategoryAnyOf),
+            CategoryNoneOf = UnionOrReplace(source.CategoryNoneOf, predicates.CategoryNoneOf),
             StatusAnyOf = IntersectOrReplace(source.StatusAnyOf, predicates.StatusAnyOf),
             IntentAnyOf = IntersectOrReplace(source.IntentAnyOf, predicates.IntentAnyOf),
             CodeAnyOf = IntersectOrReplace(source.CodeAnyOf, predicates.CodeAnyOf),
@@ -248,6 +254,7 @@ internal static class CqlInstanceFilterAnalyzer
             RequireIpExists = source.RequireIpExists || predicates.RequireIpExists,
             RequireEncounterLinkedToIp = source.RequireEncounterLinkedToIp || predicates.RequireEncounterLinkedToIp,
             MustBeIpEncounter = source.MustBeIpEncounter,
+            LocationFromIpEncounterLocations = source.LocationFromIpEncounterLocations || predicates.LocationFromIpEncounter,
             SubjectMustBePatient = source.SubjectMustBePatient,
             SpecimenFromMatchingObservations = source.SpecimenFromMatchingObservations,
             ObservationSourceRules = source.ObservationSourceRules
@@ -265,6 +272,17 @@ internal static class CqlInstanceFilterAnalyzer
         return merged.Count == 0 ? extra : merged;
     }
 
+    private static HashSet<string>? UnionOrReplace(HashSet<string>? inherited, HashSet<string>? extra)
+    {
+        if (extra == null || extra.Count == 0)
+            return inherited;
+        if (inherited == null || inherited.Count == 0)
+            return extra;
+        var merged = new HashSet<string>(inherited, StringComparer.OrdinalIgnoreCase);
+        merged.UnionWith(extra);
+        return merged;
+    }
+
     private static HashSet<string>? UnionCodes(HashSet<string>? existing, IEnumerable<string> extra)
     {
         var set = existing ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -280,12 +298,14 @@ internal static class CqlInstanceFilterAnalyzer
     private sealed class WherePredicates
     {
         public HashSet<string>? CategoryAnyOf { get; set; }
+        public HashSet<string>? CategoryNoneOf { get; set; }
         public HashSet<string>? StatusAnyOf { get; set; }
         public HashSet<string>? IntentAnyOf { get; set; }
         public HashSet<string>? CodeAnyOf { get; set; }
         public DateRelation Date { get; set; }
         public bool RequireIpExists { get; set; }
         public bool RequireEncounterLinkedToIp { get; set; }
+        public bool LocationFromIpEncounter { get; set; }
     }
 
     private static WherePredicates ParseWhere(CqlMeasureBundleModel model, string? whereClause)
@@ -308,17 +328,25 @@ internal static class CqlInstanceFilterAnalyzer
             result.RequireEncounterLinkedToIp = true;
         }
 
-        var categories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var categoryAnyOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var categoryNoneOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var notSpans = FindNotSpans(text);
         foreach (Match match in Regex.Matches(
                      text,
                      @"\.category\b[\s\S]{0,160}~\s*""([^""]+)""",
                      RegexOptions.IgnoreCase))
         {
-            categories.Add(model.ResolveCode(match.Groups[1].Value));
+            var code = model.ResolveCode(match.Groups[1].Value);
+            if (notSpans.Any(span => match.Index >= span.Start && match.Index <= span.End))
+                categoryNoneOf.Add(code);
+            else
+                categoryAnyOf.Add(code);
         }
 
-        if (categories.Count > 0)
-            result.CategoryAnyOf = categories;
+        if (categoryAnyOf.Count > 0)
+            result.CategoryAnyOf = categoryAnyOf;
+        if (categoryNoneOf.Count > 0)
+            result.CategoryNoneOf = categoryNoneOf;
 
         var statusIn = StatusInPattern.Match(text);
         if (statusIn.Success)
@@ -403,6 +431,65 @@ internal static class CqlInstanceFilterAnalyzer
         }
 
         return null;
+    }
+
+    private static bool LooksLikeLocationFromIpEncounter(string body)
+    {
+        if (body.Contains("GetLocation", StringComparison.OrdinalIgnoreCase)
+            && (body.Contains("IP.location", StringComparison.Ordinal)
+                || body.Contains("locationElements", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("InitialPopulation.location", StringComparison.OrdinalIgnoreCase)
+                || (body.Contains("\"Initial Population\"", StringComparison.Ordinal)
+                    && body.Contains(".location", StringComparison.OrdinalIgnoreCase))))
+        {
+            return true;
+        }
+
+        return Regex.IsMatch(
+            body,
+            @"Get Locations from (IP|Initial Population)",
+            RegexOptions.IgnoreCase);
+    }
+
+    private static List<(int Start, int End)> FindNotSpans(string text)
+    {
+        var spans = new List<(int Start, int End)>();
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (!CqlText.IsKeywordAt(text, i, "not"))
+                continue;
+
+            var j = i + 3;
+            while (j < text.Length && char.IsWhiteSpace(text[j]))
+                j++;
+            if (j >= text.Length || text[j] != '(')
+                continue;
+
+            var end = MatchingCloseParen(text, j);
+            if (end > j)
+                spans.Add((j, end));
+            i = j;
+        }
+
+        return spans;
+    }
+
+    private static int MatchingCloseParen(string text, int openIndex)
+    {
+        var depth = 0;
+        for (var i = openIndex; i < text.Length; i++)
+        {
+            if (text[i] == '(')
+                depth++;
+            else if (text[i] == ')')
+            {
+                depth--;
+                if (depth == 0)
+                    return i;
+            }
+        }
+
+        return -1;
     }
 
     private static bool LooksLikeSpecimenFromObservation(string body, string? returnClause)
