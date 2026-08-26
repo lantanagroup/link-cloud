@@ -2,6 +2,7 @@
 using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Helpers;
 using Hl7.Fhir.Introspection;
+using Hl7.Fhir.Model;
 using System.Globalization;
 using System.Text.Json;
 
@@ -576,5 +577,41 @@ public class QueryPlanAcquisitionSimulatorTests
         }
 
         return end >= mpStart && start <= mpEnd;
+    }
+
+    [Fact]
+    public void Observation_EffectiveInLastSecondOfPeriodEnd_IsAcquired()
+    {
+        // Daily ACH PeriodEnd is formatted as le2023-01-15T23:59:59Z (second precision).
+        // HAPI treats that bound as covering [23:59:59.000, 24:00:00). A generated
+        // Observation at 23:59:59.167 is included by DA and must be predicted.
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2023-01-14T18:00:00Z", "end":"2023-01-16T05:59:59Z" } }
+            """);
+        var inLastSecond = Entry("Observation", "O-last-second", """
+            { "resourceType":"Observation","id":"O-last-second",
+              "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs"}]}],
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-01-15T23:59:59.167Z" }
+            """);
+        var atNextMidnight = Entry("Observation", "O-next-midnight", """
+            { "resourceType":"Observation","id":"O-next-midnight",
+              "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs"}]}],
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-01-16T00:00:00Z" }
+            """);
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter, inLastSecond, atNextMidnight],
+            null,
+            QueryPlanDefaults.GetDefaultAsInput(),
+            "2023-01-15T00:00:00Z",
+            "2023-01-15T23:59:59Z",
+            allowEncounterAnchoredDateOverrideForOutOfRange: false);
+
+        Assert.Contains("Observation/O-last-second", acquired);
+        Assert.DoesNotContain("Observation/O-next-midnight", acquired);
     }
 }

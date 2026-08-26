@@ -209,7 +209,7 @@ public static class QueryPlanAcquisitionSimulator
                     if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
                     {
                         recognizedAny = true;
-                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
+                        matchedAny |= PassesTemporalBound(isGe, bound.Value, effStart, effEnd);
                     }
 
                     if (!recognizedAny)
@@ -268,19 +268,7 @@ public static class QueryPlanAcquisitionSimulator
                     return false;
                 }
 
-                if (isGe && resourceEnd < bound.Value)
-                {
-                    if (allowEncounterAnchoredDateOverrideForOutOfRange
-                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
-                    {
-                        continue;
-                    }
-
-                    return false;
-                }
-
-                if (isLe && resourceStart > bound.Value)
+                if (!PassesTemporalBound(isGe, bound.Value, resourceStart, resourceEnd))
                 {
                     if (allowEncounterAnchoredDateOverrideForOutOfRange
                         && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
@@ -295,6 +283,35 @@ public static class QueryPlanAcquisitionSimulator
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// FHIR date search values carry an interval implied by their precision.
+    /// Data Acquisition formats PeriodEnd as <c>yyyy-MM-ddTHH:mm:ssZ</c> (second
+    /// precision, no fraction), so <c>le2023-01-15T23:59:59Z</c> matches any instant
+    /// in <c>[23:59:59.000, 24:00:00.000)</c> — HAPI inclusive-whole-second semantics.
+    /// Treating the bound as an exact tick (<c>resourceStart &lt;= 23:59:59.000</c>)
+    /// drops the last Observation of a Daily ACH 1-day window (spread across a
+    /// ±6h padded encounter at 0.3 of 1000 resources lands at ~23:59:59.167).
+    /// </summary>
+    private static bool PassesTemporalBound(
+        bool isGe,
+        DateTimeOffset bound,
+        DateTimeOffset resourceStart,
+        DateTimeOffset resourceEnd)
+    {
+        if (isGe)
+            return resourceEnd >= bound;
+
+        return resourceStart < ExclusiveLeBound(bound);
+    }
+
+    private static DateTimeOffset ExclusiveLeBound(DateTimeOffset bound)
+    {
+        if (bound.Millisecond == 0 && bound.Ticks % TimeSpan.TicksPerSecond == 0)
+            return bound.AddSeconds(1);
+
+        return bound.AddTicks(1);
     }
 
     /// <summary>
