@@ -23,9 +23,13 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid MultiMeasureId = new("00000000-0000-0000-0000-000000000006");
     private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
+    private static readonly Guid AdhocReportDailyAchTestId = new("00000000-0000-0000-0000-000000000009");
 
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
+
+    private static readonly List<ProfiledMeasureType> DailyAchMeasures =
+        [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation];
 
     private const string AdhocReportTestNhsnOrganizationId = "10756";
     private const string ApiHealthScenarioNhsnOrganizationId = "10757";
@@ -35,6 +39,7 @@ public sealed class ScenarioSeedService : IHostedService
     private const string ScheduledReportTestNhsnOrganizationId = "10761";
     private const string RegenerateReportTestNhsnOrganizationId = "10762";
     private const string MultiMeasureTestNhsnOrganizationId = "10763";
+    private const string AdhocReportDailyAchTestNhsnOrganizationId = "10764";
 
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
@@ -47,6 +52,12 @@ public sealed class ScenarioSeedService : IHostedService
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultNonQualifyingEligibilities =
         DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying);
+
+    private static readonly List<string> DailyAchEligibleScenarioIds =
+        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DailyAchMeasures, MeasureEligibility.Qualifying)];
+
+    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DailyAchQualifyingEligibilities =
+        DailyAchMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
 
     public ScenarioSeedService(IScenarioStore store, ILogger<ScenarioSeedService> logger)
     {
@@ -101,6 +112,38 @@ public sealed class ScenarioSeedService : IHostedService
                     PatientCount = 1,
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 1000,
+                    ResourcesPerPatientMax = 1000,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
+                }
+            ],
+            CleanupServiceData = false,
+            CleanupFhirData = true,
+        },
+
+        // --- Adhoc Report Daily ACH Test (ad-hoc, ACH Daily, 1 patient, 1000 resources) ---
+        new TestScenarioDefinition
+        {
+            Id = AdhocReportDailyAchTestId,
+            Name = "Adhoc Report Daily ACH Test",
+            Description = "Single patient ad-hoc report against ACH Daily. Mirrors the AdhocReportDailyAchTest backend E2E test.",
+            IsSystemScenario = true,
+            ReportMethod = ReportMethod.Adhoc,
+            SelectedMeasures = [..DailyAchMeasures],
+            NhsnOrganizationId = AdhocReportDailyAchTestNhsnOrganizationId,
+            Seed = 20260825,
+            PatientCount = 1,
+            ResourcesPerPatientMin = 1000,
+            ResourcesPerPatientMax = 1000,
+            ReportPeriodStart = new DateTimeOffset(2023, 1, 15, 0, 0, 0, TimeSpan.Zero),
+            ReportPeriodEnd = new DateTimeOffset(2023, 1, 15, 23, 59, 59, TimeSpan.Zero),
+            PatientCohorts =
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DailyAchQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DailyAchEligibleScenarioIds],
                     ResourcesPerPatientMin = 1000,
                     ResourcesPerPatientMax = 1000,
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
