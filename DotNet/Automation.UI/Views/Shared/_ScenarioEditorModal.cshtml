@@ -183,29 +183,62 @@
                                 <label class="form-check-label" for="CleanupServiceData">Cleanup Service Data</label>
                             </div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label d-block">Metrics Run</label>
+                        <div class="col-12 au-help-scope">
+                            <label class="form-label d-block">
+                                Metrics run
+                                <button type="button" class="au-info-toggle" data-help="metricsRunHelp" aria-label="About metrics runs" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                            </label>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="IsMetricsRun" />
-                                <label class="form-check-label" for="IsMetricsRun">Collect performance-depth telemetry. Ordinary runs stay lightweight (success, evidence, high-level counts).</label>
+                                <label class="form-check-label" for="IsMetricsRun">Record extra performance data for this scenario. Off keeps ordinary runs cheap (pass/fail, evidence, high-level counts only).</label>
+                            </div>
+                            <div id="metricsRunHelp" class="au-help-text mb-2" hidden>
+                                Ordinary runs already tell you whether the pipeline succeeded. A metrics run also records how long it took, throughput, and (if Prometheus is reachable) per-stage latency. Results land on the Metrics page after the run finishes. Use this for performance comparisons, not for everyday functional tests.
                             </div>
                             <div class="row g-2" id="metricsRunOptions" style="display:none;">
                                 <div class="col-md-4">
-                                    <label class="form-label" for="BenchmarkKey">Benchmark Key</label>
-                                    <input class="form-control" id="BenchmarkKey" maxlength="120" placeholder="optional" />
+                                    <label class="form-label" for="BenchmarkKey">
+                                        Benchmark name
+                                        <button type="button" class="au-info-toggle" data-help="benchmarkKeyHelp" aria-label="About benchmark name" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                    </label>
+                                    <input class="form-control" id="BenchmarkKey" maxlength="120" placeholder="e.g. monthly-150-patients" />
+                                    <div class="form-text">Optional. Same name on every run that should share one saved set of limits.</div>
+                                    <div id="benchmarkKeyHelp" class="au-help-text mt-1" hidden>
+                                        A benchmark is a named bag of pass/fail limits (for example max total time, min patients per minute, max validation p95). Leaving this blank still records the run on the Metrics page and still applies the time budget below. Filling it in attaches this run to that named bag so later runs can be compared, and so “fail the run if it misses…” can use those stored limits. Without a matching saved benchmark, the name is just a label on the snapshot.
+                                    </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="TargetDurationSeconds">Target Duration (seconds)</label>
-                                    <input class="form-control" type="number" id="TargetDurationSeconds" min="1" step="1" placeholder="SLO, not a soak" />
+                                    <label class="form-label" for="TargetDurationSeconds">
+                                        Time budget (seconds)
+                                        <button type="button" class="au-info-toggle" data-help="targetDurationHelp" aria-label="About time budget" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                    </label>
+                                    <input class="form-control" type="number" id="TargetDurationSeconds" min="1" step="1" placeholder="e.g. 1800" />
+                                    <div class="form-text">Checked after the run finishes. Does not stop the run when time is up.</div>
+                                    <div id="targetDurationHelp" class="au-help-text mt-1" hidden>
+                                        This is a goal, not a timeout. The run still generates and processes every patient even if it takes longer. When it ends we compare wall-clock duration to this number and mark the Metrics snapshot pass or fail. Empty means no duration goal. (A soak would keep the system under load for a fixed period and then stop; this does not do that.)
+                                    </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="Concurrency">Concurrency (1–8)</label>
-                                    <input class="form-control" type="number" id="Concurrency" min="1" max="8" step="1" placeholder="optional" />
+                                    <label class="form-label" for="Concurrency">
+                                        FHIR query parallelism (1–8)
+                                        <button type="button" class="au-info-toggle" data-help="concurrencyHelp" aria-label="About FHIR query parallelism" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                    </label>
+                                    <input class="form-control" type="number" id="Concurrency" min="1" max="8" step="1" placeholder="default 8" />
+                                    <div class="form-text">How many Data Acquisition FHIR queries may run at once. Hard cap is 8.</div>
+                                    <div id="concurrencyHelp" class="au-help-text mt-1" hidden>
+                                        This sets Data Acquisition’s max concurrent FHIR requests for this run’s facility. Higher values finish querying faster but put more load on the FHIR server and downstream services. 8 is also the acquisition worker cap, so 16 is silently treated as 8. Leave blank to keep the default of 8. This does not change how many patients Thetis generates.
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="FailRunOnBenchmark" />
-                                        <label class="form-check-label" for="FailRunOnBenchmark">Fail the run if it misses the stored benchmark</label>
+                                        <label class="form-check-label" for="FailRunOnBenchmark">
+                                            Fail the run if it misses the time budget or saved benchmark
+                                            <button type="button" class="au-info-toggle" data-help="failOnBenchmarkHelp" aria-label="About failing the run on missed budget" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                        </label>
+                                    </div>
+                                    <div id="failOnBenchmarkHelp" class="au-help-text mt-1" hidden>
+                                        Off (default): validators still decide Succeeded vs Failed; a missed time budget is only recorded on the Metrics page. On: after a successful functional run, if duration or the named benchmark’s limits are missed, the run is marked Failed. Leave this off until you have a baseline you actually want to enforce.
                                     </div>
                                 </div>
                             </div>
@@ -2196,11 +2229,11 @@
                 if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
             }
             if (model.concurrency != null && (model.concurrency < 1 || model.concurrency > 8)) {
-                markFieldError('Concurrency', 'Concurrency must be between 1 and 8.');
+                markFieldError('Concurrency', 'FHIR query parallelism must be between 1 and 8.');
                 valid = false;
             }
             if (model.targetDurationSeconds != null && model.targetDurationSeconds < 1) {
-                markFieldError('TargetDurationSeconds', 'Target duration must be a positive number of seconds.');
+                markFieldError('TargetDurationSeconds', 'Time budget must be a positive number of seconds.');
                 valid = false;
             }
             // Imported-by-ID rows must have a non-empty patient id.
