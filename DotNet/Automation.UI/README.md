@@ -425,6 +425,7 @@ UI scenario and the backend test produces equivalent FHIR input:
 | System scenario | Seed | Patients | Resources |
 |---|---:|---:|---:|
 | Adhoc Report Test | 20260326 | 1 | 1000 |
+| Adhoc Report Daily ACH Test | 20260825 | 1 | 1000 |
 | Multi Patient Test | 20260328 | 150 | 25-50 |
 | Mega Patient Test | 20260327 | 1 | 5000 |
 | Mega Multi Patient Test | 20260330 | 150 | 5000 / 25-50 |
