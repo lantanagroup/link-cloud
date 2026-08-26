@@ -1,8 +1,9 @@
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
-/// Cadence for Automation's three independent loops. Lightweight (ordinary) runs
-/// must not poll five pipeline APIs plus Loki every 5 seconds.
+/// Cadence for Automation's three independent loops. Ordinary runs still poll all
+/// pipeline domains so Run Details counts and charts update; they just do it less
+/// often. Loki resource-type scrape stays Metrics-run only.
 /// </summary>
 public static class AutomationRunPollingPolicy
 {
@@ -28,7 +29,7 @@ public static class AutomationRunPollingPolicy
         return patientCount >= 500 ? LargeRunDiagnosticsInterval : MetricsDiagnosticsInterval;
     }
 
-    public static bool PollAllDomainsDuringRun(bool isMetricsRun) => isMetricsRun;
+    public static bool PollAllDomainsDuringRun(bool isMetricsRun) => true;
 
     public static bool ScrapeNormalizationResourceTypes(bool isMetricsRun) => isMetricsRun;
 }

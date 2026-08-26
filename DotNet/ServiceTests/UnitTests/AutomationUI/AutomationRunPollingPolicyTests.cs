@@ -7,12 +7,12 @@ namespace UnitTests.AutomationUI;
 public class AutomationRunPollingPolicyTests
 {
     [Fact]
-    public void Lightweight_runs_use_15_second_loops_and_skip_full_domain_polls()
+    public void Lightweight_runs_use_15_second_loops_but_still_poll_all_domains()
     {
         AutomationRunPollingPolicy.OrchestratorInterval(anyMetricsRun: false).Should().Be(TimeSpan.FromSeconds(15));
         AutomationRunPollingPolicy.PollerInterval(isMetricsRun: false).Should().Be(TimeSpan.FromSeconds(15));
         AutomationRunPollingPolicy.DiagnosticsInterval(isMetricsRun: false, patientCount: 10).Should().Be(TimeSpan.FromSeconds(15));
-        AutomationRunPollingPolicy.PollAllDomainsDuringRun(false).Should().BeFalse();
+        AutomationRunPollingPolicy.PollAllDomainsDuringRun(false).Should().BeTrue();
         AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(false).Should().BeFalse();
     }
 

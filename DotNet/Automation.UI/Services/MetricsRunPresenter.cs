@@ -99,6 +99,12 @@ public sealed class MetricsRunPresenter
         return detail;
     }
 
+    public async Task<MetricsRunDetailViewModel?> GetCapturedAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _store.GetAsync(runId, cancellationToken);
+        return snapshot == null ? null : ToDetail(snapshot);
+    }
+
     public async Task<(IReadOnlyList<AutomationMetricsBenchmarkDocument> Records, PaginationMetadata Metadata)> ListBenchmarksAsync(
         int pageNumber,
         int pageSize,

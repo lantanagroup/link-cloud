@@ -4,9 +4,9 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 namespace Automation.UI.Services;
 
 /// <summary>
-/// Per-run poller. Metrics runs poll five pipeline domains every 5s (with the
-/// existing 8s HTTP cache). Lightweight runs poll schedule status only every 15s
-/// and take a full-domain snapshot once in <see cref="FinalPollAsync"/>.
+/// Per-run poller. Every run polls five pipeline domains so Run Details stays live.
+/// Metrics runs poll every 5s; ordinary runs poll every 15s. Both honor the 8s HTTP
+/// cache. A full-domain snapshot still runs once in <see cref="FinalPollAsync"/>.
 ///
 /// Data persists across process restarts. Multiple UI instances can read
 /// the same data. The controller reads are instant (no API calls).

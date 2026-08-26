@@ -64,6 +64,28 @@
         </div>
     </div>
 
+    @if (Model.IsMetricsRun)
+    {
+        <div id="advancedPerformanceHost">
+            @if (ViewBag.Performance is MetricsRunDetailViewModel performance)
+            {
+                @await Html.PartialAsync("~/Views/Metrics/_AdvancedPerformance.cshtml", performance)
+            }
+            else
+            {
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-speedometer2 me-2"></i>Advanced performance</div>
+                    <div class="card-body">
+                        <p class="mb-0 text-muted">
+                            This is a metrics run. Live counts and charts below update while the pipeline is working.
+                            Typical / Slow / Slowest timings for each step are captured about a minute after the run finishes and will appear here.
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
     <div class="au-card au-live-panel" id="liveSimulationCard" style="display:none;">
         @Html.AntiForgeryToken()
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -302,17 +324,14 @@
                             <canvas id="dataAcqDonut" height="160" style="height:160px;max-height:160px;max-width: 220px;"></canvas>
                             <div id="dataAcqLegend" class="small mt-2"></div>
                         </div>
-                        @if (Model.IsMetricsRun)
-                        {
-                            <div class="col-md-4">
-                                <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
-                                <canvas id="dataAcqTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="small text-muted mb-1">Top Resource Types</div>
-                                <canvas id="dataAcqResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
-                            </div>
-                        }
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="dataAcqTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="dataAcqResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -329,8 +348,6 @@
                         </div>
                     </div>
 
-                    @if (Model.IsMetricsRun)
-                    {
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
@@ -341,7 +358,6 @@
                             <canvas id="normalizationResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
                         </div>
                     </div>
-                    }
                 </div>
             </div>
 
@@ -357,8 +373,6 @@
                         </div>
                     </div>
 
-                    @if (Model.IsMetricsRun)
-                    {
                     <div class="row g-3">
                         <div class="col-md-4">
                             <div class="small text-muted mb-1">Measure Report Patient States</div>
@@ -374,7 +388,6 @@
                             <canvas id="measureResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
                         </div>
                     </div>
-                    }
                 </div>
             </div>
 
@@ -390,8 +403,6 @@
                         </div>
                     </div>
 
-                    @if (Model.IsMetricsRun)
-                    {
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="small text-muted mb-1">Validation Patient States</div>
@@ -403,7 +414,6 @@
                             <canvas id="validationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
                         </div>
                     </div>
-                    }
                 </div>
             </div>
         </div>
@@ -527,6 +537,48 @@
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
         const manifestUrl = '@Url.Action("ManifestData", "Runs")';
+        const performancePanelUrl = '@Url.Action("PerformancePanel", "Runs", new { id = Model.RunId })';
+        let advancedPanelLoaded = @(ViewBag.Performance != null ? "true" : "false");
+        let advancedPollTimer = null;
+
+        async function refreshAdvancedPerformancePanel() {
+            if (!isMetricsRun || advancedPanelLoaded) return true;
+            try {
+                const response = await fetch(performancePanelUrl, { headers: { 'Accept': 'text/html' } });
+                if (!response.ok || response.status === 204) return false;
+                const html = await response.text();
+                if (!html || !html.trim()) return false;
+                const host = document.getElementById('advancedPerformanceHost');
+                if (host) {
+                    host.innerHTML = html;
+                    advancedPanelLoaded = true;
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function startAdvancedPerformancePolling() {
+            if (!isMetricsRun || advancedPanelLoaded || advancedPollTimer) return;
+            advancedPollTimer = setInterval(async function () {
+                const done = await refreshAdvancedPerformancePanel();
+                if (done && advancedPollTimer) {
+                    clearInterval(advancedPollTimer);
+                    advancedPollTimer = null;
+                }
+            }, 5000);
+            setTimeout(function () {
+                if (advancedPollTimer) {
+                    clearInterval(advancedPollTimer);
+                    advancedPollTimer = null;
+                }
+            }, 180000);
+        }
+
+        if (isMetricsRun && !advancedPanelLoaded)
+            startAdvancedPerformancePolling();
+
         const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
         const normalizationSuiteGetJsonUrl = '@Url.Action("GetSuiteJson", "Normalizations")';
         const orgResourceMapGetJsonUrl = '@Url.Action("GetJson", "OrganizationResourceMaps")';
@@ -1860,10 +1912,8 @@
                 document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
                 document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
                 document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
-                if (isMetricsRun) {
-                    renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#06b6d4');
-                    renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
-                }
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#06b6d4');
+                renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
                 dataAcqErrors = dataAcq.errors || [];
                 document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
 
@@ -1875,10 +1925,8 @@
                 document.getElementById('normalizationRate').textContent = formatNumber(snapshot.normalization?.completionRatePerSecond);
                 document.getElementById('normalizationResourceCount').textContent = snapshot.normalization?.resourceCount || 0;
                 document.getElementById('normalizationResPerSec').textContent = formatNumber(snapshot.normalization?.averageResourcesPerSecond);
-                if (isMetricsRun) {
-                    renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
-                    renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], '#6f42c1');
-                }
+                renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
+                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], '#6f42c1');
 
                 normalizationErrors = snapshot.normalization?.errors || [];
                 document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
@@ -1886,15 +1934,13 @@
                 document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
                 document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
                 document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
-                if (isMetricsRun) {
-                    renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
-                        'no measure report': '#94a3b8',
-                        notreportable: '#f59e0b',
-                        readyforvalidation: '#198754'
-                    });
-                    renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
-                    renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#0d6efd');
-                }
+                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
+                    'no measure report': '#94a3b8',
+                    notreportable: '#f59e0b',
+                    readyforvalidation: '#198754'
+                });
+                renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#0d6efd');
 
                 measureErrors = snapshot.measureEval?.errors || [];
                 document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
@@ -1907,14 +1953,12 @@
                 document.getElementById('validationPatientCount').textContent = validationTotal;
                 document.getElementById('validationPassedCount').textContent = validationPassed;
                 document.getElementById('validationFailedCount').textContent = validationFailed;
-                if (isMetricsRun) {
-                    renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
-                        notvalidated: '#94a3b8',
-                        failedvalidation: '#ef4444',
-                        passedvalidation: '#198754'
-                    });
-                    renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
-                }
+                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
+                    notvalidated: '#94a3b8',
+                    failedvalidation: '#ef4444',
+                    passedvalidation: '#198754'
+                });
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
 
                 validationErrors = snapshot.validation?.errors || [];
                 document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';
@@ -1936,6 +1980,7 @@
                         setFinalizingBadge(false);
                         stopSnapshotPolling();
                     }
+                    startAdvancedPerformancePolling();
                 } else {
                     setFinalizingBadge(false);
                 }

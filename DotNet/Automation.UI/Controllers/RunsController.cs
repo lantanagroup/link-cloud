@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
@@ -20,6 +21,7 @@ public class RunsController(
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     GeneratedTemplateCacheVersionStore templateCacheVersionStore,
+    MetricsRunPresenter metricsPresenter,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -171,7 +173,19 @@ public class RunsController(
 
         ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        if (run.IsMetricsRun)
+            ViewBag.Performance = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
         return View(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PerformancePanel(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
+        if (detail == null)
+            return NoContent();
+
+        return PartialView("~/Views/Metrics/_AdvancedPerformance.cshtml", detail);
     }
 
     [HttpGet]
