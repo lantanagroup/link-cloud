@@ -15,8 +15,7 @@ import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import org.slf4j.Logger;
@@ -33,7 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 @Service
-@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
+@Lazy(false)
 public class ValidationService {
     private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
     private final FhirValidator fhirValidator;
@@ -59,6 +58,7 @@ public class ValidationService {
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
+        logger.info("ValidationService initialized (packages and FhirValidator loaded)");
     }
 
     // Package-private for unit testing of the terminology support chain composition.
@@ -88,6 +88,9 @@ public class ValidationService {
 
     public List<Result> validate(IBaseResource resource) {
         try {
+            if (resource instanceof Bundle bundle) {
+                logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
+            }
             List<Result> results = resource instanceof Bundle bundle
                     ? validateBundle(bundle)
                     : toResults(fhirValidator.validateWithResult(resource));

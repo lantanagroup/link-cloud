@@ -89,6 +89,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             if (bundle == null) {
                 bundle = getBundleViaRest(facilityId, patientId, reportId);
             }
+            _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
             if (Headers.isPerformanceMode(record.headers())) {
                 Attributes fetchAttributes = Attributes.builder()
                         .put(DiagnosticNames.FACILITY_ID, facilityId)
