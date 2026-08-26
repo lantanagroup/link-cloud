@@ -4,7 +4,9 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.context.support.IValidationSupport;
 import com.lantanagroup.link.validation.configs.LinkConfig;
+import com.lantanagroup.link.validation.configs.ValidationResultIgnoreRuleConfig;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.entities.ResultField;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
@@ -18,6 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -132,6 +135,34 @@ class ValidationServiceTest {
         assertFalse(deduplicated.contains(inactiveNoSuffix), "duplicate inactive variant dropped");
         assertTrue(deduplicated.contains(otherFinding), "non-inactive finding preserved");
         assertTrue(deduplicated.contains(inactiveDifferentElement), "inactive on a different element preserved");
+    }
+
+    @Test
+    void validationResultIgnoreService_doesNotMatchWhenNoRulesConfigured() {
+        LinkConfig config = mock(LinkConfig.class);
+        when(config.getValidationResultIgnoreRules()).thenReturn(null);
+
+        ValidationResultIgnoreService service = new ValidationResultIgnoreService(config);
+
+        assertNull(service.getFirstMatchingRuleId(result("expr", "1:1", "message")));
+    }
+
+    @Test
+    void validationResultIgnoreService_matchesConfiguredMessageRule() {
+        ValidationResultIgnoreRuleConfig rule = new ValidationResultIgnoreRuleConfig();
+        rule.setId("ignore_deprecated");
+        ValidationResultIgnoreRuleConfig.MatcherConfig matcher = new ValidationResultIgnoreRuleConfig.MatcherConfig();
+        matcher.setField(ResultField.MESSAGE);
+        matcher.setRegex("deprecated");
+        rule.setMatcher(matcher);
+
+        LinkConfig config = mock(LinkConfig.class);
+        when(config.getValidationResultIgnoreRules()).thenReturn(List.of(rule));
+
+        ValidationResultIgnoreService service = new ValidationResultIgnoreService(config);
+
+        Result result = result("expr", "1:1", "This extension is deprecated");
+        assertEquals("ignore_deprecated", service.getFirstMatchingRuleId(result));
     }
 
     private static Result result(String expression, String location, String message) {

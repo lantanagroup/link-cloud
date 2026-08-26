@@ -38,12 +38,14 @@ public class ValidationService {
     private final FhirValidator fhirValidator;
     private final LinkConfig linkConfig;
     private final ExecutorService bundleValidationExecutor;
+    private final ValidationResultIgnoreService validationResultIgnoreService;
 
     public ValidationService(
             FhirContext fhirContext,
             ArtifactService artifactService,
             LinkConfig linkConfig,
             ValidationCacheService validationCacheService,
+            ValidationResultIgnoreService validationResultIgnoreService,
             @Qualifier("bundleValidationExecutor") ExecutorService bundleValidationExecutor) throws IOException {
         this.linkConfig = linkConfig;
         this.bundleValidationExecutor = bundleValidationExecutor;
@@ -51,6 +53,8 @@ public class ValidationService {
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
                 new SnapshotGeneratingValidationSupport(fhirContext));
+
+        this.validationResultIgnoreService = validationResultIgnoreService;
 
         loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain, validationCacheService);
 
@@ -94,7 +98,7 @@ public class ValidationService {
             List<Result> results = resource instanceof Bundle bundle
                     ? validateBundle(bundle)
                     : toResults(fhirValidator.validateWithResult(resource));
-            return deduplicateInactiveResults(results);
+            return validationResultIgnoreService.filterIgnored(deduplicateInactiveResults(results));
         } catch (Exception ex) {
             logger.error("Validation failed", ex);
             throw ex;

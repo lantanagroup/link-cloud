@@ -53,6 +53,14 @@ spring:
       group-id: validation
     producer:
       client-id: validation-service
+    retry:
+      # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
+      # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
+      consumer-retry-duration:
+        - PT20S
+        - PT60S
+        - PT120S
+      disable-retry-consumer: false
     #properties:
       #security.protocol: SASL_SSL
       #sasl.mechanism: PLAIN
@@ -113,6 +121,27 @@ link:
   bundle-validation-parallelism: 4
   bundle-validation-batch-size: 32
   terminology-service-url: ''
+  validation-result-ignore-rules:
+    - id: ignore_measureeval_measure_report_population_description_invalid_version
+      description: Ignore known MeasureEval-generated MeasureReport population description extension version warnings
+      matcher:
+        field: EXPRESSION
+        regex: "\\.extension\\[[0-9]+\\]\\[url='http://hl7\\.org/fhir/5\\.0/StructureDefinition/extension-MeasureReport\\.population\\.description'\\]$"
+    - id: ignore_sde_reference_extension
+      description: Ignore known MeasureReport.supplementalDataElement.reference extension
+      matcher:
+        field: EXPRESSION
+        regex: "\\.extension\\[[0-9]+\\]\\[url='http://hl7\\.org/fhir/5\\.0/StructureDefinition/extension-MeasureReport\\.supplementalDataElement\\.reference'\\]$"
+    - id: ignore_measureeval_measure_report_population_description_unknown_extension
+      description: Ignore known MeasureEval-generated MeasureReport population description unknown extension warnings
+      matcher:
+        field: MESSAGE
+        regex: "^Unknown extension http://hl7\\.org/fhir/5\\.0/StructureDefinition/extension-MeasureReport\\.population\\.description$"
+    - id: ignore_deprecated_criteria_reference_extension
+      description: Ignore deprecated criteriaReference extension warnings from measure-generated content
+      matcher:
+        field: MESSAGE
+        regex: "^The extension http://hl7\\.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference\\|5\\.0\\.0 is deprecated$"
   # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
   # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy
   # "503 no healthy upstream" during a terminology-service rollout). 4xx never retries.

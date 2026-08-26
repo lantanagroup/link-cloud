@@ -54,6 +54,13 @@ public class LinkConfig {
     @Getter @Setter
     private int bundleValidationBatchSize = 32;
 
+    /**
+     * Configured validation-result rules whose matches should be dropped before categorization,
+     * persistence, and downstream validity calculations.
+     */
+    @Getter @Setter
+    private List<ValidationResultIgnoreRuleConfig> validationResultIgnoreRules = new ArrayList<>();
+
     @Bean(name = "bundleValidationExecutor", destroyMethod = "shutdown")
     public ExecutorService bundleValidationExecutor() {
         int parallelism = Math.max(1, bundleValidationParallelism);

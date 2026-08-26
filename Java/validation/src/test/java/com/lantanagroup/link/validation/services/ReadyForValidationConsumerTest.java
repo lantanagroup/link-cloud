@@ -325,6 +325,17 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null));
+
+        verify(categorizationService).categorize(Collections.emptyList());
+        verify(resultRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void process_inactiveCodeResult_isCategorizedAsInactiveCodeAndPersisted() throws Exception {
         // Wire a real CategorizationService backed by the shipped categories.json so this exercises the
         // actual message -> inactive_code category -> saveAll path for an inactive-code finding.

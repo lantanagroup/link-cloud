@@ -517,6 +517,8 @@ for that type excludes it.
 `FhirGenerationPipeline` passes the run's uploaded/edited measure JSON when present
 (only the patient's qualifying measures). If no bundle JSON is supplied, it falls
 back to the embedded system bundles for the qualifying `ProfiledMeasureType` values.
+Non-qualifying measures do not contribute contained resources and must not influence
+the intersection.
 
 This is why uploading a new version of ACH Monthly does not require recoding a
 family profile: comment-stripping and SDE analysis read the CQL that MeasureEval

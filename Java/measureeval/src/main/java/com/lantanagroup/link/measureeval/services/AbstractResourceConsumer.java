@@ -8,7 +8,7 @@ import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AbstractAsyncConsumer<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger = LoggerFactory.getLogger("com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
 
@@ -54,6 +54,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final RedisResourceService redisResourceService;
     private final AbsResourceService absResourceService;
+    private final ResourceCacheCleanup cacheCleanup;
     private final MongoOperations mongoOperations;
 
     public AbstractResourceConsumer (
@@ -80,6 +81,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.blobStorageService = blobStorageService;
         this.redisResourceService = redisResourceService;
         this.absResourceService = absResourceService;
+        this.cacheCleanup = new ResourceCacheCleanup(redisResourceService, absResourceService);
         this.mongoOperations = mongoOperations;
     }
 
@@ -119,9 +121,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getCacheType() == null) {
                 throw new ValidationException("Cache Type is null.");
             }
-            // Captured here, next to its validation, rather than after the metrics/logging below: the
-            // finally-block cleanup is guarded on both correlationId and cacheType, so anything that
-            // throws between the two assignments would silently strand a valid cache entry.
             cacheType = value.getCacheType();
             correlationId = value.getCacheKey();
             if (correlationId == null || correlationId.isEmpty()) {
@@ -171,7 +170,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             }
 
             if (resources.isEmpty()) {
-                logger.info("Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report", correlationId);
+                logger.warn(
+                        "Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report. " +
+                        "If this patient had acquired resources, the resource-cache write/copy path failed.",
+                        LogUtils.sanitize(correlationId));
             }
 
             logger.trace("Beginning patient status update");
@@ -214,7 +216,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                     value.getQueryType() == QueryType.INITIAL && reportablePatient;
 
             // INITIAL + reportable keeps the cache for the SUPPLEMENTAL pass to reuse; every other
-            // outcome, including failure, is cleaned up by the finally block below.
+            // successful outcome cleans it up below.
             keepCacheForSupplemental = initialReportable;
 
             if (initialReportable) {
@@ -228,37 +230,26 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         resources.size(), correlationId);
             }
 
-        } finally {
-            // A task may still be running if we got here by way of an exception; stop it so that its
-            // elapsed time is reported and so that starting the cleanup task below cannot throw.
-            if (perf && taskStopWatch.isRunning()) {
-                taskStopWatch.stop();
-            }
-
-            // Clean up cache after SUPPLEMENTAL, after INITIAL if patient is not reportable, and after
-            // any failure. INITIAL + reportable keeps the cache for the SUPPLEMENTAL pass to reuse.
+            // Cleanup runs ONLY when processing succeeded. A thrown exception must leave the cache
+            // intact: the recoverer may route the record to -Retry, and the redelivered record needs
+            // its cached resources. Terminal (dead-letter) cleanup is the recoverer's job — it is the
+            // only place the routing decision is known (see the terminal-failure hook in KafkaConfig).
             if (keepCacheForSupplemental) {
-                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", correlationId);
-            } else if (correlationId != null && cacheType != null) {
+                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", LogUtils.sanitize(correlationId));
+            } else {
                 if (perf) taskStopWatch.start("cleanupCache");
                 try {
-                    switch (cacheType) {
-                        case REDIS -> redisResourceService.cleanup(correlationId);
-                        case ABS -> {
-                            if (absResourceService != null) {
-                                absResourceService.cleanup(correlationId);
-                            }
-                        }
-                    }
-                    logger.debug("Cache cleanup complete for correlationId={}, cacheType={}",
-                            LogUtils.sanitize(correlationId), LogUtils.sanitize(cacheType));
-                } catch (Exception e) {
-                    // Never mask the exception that brought us here, if any.
-                    logger.error("Cache cleanup failed for correlationId={}, cacheType={}",
-                            LogUtils.sanitize(correlationId), LogUtils.sanitize(cacheType), e);
+                    cacheCleanup.cleanup(correlationId, cacheType);
                 } finally {
                     if (perf) taskStopWatch.stop();
                 }
+            }
+
+        } finally {
+            // A task may still be running if we got here by way of an exception; stop it so that its
+            // elapsed time is reported.
+            if (perf && taskStopWatch.isRunning()) {
+                taskStopWatch.stop();
             }
 
             if (perf) {

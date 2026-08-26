@@ -3,7 +3,7 @@
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Display names and system measure-definition JSON for the closed generation families.
+/// Display names, bundle resource URIs, and embedded measure-definition JSON.
 /// ACH Daily/Monthly are Validation NHSN 2.0.0-cibuild; Hypoglycemic is the current
 /// NHSN hypoglycemic package (no 2.0 file in-repo).
 /// </summary>
@@ -17,6 +17,21 @@ public static class ProfiledMeasureCatalog
         _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
     };
 
+    public static string GetBundleLocation(ProfiledMeasureType measure) => measure switch
+    {
+        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
+            => "resource://LantanaGroup.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
+        ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
+            => "resource://LantanaGroup.Automation.measures.NHSNAcuteCareHospitalDailyInitialPopulation.json",
+        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+            => "resource://LantanaGroup.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
+        _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
+    };
+
+    /// <summary>
+    /// Reads the embedded FHIR measure-bundle JSON used by MeasureEval and by
+    /// <see cref="CqlFilterSimulator"/> instance prediction.
+    /// </summary>
     public static string ReadBundleJson(ProfiledMeasureType measure, Assembly? assembly = null)
     {
         var resourceName = measure switch

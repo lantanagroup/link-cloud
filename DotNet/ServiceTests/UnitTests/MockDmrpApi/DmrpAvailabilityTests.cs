@@ -2,8 +2,6 @@
 using LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Moq;
 using Xunit;
 
 namespace UnitTests.MockDmrpApi;
@@ -12,15 +10,15 @@ namespace UnitTests.MockDmrpApi;
 /// Covers the decision that keeps this stand-in out of production. Both the request
 /// pipeline and startup consult it, so it is the whole of the service's protection.
 /// </summary>
+/// <remarks>
+/// The environment name is deliberately not part of that decision. Every deployed Link
+/// namespace runs with <c>ASPNETCORE_ENVIRONMENT=Production</c> -- dev, qa and test
+/// included -- so an <c>IsProduction()</c> check disabled the mock everywhere it is
+/// actually deployed (LEGLINK-1048). Failing closed on the configuration key protects the
+/// same thing without depending on a name that does not distinguish environments here.
+/// </remarks>
 public class DmrpAvailabilityTests
 {
-    private static IHostEnvironment Environment(string environmentName)
-    {
-        var environment = new Mock<IHostEnvironment>();
-        environment.SetupGet(e => e.EnvironmentName).Returns(environmentName);
-        return environment.Object;
-    }
-
     private static IConfiguration Configuration(string? enabled)
     {
         var values = new Dictionary<string, string?>();
@@ -32,29 +30,51 @@ public class DmrpAvailabilityTests
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
 
-    // ------------------------------------------------------ the production block
+    // ------------------------------------------------------------ failing closed
+
+    [Fact]
+    public void IsEnabled_WithNoConfiguration_IsFalse()
+    {
+        // The test that matters. An environment that provisions no row -- which is what a
+        // production store does -- gets a dormant service rather than a running mock.
+        DmrpAvailability.IsEnabled(Configuration(null)).Should().BeFalse();
+    }
 
     [Theory]
-    [InlineData("true")]
-    [InlineData("True")]
-    [InlineData("false")]
-    [InlineData(null)]
-    public void IsEnabled_InProduction_IsAlwaysFalseWhateverTheConfigurationSays(string? configured)
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("yes")]
+    [InlineData("1")]
+    [InlineData("enabled")]
+    public void IsEnabled_WithAValueThatIsNotABoolean_IsFalse(string configured)
     {
-        // The test that matters. Azure App Configuration is appended last in the
-        // configuration chain, so a row provisioned against a production label outranks
-        // appsettings and environment variables. This closes that off: no configuration
-        // source can turn the mock on in production.
-        DmrpAvailability.IsEnabled(Environment("Production"), Configuration(configured))
-            .Should().BeFalse();
+        // Worth pinning twice over. The default is the whole protection, so a fat-fingered
+        // row must not slip past it -- and it must not throw either: this runs before the
+        // host is built, so a value that cannot be parsed has to leave the service dormant
+        // rather than crash-loop the pod.
+        DmrpAvailability.IsEnabled(Configuration(configured)).Should().BeFalse();
+    }
+
+    // --------------------------------------------------------- configuration decides
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("True", true)]
+    [InlineData("TRUE", true)]
+    [InlineData("false", false)]
+    [InlineData("False", false)]
+    public void IsEnabled_FollowsConfiguration(string configured, bool expected)
+    {
+        DmrpAvailability.IsEnabled(Configuration(configured)).Should().Be(expected);
     }
 
     [Fact]
-    public void IsEnabled_InProduction_IsFalseEvenWhenEveryOtherSignalSaysOtherwise()
+    public void IsEnabled_TakesTheHighestRankedSource()
     {
         // Layered the way the real chain layers them: a base source standing in for
         // appsettings, and a second appended after it standing in for Azure App
-        // Configuration, which is added last and so outranks everything before it.
+        // Configuration, which is added last and so outranks everything before it. An
+        // environment that wants the mock on provisions the row there, and it wins.
         //
         // A differently-cased key would not work as a second signal -- configuration keys are
         // case-insensitive, so it is the same key, and the in-memory provider rejects it as a
@@ -70,41 +90,14 @@ public class DmrpAvailabilityTests
             })
             .Build();
 
-        // Guards the test against going vacuous: the later source really does win, so the
-        // environment block below is the only thing standing between this and a running mock.
-        configuration[DmrpAvailability.EnabledConfigurationKey].Should().Be("true");
-
-        DmrpAvailability.IsEnabled(Environment("Production"), configuration).Should().BeFalse();
-    }
-
-    // ------------------------------------------------- everywhere else, config wins
-
-    [Theory]
-    [InlineData("Development")]
-    [InlineData("Docker")]
-    [InlineData("Staging")]
-    [InlineData("qa")]
-    public void IsEnabled_OutsideProduction_FollowsConfiguration(string environmentName)
-    {
-        DmrpAvailability.IsEnabled(Environment(environmentName), Configuration("true")).Should().BeTrue();
-        DmrpAvailability.IsEnabled(Environment(environmentName), Configuration("false")).Should().BeFalse();
+        DmrpAvailability.IsEnabled(configuration).Should().BeTrue();
     }
 
     [Fact]
-    public void IsEnabled_OutsideProductionWithNoConfiguration_DefaultsToEnabled()
+    public void IsEnabled_RejectsNullConfiguration()
     {
-        // A bare "dotnet run" should serve requests. Production is covered by the
-        // environment check rather than by this default.
-        DmrpAvailability.IsEnabled(Environment("Development"), Configuration(null)).Should().BeTrue();
-    }
+        var nullConfiguration = () => DmrpAvailability.IsEnabled(null!);
 
-    [Fact]
-    public void IsEnabled_RejectsNullArguments()
-    {
-        var nullEnvironment = () => DmrpAvailability.IsEnabled(null!, Configuration("true"));
-        var nullConfiguration = () => DmrpAvailability.IsEnabled(Environment("Development"), null!);
-
-        nullEnvironment.Should().Throw<ArgumentNullException>();
         nullConfiguration.Should().Throw<ArgumentNullException>();
     }
 
