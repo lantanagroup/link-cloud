@@ -118,6 +118,8 @@ authentication:
 
 link:
   info-route: /api/validation/info
+  bundle-validation-parallelism: 4
+  bundle-validation-batch-size: 32
   terminology-service-url: ''
   validation-result-ignore-rules:
     - id: ignore_measureeval_measure_report_population_description_invalid_version
