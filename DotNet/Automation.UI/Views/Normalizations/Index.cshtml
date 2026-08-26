@@ -854,7 +854,11 @@
 
         const container = document.getElementById('seqEntriesContainer');
         container.innerHTML = '';
-        (data?.entries || []).sort((a,b) => a.sequence - b.sequence).forEach(e => addSeqEntryRow(e));
+        (data?.entries || [])
+            .sort((a, b) => a.sequence - b.sequence)
+            .forEach(e => addSeqEntryRow(e));
+
+        updateSeqOperationOptions();
 
         document.getElementById('btnSeqSave').style.display = mode === 'edit' ? '' : 'none';
         document.getElementById('seqSystemOverlay').style.display = mode === 'view' ? '' : 'none';
@@ -865,14 +869,67 @@
     function addSeqEntryRow(entry) {
         const container = document.getElementById('seqEntriesContainer');
         const seq = container.children.length + 1;
-        const options = allOperations.map(o => `<option value="${o.id}" ${o.id === entry?.operationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`).join('');
+
+        const selectedOperationIds = new Set(
+            Array.from(container.querySelectorAll('.seq-op-select'))
+                .map(select => select.value).filter(Boolean)
+        );
+
+        const selectedOperationId = entry?.operationId
+            || allOperations.find(o => !selectedOperationIds.has(o.id))?.id
+            || '';
+
+        if (!selectedOperationId) {
+            return;
+        }
+
+        const options = allOperations.map(o =>
+                `<option value="${o.id}" ${o.id === selectedOperationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`
+            ).join('');
+
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
             <select class="form-select form-select-sm seq-op-select">${options}</select>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove(); renumberSeqEntries();"><i class="bi bi-x-lg"></i></button>`;
+            <button type="button" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-x-lg"></i>
+            </button>`;
+
+        const select = row.querySelector('.seq-op-select');
+
+        select.addEventListener('change', updateSeqOperationOptions);
+
+        row.querySelector('.btn-outline-danger').addEventListener('click', () => {
+            row.remove();
+            renumberSeqEntries();
+            updateSeqOperationOptions();
+        });
+
         container.appendChild(row);
+        updateSeqOperationOptions();
+    }
+
+    function updateSeqOperationOptions() {
+        const selects = Array.from(document.querySelectorAll('#seqEntriesContainer .seq-op-select'));
+
+        selects.forEach(select => {
+            const selectedByOtherRows = new Set(
+                selects
+                    .filter(other => other !== select)
+                    .map(other => other.value)
+                    .filter(Boolean)
+            );
+
+            Array.from(select.options).forEach(option => {
+                option.disabled =
+                    option.value !== select.value &&
+                    selectedByOtherRows.has(option.value);
+            });
+        });
+
+        document.getElementById('btnAddSeqEntry').disabled =
+            selects.length >= allOperations.length;
     }
 
     function renumberSeqEntries() {
@@ -898,12 +955,31 @@
     }
 
     document.getElementById('btnSeqSave').addEventListener('click', async () => {
+        const formErrors = document.getElementById('seqFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
         const data = collectSeqData();
-        const resp = await postJson('@Url.Action("SaveSequence", "Normalizations")', data);
-        if (resp.ok) { location.reload(); } else {
+
+        const operationIds = data.entries.map(e => e.operationId);
+        if (new Set(operationIds).size !== operationIds.length) {
+            formErrors.textContent =
+                'A sequence cannot contain the same operation more than once.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        const resp = await postJson(
+            '@Url.Action("SaveSequence", "Normalizations")',
+            data
+        );
+
+        if (resp.ok) {
+            location.reload();
+        } else {
             const err = await resp.text();
-            document.getElementById('seqFormErrors').textContent = err;
-            document.getElementById('seqFormErrors').style.display = '';
+            formErrors.textContent = err;
+            formErrors.style.display = '';
         }
     });
 
