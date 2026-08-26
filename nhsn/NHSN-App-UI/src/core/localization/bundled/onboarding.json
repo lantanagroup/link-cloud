@@ -1,0 +1,74 @@
+{
+  "steps": {
+    "welcome": "Welcome",
+    "reportingPlan": "Facility Reporting Plan",
+    "facilityInfo": "Facility Information",
+    "manualUpload": "Manual Upload",
+    "fhir": "FHIR Server Information",
+    "census": "Patients of Interest Configuration",
+    "locationOrg": "Organization Identification",
+    "hsloc": "Location Identification (HSLOC)",
+    "encounter": "Encounter Mapping",
+    "report": "Generate Test Report",
+    "reportResults": "Report Results",
+    "mrnIntake": "MRN Identifier Intake",
+    "complete": "Enrollment Complete"
+  },
+  "welcome": {
+    "title": "Welcome to DQM Onboarding",
+    "intro": "The National Healthcare Safety Network (NHSN) uses <nhsnlink>NHSNLink</nhsnlink>, an open-source Fast Healthcare Interoperability Resources (<fhir>FHIR®</fhir>) application, to enable reporting of digital quality measures (dQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of dQMs to NHSN.",
+    "audienceTitle": "Intended Audience",
+    "audienceBody": "The onboarding steps that follow should be completed by the site’s information technology team.",
+    "workflowTitle": "Workflow",
+    "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time.",
+    "vendorNote": "Your facility is configured for {{vendor}}."
+  },
+  "reportingPlan": {
+    "title": "Facility Reporting Plan"
+  },
+  "facilityInfo": {
+    "title": "Facility Information"
+  },
+  "manualUpload": {
+    "title": "Manual Upload"
+  },
+  "fhir": {
+    "title": "FHIR Server Information"
+  },
+  "census": {
+    "title": "Patients of Interest Configuration"
+  },
+  "locationOrg": {
+    "title": "Organization Identification"
+  },
+  "hsloc": {
+    "title": "Location Identification (HSLOC)"
+  },
+  "encounter": {
+    "title": "Encounter Mapping"
+  },
+  "report": {
+    "title": "Generate Test Report"
+  },
+  "reportResults": {
+    "title": "Report Results"
+  },
+  "mrnIntake": {
+    "title": "MRN Identifier Intake"
+  },
+  "complete": {
+    "title": "Enrollment Complete"
+  },
+  "page": {
+    "title": "Onboarding",
+    "intro": "Hello world..."
+  },
+  "messages": {
+    "completeSuccess": "Completed onboarding for facility {{facilityId}}.",
+    "completeError": "Unable to complete onboarding.",
+    "stepNotImplemented": "This step is not implemented yet.",
+    "stepUnavailable": "That step is not available.",
+    "draftConflict": "This facility was updated in another window. Reload to see the latest version.",
+    "notConnected": "Not yet connected to live data. The values shown are simulated."
+  }
+}
