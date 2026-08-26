@@ -40,9 +40,9 @@ public static class MetricsBenchmarkEvaluator
                 continue;
 
             if (spec.Max is double max && value.Value > max)
-                violations.Add($"{key} {Format(value.Value)} exceeds max {Format(max)}");
+                violations.Add($"{FriendlyName(key)} was {Format(value.Value)}; the limit is {Format(max)}.");
             if (spec.Min is double min && value.Value < min)
-                violations.Add($"{key} {Format(value.Value)} is below min {Format(min)}");
+                violations.Add($"{FriendlyName(key)} was {Format(value.Value)}; it needs to be at least {Format(min)}.");
         }
 
         var flags = new List<string>();
@@ -53,7 +53,7 @@ public static class MetricsBenchmarkEvaluator
             {
                 var limit = previous.E2eDurationSeconds * (1 + percent / 100.0);
                 if (document.E2eDurationSeconds > limit)
-                    flags.Add($"e2eDurationSeconds {Format(document.E2eDurationSeconds)} is >{percent}% worse than previous {Format(previous.E2eDurationSeconds)}");
+                    flags.Add($"Total run time ({Format(document.E2eDurationSeconds)} sec) was more than {percent}% slower than the last successful run ({Format(previous.E2eDurationSeconds)} sec).");
             }
 
             foreach (var stage in document.Stages.Keys)
@@ -65,7 +65,7 @@ public static class MetricsBenchmarkEvaluator
 
                 var limit = prior.P95Ms * (1 + percent / 100.0);
                 if (current.P95Ms > limit)
-                    flags.Add($"stages.{stage}.p95Ms {Format(current.P95Ms)} is >{percent}% worse than previous {Format(prior.P95Ms)}");
+                    flags.Add($"{FriendlyStage(stage)} slow time ({Format(current.P95Ms)} ms) was more than {percent}% slower than the last successful run ({Format(prior.P95Ms)} ms).");
             }
         }
 
@@ -117,6 +117,45 @@ public static class MetricsBenchmarkEvaluator
             "errorCount" => snapshot.ErrorCount,
             _ => null
         };
+    }
+
+    internal static string FriendlyName(string path) => path switch
+    {
+        "e2eDurationSeconds" => "Total run time (seconds)",
+        "patientsPerMinute" => "Patients per minute",
+        "resourcesPerSecond" => "Resources per second",
+        "errorRate" => "Error rate",
+        _ when path.StartsWith("stages.", StringComparison.Ordinal) => FriendlyStagePath(path),
+        _ => path
+    };
+
+    internal static string FriendlyStage(string key) => key switch
+    {
+        "acquisition" => "Data Acquisition",
+        "dispatch" => "Query Dispatch",
+        "normalization" => "Normalization",
+        "measureeval" => "Measure Evaluation",
+        "validation" => "Validation",
+        "submission" => "Submission",
+        _ => key
+    };
+
+    private static string FriendlyStagePath(string path)
+    {
+        var rest = path["stages.".Length..];
+        var dot = rest.LastIndexOf('.');
+        var stage = dot > 0 ? rest[..dot] : rest;
+        var field = dot > 0 ? rest[(dot + 1)..] : "";
+        var fieldLabel = field switch
+        {
+            "p50Ms" => "typical time (ms)",
+            "p95Ms" => "slow time (ms)",
+            "p99Ms" => "slowest time (ms)",
+            "count" => "operation count",
+            "errorCount" => "error count",
+            _ => field
+        };
+        return $"{FriendlyStage(stage)} {fieldLabel}";
     }
 
     private static ThresholdSpec Merge(ThresholdSpec left, ThresholdSpec right) => new()

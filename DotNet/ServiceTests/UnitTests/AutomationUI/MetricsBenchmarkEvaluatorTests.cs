@@ -15,7 +15,7 @@ public class MetricsBenchmarkEvaluatorTests
         var result = MetricsBenchmarkEvaluator.Evaluate(doc, benchmark: null, targetDurationSeconds: 90, previous: null);
 
         result.Pass.Should().BeFalse();
-        result.Violations.Should().Contain(v => v.Contains("e2eDurationSeconds"));
+        result.Violations.Should().Contain(v => v.Contains("Total run time"));
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class MetricsBenchmarkEvaluatorTests
         var result = MetricsBenchmarkEvaluator.Evaluate(doc, benchmark, null, null);
 
         result.Pass.Should().BeFalse();
-        result.Violations.Should().Contain(v => v.Contains("stages.validation.p95Ms"));
+        result.Violations.Should().Contain(v => v.Contains("Validation") && v.Contains("slow time"));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class MetricsBenchmarkEvaluatorTests
 
         result.Pass.Should().BeTrue();
         result.PreviousRunId.Should().Be(previous.RunId);
-        result.RegressionFlags.Should().Contain(f => f.Contains("stages.acquisition.p95Ms"));
+        result.RegressionFlags.Should().Contain(f => f.Contains("Data Acquisition") && f.Contains("slower"));
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class MetricsBenchmarkEvaluatorTests
         var result = MetricsBenchmarkEvaluator.Evaluate(doc, benchmark, null, null);
 
         result.Pass.Should().BeFalse();
-        result.Violations.Should().Contain(v => v.Contains("patientsPerMinute"));
+        result.Violations.Should().Contain(v => v.Contains("Patients per minute"));
     }
 
     private static AutomationRunMetricsDocument Doc(double e2e)

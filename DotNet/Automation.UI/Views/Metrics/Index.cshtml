@@ -1,47 +1,56 @@
 @model MetricsDashboardViewModel
 @{
-    ViewData["Title"] = "Metrics";
-    var lastE2e = Model.LastRunE2eSeconds > 0
-        ? TimeSpan.FromSeconds(Model.LastRunE2eSeconds).ToString(@"mm\:ss")
-        : "—";
+    ViewData["Title"] = "Performance results";
+    string FormatDuration(double seconds)
+    {
+        if (seconds <= 0) return "—";
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours} hr {ts.Minutes} min";
+        if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes} min {ts.Seconds} sec";
+        return $"{Math.Max(1, ts.Seconds)} sec";
+    }
+    string FormatWhen(DateTimeOffset? value)
+    {
+        if (value is null) return "—";
+        return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+    }
+    var lastE2e = FormatDuration(Model.LastRunE2eSeconds);
     var patientsPerMin = Model.LastRunPatientsPerMinute is > 0
         ? Model.LastRunPatientsPerMinute.Value.ToString("0.0")
         : "—";
 }
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-        <div>
-            <h2 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>Metrics</h2>
-            <p class="text-muted mb-0">Performance-run snapshots from Mongo. Stage latency is captured at run end — this page does not query Prometheus.</p>
-        </div>
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>Performance results</h2>
+        <p class="text-muted mb-0">History of scenarios that had <strong>Metrics run</strong> turned on. Open a row to see total time, speed, and how long each pipeline step took. Everyday functional runs stay on the Runs page.</p>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="au-kpi-card">
+            <div class="au-kpi-card" title="How long the most recent metrics run took, start to finish.">
                 <div class="au-kpi-value">@lastE2e</div>
-                <div class="au-kpi-label">Last run e2e</div>
+                <div class="au-kpi-label">Last run total time</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="au-kpi-card">
+            <div class="au-kpi-card" title="How fast the last run moved patients through the pipeline.">
                 <div class="au-kpi-value">@patientsPerMin</div>
-                <div class="au-kpi-label">Patients / min</div>
+                <div class="au-kpi-label">Last run patients / min</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="au-kpi-card">
-                <div class="au-kpi-value">@(Model.RegressionFlagCount)</div>
-                <div class="au-kpi-label">Regression flags (14d)</div>
+            <div class="au-kpi-card" title="How many times a recent run was noticeably slower than the previous successful run of the same scenario (last 14 days).">
+                <div class="au-kpi-value @(Model.RegressionFlagCount > 0 ? "text-warning" : "")">@(Model.RegressionFlagCount)</div>
+                <div class="au-kpi-label">Got slower (14 days)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="au-kpi-card">
+            <div class="au-kpi-card" title="Whether the last run recorded per-step timings (Data Acquisition, Normalization, and so on).">
                 <div class="au-kpi-value @(Model.LastRunStagesUnavailable ? "text-warning" : "text-success")">
                     @(Model.LastRunStagesUnavailable ? "No" : "Yes")
                 </div>
-                <div class="au-kpi-label">Stage latency available</div>
+                <div class="au-kpi-label">Step timings recorded</div>
             </div>
         </div>
     </div>
@@ -50,19 +59,20 @@
     {
         <div class="alert alert-warning" role="alert">
             <i class="bi bi-exclamation-triangle me-1"></i>
-            Stage latency is unavailable for the latest Metrics run (Prometheus was empty, unreachable, or not configured). Wall-clock duration and validators still persisted.
+            The latest run saved total time and check results, but not per-step timings. That usually means the metrics store was empty or unreachable. The run itself is still on this list.
         </div>
     }
 
     <div class="au-card mb-4">
-        <div class="card-header"><i class="bi bi-play-fill me-2"></i>Run Metrics scenario</div>
+        <div class="card-header"><i class="bi bi-play-fill me-2"></i>Start a metrics run</div>
         <div class="card-body">
             @if (Model.MetricsScenarios.Count == 0)
             {
-                <p class="text-muted mb-0">No scenarios have <strong>Metrics / Performance run</strong> enabled. Open Scenarios, check the Metrics box, then return here.</p>
+                <p class="text-muted mb-0">No saved scenarios have <strong>Metrics run</strong> turned on. Open Scenarios, edit a scenario, switch Metrics run on, save, then come back here.</p>
             }
             else
             {
+                <p class="small text-muted mb-2">Only scenarios with Metrics run enabled appear here. The run still uses that scenario’s patients, measures, and report settings.</p>
                 <form asp-controller="Runs" asp-action="Start" method="post" class="row g-2 align-items-end">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="Scenario" value="@AutomationScenarioKind.Custom" />
@@ -86,14 +96,15 @@
     </div>
 
     <div class="au-card mb-4">
-        <div class="card-header"><i class="bi bi-graph-up me-2"></i>E2E duration (14 days)</div>
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Total run time — last 14 days</div>
         <div class="card-body">
             @if (Model.DurationTrend.Count == 0)
             {
-                <p class="text-muted mb-0">No Metrics snapshots in the last 14 days.</p>
+                <p class="text-muted mb-0">No metrics runs in the last 14 days.</p>
             }
             else
             {
+                <p class="small text-muted mb-2">Each point is one finished metrics run. Spikes mean that run took longer than usual.</p>
                 <canvas id="metricsDurationChart" height="120"></canvas>
             }
         </div>
@@ -101,7 +112,7 @@
 
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-clock-history me-2"></i>Metrics runs</span>
+            <span><i class="bi bi-clock-history me-2"></i>Finished metrics runs</span>
             <span class="small" style="opacity:.75;">@Model.Metadata.TotalCount total</span>
         </div>
         <div class="card-body p-0">
@@ -110,9 +121,9 @@
                     <thead>
                         <tr>
                             <th>Scenario</th>
-                            <th>Outcome</th>
-                            <th>E2E</th>
-                            <th>Stages</th>
+                            <th>Result</th>
+                            <th>Total time</th>
+                            <th>Step timings</th>
                             <th>Finished</th>
                             <th></th>
                         </tr>
@@ -120,7 +131,7 @@
                     <tbody>
                     @if (Model.Runs.Count == 0)
                     {
-                        <tr><td colspan="6" class="text-muted text-center py-4">No Metrics snapshots yet. Run a scenario with the Metrics checkbox.</td></tr>
+                        <tr><td colspan="6" class="text-muted text-center py-4">Nothing here yet. Turn on Metrics run on a scenario and run it.</td></tr>
                     }
                     else
                     {
@@ -130,23 +141,23 @@
                                 <td>@run.ScenarioName</td>
                                 <td>
                                     <span class="badge rounded-pill @(run.Outcome == "Succeeded" ? "au-badge-success" : run.Outcome == "Failed" ? "au-badge-danger" : "au-badge-muted")">
-                                        @run.Outcome
+                                        @(run.Outcome == "Succeeded" ? "Passed" : run.Outcome == "Failed" ? "Failed" : run.Outcome)
                                     </span>
                                 </td>
-                                <td>@(run.E2eDurationSeconds > 0 ? TimeSpan.FromSeconds(run.E2eDurationSeconds).ToString(@"mm\:ss") : "—")</td>
+                                <td>@FormatDuration(run.E2eDurationSeconds)</td>
                                 <td>
                                     @if (run.StagesUnavailable)
                                     {
-                                        <span class="text-warning">unavailable</span>
+                                        <span class="text-warning">Not recorded</span>
                                     }
                                     else
                                     {
-                                        <span class="text-success">captured</span>
+                                        <span class="text-success">Recorded</span>
                                     }
                                 </td>
-                                <td>@(run.FinishedAt?.ToString("u") ?? "—")</td>
+                                <td>@FormatWhen(run.FinishedAt)</td>
                                 <td>
-                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action">Details</a>
+                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action">View</a>
                                 </td>
                             </tr>
                         }
@@ -178,7 +189,7 @@
 <script>
     (function () {
         const points = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-            Model.DurationTrend.Select(p => new { finishedAt = p.FinishedAt.ToString("u"), seconds = p.E2eDurationSeconds, runId = p.RunId }),
+            Model.DurationTrend.Select(p => new { finishedAt = p.FinishedAt.UtcDateTime.ToString("MMM d h:mm tt"), seconds = p.E2eDurationSeconds, runId = p.RunId }),
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
         const canvas = document.getElementById('metricsDurationChart');
         if (!canvas || !points.length) return;
@@ -187,7 +198,7 @@
             data: {
                 labels: points.map(p => p.finishedAt),
                 datasets: [{
-                    label: 'E2E seconds',
+                    label: 'Total time (seconds)',
                     data: points.map(p => p.seconds),
                     borderColor: '#4da3ff',
                     backgroundColor: 'rgba(77,163,255,.15)',
@@ -197,7 +208,12 @@
             },
             options: {
                 plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Seconds' }
+                    }
+                }
             }
         });
     })();

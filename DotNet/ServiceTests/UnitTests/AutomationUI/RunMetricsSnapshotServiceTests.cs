@@ -92,7 +92,7 @@ public class RunMetricsSnapshotServiceTests
 
         saved.Should().NotBeNull();
         saved!.Benchmark.Pass.Should().BeFalse();
-        saved.Benchmark.Violations.Should().Contain(v => v.Contains("e2eDurationSeconds"));
+        saved.Benchmark.Violations.Should().Contain(v => v.Contains("Total run time"));
     }
 
     [Fact]
