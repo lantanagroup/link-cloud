@@ -83,6 +83,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         };
 
         await _store.RegisterRunAsync(runId, meta);
+        StartPoller(meta, CancellationToken.None);
         _logger.LogInformation("Registered run {RunId} for snapshot polling", runId);
     }
 
