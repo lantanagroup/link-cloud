@@ -47,6 +47,9 @@ RetentionCheckScheduled:3:1
 RetentionCheckScheduled-Error:3:1
 RetentionCheckScheduled-Retry:3:1
 Service-Healthcheck:3:1
+ShadowCompareEvent:3:1
+ShadowCompareEvent-Error:3:1
+ShadowCompareEvent-Retry:3:1
 SubmitPayload:3:1
 SubmitPayload-Error:3:1
 SubmitPayload-Retry:3:1

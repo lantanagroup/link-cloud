@@ -151,6 +151,11 @@ vaas:
   bridge:
     enabled: true
     rubric-id: measure-report-submission-v1
+    shadow-enabled: true
+    shadow-report:
+       daily-blob-path: shadow-reports/shadow-comparison-daily-report.xlsx
+      # Cron (Spring format, evaluated in UTC) for ShadowComparisonDailyReportJob; defaults to 00:15 UTC daily.
+       daily-cron: "0 15 0 * * *"
 
 validation:
   categoryOverride:

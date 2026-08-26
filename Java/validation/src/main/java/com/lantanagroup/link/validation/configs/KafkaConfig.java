@@ -5,8 +5,10 @@ import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
+import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.services.ReadyForValidationConsumer;
+import com.lantanagroup.link.validation.services.ShadowValidationConsumer;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -54,7 +56,8 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper));
+                Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
+                ShadowCompareEvent.TOPIC, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
@@ -62,7 +65,8 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.class, objectMapper));
+                Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.class, objectMapper),
+                ShadowCompareEvent.TOPIC, new JsonDeserializer<>(ShadowCompareEvent.class, objectMapper));
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
@@ -92,7 +96,8 @@ public class KafkaConfig {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ValidationComplete.class, getJsonSerializer(objectMapper, ValidationComplete.class),
-                ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class)
+                ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class),
+                ShadowCompareEvent.class, getJsonSerializer(objectMapper, ShadowCompareEvent.class)
         );
         return new DelegatingByTypeSerializer(serializers);
     }
@@ -147,6 +152,17 @@ public class KafkaConfig {
             ConcurrentKafkaListenerContainerFactory<ReadyForValidation.Key, ReadyForValidation> factory,
             ReadyForValidationConsumer consumer) {
         return getAsyncListenerContainer(factory, consumer, Topics.READY_FOR_VALIDATION);
+    }
+
+    // readyForValidationContainer above -- its pace, lag, and failures can never affect the primary consumer.
+    @Bean
+    public ConcurrentMessageListenerContainer<String, ShadowCompareEvent> shadowCompareEventContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ShadowCompareEvent> factory,
+            ShadowValidationConsumer consumer) {
+        ConcurrentMessageListenerContainer<String, ShadowCompareEvent> container =
+                getAsyncListenerContainer(factory, consumer, ShadowCompareEvent.TOPIC);
+        container.getContainerProperties().setGroupId("validation-shadow");
+        return container;
     }
 
     private <K, V> ConcurrentMessageListenerContainer<K, V> getAsyncListenerContainer(

@@ -33,6 +33,17 @@ public class BlobStorageService {
         return client.downloadContent();
     }
 
+    /** Downloads a blob's content, or returns {@code null} if it doesn't exist yet. */
+    public BinaryData downloadIfExists(String blobName) {
+        BlobClient client = containerClient.getBlobClient(blobName);
+        return client.exists() ? client.downloadContent() : null;
+    }
+
+    /** Uploads a block blob, overwriting any existing content -- for small generated artifacts (reports), not NDJSON. */
+    public void upload(String blobName, BinaryData data) {
+        containerClient.getBlobClient(blobName).upload(data, true);
+    }
+
     /**
      * Appends a single NDJSON line (one serialized FHIR resource) to an existing patient NDJSON append
      * blob. The blob is created upstream by the Report service's aggregation as an append blob, so this
