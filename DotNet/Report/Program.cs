@@ -226,6 +226,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
             KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
             KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+            KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
         ]));
 
     builder.Services.AddHostedService<RetryScheduleService>();
