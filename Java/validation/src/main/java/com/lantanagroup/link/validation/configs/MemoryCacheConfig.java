@@ -29,6 +29,7 @@ public class MemoryCacheConfig {
         logger.info("Cache type set to 'memory'");
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
                 "validateCodeCache",
+                "lookupCodeCache",
                 "isCodeSystemSupportedCache",
                 "isValueSetSupportedCache");
         cacheManager.setCaffeine(Caffeine.newBuilder()

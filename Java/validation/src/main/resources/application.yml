@@ -110,6 +110,8 @@ authentication:
 
 link:
   info-route: /api/validation/info
+  bundle-validation-parallelism: 4
+  bundle-validation-batch-size: 32
   terminology-service-url: ''
   # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
   # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy
