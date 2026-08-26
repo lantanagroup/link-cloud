@@ -105,6 +105,11 @@ public static class OrgResourceMapPredictionFilter
                 orgEncounterIds.Add(encounter.ResourceId);
         }
 
+        var orgEncounterAncestorLocationIds = CollectLocationAncestors(
+            locations,
+            orgEncounterLocationIds,
+            effectiveOrgLocationIds);
+
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in acquiredKeys)
         {
@@ -114,7 +119,7 @@ public static class OrgResourceMapPredictionFilter
                 continue;
             }
 
-            if (MatchesOrganizationScope(entry, orgEncounterIds, orgEncounterLocationIds))
+            if (MatchesOrganizationScope(entry, orgEncounterIds, orgEncounterLocationIds, orgEncounterAncestorLocationIds))
                 filtered.Add(key);
         }
 
@@ -182,16 +187,66 @@ public static class OrgResourceMapPredictionFilter
         return keptKeys;
     }
 
+    private static HashSet<string> CollectLocationAncestors(
+        List<ResourceEntry> locations,
+        HashSet<string> startIds,
+        HashSet<string> allowedIds)
+    {
+        var ancestors = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (startIds.Count == 0 || locations.Count == 0)
+            return ancestors;
+
+        var byId = new Dictionary<string, ResourceEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var location in locations)
+        {
+            if (!string.IsNullOrWhiteSpace(location.ResourceId))
+                byId[location.ResourceId] = location;
+        }
+
+        foreach (var startId in startIds)
+        {
+            var current = startId;
+            for (var guard = 0; guard < 16; guard++)
+            {
+                if (!byId.TryGetValue(current, out var location))
+                    break;
+                if (!TryGetReferencedResourceIds(location.Resource, "Location", out var parentIds))
+                    break;
+
+                var advanced = false;
+                foreach (var parentId in parentIds)
+                {
+                    if (!allowedIds.Contains(parentId))
+                        continue;
+                    if (!ancestors.Add(parentId))
+                        continue;
+                    current = parentId;
+                    advanced = true;
+                    break;
+                }
+
+                if (!advanced)
+                    break;
+            }
+        }
+
+        return ancestors;
+    }
+
     private static bool MatchesOrganizationScope(
         ResourceEntry resource,
         HashSet<string> orgEncounterIds,
-        HashSet<string> orgEncounterLocationIds)
+        HashSet<string> orgEncounterLocationIds,
+        HashSet<string> orgEncounterAncestorLocationIds)
     {
         if (string.Equals(resource.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase))
             return orgEncounterIds.Contains(resource.ResourceId);
 
         if (string.Equals(resource.ResourceType, "Location", StringComparison.OrdinalIgnoreCase))
-            return orgEncounterLocationIds.Contains(resource.ResourceId);
+        {
+            return orgEncounterLocationIds.Contains(resource.ResourceId)
+                   || orgEncounterAncestorLocationIds.Contains(resource.ResourceId);
+        }
 
         if (!TryGetReferencedResourceIds(resource.Resource, "Encounter", out var encounterIds))
             return true;

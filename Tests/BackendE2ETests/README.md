@@ -34,7 +34,8 @@ These tests use `AutomationUiScenarioRunner` to start a seeded scenario and poll
 
 | Suite | System scenario id | Notes |
 |---|---|---|
-| `AdhocReportTest` | `00000000-0000-0000-0000-000000000001` | PR-safe |
+| `AdhocReportTest` | `00000000-0000-0000-0000-000000000001` | PR-safe (ACH Monthly) |
+| `AdhocReportDailyAchTest` | `00000000-0000-0000-0000-000000000009` | PR-safe (ACH Daily) |
 | `MultiPatientTest` | `00000000-0000-0000-0000-000000000002` | PR-safe |
 | `MegaPatientTest` | `00000000-0000-0000-0000-000000000003` | `Category=LongRunning` |
 | `ReportScheduledWorkflowTest` (`ReportScheduledTest`) | `00000000-0000-0000-0000-000000000004` | PR-safe |
@@ -99,6 +100,7 @@ Backend E2E categories and excludes long-running mega stress tests.
 Current PR list includes:
 
 - `AdhocReportTest`
+- `AdhocReportDailyAchTest`
 - `ApiStabilityTest`
 - `AutomationUiSmokeTest`
 - `ReportScheduledTest`
