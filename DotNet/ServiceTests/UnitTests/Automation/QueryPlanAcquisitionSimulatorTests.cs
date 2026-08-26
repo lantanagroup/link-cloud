@@ -1,5 +1,8 @@
 ﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Helpers;
+using Hl7.Fhir.Introspection;
+using System.Globalization;
 using System.Text.Json;
 
 namespace UnitTests.Automation;
@@ -154,8 +157,8 @@ public class QueryPlanAcquisitionSimulatorTests
     [Fact]
     public void Observation_EffectivePeriod_OverlapsPeriod_IsAcquired()
     {
-        // Lab observations in the synthetic generator (and many real EHRs) use
-        // effectivePeriod, not effectiveDateTime.
+        // Imported/EHR lab observations may use effectivePeriod rather than
+        // effectiveDateTime. The simulator must still apply FHIR overlap.
         var entry = Entry("Observation", "O1", """
             { "resourceType":"Observation","id":"O1",
               "category":[{"coding":[{"code":"laboratory"}]}],
@@ -479,5 +482,99 @@ public class QueryPlanAcquisitionSimulatorTests
 
         Assert.Contains("Encounter/E1", acquired);
         Assert.DoesNotContain("DiagnosticReport/DxRpt-042", acquired);
+    }
+
+    [Fact]
+    public void DailyWindow_FhirBundleGeneratorObservations_SimulatorMatchesPeriodOverlap()
+    {
+        var mpStart = new DateTimeOffset(2023, 1, 15, 0, 0, 0, TimeSpan.Zero);
+        var mpEnd = new DateTimeOffset(2023, 1, 15, 23, 59, 59, TimeSpan.Zero);
+        var encStart = mpStart.AddHours(-6).UtcDateTime;
+        var encEnd = mpEnd.AddHours(6).UtcDateTime;
+
+        var serializerOptions = new JsonSerializerOptions();
+        serializerOptions.ForFhir(ModelInfo.ModelInspector);
+
+        var encounterJson = JsonSerializer.Serialize(
+            new Encounter
+            {
+                Id = "E1",
+                Period = new Period
+                {
+                    StartElement = new FhirDateTime(encStart),
+                    EndElement = new FhirDateTime(encEnd)
+                }
+            },
+            serializerOptions);
+
+        var entries = new List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>
+        {
+            Entry("Encounter", "E1", encounterJson)
+        };
+
+        var observationIds = new List<string>();
+        var specimenIds = new List<string> { "S1" };
+        const int observationCount = 80;
+        for (var i = 0; i < observationCount; i++)
+        {
+            var offset = TimeSpan.FromMinutes((double)i / observationCount * (encEnd - encStart).TotalMinutes);
+            var effective = encStart.Add(offset);
+            var id = $"O-{i:D3}";
+            var obs = ObservationFactory.Generate(id, "P1", "E1", effective, seed: 20260825 + i, specimenIds, observationIds);
+            var json = JsonSerializer.Serialize(obs, obs.GetType(), serializerOptions);
+            entries.Add(Entry("Observation", id, json));
+        }
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            entries,
+            null,
+            QueryPlanDefaults.GetDefaultAsInput(),
+            "2023-01-15T00:00:00Z",
+            "2023-01-15T23:59:59Z",
+            allowEncounterAnchoredDateOverrideForOutOfRange: false);
+
+        var mismatches = new List<string>();
+        foreach (var entry in entries.Where(e => e.ResourceType == "Observation"))
+        {
+            var overlaps = ObservationJsonOverlaps(entry.Resource, mpStart, mpEnd);
+            var simHas = acquired.Contains(entry.Key);
+            if (overlaps != simHas)
+                mismatches.Add($"{entry.Key} overlaps={overlaps} sim={simHas} json={entry.Resource.GetRawText()}");
+        }
+
+        Assert.True(mismatches.Count == 0,
+            $"Simulator/overlap mismatches ({mismatches.Count}):\n" + string.Join("\n", mismatches.Take(8)));
+    }
+
+    private static bool ObservationJsonOverlaps(JsonElement resource, DateTimeOffset mpStart, DateTimeOffset mpEnd)
+    {
+        DateTimeOffset start = default;
+        DateTimeOffset end = default;
+        if (resource.TryGetProperty("effectiveDateTime", out var dt)
+            && dt.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(dt.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out start))
+        {
+            end = start;
+        }
+        else if (resource.TryGetProperty("effectivePeriod", out var period) && period.ValueKind == JsonValueKind.Object)
+        {
+            var hasStart = period.TryGetProperty("start", out var s)
+                           && s.ValueKind == JsonValueKind.String
+                           && DateTimeOffset.TryParse(s.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out start);
+            var hasEnd = period.TryGetProperty("end", out var e)
+                         && e.ValueKind == JsonValueKind.String
+                         && DateTimeOffset.TryParse(e.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out end);
+            if (!hasStart && !hasEnd)
+                return false;
+            if (!hasStart) start = DateTimeOffset.MinValue;
+            if (!hasEnd) end = DateTimeOffset.MaxValue;
+        }
+        else
+        {
+            return false;
+        }
+
+        return end >= mpStart && start <= mpEnd;
     }
 }
