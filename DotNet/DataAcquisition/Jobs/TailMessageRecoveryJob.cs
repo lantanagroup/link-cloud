@@ -112,6 +112,12 @@ public class TailMessageRecoveryJob : IJob
                         },
                         context.CancellationToken);
 
+                    await dataAcquisitionLogManager.MarkTailSentAsync(
+                        tailResult.FacilityId,
+                        tailResult.CorrelationId,
+                        tailResult.QueryPhase,
+                        context.CancellationToken);
+
                     _logger.LogInformation(
                         "TailMessageRecoveryJob recovered tail for FacilityId={FacilityId}, PatientId={PatientId}",
                         tailResult.FacilityId.SanitizeForLog(),
@@ -139,7 +145,7 @@ public class TailMessageRecoveryJob : IJob
                         {
                             _logger.LogError(
                                 revertEx,
-                                "Failed to revert TailSent after recovery failure for LogId {LogId}.",
+                                "Failed to revert tail claim after recovery failure for LogId {LogId}. Stale claim will be reclaimed after the lease.",
                                 logId);
                         }
                     }

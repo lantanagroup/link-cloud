@@ -81,9 +81,15 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
                 kept.Count);
         }
 
-        // Prefer ABS when a correlation has data in both stores (a replica split) so
-        // Normalization does not look only in Redis and miss the ABS payload.
-        if (sawAbs)
+        if (sawAbs && sawRedis)
+        {
+            await ConsolidateIntoAbsAsync(kept, cancellationToken);
+            _logger.LogWarning(
+                "Replica split for CorrelationId={CorrelationId}: copied Redis-only keys into ABS so ResourcesAcquired can advertise a single CacheType.",
+                tail.CorrelationId.SanitizeForLog());
+            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
+        }
+        else if (sawAbs)
         {
             tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
         }
@@ -99,21 +105,75 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
     }
 
+    private async Task ConsolidateIntoAbsAsync(List<string> kept, CancellationToken cancellationToken)
+    {
+        var redis = TryGetImplementation(ResourceCacheType.Redis);
+        var abs = TryGetImplementation(ResourceCacheType.ABS);
+        if (redis == null || abs == null)
+        {
+            return;
+        }
+
+        var redisOnly = new List<string>();
+        foreach (var key in kept)
+        {
+            if (await redis.HasResourcesAsync(key, cancellationToken)
+                && !await abs.HasResourcesAsync(key, cancellationToken))
+            {
+                redisOnly.Add(key);
+            }
+        }
+
+        foreach (var key in redisOnly)
+        {
+            var resources = await redis.GetAsync(key, cancellationToken);
+            if (resources.Count == 0)
+            {
+                continue;
+            }
+
+            var resourceType = abs.GetResourceTypeByCacheKey(key);
+            await abs.UpdateCorrelationCacheAsync(key, resources, resourceType, cancellationToken);
+        }
+
+        var redisCopies = new List<string>();
+        foreach (var key in kept)
+        {
+            if (await redis.HasResourcesAsync(key, cancellationToken))
+            {
+                redisCopies.Add(key);
+            }
+        }
+
+        if (redisCopies.Count > 0)
+        {
+            await redis.DeleteAsync(redisCopies, cancellationToken);
+        }
+    }
+
     private async Task<bool> KeyHasResourcesAsync(
         ResourceCacheType cacheType,
         string cacheKey,
         CancellationToken cancellationToken)
     {
-        IResourceCache implementation;
-        try
-        {
-            implementation = _resourceCache.GetImplementation(cacheType);
-        }
-        catch (NotSupportedException)
+        var implementation = TryGetImplementation(cacheType);
+        if (implementation == null)
         {
             return false;
         }
 
         return await implementation.HasResourcesAsync(cacheKey, cancellationToken);
+    }
+
+    private IResourceCache? TryGetImplementation(ResourceCacheType cacheType)
+    {
+        try
+        {
+            return _resourceCache.GetImplementation(cacheType);
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

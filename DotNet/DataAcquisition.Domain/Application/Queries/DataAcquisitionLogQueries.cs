@@ -95,6 +95,8 @@ public interface IDataAcquisitionLogQueries
     /// Safety-net query: finds one representative log ID per group that is
     /// fully terminal, has SiblingCount stamped, but TailSent is still false
     /// and the last ModifyDate is older than <paramref name="minAge"/>.
+    /// In-flight <c>TailClaimedAt</c> claims inside the lease are excluded;
+    /// stale claims (lease expired, TailSent still false) are included.
     /// </summary>
     Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default);
 
@@ -362,9 +364,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             //          non-terminal logs (i.e. all logs are finished).
 
             // Phase 1 ? narrow candidate groups via terminal-status logs only.
+            // Skip in-flight claims so this path cannot double-produce while a worker holds the lease.
+            var leaseCutoff = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease);
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
+                    (log.TailClaimedAt == null || log.TailClaimedAt <= leaseCutoff) &&
                     log.Status != null && terminalStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null)
@@ -1168,15 +1173,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         var cutoff = DateTime.UtcNow.Subtract(minAge);
+        var leaseCutoff = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease);
 
         // Find groups where:
         //  - TailSent is still false
         //  - SiblingCount is stamped (creation completed)
         //  - Last activity was > minAge ago (avoids racing with the inline path)
+        //  - No in-flight TailClaimedAt inside the lease (stale claims are reclaimable)
         //  - ALL logs in the group are terminal (no incomplete siblings)
         var orphanedGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Where(l =>
                 !l.TailSent
+                && (l.TailClaimedAt == null || l.TailClaimedAt <= leaseCutoff)
                 && l.SiblingCount != null
                 && l.CorrelationId != null
                 && l.QueryPhase != null

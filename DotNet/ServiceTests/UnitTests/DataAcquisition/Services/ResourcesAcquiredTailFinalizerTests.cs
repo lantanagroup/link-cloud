@@ -158,6 +158,70 @@ public class ResourcesAcquiredTailFinalizerTests
         Assert.Equal(ResourceCacheType.ABS, tail.ResourcesAcquired.CacheType);
     }
 
+    [Fact]
+    public async Task FinalizeAsync_CopiesRedisOnlyKeysIntoAbsWhenStoresAreSplit()
+    {
+        var locationMapping = new Mock<ILocationMappingService>();
+        locationMapping
+            .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var patient = new Patient { Id = "patient-1" };
+
+        var redis = new Mock<IResourceCache>();
+        redis.Setup(c => c.HasResourcesAsync(PatientKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        redis.Setup(c => c.HasResourcesAsync(EncounterKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        redis.Setup(c => c.GetAsync(PatientKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource> { patient });
+        redis.Setup(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var abs = new Mock<IResourceCache>();
+        abs.Setup(c => c.HasResourcesAsync(PatientKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        abs.Setup(c => c.HasResourcesAsync(EncounterKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        abs.Setup(c => c.GetResourceTypeByCacheKey(PatientKey)).Returns(ResourceType.Patient);
+        abs.Setup(c => c.UpdateCorrelationCacheAsync(
+                PatientKey,
+                It.IsAny<List<DomainResource>>(),
+                ResourceType.Patient,
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(ResourceCacheType.Redis)).Returns(redis.Object);
+        cache.Setup(c => c.GetImplementation(ResourceCacheType.ABS)).Returns(abs.Object);
+
+        var sut = new ResourcesAcquiredTailFinalizer(
+            locationMapping.Object,
+            cache.Object,
+            Mock.Of<ILogger<ResourcesAcquiredTailFinalizer>>());
+
+        var tail = BuildTail([PatientKey, EncounterKey]);
+        tail.ResourcesAcquired.CacheType = ResourceCacheType.Redis;
+
+        await sut.FinalizeAsync(tail, CancellationToken.None);
+
+        Assert.Equal([PatientKey, EncounterKey], tail.ResourcesAcquired.CacheKeys);
+        Assert.Equal(ResourceCacheType.ABS, tail.ResourcesAcquired.CacheType);
+        abs.Verify(
+            c => c.UpdateCorrelationCacheAsync(
+                PatientKey,
+                It.Is<List<DomainResource>>(r => r.Count == 1),
+                ResourceType.Patient,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        redis.Verify(
+            c => c.DeleteAsync(
+                It.Is<List<string>>(keys => keys.SequenceEqual(new[] { PatientKey })),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
+    }
+
     private static TailCompletionResult BuildTail(List<string> cacheKeys) => new()
     {
         FacilityId = FacilityId,

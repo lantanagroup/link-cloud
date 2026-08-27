@@ -290,6 +290,12 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     },
                     ct);
 
+            await logManager.MarkTailSentAsync(
+                tailResult.FacilityId,
+                tailResult.CorrelationId,
+                tailResult.QueryPhase,
+                ct);
+
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
                 tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
@@ -314,7 +320,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 {
                     _logger.LogError(
                         revertEx,
-                        "Failed to revert TailSent after inline tail failure for LogId {LogId}.",
+                        "Failed to revert tail claim after inline tail failure for LogId {LogId}. Stale claim will be reclaimed after the lease.",
                         logId);
                 }
             }

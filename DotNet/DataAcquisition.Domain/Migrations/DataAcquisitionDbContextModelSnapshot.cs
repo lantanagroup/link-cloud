@@ -659,6 +659,9 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTime?>("TailClaimedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("TailSent")
                         .HasColumnType("bit");
 
