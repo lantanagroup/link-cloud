@@ -292,18 +292,36 @@ public class LiveExpectedStateTrackerTests
     }
 
     [Fact]
-    public void Mid_window_generate_can_append_data_driven_expectation_without_census()
+    public void Mid_window_generate_does_not_expect_report_until_admitted()
     {
         var tracker = NewTracker(["cohort-1"]);
 
         var entry = tracker.AddToPool("live-gen-1", LivePatientOrigin.Generated, expectedInReport: true);
 
         entry.CensusState.Should().Be(LivePatientCensusState.NotAdmitted);
+        entry.ExpectedInReport.Should().BeTrue();
         tracker.GetState().Admitted.Should().BeEmpty();
-        tracker.GetExpectedPopulation().Should().Equal("live-gen-1");
+        tracker.GetExpectedPopulation().Should().BeEmpty();
         var inject = tracker.GetEvents().Should().ContainSingle(e => e.EventType == PatientEventType.Inject).Subject;
         inject.PatientId.Should().Be("live-gen-1");
         inject.TimestampUtc.Should().NotBe(default);
+
+        tracker.Admit("live-gen-1", LiveEventSources.UI, null);
+
+        tracker.GetExpectedPopulation().Should().Equal("live-gen-1");
+        tracker.GetState().Admitted.Should().Equal("live-gen-1");
+    }
+
+    [Fact]
+    public void Mid_window_generate_non_qualifying_is_not_expected_after_admit()
+    {
+        var tracker = NewTracker(["cohort-1"]);
+        tracker.AddToPool("live-nq", LivePatientOrigin.Generated, expectedInReport: false);
+
+        tracker.Admit("live-nq", LiveEventSources.UI, null);
+
+        tracker.GetState().Admitted.Should().Equal("live-nq");
+        tracker.GetExpectedPopulation().Should().BeEmpty();
     }
 
     [Fact]

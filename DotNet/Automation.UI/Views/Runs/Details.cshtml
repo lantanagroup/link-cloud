@@ -101,7 +101,7 @@
 
             <details class="mb-3">
                 <summary class="text-muted small">How this works</summary>
-                <p class="small text-muted mb-0 mt-2">Patterns drive automatic census. Use Admit / Discharge / Re-admit on a pool row to change acquisition timing only — that does not rewrite generated clinical data or the generation manifest. Generate, Upload, and FHIR ID add patients with generation/import tracking so report validation can evaluate their data.</p>
+                <p class="small text-muted mb-0 mt-2">Patterns drive automatic census. Generate, Upload, and FHIR ID only add a patient to the pool — they are not expected in the report until Admit (and only if the predictor says they qualify). Discharge after Admit keeps them expected. Admit/Discharge does not rewrite generated clinical data.</p>
             </details>
 
             <div class="row g-3">

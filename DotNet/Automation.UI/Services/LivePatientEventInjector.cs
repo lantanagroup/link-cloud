@@ -350,8 +350,8 @@ public sealed class LivePatientEventInjector(
             .Select(id => id.Trim())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        // Inclusion comparison uses classic data/pattern expected IDs when the caller
-        // supplies them (GenerationManifest). The tracker is not the sole authority.
+        // Callers may pass a realized expected set (admitted AND predictor-qualifying).
+        // When omitted, the tracker snapshot is used.
         var expected = (expectedPopulation ?? session.Tracker.GetExpectedPopulation())
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id.Trim())

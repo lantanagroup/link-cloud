@@ -152,7 +152,7 @@ public sealed class AutomationRunsApiController(
         {
             admitted = state.Admitted,
             dischargedDuringWindow = state.DischargedDuringWindow,
-            expectedPopulation = state.ExpectedPopulation, // data/pattern inclusion, not census union
+            expectedPopulation = state.ExpectedPopulation, // admitted AND predictor-qualifying
             pool = state.Pool,
             poolTotals = state.PoolTotals,
             acceptingInjections = state.AcceptingInjections,
