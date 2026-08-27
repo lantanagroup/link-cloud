@@ -12,22 +12,22 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 /**
- * Once daily, consolidates the previous UTC day's {@code shadow_comparison_result} rows into an Excel
- * workbook and uploads it via {@link ShadowExcelReportService#generateDailyReport}. Safe to re-run --
- * it always rebuilds the full window and overwrites the same blob path.
+ * Once daily, consolidates the previous UTC day's {@code shadow_comparison_result} rows into a CSV
+ * report and uploads it via {@link ShadowCsvReportService#generateDailyReport}. Safe to re-run -- it
+ * always rebuilds the full window and overwrites the same blob path.
  */
 @Component
 @Slf4j
 public class ShadowComparisonDailyReportJob {
 
     private final ShadowComparisonResultRepository shadowComparisonResultRepository;
-    private final ShadowExcelReportService shadowExcelReportService;
+    private final ShadowCsvReportService shadowCsvReportService;
 
     public ShadowComparisonDailyReportJob(
             ShadowComparisonResultRepository shadowComparisonResultRepository,
-            ShadowExcelReportService shadowExcelReportService) {
+            ShadowCsvReportService shadowCsvReportService) {
         this.shadowComparisonResultRepository = shadowComparisonResultRepository;
-        this.shadowExcelReportService = shadowExcelReportService;
+        this.shadowCsvReportService = shadowCsvReportService;
     }
 
     @Scheduled(cron = "${vaas.bridge.shadow-report.daily-cron:0 15 0 * * *}", zone = "UTC")
@@ -35,12 +35,11 @@ public class ShadowComparisonDailyReportJob {
         OffsetDateTime endOfWindow = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
         OffsetDateTime startOfWindow = endOfWindow.minusDays(1);
         LocalDate reportDate = startOfWindow.toLocalDate();
-
         try {
             List<ShadowComparisonResult> results =
                     shadowComparisonResultRepository.findByComparedAtBetween(startOfWindow, endOfWindow);
             log.info("Generating daily shadow comparison report for {} with {} row(s)", reportDate, results.size());
-            shadowExcelReportService.generateDailyReport(reportDate, results);
+            shadowCsvReportService.generateDailyReport(reportDate, results);
         } catch (Exception e) {
             log.warn("Failed to generate the daily shadow comparison report for {}", reportDate, e);
         }

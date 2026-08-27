@@ -24,12 +24,12 @@ class ShadowComparisonDailyReportJobTest {
     @Mock
     private ShadowComparisonResultRepository shadowComparisonResultRepository;
     @Mock
-    private ShadowExcelReportService shadowExcelReportService;
+    private ShadowCsvReportService shadowCsvReportService;
 
     @Test
     void run_queriesThePreviousUtcDayAndForwardsResultsToTheReportService() {
         ShadowComparisonDailyReportJob job =
-                new ShadowComparisonDailyReportJob(shadowComparisonResultRepository, shadowExcelReportService);
+                new ShadowComparisonDailyReportJob(shadowComparisonResultRepository, shadowCsvReportService);
         ShadowComparisonResult result = ShadowComparisonResult.builder().build();
         when(shadowComparisonResultRepository.findByComparedAtBetween(any(), any())).thenReturn(List.of(result));
 
@@ -45,13 +45,13 @@ class ShadowComparisonDailyReportJobTest {
         assertEquals(expectedStart, startCaptor.getValue());
         assertEquals(expectedEnd, endCaptor.getValue());
 
-        verify(shadowExcelReportService).generateDailyReport(expectedStart.toLocalDate(), List.of(result));
+        verify(shadowCsvReportService).generateDailyReport(expectedStart.toLocalDate(), List.of(result));
     }
 
     @Test
     void run_swallowsExceptions_soASchedulerFailureNeverPropagates() {
         ShadowComparisonDailyReportJob job =
-                new ShadowComparisonDailyReportJob(shadowComparisonResultRepository, shadowExcelReportService);
+                new ShadowComparisonDailyReportJob(shadowComparisonResultRepository, shadowCsvReportService);
         when(shadowComparisonResultRepository.findByComparedAtBetween(any(), any()))
                 .thenThrow(new RuntimeException("boom"));
 

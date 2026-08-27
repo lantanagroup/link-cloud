@@ -6,7 +6,7 @@ import com.lantanagroup.link.validation.models.ShadowComparisonResultDto;
 import com.lantanagroup.link.validation.services.LegacyShadowResultQueryService;
 import com.lantanagroup.link.validation.services.RubricResultQueryService;
 import com.lantanagroup.link.validation.services.ShadowComparisonQueryService;
-import com.lantanagroup.link.validation.services.ShadowExcelReportService;
+import com.lantanagroup.link.validation.services.ShadowCsvReportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +47,7 @@ class ShadowComparisonControllerTest {
     private LegacyShadowResultQueryService legacyShadowResultQueryService;
 
     @MockBean
-    private ShadowExcelReportService shadowExcelReportService;
+    private ShadowCsvReportService shadowCsvReportService;
 
     @Test
     @DisplayName("GET a known request id returns 200 with the mapped comparison results")
@@ -112,15 +112,15 @@ class ShadowComparisonControllerTest {
     }
 
     @Test
-    @DisplayName("GET the daily report for a date that has one returns 200 with the xlsx bytes")
+    @DisplayName("GET the daily report for a date that has one returns 200 with the csv bytes")
     void returnsDailyReportBytes() throws Exception {
-        byte[] bytes = "workbook-bytes".getBytes();
-        when(shadowExcelReportService.downloadDailyReport(LocalDate.parse("2026-08-21"))).thenReturn(bytes);
+        byte[] bytes = "csv-bytes".getBytes();
+        when(shadowCsvReportService.downloadDailyReport(LocalDate.parse("2026-08-21"))).thenReturn(bytes);
 
         mockMvc.perform(get(BASE + "/daily-report").param("date", "2026-08-21"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"shadow-comparison-daily-report-2026-08-21.xlsx\""))
+                        "attachment; filename=\"shadow-comparison-daily-report-2026-08-21.csv\""))
                 .andExpect(content().bytes(bytes));
     }
 
@@ -128,7 +128,7 @@ class ShadowComparisonControllerTest {
     @DisplayName("GET the daily report with no date defaults to yesterday (UTC)")
     void defaultsToYesterdayWhenDateOmitted() throws Exception {
         LocalDate yesterday = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1);
-        when(shadowExcelReportService.downloadDailyReport(yesterday)).thenReturn("bytes".getBytes());
+        when(shadowCsvReportService.downloadDailyReport(yesterday)).thenReturn("bytes".getBytes());
 
         mockMvc.perform(get(BASE + "/daily-report"))
                 .andExpect(status().isOk());
@@ -137,7 +137,7 @@ class ShadowComparisonControllerTest {
     @Test
     @DisplayName("GET the daily report for a date with no generated report returns 404")
     void returnsNotFoundWhenNoDailyReportForDate() throws Exception {
-        when(shadowExcelReportService.downloadDailyReport(LocalDate.parse("2026-08-21"))).thenReturn(null);
+        when(shadowCsvReportService.downloadDailyReport(LocalDate.parse("2026-08-21"))).thenReturn(null);
 
         mockMvc.perform(get(BASE + "/daily-report").param("date", "2026-08-21"))
                 .andExpect(status().isNotFound());
