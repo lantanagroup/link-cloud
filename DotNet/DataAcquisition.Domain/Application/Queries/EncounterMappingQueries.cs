@@ -146,21 +146,19 @@ public class EncounterMappingQueries : IEncounterMappingQueries
             .Distinct()
             .ToList();
 
-        List<OrganizationLocationMapping> organizationLocations = organizationLocationMappingIds.Count == 0
+        var organizationLocations = organizationLocationMappingIds.Count == 0
             ? []
             : await _database.LocationMappingRepository
                 .FindAsync(l => organizationLocationMappingIds.Contains(l.LocationMappingId));
 
-        var locationIdsByMappingId = organizationLocations.ToDictionary(
-            l => l.LocationMappingId,
-            l => l.LocationId);
+        var organizationLocationsById = organizationLocations.ToDictionary(l => l.LocationMappingId);
 
         return encounterLocations
             .GroupBy(l => l.EncounterMappingId)
             .ToDictionary(
                 group => group.Key,
                 group => group
-                    .Select(location => ProjectEncounterLocation(location, locationIdsByMappingId))
+                    .Select(location => ProjectEncounterLocation(location, organizationLocationsById))
                     .ToList());
     }
 
@@ -185,16 +183,22 @@ public class EncounterMappingQueries : IEncounterMappingQueries
 
     private static EncounterLocationModel ProjectEncounterLocation(
         EncounterLocation entity,
-        IReadOnlyDictionary<int, string> locationIdsByMappingId)
+        IReadOnlyDictionary<int, OrganizationLocationMapping> organizationLocationsById)
     {
+        var mapping = organizationLocationsById.TryGetValue(entity.OrganizationLocationMappingId, out var m)
+            ? m
+            : entity.OrganizationLocationMapping;
+        
         return new EncounterLocationModel
         {
             EncounterLocationId = entity.EncounterLocationId,
             EncounterMappingId = entity.EncounterMappingId,
             OrganizationLocationMappingId = entity.OrganizationLocationMappingId,
-            LocationId = locationIdsByMappingId.TryGetValue(entity.OrganizationLocationMappingId, out var locationId)
-                ? locationId
-                : entity.OrganizationLocationMapping?.LocationId,
+            LocationId = mapping?.LocationId,
+            LocationName = mapping?.LocationName,
+            LocationAlias = mapping?.LocationAlias,
+            PartOfValue = mapping?.PartOfValue,
+            IsOrgLocation = mapping?.IsOrgLocation ?? false,
             CreateDate = entity.CreateDate,
             ModifiedDate = entity.ModifiedDate
         };

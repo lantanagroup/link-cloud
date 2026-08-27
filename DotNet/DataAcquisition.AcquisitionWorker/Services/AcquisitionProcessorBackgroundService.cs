@@ -17,6 +17,8 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Threading.Channels;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 
@@ -26,6 +28,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
     private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<ResourceKey, MappingOutcomeValue> _mappingOutcomeProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -35,12 +38,14 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
         IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
+        IProducer<ResourceKey, MappingOutcomeValue> mappingOutcomeProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _resourceAcquiredProducer = resourceAcquiredProducer;
+        _mappingOutcomeProducer = mappingOutcomeProducer;
 
         if (settings?.Value != null)
         {
@@ -268,7 +273,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             
             // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
             // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
-            await locationMappingService.StripNonOrgEncountersFromCacheAsync(
+            var locationOrgOutcome = await locationMappingService.StripNonOrgEncountersFromCacheAsync(
                 tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
 
             var headers = new Headers
@@ -282,6 +287,47 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
             }
 
+            // Encounters are acquired and org-filtered on the INITIAL pass only. SUPPLEMENTAL enriches the
+            // encounters that survived, so by then the non-org ones have been deleted from the cache and its
+            // counts would describe the survivors -- arriving last and overwriting the real result.
+            var isInitialPhase = string.Equals(
+                tailResult.ResourcesAcquired.QueryType,
+                nameof(QueryPhase.Initial),
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isInitialPhase)
+            {
+                try
+                {
+                    // Produced before ResourcesAcquired so that a failure here is handled while the pipeline
+                    // message is still unsent, rather than leaving the correlation half-announced. Report is
+                    // the only consumer of this topic; the strip above has already filtered the cache, so
+                    // nothing downstream depends on the ordering of these two produces.
+                    await _mappingOutcomeProducer.ProduceAsync(
+                        KafkaTopic.MappingOutcomeEvaluated.ToString(),
+                        new Message<ResourceKey, MappingOutcomeValue>
+                        {
+                            Key = new ResourceKey
+                                { FacilityId = tailResult.FacilityId, PatientId = tailResult.PatientId },
+                            Headers = headers,
+                            Value = new MappingOutcomeValue
+                            {
+                                Source = MappingOutcomeSource.Acquisition,
+                                ScheduledReports = tailResult.ResourcesAcquired.ScheduledReports,
+                                LocationOrgOutcome = locationOrgOutcome
+                            }
+                        },
+                        ct);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // Capture error but let it continue to produce the tail message, so the log group can complete
+                    // and not stall downstream.
+                    _logger.LogError(e, "Failed to produce MappingOutcomeEvaluated message for LogId {LogId}. " +
+                                        "The mapping outcome for this correlation is lost; its report will show " +
+                                        "no mapping indicators for this patient.", logId);
+                }
+            }
 
             await _resourceAcquiredProducer.ProduceAsync(
                     KafkaTopic.ResourcesAcquired.ToString(),
