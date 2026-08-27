@@ -58,6 +58,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None));
 
         Assert.Contains("All 1 ResourcesAcquired cache key(s) were empty", ex.Message);
+        Assert.Contains(PatientCacheKey, ex.Message);
         resourceCache.Verify(
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);

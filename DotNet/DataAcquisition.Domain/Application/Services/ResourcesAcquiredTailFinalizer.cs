@@ -49,7 +49,7 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
             return;
         }
 
-        var cache = _resourceCache.GetImplementation(tail.ResourcesAcquired.CacheType);
+        var cache = _resourceCache.GetImplementation(tail.ResourcesAcquired.CacheType) ?? _resourceCache;
         var kept = new List<string>(listed.Count);
         foreach (var key in listed)
         {

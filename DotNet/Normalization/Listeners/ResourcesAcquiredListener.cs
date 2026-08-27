@@ -336,8 +336,9 @@ public class ResourcesAcquiredListener : BackgroundService
 
             if (copiedKeys.Count == 0 && cacheKeys.Count > 0)
             {
+                var emptyKeys = string.Join(", ", cacheKeys.Select(key => key.SanitizeForLog()));
                 throw new TransientException(
-                    $"All {cacheKeys.Count} ResourcesAcquired cache key(s) were empty. " +
+                    $"All {cacheKeys.Count} ResourcesAcquired cache key(s) were empty: {emptyKeys}. " +
                     $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
             }
 
