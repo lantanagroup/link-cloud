@@ -1,4 +1,4 @@
-import {CanActivate, Router} from "@angular/router";
+import {CanActivate, Router, UrlTree} from "@angular/router";
 import {Injectable} from "@angular/core";
 import {AppConfigService} from "../app-config.service";
 
@@ -12,12 +12,11 @@ export class DmrpGuard implements CanActivate {
   constructor(private router: Router, private appConfigService: AppConfigService) {
   }
 
-  canActivate(): boolean {
+  canActivate(): boolean | UrlTree {
     if (this.appConfigService.config?.dmrpEnabled) {
       return true;
     }
 
-    this.router.navigate(['/dashboard']);
-    return false;
+    return this.router.createUrlTree(['/dashboard']);
   }
 }

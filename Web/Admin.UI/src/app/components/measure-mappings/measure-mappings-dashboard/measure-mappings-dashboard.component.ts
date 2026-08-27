@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { EMPTY, Subject, Subscription, catchError, switchMap } from 'rxjs';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -41,9 +42,12 @@ import { Frequency, IMeasureMapping, MEASURE_MAPPING_FREQUENCIES } from '../../.
   templateUrl: './measure-mappings-dashboard.component.html',
   styleUrls: ['./measure-mappings-dashboard.component.scss']
 })
-export class MeasureMappingsDashboardComponent implements OnInit {
+export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
   private initPageSize = 10;
   private initPageNumber = 0;
+
+  private readonly search$ = new Subject<void>();
+  private searchSubscription?: Subscription;
 
   measureMappings: IMeasureMapping[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
@@ -70,39 +74,52 @@ export class MeasureMappingsDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
+
+    // Every reload goes through this one stream: switchMap drops the in-flight request when a
+    // newer search starts, so a slow earlier response can never overwrite a later one's results.
+    // Errors are caught per-request, or the first failure would end the stream for good.
+    this.searchSubscription = this.search$.pipe(
+      switchMap(() => this.measureMappingService.searchMeasureMappings(
+        this.filterMeasure,
+        this.filterDqm,
+        this.filterFrequency,
+        this.sortBy,
+        this.sortOrder,
+        this.paginationMetadata.pageSize,
+        this.paginationMetadata.pageNumber
+      ).pipe(
+        catchError(() => {
+          this.loading = false;
+          return EMPTY;
+        })
+      ))
+    ).subscribe((response) => {
+      this.loading = false;
+
+      if (!response) {
+        this.measureMappings = [];
+        this.dataSource.data = [];
+        this.paginationMetadata.totalCount = 0;
+        this.paginationMetadata.totalPages = 0;
+        return;
+      }
+
+      this.measureMappings = response.records;
+      this.dataSource.data = this.measureMappings;
+      this.paginationMetadata = response.metadata;
+    });
+
     this.getMeasureMappings();
+  }
+
+  ngOnDestroy(): void {
+    this.searchSubscription?.unsubscribe();
+    this.search$.complete();
   }
 
   getMeasureMappings(): void {
     this.loading = true;
-    this.measureMappingService.searchMeasureMappings(
-      this.filterMeasure,
-      this.filterDqm,
-      this.filterFrequency,
-      this.sortBy,
-      this.sortOrder,
-      this.paginationMetadata.pageSize,
-      this.paginationMetadata.pageNumber
-    ).subscribe({
-      next: (response) => {
-        this.loading = false;
-
-        if (!response) {
-          this.measureMappings = [];
-          this.dataSource.data = [];
-          this.paginationMetadata.totalCount = 0;
-          this.paginationMetadata.totalPages = 0;
-          return;
-        }
-
-        this.measureMappings = response.records;
-        this.dataSource.data = this.measureMappings;
-        this.paginationMetadata = response.metadata;
-      },
-      error: () => {
-        this.loading = false;
-      }
-    });
+    this.search$.next();
   }
 
   onSearchChange(): void {

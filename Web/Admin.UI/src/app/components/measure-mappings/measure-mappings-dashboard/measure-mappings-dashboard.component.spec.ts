@@ -1,8 +1,8 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { of, delay, throwError } from 'rxjs';
 
 import { MeasureMappingsDashboardComponent } from './measure-mappings-dashboard.component';
 import { MeasureMappingDialogComponent } from '../measure-mapping-dialog/measure-mapping-dialog.component';
@@ -111,6 +111,39 @@ describe('MeasureMappingsDashboardComponent', () => {
     component.onEdit(mappings[1]);
 
     expect(measureMappingService.searchMeasureMappings.calls.count()).toBe(before);
+  });
+
+  it('discards a slow earlier search that resolves after a later one', fakeAsync(() => {
+    const laterPage: IPagedMeasureMapping = {
+      records: [mappings[0]],
+      metadata: { pageSize: 10, pageNumber: 0, totalCount: 1, totalPages: 1 }
+    };
+    measureMappingService.searchMeasureMappings.and.returnValues(
+      of(pagedResponse).pipe(delay(100)),
+      of(laterPage).pipe(delay(10)));
+
+    fixture.detectChanges();       // first search, slow
+    component.onSearchChange();    // second search, fast
+
+    tick(10);
+    expect(component.measureMappings).toEqual([mappings[0]]);
+    expect(component.loading).toBeFalse();
+
+    tick(100);                     // when the slow response would have arrived
+    expect(component.measureMappings).toEqual([mappings[0]]);
+  }));
+
+  it('keeps searching after a failed search', () => {
+    measureMappingService.searchMeasureMappings.and.returnValues(
+      throwError(() => new Error('down')),
+      of(pagedResponse));
+
+    fixture.detectChanges();
+    expect(component.loading).toBeFalse();
+    expect(component.measureMappings).toEqual([]);
+
+    component.onSearchChange();
+    expect(component.measureMappings.length).toBe(2);
   });
 
   it('resets to the first page when a filter changes', () => {

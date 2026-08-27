@@ -28,16 +28,7 @@ export class MeasureMappingFormComponent implements OnInit {
   @Input() item!: IMeasureMapping;
   @Input() formMode!: FormMode;
 
-  private _viewOnly: boolean = false;
-
-  @Input()
-  set viewOnly(v: boolean) {
-    if (v) this._viewOnly = v;
-  }
-
-  get viewOnly() {
-    return this._viewOnly;
-  }
+  @Input() viewOnly: boolean = false;
 
   @Output() formValueChanged = new EventEmitter<boolean>();
 
@@ -130,7 +121,9 @@ export class MeasureMappingFormComponent implements OnInit {
       },
       error: () => {
         // Leave dqmOptions null: the free-text input stays, and ErrorHandlingService has
-        // already surfaced the fetch failure.
+        // already surfaced the fetch failure. Still emit, or a pre-filled valid form keeps
+        // the dialog's save button disabled until the admin edits a field.
+        this.formValueChanged.emit(this.measureMappingForm.invalid);
       }
     });
   }

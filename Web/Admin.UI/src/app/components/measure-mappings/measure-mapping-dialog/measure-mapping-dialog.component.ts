@@ -53,7 +53,7 @@ export class MeasureMappingDialogComponent implements OnInit {
   }
 
   onFormValueChanged(formInvalid: boolean) {
-    this.canSave = this.updateCanSave();
+    this.canSave = !formInvalid;
   }
 
   onSubmittedConfiguration(outcome: IApiResponse) {
@@ -78,9 +78,5 @@ export class MeasureMappingDialogComponent implements OnInit {
       return;
     }
     this.measureMappingForm.submitConfiguration();
-  }
-
-  updateCanSave() {
-    return (this.measureMappingForm?.measureMappingForm.status == 'VALID');
   }
 }

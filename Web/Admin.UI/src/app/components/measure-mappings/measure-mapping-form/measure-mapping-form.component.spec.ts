@@ -178,6 +178,17 @@ describe('MeasureMappingFormComponent', () => {
     expect(input).toBeTruthy();
   });
 
+  it('still emits validity when the definitions fetch fails, so a valid form can be saved', () => {
+    measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(throwError(() => new Error('down')));
+
+    const emissions: boolean[] = [];
+    component.formValueChanged.subscribe(invalid => emissions.push(invalid));
+
+    initWith(ach, FormMode.Edit);
+
+    expect(emissions).toEqual([false]);
+  });
+
   it('emits success after a saved update', () => {
     measureMappingService.updateMeasureMapping.and.returnValue(of({} as IMeasureMapping));
     initWith(ach, FormMode.Edit);
