@@ -1,4 +1,6 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -139,6 +141,59 @@ namespace IntegrationTests.Normalization
                 Times.Once);
         }
 
+        [Fact]
+        public async Task ConsumeABSEvent_MissingSourceBlob_DoesNotProduceNormalized()
+        {
+            _fixture.ResourcesNormalizedProducerMock.Reset();
+
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
+
+            string facilityId = "Facility1";
+            string patientId = "Patient1";
+            var correlationId = Guid.NewGuid().ToString();
+
+            await LoadFacilityLocationConfig(facilityId, scope);
+
+            var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+            {
+                Message = new Message<ResourceKey, ResourcesAcquiredValue>
+                {
+                    Key = new ResourceKey { FacilityId = facilityId, PatientId = patientId },
+                    Value = new ResourcesAcquiredValue
+                    {
+                        QueryType = QueryType.Initial.ToString(),
+                        CacheType = ResourceCacheType.ABS,
+                        CacheKeys = new List<string> { correlationId + ":Location" },
+                        ReportableEvent = ReportableEvent.Discharge.ToString(),
+                        ScheduledReports = new List<ScheduledReport>
+                        {
+                            new()
+                            {
+                                ReportTrackingId = "Report1",
+                                StartDate = DateTime.Now,
+                                EndDate = DateTime.Now,
+                                Frequency = Frequency.Discharge,
+                                ReportTypes = new List<string> { "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
+                            }
+                        }
+                    },
+                    Headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) } }
+                }
+            };
+
+            var ex = await Assert.ThrowsAsync<TransientException>(() =>
+                listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
+
+            Assert.Contains(correlationId + ":Location", ex.Message);
+            _fixture.ResourcesNormalizedProducerMock.Verify(
+                p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
         private void UploadResourceCacheRedis(string correlationId) 
         {
             var options = ConfigurationOptions.Parse(_fixture.RedisConnectionString);
@@ -176,17 +231,15 @@ namespace IntegrationTests.Normalization
                 }
             };
 
-            var blobClient = _containerClient.GetBlobClient(correlationId + ":Location");
+            // Match production Data Acquisition: Hybrid ABS writes are append blobs, not block blobs.
+            var appendClient = _containerClient.GetAppendBlobClient(correlationId + ":Location");
+            appendClient.CreateIfNotExists();
 
-            StringBuilder sb = new StringBuilder();
-
-            sb.Append(location.TypeName + "/" + location.Id);
-            sb.Append(Environment.NewLine);
-            sb.Append(location.ToJson());
-            
-            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
-
-            blobClient.Upload(stream, overwrite: true);
+            using var stream = appendClient.OpenWrite(overwrite: false);
+            using var writer = new StreamWriter(stream);
+            writer.WriteLine(location.TypeName + "/" + location.Id);
+            writer.WriteLine(location.ToJson());
+            writer.Flush();
         }
 
         private async Task LoadFacilityLocationConfig(string facilityId, IServiceScope scope) 
