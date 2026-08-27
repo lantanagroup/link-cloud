@@ -1,7 +1,7 @@
 namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 
 /// <summary>
-/// Which service produced a <see cref="MappingOutcomeValue"/>, and therefore which of its fields are
+/// Which service produced a <see cref="MappingOutcomeEvaluatedValue"/>, and therefore which of its fields are
 /// authoritative.
 /// </summary>
 /// <remarks>
@@ -14,14 +14,14 @@ namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 public enum MappingOutcomeSource
 {
     /// <summary>
-    /// DataAcquisition. <see cref="MappingOutcomeValue.LocationOrgOutcome"/> is authoritative;
-    /// <see cref="MappingOutcomeValue.CodeMapOutcomes"/> is always empty and means nothing.
+    /// DataAcquisition. <see cref="MappingOutcomeEvaluatedValue.LocationOrgOutcome"/> is authoritative;
+    /// <see cref="MappingOutcomeEvaluatedValue.CodeMapOutcomes"/> is always empty and means nothing.
     /// </summary>
     Acquisition,
 
     /// <summary>
-    /// Normalization. <see cref="MappingOutcomeValue.CodeMapOutcomes"/> is authoritative, including when
-    /// it is empty; <see cref="MappingOutcomeValue.LocationOrgOutcome"/> is always null and means
+    /// Normalization. <see cref="MappingOutcomeEvaluatedValue.CodeMapOutcomes"/> is authoritative, including when
+    /// it is empty; <see cref="MappingOutcomeEvaluatedValue.LocationOrgOutcome"/> is always null and means
     /// nothing.
     /// </summary>
     Normalization

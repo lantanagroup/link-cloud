@@ -48,7 +48,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
         var service = new AcquisitionProcessorBackgroundService(
             loggerMock.Object, _fixture.ServiceProvider, null,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeValue>>());
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
 
         // Use an ID that definitely does not exist
         var workItem = new AcquisitionWorkItem(999999, "NonExistent");
@@ -245,7 +245,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
         var service = new AcquisitionProcessorBackgroundService(
             loggerMock.Object, _fixture.ServiceProvider, _fixture.ResourcesAcquiredProducerMock.Object,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeValue>>());
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
         using var cts = new CancellationTokenSource();
         await service.StartAsync(cts.Token);
         await service.EnqueueAsync(new AcquisitionWorkItem(conditionLogId, facilityId), cts.Token);

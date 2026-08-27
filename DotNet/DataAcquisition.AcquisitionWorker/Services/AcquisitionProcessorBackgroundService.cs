@@ -28,7 +28,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
     private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
-    private readonly IProducer<ResourceKey, MappingOutcomeValue> _mappingOutcomeProducer;
+    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -38,7 +38,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
         IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
-        IProducer<ResourceKey, MappingOutcomeValue> mappingOutcomeProducer,
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
@@ -305,12 +305,12 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     // nothing downstream depends on the ordering of these two produces.
                     await _mappingOutcomeProducer.ProduceAsync(
                         KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                        new Message<ResourceKey, MappingOutcomeValue>
+                        new Message<ResourceKey, MappingOutcomeEvaluatedValue>
                         {
                             Key = new ResourceKey
                                 { FacilityId = tailResult.FacilityId, PatientId = tailResult.PatientId },
                             Headers = headers,
-                            Value = new MappingOutcomeValue
+                            Value = new MappingOutcomeEvaluatedValue
                             {
                                 Source = MappingOutcomeSource.Acquisition,
                                 ScheduledReports = tailResult.ResourcesAcquired.ScheduledReports,

@@ -47,7 +47,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
-    private readonly IProducer<ResourceKey, MappingOutcomeValue> _mappingOutcomeProducer;
+    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -67,7 +67,7 @@ public class ResourcesAcquiredListener : BackgroundService
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache,
         IResourceCachePurger resourceCachePurger,
-        IProducer<ResourceKey, MappingOutcomeValue> mappingOutcomeProducer)
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -436,7 +436,7 @@ public class ResourcesAcquiredListener : BackgroundService
         CancellationToken cancellationToken = default)
     {
         var outcomes = mappingOutcomes.BuildAll().ToList();
-        var value = new MappingOutcomeValue
+        var value = new MappingOutcomeEvaluatedValue
         {
             Source = MappingOutcomeSource.Normalization,
             ScheduledReports = acquiredValue.ScheduledReports,
@@ -459,7 +459,7 @@ public class ResourcesAcquiredListener : BackgroundService
         try
         {
             await _mappingOutcomeProducer.ProduceAsync(KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                new Message<ResourceKey, MappingOutcomeValue>
+                new Message<ResourceKey, MappingOutcomeEvaluatedValue>
                 {
                     Key = new ResourceKey
                     {

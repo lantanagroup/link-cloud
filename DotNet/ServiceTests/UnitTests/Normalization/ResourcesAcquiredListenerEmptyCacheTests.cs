@@ -135,9 +135,9 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
         Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
-        Mock<IProducer<ResourceKey, MappingOutcomeValue>>? mappingOutcomeProducer = null)
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
     {
-        mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeValue>>();
+        mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
         sequenceQueries
             .Setup(item => item.Search(

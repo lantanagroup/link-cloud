@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 /// preserving per-facility ordering.
 /// </para>
 /// </remarks>
-public class MappingOutcomeValue
+public class MappingOutcomeEvaluatedValue
 {
     /// <summary>
     /// Which service produced this message. Determines which of the properties below carry meaning; see

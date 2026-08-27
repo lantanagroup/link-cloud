@@ -202,7 +202,7 @@ public class ReadyToAcquireListenerTests
                 new Mock<ILogger<AcquisitionProcessorBackgroundService>>().Object,
                 new ServiceCollection().BuildServiceProvider(),
                 new Mock<IProducer<ResourceKey, ResourcesAcquired>>().Object,
-                new Mock<IProducer<ResourceKey, MappingOutcomeValue>>().Object,
+                new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>().Object,
                 Options.Create(new LantanaGroup.Link.DataAcquisition.Domain.Settings.AcquisitionWorkerProcessorSettings()))
         {
         }

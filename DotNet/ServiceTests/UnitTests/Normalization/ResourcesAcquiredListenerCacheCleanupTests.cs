@@ -134,7 +134,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             purger.Object,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeValue>>());
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(string patientId = PatientId)
