@@ -67,14 +67,6 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("FacilityId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("GroupsRaw")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<DateTime?>("LastAccessedOn")
                         .HasColumnType("datetime2");
 

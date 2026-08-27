@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
+namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 
 public class FacilitySummaryResponse
 {

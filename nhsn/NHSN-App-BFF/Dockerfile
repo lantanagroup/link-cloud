@@ -7,12 +7,14 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
+COPY ["DotNet/LinkSdk/LinkSdk.csproj", "DotNet/LinkSdk/"]
 COPY ["nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj", "nhsn/NHSN-App-BFF/"]
 COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj"
 
 COPY ["DotNet/Shared/", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/", "DotNet/Link.Authorization/"]
+COPY ["DotNet/LinkSdk/", "DotNet/LinkSdk/"]
 COPY ["nhsn/NHSN-App-BFF/", "nhsn/NHSN-App-BFF/"]
 
 RUN dotnet build "nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj" -c ${BUILD_CONFIGURATION} -o /app/build

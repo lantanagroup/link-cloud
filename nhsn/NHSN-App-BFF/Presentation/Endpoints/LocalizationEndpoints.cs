@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 

@@ -2,8 +2,11 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Errors;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.DependencyInjection;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence.Seed;
 using LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -11,6 +14,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,9 +38,11 @@ app.Run();
 static void RegisterServices(WebApplicationBuilder builder)
 {
     builder.AddExternalConfiguration(NhsnAppConstants.ServiceName);
+    ValidateConfiguration(builder);
 
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     var serviceInformation = builder.SetupServiceInformation(NhsnAppConstants.ServiceName, assemblyVersion);
+    ServiceActivitySource.Initialize(serviceInformation);
 
     builder.Services.AddProblemDetailsService(options =>
     {
@@ -126,6 +132,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddAuthorizationBuilder()
         .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 
+    builder.Services.AddLinkGateways(builder.Configuration);
+    builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
+
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = NhsnAppConstants.ServiceName;
+        options.ServiceVersion = ServiceActivitySource.Instance.Version;
+    });
+
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<INhsnUserContext, NhsnUserContext>();
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
@@ -341,4 +359,40 @@ static SecurityKey CreateIssuerSigningKey(X509Certificate2 certificate)
     }
 
     throw new InvalidOperationException("NhsnJwt:PublicCertificatePem must contain an RSA or ECDSA public key.");
+}
+
+// Fails the process at startup when configuration is missing or unsafe for the target environment.
+//
+// Validate the ServiceRegistry strings directly. Never resolve a Link client or read a *ApiUrl
+// property to do this: TenantServiceApiUrl's getter dereferences ServiceRegistry.TenantService,
+// declared null!, so that throws NullReferenceException from inside the check itself.
+static void ValidateConfiguration(WebApplicationBuilder builder)
+{
+    // Docker is exempt alongside Development: the compose stack deliberately runs with
+    // AllowAllOrigins and no JWT audience.
+    if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Docker"))
+    {
+        return;
+    }
+
+    var errors = new List<string>();
+    var serviceRegistry = builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName);
+
+    // Tenant is a nested object, not a flat key like the other services' *ServiceUrl names.
+    if (string.IsNullOrWhiteSpace(serviceRegistry["TenantService:TenantServiceUrl"]))
+    {
+        errors.Add("ServiceRegistry:TenantService:TenantServiceUrl must be configured.");
+    }
+
+    // Only services this build actually calls are validated, so a deployment isn't blocked on
+    // configuration for a phase that hasn't shipped.
+    if (string.IsNullOrWhiteSpace(serviceRegistry["DataAcquisitionServiceUrl"]))
+    {
+        errors.Add("ServiceRegistry:DataAcquisitionServiceUrl must be configured.");
+    }
+
+    if (errors.Count > 0)
+    {
+        throw new InvalidOperationException("Invalid configuration:" + Environment.NewLine + " - " + string.Join(Environment.NewLine + " - ", errors));
+    }
 }
