@@ -178,6 +178,7 @@ jobs:
           # name|category|trx-file
           TESTS=(
             "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
+            "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
             "API Stability|ApiStabilityTest|api-stability-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
