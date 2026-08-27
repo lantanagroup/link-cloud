@@ -26,7 +26,20 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly ResourceCacheSettings _settings;
         private readonly ILogger<HybridResourceCache> _logger;
 
-        private readonly ConcurrentDictionary<string, ResourceCacheType> _correlationCacheTypes = new();
+        /// <summary>
+        /// In-process Redis-vs-ABS memo. Entries are not removed by <see cref="DeleteAsync"/>:
+        /// org-location strip deletes only <c>{correlation}:Encounter</c>, and remaining
+        /// Patient/Location keys are purged by Normalization via <see cref="GetImplementation"/>,
+        /// never through this Hybrid instance. Eviction is sliding TTL (same as Redis
+        /// <see cref="ResourceCacheRedisSettings.CacheEntryTtlDays"/>) plus an explicit
+        /// <see cref="ForgetCacheTypeForCorrelationId"/> after the ResourcesAcquired tail is produced.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, CacheTypeEntry> _correlationCacheTypes = new();
+        private readonly TimeProvider _timeProvider;
+        private readonly TimeSpan _correlationCacheTypeTtl;
+        private int _accessesSinceSweep;
+
+        private const int SweepInterval = 256;
 
         /// <summary>
         /// Memory statistics pulled out of Redis <c>INFO memory</c> and echoed on every selection
@@ -55,12 +68,27 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             IRedisDatabase redisDatabase,
             IOptions<ResourceCacheSettings> settings,
             ILogger<HybridResourceCache> logger)
+            : this(redisCache, absCache, redisDatabase, settings, logger, TimeProvider.System)
+        {
+        }
+
+        public HybridResourceCache(
+            [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
+            [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
+            IRedisDatabase redisDatabase,
+            IOptions<ResourceCacheSettings> settings,
+            ILogger<HybridResourceCache> logger,
+            TimeProvider timeProvider)
         {
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
             _redisDatabase = redisDatabase ?? throw new ArgumentNullException(nameof(redisDatabase));
             _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+
+            var ttlDays = _settings.Redis.CacheEntryTtlDays;
+            _correlationCacheTypeTtl = TimeSpan.FromDays(ttlDays > 0 ? ttlDays : 7);
         }
 
         /// <inheritdoc/>
@@ -88,7 +116,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
             var byType = cacheKeys
-                .GroupBy(k => _correlationCacheTypes.GetValueOrDefault(ExtractCorrelationId(k), ResourceCacheType.Redis));
+                .GroupBy(k => TryGetRecordedCacheType(ExtractCorrelationId(k), out var cacheType)
+                    ? cacheType
+                    : ResourceCacheType.Redis);
 
             foreach (var group in byType)
             {
@@ -98,13 +128,17 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             // Keep the Redis-vs-ABS decision for the correlation. Deleting one resource-type
             // key (org-location Encounter strip) must not make later Patient/Location reads
-            // fall back to Redis while the remaining blobs still live in ABS.
+            // fall back to Redis while the remaining blobs still live in ABS. Patient/Location
+            // keys are later deleted by Normalization through GetImplementation, so last-key
+            // tracking here would never see a complete eviction.
         }
 
         /// <inheritdoc/>
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
         {
-            return _correlationCacheTypes.GetValueOrDefault(correlationId, ResourceCacheType.Redis);
+            return TryGetRecordedCacheType(ExtractCorrelationId(correlationId), out var cacheType)
+                ? cacheType
+                : ResourceCacheType.Redis;
         }
 
         /// <inheritdoc/>
@@ -113,15 +147,26 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
+        /// <inheritdoc/>
+        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        {
+            if (string.IsNullOrEmpty(correlationId))
+            {
+                return;
+            }
+
+            _correlationCacheTypes.TryRemove(ExtractCorrelationId(correlationId), out _);
+        }
+
         // -------------------------------------------------------------------------
 
         private async Task<IResourceCache> DetermineAndRecordCacheAsync(string correlationId, CancellationToken cancellationToken)
         {
             var key = ExtractCorrelationId(correlationId);
-            if (!_correlationCacheTypes.TryGetValue(key, out var cacheType))
+            if (!TryGetRecordedCacheType(key, out var cacheType))
             {
                 cacheType = await SelectCacheTypeAsync(cancellationToken);
-                cacheType = _correlationCacheTypes.GetOrAdd(key, cacheType);
+                cacheType = RememberCacheType(key, cacheType);
             }
 
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
@@ -130,8 +175,78 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private IResourceCache ResolveFromKey(string cacheKey)
         {
             var correlationId = ExtractCorrelationId(cacheKey);
-            var cacheType = _correlationCacheTypes.GetValueOrDefault(correlationId, ResourceCacheType.Redis);
+            var cacheType = TryGetRecordedCacheType(correlationId, out var recorded)
+                ? recorded
+                : ResourceCacheType.Redis;
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+        }
+
+        private ResourceCacheType RememberCacheType(string correlationId, ResourceCacheType cacheType)
+        {
+            var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
+            var entry = _correlationCacheTypes.GetOrAdd(
+                correlationId,
+                _ => new CacheTypeEntry(cacheType, nowTicks));
+            entry.LastAccessedUtcTicks = nowTicks;
+            MaybeSweepExpired();
+            return entry.Type;
+        }
+
+        private bool TryGetRecordedCacheType(string correlationId, out ResourceCacheType cacheType)
+        {
+            MaybeSweepExpired();
+
+            if (_correlationCacheTypes.TryGetValue(correlationId, out var entry))
+            {
+                if (!IsExpired(entry))
+                {
+                    entry.LastAccessedUtcTicks = _timeProvider.GetUtcNow().UtcTicks;
+                    cacheType = entry.Type;
+                    return true;
+                }
+
+                _correlationCacheTypes.TryRemove(correlationId, out _);
+            }
+
+            cacheType = default;
+            return false;
+        }
+
+        private bool IsExpired(CacheTypeEntry entry)
+        {
+            var age = _timeProvider.GetUtcNow().UtcTicks - entry.LastAccessedUtcTicks;
+            return age >= _correlationCacheTypeTtl.Ticks;
+        }
+
+        private void MaybeSweepExpired()
+        {
+            if (Interlocked.Increment(ref _accessesSinceSweep) < SweepInterval)
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref _accessesSinceSweep, 0);
+
+            var cutoff = _timeProvider.GetUtcNow().UtcTicks - _correlationCacheTypeTtl.Ticks;
+            foreach (var pair in _correlationCacheTypes)
+            {
+                if (pair.Value.LastAccessedUtcTicks < cutoff)
+                {
+                    _correlationCacheTypes.TryRemove(pair.Key, out _);
+                }
+            }
+        }
+
+        private sealed class CacheTypeEntry
+        {
+            public CacheTypeEntry(ResourceCacheType type, long lastAccessedUtcTicks)
+            {
+                Type = type;
+                LastAccessedUtcTicks = lastAccessedUtcTicks;
+            }
+
+            public ResourceCacheType Type { get; }
+            public long LastAccessedUtcTicks;
         }
 
         /// <remarks>

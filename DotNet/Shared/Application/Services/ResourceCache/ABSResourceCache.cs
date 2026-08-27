@@ -195,6 +195,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return this;
         }
 
+        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        {
+        }
+
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
             foreach (var cacheKey in cacheKeys)

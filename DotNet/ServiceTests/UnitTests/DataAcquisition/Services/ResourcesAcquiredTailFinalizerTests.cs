@@ -47,6 +47,7 @@ public class ResourcesAcquiredTailFinalizerTests
         locationMapping.Verify(
             s => s.StripNonOrgEncountersFromCacheAsync(FacilityId, CorrelationId, "patient-1", It.IsAny<CancellationToken>()),
             Times.Once);
+        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
     }
 
     [Fact]
@@ -74,6 +75,49 @@ public class ResourcesAcquiredTailFinalizerTests
         await sut.FinalizeAsync(tail, CancellationToken.None);
 
         Assert.Equal([PatientKey, EncounterKey], tail.ResourcesAcquired.CacheKeys);
+        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_ForgetsCacheTypeWhenNoKeysAreListed()
+    {
+        var locationMapping = new Mock<ILocationMappingService>();
+        locationMapping
+            .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var cache = new Mock<IResourceCache>();
+        var sut = new ResourcesAcquiredTailFinalizer(
+            locationMapping.Object,
+            cache.Object,
+            Mock.Of<ILogger<ResourcesAcquiredTailFinalizer>>());
+
+        var tail = BuildTail([]);
+
+        await sut.FinalizeAsync(tail, CancellationToken.None);
+
+        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
+        cache.Verify(c => c.GetImplementation(It.IsAny<ResourceCacheType>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_DoesNotForgetCacheTypeWhenStripThrows()
+    {
+        var locationMapping = new Mock<ILocationMappingService>();
+        locationMapping
+            .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("strip failed"));
+
+        var cache = new Mock<IResourceCache>();
+        var sut = new ResourcesAcquiredTailFinalizer(
+            locationMapping.Object,
+            cache.Object,
+            Mock.Of<ILogger<ResourcesAcquiredTailFinalizer>>());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.FinalizeAsync(BuildTail([PatientKey]), CancellationToken.None));
+
+        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(It.IsAny<string>()), Times.Never);
     }
 
     private static TailCompletionResult BuildTail(List<string> cacheKeys) => new()

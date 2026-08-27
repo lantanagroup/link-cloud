@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using StackExchange.Redis;
 using StackExchange.Redis.Extensions.Core.Abstractions;
@@ -34,15 +35,23 @@ public class HybridResourceCacheTests
         _database.SetupGet(database => database.Multiplexer).Returns(_multiplexer.Object);
     }
 
-    private HybridResourceCache CreateSut(ResourceCacheRedisSettings redisSettings)
+    private HybridResourceCache CreateSut(ResourceCacheRedisSettings redisSettings, TimeProvider? timeProvider = null)
     {
         var settings = new ResourceCacheSettings { Redis = redisSettings };
-        return new HybridResourceCache(
-            _redisCache.Object,
-            _absCache.Object,
-            _redisDatabase.Object,
-            Options.Create(settings),
-            _logger.Object);
+        return timeProvider is null
+            ? new HybridResourceCache(
+                _redisCache.Object,
+                _absCache.Object,
+                _redisDatabase.Object,
+                Options.Create(settings),
+                _logger.Object)
+            : new HybridResourceCache(
+                _redisCache.Object,
+                _absCache.Object,
+                _redisDatabase.Object,
+                Options.Create(settings),
+                _logger.Object,
+                timeProvider);
     }
 
     /// <summary>Configures a connected Redis server whose INFO memory section returns the given used_memory.</summary>
@@ -218,6 +227,77 @@ public class HybridResourceCacheTests
 
         _absCache.Verify(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()), Times.Once);
         _redisCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ForgetCacheType_allows_subsequent_reads_to_fall_back_to_Redis()
+    {
+        SetupRedisUsedMemory(900L * 1024 * 1024);
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await Write(sut, "corr-forget");
+        sut.GetCacheTypeForCorrelationId("corr-forget").Should().Be(ResourceCacheType.ABS);
+
+        sut.ForgetCacheTypeForCorrelationId("corr-forget");
+
+        sut.GetCacheTypeForCorrelationId("corr-forget").Should().Be(ResourceCacheType.Redis);
+
+        _redisCache
+            .Setup(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>());
+
+        await sut.GetAsync("corr-forget:Patient");
+
+        _redisCache.Verify(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()), Times.Once);
+        _absCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cache_type_memo_expires_after_configured_ttl_without_access()
+    {
+        SetupRedisUsedMemory(900L * 1024 * 1024);
+        var clock = new FakeTimeProvider();
+        var sut = CreateSut(
+            new ResourceCacheRedisSettings
+            {
+                MaxMemoryBytes = 1000L * 1024 * 1024,
+                MemoryThresholdPercent = 80.0,
+                CacheEntryTtlDays = 7
+            },
+            clock);
+
+        await Write(sut, "corr-ttl");
+        sut.GetCacheTypeForCorrelationId("corr-ttl").Should().Be(ResourceCacheType.ABS);
+
+        clock.Advance(TimeSpan.FromDays(7));
+
+        sut.GetCacheTypeForCorrelationId("corr-ttl").Should().Be(ResourceCacheType.Redis);
+    }
+
+    [Fact]
+    public async Task Cache_type_memo_slides_on_access()
+    {
+        SetupRedisUsedMemory(900L * 1024 * 1024);
+        var clock = new FakeTimeProvider();
+        var sut = CreateSut(
+            new ResourceCacheRedisSettings
+            {
+                MaxMemoryBytes = 1000L * 1024 * 1024,
+                MemoryThresholdPercent = 80.0,
+                CacheEntryTtlDays = 7
+            },
+            clock);
+
+        await Write(sut, "corr-slide");
+
+        clock.Advance(TimeSpan.FromDays(6));
+        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.ABS);
+
+        clock.Advance(TimeSpan.FromDays(6));
+        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.ABS);
+
+        clock.Advance(TimeSpan.FromDays(7));
+        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.Redis);
     }
 
     [Fact]

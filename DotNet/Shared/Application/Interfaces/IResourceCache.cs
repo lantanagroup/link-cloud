@@ -12,5 +12,11 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         ResourceType GetResourceTypeByCacheKey(string cacheKey);
         ResourceCacheType GetCacheTypeForCorrelationId(string correlationId);
         IResourceCache GetImplementation(ResourceCacheType cacheType);
+
+        /// <summary>
+        /// Drops any in-process Redis-vs-ABS memo for <paramref name="correlationId"/>.
+        /// No-op for implementations that do not memoize a per-correlation cache type.
+        /// </summary>
+        void ForgetCacheTypeForCorrelationId(string correlationId);
     }
 }

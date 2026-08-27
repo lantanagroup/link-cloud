@@ -113,5 +113,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
             return this;
         }
+
+        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        {
+        }
     }
 }

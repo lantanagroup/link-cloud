@@ -46,6 +46,8 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         var listed = tail.ResourcesAcquired.CacheKeys ?? [];
         if (listed.Count == 0)
         {
+            // CacheType is already stamped on the tail; Hybrid no longer needs the memo.
+            _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
             return;
         }
 
@@ -72,5 +74,10 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         }
 
         tail.ResourcesAcquired.CacheKeys = kept;
+
+        // CacheType is already on the Kafka payload. Drop the in-process Hybrid memo so
+        // _correlationCacheTypes cannot grow without bound now that DeleteAsync no longer
+        // TryRemove's it (strip deletes Encounter only; Patient/Location are purged downstream).
+        _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
     }
 }
