@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 
 public interface IApi
 {

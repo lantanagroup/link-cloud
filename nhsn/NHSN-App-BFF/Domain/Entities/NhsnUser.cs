@@ -17,12 +17,6 @@ public class NhsnUser
     [MaxLength(256)]
     public string Name { get; set; } = string.Empty;
 
-    [MaxLength(256)]
-    public string? GroupsRaw { get; set; }
-
-    [MaxLength(64)]
-    public string? FacilityId { get; set; }
-
     public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
     [MaxLength(256)]

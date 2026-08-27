@@ -3,11 +3,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using Microsoft.Extensions.Options;
 
-namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services;
+namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
 
 public sealed class LocalizationResourceService : ILocalizationResourceService
 {

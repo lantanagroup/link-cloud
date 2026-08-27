@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\DotNet\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
   </ItemGroup>
 

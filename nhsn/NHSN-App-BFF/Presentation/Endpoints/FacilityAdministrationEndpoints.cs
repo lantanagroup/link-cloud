@@ -1,7 +1,5 @@
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
-using LantanaGroup.Link.Nhsn.App.Bff.Settings;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -13,20 +11,16 @@ public class FacilityAdministrationEndpoints : IApi
             .WithTags("NHSN App BFF")
             .RequireAuthorization("AuthenticatedUser");
 
-        group.MapPut("/{facilityId}/onboarding", async (string facilityId, UpdateFacilityOnboardingRequest request, HttpContext httpContext, IFacilityAdministrationService facilityAdministrationService, IOptions<NhsnJwtSettings> jwtOptions, CancellationToken cancellationToken) =>
+        group.MapPut("/{facilityId}/onboarding", async (string facilityId, UpdateFacilityOnboardingRequest request, INhsnUserContext userContext, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
             {
-                var actingFacilityId = httpContext.User.FindFirst(jwtOptions.Value.FacilityIdClaimType)?.Value;
-                var groups = httpContext.User.FindAll(jwtOptions.Value.GroupsClaimType).Select(x => x.Value);
-                var isFacilityAdmin = groups.Contains("FACADMIN", StringComparer.OrdinalIgnoreCase);
-
-                if (string.IsNullOrWhiteSpace(actingFacilityId))
+                if (!userContext.HasFacility)
                 {
                     return Results.BadRequest(new { message = "Facility context is required." });
                 }
 
                 try
                 {
-                    var updated = await facilityAdministrationService.UpdateFacilityOnboardingAsync(facilityId, actingFacilityId, isFacilityAdmin, request, cancellationToken);
+                    var updated = await facilityAdministrationService.UpdateFacilityOnboardingAsync(facilityId, request, cancellationToken);
                     return updated is null ? Results.NotFound() : Results.Ok(updated);
                 }
                 catch (InvalidOperationException ex)
