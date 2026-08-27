@@ -24,7 +24,7 @@ export class TestAuthApiClient implements ApiClient {
   // Every method delegates; the header is attached by the interceptor below.
   getUserInfo = () => this.inner.getUserInfo();
   getDraft = () => this.inner.getDraft();
-  saveDraft: ApiClient['saveDraft'] = (draft, etag) => this.inner.saveDraft(draft, etag);
+  saveDraft: ApiClient['saveDraft'] = draft => this.inner.saveDraft(draft);
   importDraft: ApiClient['importDraft'] = file => this.inner.importDraft(file);
   exportDraft = () => this.inner.exportDraft();
   completeOnboarding = () => this.inner.completeOnboarding();
@@ -41,7 +41,6 @@ export class TestAuthApiClient implements ApiClient {
 
   queryPatientList: ApiClient['queryPatientList'] = k => this.inner.queryPatientList(k);
   listSftpFiles = () => this.inner.listSftpFiles();
-  previewSftpFile: ApiClient['previewSftpFile'] = id => this.inner.previewSftpFile(id);
   testSftpConnection: ApiClient['testSftpConnection'] = c => this.inner.testSftpConnection(c);
   saveSftpCredentials: ApiClient['saveSftpCredentials'] = c => this.inner.saveSftpCredentials(c);
   acknowledgeCensus: ApiClient['acknowledgeCensus'] = a => this.inner.acknowledgeCensus(a);

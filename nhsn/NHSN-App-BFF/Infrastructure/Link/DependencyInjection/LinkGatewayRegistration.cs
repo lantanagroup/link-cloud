@@ -1,4 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Concurrency;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Capabilities;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -22,6 +24,7 @@ public static class LinkGatewayRegistration
         services.Configure<ServiceRegistry>(configuration.GetSection(ServiceRegistry.ConfigSectionName));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
         services.Configure<LinkCapabilitiesSettings>(configuration.GetSection(LinkCapabilitiesSettings.SectionName));
+        services.Configure<FacilityWriteLockSettings>(configuration.GetSection(FacilityWriteLockSettings.SectionName));
 
         var allowAnonymous = configuration.GetValue<bool?>("Authentication:AllowAnonymous") ?? false;
         services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(options =>
@@ -33,6 +36,14 @@ public static class LinkGatewayRegistration
         services.AddLinkSdk();
 
         services.AddScoped<IFacilityGateway, FacilityGateway>();
+        services.AddScoped<IFhirConfigurationGateway, FhirConfigurationGateway>();
+        services.AddScoped<ICensusConfigurationGateway, CensusConfigurationGateway>();
+        services.AddScoped<IQueryDispatchGateway, QueryDispatchGateway>();
+        services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
+
+        // No real adapter exists yet — LinkSdk has no sFTP coverage — so this is the only
+        // registration until one can replace it.
+        services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
 
         return services;
     }

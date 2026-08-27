@@ -11,7 +11,6 @@ import React, {
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
-import {DraftConflictError} from '../api/http';
 import {furthestLegalStep, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
 import {draftReducer, type DraftAction, type DraftSections} from './reducer';
@@ -29,8 +28,6 @@ interface OnboardingContextValue {
   commitState: CommitResult | null;
   /** True while a save is in flight; steps disable their Next button on it. */
   saving: boolean;
-  /** Set when another tab saved first. The user resolves it, not us. */
-  conflict: boolean;
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
   goTo: (stepId: StepId) => void;
@@ -73,13 +70,10 @@ export function OnboardingProvider({
   const [commitState, setCommitState] = useState<CommitResult | null>(null);
   const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
   const [saving, setSaving] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const etagRef = useRef<string | undefined>(undefined);
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const pendingSaves = useRef(0);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
-    etagRef.current = envelope.etag;
     setCommitState(envelope.commitState);
     dispatch({type: 'draft/loaded', draft: migrateDraft(envelope.draft ?? createEmptyDraft())});
   }, []);
@@ -87,7 +81,6 @@ export function OnboardingProvider({
   const reloadDraft = useCallback(async () => {
     const envelope = await api.getDraft();
     applyEnvelope(envelope);
-    setConflict(false);
   }, [api, applyEnvelope]);
 
   // Initial load. Vendor profiles come with it because every step that
@@ -188,32 +181,19 @@ export function OnboardingProvider({
     pendingSaves.current += 1;
     setSaving(true);
 
-    // Saves are serialized rather than fired concurrently. The draft is
-    // ETag-guarded and single-writer: two saves in flight means the second
-    // reads `etagRef` before the first has updated it, collides with our own
-    // previous write, and reports it as a concurrent edit. Chaining also
-    // guarantees the writes land in the order the user made them.
+    // Serialized so writes land in the order the user made them - the BFF's lock orders
+    // arrivals, not intentions, so two saves in flight could otherwise land out of order.
     saveChain.current = saveChain.current
       // A failed save must not stall every later one.
       .catch(() => undefined)
       .then(async () => {
         try {
-          const envelope = await api.saveDraft(draft, etagRef.current);
-          // Adopt the new ETag even if a later transition superseded this
-          // save — the write landed and the server's version moved on.
-          etagRef.current = envelope.etag;
+          await api.saveDraft(draft);
         } catch (cause) {
           if (cancelled) {
             return;
           }
-          if (cause instanceof DraftConflictError) {
-            // Another tab saved first. Refetch so the user sees the winning
-            // version, and surface it — only they know which one is right.
-            setConflict(true);
-            await reloadDraft().catch(() => undefined);
-          } else {
-            setError(cause instanceof Error ? cause.message : String(cause));
-          }
+          setError(cause instanceof Error ? cause.message : String(cause));
         } finally {
           pendingSaves.current -= 1;
           if (pendingSaves.current === 0) {
@@ -286,7 +266,6 @@ export function OnboardingProvider({
       vendorProfile,
       commitState,
       saving,
-      conflict,
       patch,
       goTo,
       goNext,
@@ -305,7 +284,6 @@ export function OnboardingProvider({
       vendorProfile,
       commitState,
       saving,
-      conflict,
       patch,
       goTo,
       goNext,

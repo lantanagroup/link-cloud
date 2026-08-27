@@ -29,8 +29,8 @@ import type {
   SftpConfig,
   SftpCredentials,
   SftpFile,
-  SftpFilePreview,
   Timezone,
+  SectionSource,
   UserInfoResponse,
   VendorProfile
 } from './contracts';
@@ -38,8 +38,8 @@ import type {
 export interface DraftEnvelope {
   draft: FacilityDraft | null;
   commitState: CommitResult | null;
-  /** Sent back as `If-Match` on the next save. */
-  etag?: string;
+  /** Per-section origin and status. `Unavailable` means unreachable, not "read fine and empty". */
+  sources: SectionSource[];
 }
 
 /**
@@ -58,8 +58,12 @@ export interface ApiClient {
 
   // draft
   getDraft(): Promise<DraftEnvelope>;
-  /** Throws DraftConflictError when another tab saved first. */
-  saveDraft(draft: FacilityDraft, etag?: string): Promise<DraftEnvelope>;
+  /**
+   * Saves the draft. The BFF writes only the section for `draft.currentStepId`, sent *before* the
+   * transition is applied — send it after and that step's values go unsaved. No ETag: a stale tab
+   * can only overwrite its own step.
+   */
+  saveDraft(draft: FacilityDraft): Promise<DraftEnvelope>;
   importDraft(file: File): Promise<ImportResult>;
   exportDraft(): Promise<Blob>;
   completeOnboarding(): Promise<CommitResult>;
@@ -80,7 +84,6 @@ export interface ApiClient {
   // patients of interest
   queryPatientList(key: CensusListKey): Promise<CensusListResult>;
   listSftpFiles(): Promise<SftpFile[]>;
-  previewSftpFile(fileId: string): Promise<SftpFilePreview>;
   testSftpConnection(config: SftpConfig): Promise<ConnectionResult>;
   /** Write-only: forwarded to Data Acquisition, never persisted here, never read back. */
   saveSftpCredentials(credentials: SftpCredentials): Promise<void>;

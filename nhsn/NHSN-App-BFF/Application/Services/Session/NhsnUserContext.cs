@@ -29,6 +29,8 @@ public sealed class NhsnUserContext : INhsnUserContext
         _httpContextAccessor.HttpContext?.User
         ?? throw new InvalidOperationException("No HttpContext is available; INhsnUserContext can only be resolved inside a request.");
 
+    // The gateway sends this as userID while the configured claim type is userId; .NET claim
+    // lookup is OrdinalIgnoreCase so that still resolves.
     public string ExternalUserId =>
         Principal.FindFirstValue(_jwtSettings.UserIdClaimType)
         ?? Principal.FindFirstValue(_jwtSettings.EmailClaimType)
@@ -48,6 +50,8 @@ public sealed class NhsnUserContext : INhsnUserContext
 
     public IReadOnlyList<string> Groups => _groups ??= ResolveGroups();
 
+    // The gateway sends facility as a JSON number (e.g. 20759); the JWT handler surfaces it as its
+    // string form, which is what the column stores.
     public string? FacilityId
     {
         get

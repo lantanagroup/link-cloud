@@ -79,13 +79,13 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
   }, [api, t]);
 
   const navigationSections = useMemo<NavigationSection[]>(() => {
-    if (!userInfo || userInfo.AccessState !== 'Allowed') {
+    if (!userInfo || userInfo.accessState !== 'Allowed') {
       return [];
     }
 
     const facilityItems: NavigationItem[] = [{key: 'home', label: t('navigation.home')}];
 
-    if (!userInfo.IsOnboarded) {
+    if (!userInfo.isOnboarded) {
       facilityItems.push({key: 'onboarding', label: t('navigation.onboarding')});
     } else {
       facilityItems.push({key: 'configuration', label: t('navigation.configuration')});
@@ -106,15 +106,15 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
     return <div className="nhsn-link__state">{t('state.noUserContext')}</div>;
   }
 
-  if (userInfo.AccessState === 'MissingRequiredRole') {
+  if (userInfo.accessState === 'MissingRequiredRole') {
     return (
       <div className="nhsn-link__state">
         <div className="nhsn-link__state-card">
           <h2>{t('auth.missingAccessTitle')}</h2>
           <p>{t('auth.missingAccessDescription')}</p>
-          {userInfo.AccessRequestUrl && (
+          {userInfo.accessRequestUrl && (
             <p>
-              <a href={userInfo.AccessRequestUrl} target="_blank" rel="noreferrer">
+              <a href={userInfo.accessRequestUrl} target="_blank" rel="noreferrer">
                 {t('actions.submitRequest')}
               </a>
             </p>
@@ -124,7 +124,7 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
     );
   }
 
-  if (userInfo.AccessState === 'MissingFacility' || !userInfo.HasFacility) {
+  if (userInfo.accessState === 'MissingFacility' || !userInfo.hasFacility) {
     return (
       <div className="nhsn-link__state">
         <div className="nhsn-link__state-card">
@@ -151,8 +151,8 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
           sections={navigationSections}
           activeRoute={route}
           onNavigate={navigateTo}
-          userName={userInfo.Name}
-          userEmail={userInfo.Email} />
+          userName={userInfo.name}
+          userEmail={userInfo.email} />
 
         <section className="nhsn-link__grid">
           {route === 'home' && <HomePanels userInfo={userInfo} />}
@@ -162,13 +162,13 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
             standalone harness supplied, so embedded the nav item rendered and
             clicking it produced nothing.
           */}
-          {route === 'onboarding' && !userInfo.IsOnboarded && (
+          {route === 'onboarding' && !userInfo.isOnboarded && (
             <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl}>
               <StepHost />
             </OnboardingProvider>
           )}
 
-          {route === 'configuration' && userInfo.IsOnboarded && <ConfigurationScreen />}
+          {route === 'configuration' && userInfo.isOnboarded && <ConfigurationScreen />}
         </section>
       </div>
     </div>
@@ -183,36 +183,36 @@ function HomePanels({userInfo}: {userInfo: UserInfoResponse}) {
         <h2>{t('home.userContextTitle')}</h2>
         <p>
           <strong>{t('home.facilityLabel')}</strong>{' '}
-          {userInfo.FacilityId ?? t('home.notAssigned')}
+          {userInfo.facilityId ?? t('home.notAssigned')}
         </p>
         <p>
           <strong>{t('home.groupsLabel')}</strong>{' '}
-          {userInfo.Groups.length > 0 ? userInfo.Groups.join(', ') : t('home.noGroupsProvided')}
+          {userInfo.groups.length > 0 ? userInfo.groups.join(', ') : t('home.noGroupsProvided')}
         </p>
         <p>
-          <strong>{t('home.accessStateLabel')}</strong> {userInfo.AccessState}
+          <strong>{t('home.accessStateLabel')}</strong> {userInfo.accessState}
         </p>
         <p>
           <strong>{t('home.facilityAdminLabel')}</strong>{' '}
-          {userInfo.IsFacilityAdmin ? t('commonBoolean.yes') : t('commonBoolean.no')}
+          {userInfo.isFacilityAdmin ? t('commonBoolean.yes') : t('commonBoolean.no')}
         </p>
         <p>
           <strong>{t('home.onboardingLabel')}</strong>{' '}
-          {userInfo.IsOnboarded ? t('home.onboardingComplete') : t('home.onboardingInProgress')}
+          {userInfo.isOnboarded ? t('home.onboardingComplete') : t('home.onboardingInProgress')}
         </p>
       </div>
 
       <div className="nhsn-link__panel">
         <h2>{t('home.frameworkStatusTitle')}</h2>
         <p>
-          {userInfo.IsOnboarded
+          {userInfo.isOnboarded
             ? t('home.maintenanceModeDescription')
             : t('home.onboardingModeDescription')}
         </p>
 
         <h3>{t('home.availableNavigationTitle')}</h3>
         <ul>
-          {userInfo.AvailableNavigation.map(item => (
+          {userInfo.availableNavigation.map(item => (
             <li key={item}>{item}</li>
           ))}
         </ul>

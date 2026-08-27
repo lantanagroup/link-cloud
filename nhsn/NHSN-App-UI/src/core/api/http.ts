@@ -37,17 +37,6 @@ export class HttpError extends Error {
   }
 }
 
-/**
- * A concurrent edit lost the race. Thrown for 412 on a draft save so callers
- * can tell it apart from a generic failure — it needs the user, not a retry.
- */
-export class DraftConflictError extends HttpError {
-  constructor(url: string, problem?: ProblemDetails, correlationId?: string) {
-    super(412, url, problem, correlationId);
-    this.name = 'DraftConflictError';
-  }
-}
-
 export class TimeoutError extends Error {
   constructor(readonly url: string, readonly timeoutMs: number) {
     super(`Request timed out after ${timeoutMs}ms.`);
@@ -66,8 +55,6 @@ export interface HttpResult<T> {
 export interface RequestOptions {
   method?: string;
   body?: unknown;
-  /** Sent as `If-Match`. A 412 becomes DraftConflictError. */
-  ifMatch?: string;
   headers?: Record<string, string>;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -102,9 +89,6 @@ export class HttpClient {
     if (options.body !== undefined && !isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    if (options.ifMatch) {
-      headers['If-Match'] = options.ifMatch;
-    }
 
     let response: Response;
     try {
@@ -132,9 +116,6 @@ export class HttpClient {
 
     if (!response.ok) {
       const problem = await readProblem(response);
-      if (response.status === 412) {
-        throw new DraftConflictError(url, problem, correlationId);
-      }
       throw new HttpError(response.status, url, problem, correlationId);
     }
 

@@ -30,7 +30,6 @@ import type {
   SftpConfig,
   SftpCredentials,
   SftpFile,
-  SftpFilePreview,
   Timezone,
   UserInfoResponse,
   VendorProfile
@@ -62,15 +61,13 @@ export class BffApiClient implements ApiClient {
   // ------------------------------------------------------------ draft
 
   async getDraft(): Promise<DraftEnvelope> {
-    const {data, etag} = await this.http.get<Omit<DraftEnvelope, 'etag'>>('/onboarding');
-    return {...data, etag};
+    const {data} = await this.http.get<DraftEnvelope>('/onboarding');
+    return data;
   }
 
-  async saveDraft(draft: FacilityDraft, etag?: string): Promise<DraftEnvelope> {
-    const result = await this.http.put<Omit<DraftEnvelope, 'etag'>>('/onboarding', draft, {
-      ifMatch: etag
-    });
-    return {...result.data, etag: result.etag};
+  async saveDraft(draft: FacilityDraft): Promise<DraftEnvelope> {
+    const {data} = await this.http.put<DraftEnvelope>('/onboarding', draft);
+    return data;
   }
 
   async importDraft(file: File): Promise<ImportResult> {
@@ -149,13 +146,6 @@ export class BffApiClient implements ApiClient {
 
   async listSftpFiles(): Promise<SftpFile[]> {
     const {data} = await this.http.get<SftpFile[]>('/patients-of-interest/sftp-files');
-    return data;
-  }
-
-  async previewSftpFile(fileId: string): Promise<SftpFilePreview> {
-    const {data} = await this.http.post<SftpFilePreview>(
-      `/patients-of-interest/sftp-files/${encodeURIComponent(fileId)}/previews`
-    );
     return data;
   }
 

@@ -9,15 +9,15 @@ import {createEmptyDraft, type FacilityDraft, type StepId} from './types';
  */
 
 const user: UserInfoResponse = {
-  AccessState: 'Allowed',
-  Email: 'a@example.invalid',
-  Name: 'A',
-  IsFacilityAdmin: true,
-  IsOnboarded: false,
-  HasFacility: true,
-  FacilityId: 'F1',
-  Groups: ['FACADMIN'],
-  AvailableNavigation: ['onboarding']
+  accessState: 'Allowed',
+  email: 'a@example.invalid',
+  name: 'A',
+  isFacilityAdmin: true,
+  isOnboarded: false,
+  hasFacility: true,
+  facilityId: 'F1',
+  groups: ['FACADMIN'],
+  availableNavigation: ['onboarding']
 };
 
 function draftAt(unlocked: StepId[], overrides: Partial<FacilityDraft> = {}): FacilityDraft {
