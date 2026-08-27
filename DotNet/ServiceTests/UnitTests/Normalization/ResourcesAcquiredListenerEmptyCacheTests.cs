@@ -24,9 +24,9 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Normalization;
 
 /// <summary>
-/// Data Acquisition should list a cache key only when that key currently has resources.
-/// A single empty listed key is skipped so it cannot dead-letter the patient. Every listed
-/// key empty is still treated as a cache-not-ready race and fails transiently.
+/// Data Acquisition lists a cache key only when that key currently has resources.
+/// An empty listed key is a cache-not-ready race and fails transiently so MeasureEval
+/// does not evaluate a partial bundle.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class ResourcesAcquiredListenerEmptyCacheTests
@@ -57,7 +57,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var ex = await Assert.ThrowsAsync<TransientException>(() =>
             listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None));
 
-        Assert.Contains("All 1 ResourcesAcquired cache key(s) were empty", ex.Message);
+        Assert.Contains("contained no resources", ex.Message);
         Assert.Contains(PatientCacheKey, ex.Message);
         resourceCache.Verify(
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
@@ -135,7 +135,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_MixedKeys_SkipsEmptyTypeAndProducesForPopulatedType()
+    public async Task ProcessMessageAsync_MixedKeys_ThrowsTransientAndDoesNotProduce()
     {
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
@@ -154,56 +154,25 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         resourceCache
             .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        resourceCache
-            .Setup(item => item.UpdateCorrelationCacheAsync(
-                CorrelationId,
-                It.IsAny<List<DomainResource>>(),
-                FhirResourceType.Patient,
-                It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        resourceCache
-            .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
-        producer
-            .Setup(item => item.ProduceAsync(
-                It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
-
         var listener = BuildListener(resourceCache, producer);
 
-        await listener.ProcessMessageAsync(
-            BuildConsumeResult([PatientCacheKey, EncounterCacheKey]),
-            CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<TransientException>(() =>
+            listener.ProcessMessageAsync(
+                BuildConsumeResult([PatientCacheKey, EncounterCacheKey]),
+                CancellationToken.None));
 
+        Assert.Contains(EncounterCacheKey, ex.Message);
         resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
-                CorrelationId,
-                It.Is<List<DomainResource>>(resources => resources.Count == 1),
-                FhirResourceType.Patient,
-                It.IsAny<CancellationToken>()),
-            Times.Once);
-        resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
-                It.IsAny<string>(),
-                It.IsAny<List<DomainResource>>(),
-                FhirResourceType.Encounter,
-                It.IsAny<CancellationToken>()),
+            item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        resourceCache.Verify(
-            item => item.DeleteAsync(
-                It.Is<List<string>>(keys => keys.Count == 1 && keys[0] == PatientCacheKey),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
         producer.Verify(
             item => item.ProduceAsync(
-                KafkaTopic.ResourcesNormalized.ToString(),
+                It.IsAny<string>(),
                 It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]

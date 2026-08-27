@@ -209,6 +209,12 @@ namespace IntegrationTests.DataAcquisition
             ResourceCacheMock
                 .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<DomainResource>());
+            ResourceCacheMock
+                .Setup(c => c.GetCacheTypeForCorrelationIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(ResourceCacheType.Redis);
+            ResourceCacheMock
+                .Setup(c => c.HasResourcesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
             builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
 
             // AcquisitionProcessorBackgroundService dependencies: the real dependency checker exercises

@@ -61,6 +61,12 @@ public interface IDataAcquisitionLogManager
     /// Returns null if the group is not yet complete.
     /// </summary>
     Task<TailCompletionResult?> TryCompleteTailAsync(long completedLogId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears TailSent after a claimed tail fails to finalize or produce so the
+    /// safety-net poller can retry. No-op when <paramref name="queryPhase"/> is null.
+    /// </summary>
+    Task RevertTailSentAsync(string facilityId, string correlationId, QueryPhase? queryPhase, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -880,69 +886,104 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null; // Another worker already sent the tail.
         }
 
-        // Read the data we need for the tail Kafka message.
-        var representative = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .Where(l =>
-                l.FacilityId == groupInfo.FacilityId
-                && l.CorrelationId == groupInfo.CorrelationId
-                && l.QueryPhase == groupInfo.QueryPhase)
-            .Select(l => new
-            {
-                l.PatientId,
-                l.ReportableEvent,
-                l.TraceId,
-                ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
-                {
-                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                    Frequency = l.ScheduledReportEntity.Frequency.HasValue ? l.ScheduledReportEntity.Frequency.Value : default,
-                    StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
-                    EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
-                    ReportTypes = l.ScheduledReportEntity.ReportTypes != null
-                        ? l.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
-                        : new List<string>()
-                } : null,
-            })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (representative == null)
+        try
         {
-            return null;
+            // Read the data we need for the tail Kafka message.
+            var representative = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                .Where(l =>
+                    l.FacilityId == groupInfo.FacilityId
+                    && l.CorrelationId == groupInfo.CorrelationId
+                    && l.QueryPhase == groupInfo.QueryPhase)
+                .Select(l => new
+                {
+                    l.PatientId,
+                    l.ReportableEvent,
+                    l.TraceId,
+                    ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
+                    {
+                        ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
+                        Frequency = l.ScheduledReportEntity.Frequency.HasValue ? l.ScheduledReportEntity.Frequency.Value : default,
+                        StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                        EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                        ReportTypes = l.ScheduledReportEntity.ReportTypes != null
+                            ? l.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                            : new List<string>()
+                    } : null,
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (representative == null)
+            {
+                await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, cancellationToken);
+                return null;
+            }
+
+            // Only include cache keys for resource types that had at least one resource actually acquired.
+            // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
+            // is the substring before the first '/'.
+            var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
+                .Join(_dbContext.DataAcquisitionLogs,
+                    rid => rid.DataAcquisitionLogId,
+                    l => l.Id,
+                    (rid, l) => new { rid, l })
+                .Where(x => x.l.FacilityId == groupInfo.FacilityId
+                    && x.l.CorrelationId == groupInfo.CorrelationId
+                    && x.l.QueryPhase == groupInfo.QueryPhase)
+                .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            return new TailCompletionResult
+            {
+                FacilityId = groupInfo.FacilityId,
+                PatientId = representative.PatientId ?? "",
+                CorrelationId = groupInfo.CorrelationId!,
+                QueryPhase = groupInfo.QueryPhase,
+                TraceParentId = representative.TraceId,
+                ResourcesAcquired = new ResourcesAcquired
+                {
+                    QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
+                    ReportableEvent = representative.ReportableEvent ?? default,
+                    ScheduledReports = representative.ScheduledReport != null
+                        ? new List<ScheduledReport> { representative.ScheduledReport }
+                        : new List<ScheduledReport>(),
+                    CacheType = await _resourceCache.GetCacheTypeForCorrelationIdAsync(
+                        groupInfo.CorrelationId ?? string.Empty,
+                        cancellationToken),
+                    CacheKeys = acquiredResourceTypes
+                        .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
+                        .Distinct()
+                        .ToList()
+                }
+            };
+        }
+        catch
+        {
+            await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, CancellationToken.None);
+            throw;
+        }
+    }
+
+    public async Task RevertTailSentAsync(
+        string facilityId,
+        string correlationId,
+        QueryPhase? queryPhase,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(correlationId) || queryPhase is null)
+        {
+            return;
         }
 
-        // Only include cache keys for resource types that had at least one resource actually acquired.
-        // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
-        // is the substring before the first '/'.
-        var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
-            .Join(_dbContext.DataAcquisitionLogs,
-                rid => rid.DataAcquisitionLogId,
-                l => l.Id,
-                (rid, l) => new { rid, l })
-            .Where(x => x.l.FacilityId == groupInfo.FacilityId
-                && x.l.CorrelationId == groupInfo.CorrelationId
-                && x.l.QueryPhase == groupInfo.QueryPhase)
-            .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        return new TailCompletionResult
-        {
-            FacilityId = groupInfo.FacilityId,
-            PatientId = representative.PatientId ?? "",
-            CorrelationId = groupInfo.CorrelationId!,
-            TraceParentId = representative.TraceId,
-            ResourcesAcquired = new ResourcesAcquired
-            {
-                QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
-                ReportableEvent = representative.ReportableEvent ?? default,
-                ScheduledReports = representative.ScheduledReport != null
-                    ? new List<ScheduledReport> { representative.ScheduledReport }
-                    : new List<ScheduledReport>(),
-                CacheType = _resourceCache.GetCacheTypeForCorrelationId(groupInfo.CorrelationId ?? string.Empty),
-                CacheKeys = acquiredResourceTypes
-                    .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
-                    .Distinct()
-                    .ToList()
-            }
-        };
+        await _dbContext.DataAcquisitionLogs
+            .Where(l =>
+                l.FacilityId == facilityId
+                && l.CorrelationId == correlationId
+                && l.QueryPhase == queryPhase
+                && l.TailSent)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.TailSent, false)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
     }
 }

@@ -467,7 +467,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReports = first.ScheduledReport != null
                             ? new List<ScheduledReport> { first.ScheduledReport }
                             : new List<ScheduledReport>(),
-                        CacheType = _resourceCache.GetCacheTypeForCorrelationId(group.CorrelationId ?? string.Empty),
+                        CacheType = await _resourceCache.GetCacheTypeForCorrelationIdAsync(
+                            group.CorrelationId ?? string.Empty,
+                            cancellationToken),
                         CacheKeys = acquiredResourceTypes
                             .Select(rt => $"{group.CorrelationId}:{rt}")
                             .Distinct()

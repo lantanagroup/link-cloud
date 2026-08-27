@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -251,9 +252,10 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
     private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
     {
+        TailCompletionResult? tailResult = null;
         try
         {
-            var tailResult = await logManager.TryCompleteTailAsync(logId, ct);
+            tailResult = await logManager.TryCompleteTailAsync(logId, ct);
             if (tailResult == null)
             {
                 return; // Group not yet complete.
@@ -298,6 +300,25 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
+            if (tailResult != null)
+            {
+                try
+                {
+                    await logManager.RevertTailSentAsync(
+                        tailResult.FacilityId,
+                        tailResult.CorrelationId,
+                        tailResult.QueryPhase,
+                        CancellationToken.None);
+                }
+                catch (Exception revertEx)
+                {
+                    _logger.LogError(
+                        revertEx,
+                        "Failed to revert TailSent after inline tail failure for LogId {LogId}.",
+                        logId);
+                }
+            }
+
             _logger.LogError(ex, "Failed to produce inline tail message for LogId {LogId}. Safety-net poller will recover.", logId);
         }
     }

@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -73,9 +74,10 @@ public class TailMessageRecoveryJob : IJob
                     break;
                 }
 
+                TailCompletionResult? tailResult = null;
                 try
                 {
-                    var tailResult = await dataAcquisitionLogManager.TryCompleteTailAsync(logId, context.CancellationToken);
+                    tailResult = await dataAcquisitionLogManager.TryCompleteTailAsync(logId, context.CancellationToken);
                     if (tailResult == null)
                     {
                         processed++;
@@ -123,6 +125,25 @@ public class TailMessageRecoveryJob : IJob
                 }
                 catch (Exception ex)
                 {
+                    if (tailResult != null)
+                    {
+                        try
+                        {
+                            await dataAcquisitionLogManager.RevertTailSentAsync(
+                                tailResult.FacilityId,
+                                tailResult.CorrelationId,
+                                tailResult.QueryPhase,
+                                CancellationToken.None);
+                        }
+                        catch (Exception revertEx)
+                        {
+                            _logger.LogError(
+                                revertEx,
+                                "Failed to revert TailSent after recovery failure for LogId {LogId}.",
+                                logId);
+                        }
+                    }
+
                     _logger.LogError(ex, "TailMessageRecoveryJob failed recovering orphaned tail for LogId {LogId}.", logId);
                     processed++;
                 }

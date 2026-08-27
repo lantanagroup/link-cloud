@@ -27,12 +27,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly ILogger<HybridResourceCache> _logger;
 
         /// <summary>
-        /// In-process Redis-vs-ABS memo. Entries are not removed by <see cref="DeleteAsync"/>:
-        /// org-location strip deletes only <c>{correlation}:Encounter</c>, and remaining
-        /// Patient/Location keys are purged by Normalization via <see cref="GetImplementation"/>,
-        /// never through this Hybrid instance. Eviction is sliding TTL (same as Redis
-        /// <see cref="ResourceCacheRedisSettings.CacheEntryTtlDays"/>) plus an explicit
-        /// <see cref="ForgetCacheTypeForCorrelationId"/> after the ResourcesAcquired tail is produced.
+        /// In-process Redis-vs-ABS memo. The same decision is also written to Redis at
+        /// <c>{correlationId}:__cacheType</c> so DA recovery and other worker replicas
+        /// do not default to Redis while the payload lives in ABS. Entries are not removed
+        /// by <see cref="DeleteAsync"/> (org-location strip deletes only Encounter).
+        /// In-process eviction is sliding TTL plus <see cref="ForgetCacheTypeForCorrelationId"/>
+        /// after the tail is produced; the Redis memo keeps the Redis resource-entry TTL.
         /// </summary>
         private readonly ConcurrentDictionary<string, CacheTypeEntry> _correlationCacheTypes = new();
         private readonly TimeProvider _timeProvider;
@@ -40,6 +40,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private int _accessesSinceSweep;
 
         private const int SweepInterval = 256;
+        private const string CacheTypeMemoSuffix = ":__cacheType";
 
         /// <summary>
         /// Memory statistics pulled out of Redis <c>INFO memory</c> and echoed on every selection
@@ -101,8 +102,24 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <inheritdoc/>
         public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var cache = ResolveFromKey(cacheKey);
-            return await cache.GetAsync(cacheKey, cancellationToken);
+            var correlationId = ExtractCorrelationId(cacheKey);
+            var recorded = await TryGetRecordedCacheTypeAsync(correlationId, cancellationToken);
+            var cacheType = recorded ?? ResourceCacheType.Redis;
+            var cache = cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+            var resources = await cache.GetAsync(cacheKey, cancellationToken) ?? [];
+            if (resources.Count > 0 || recorded.HasValue)
+            {
+                return resources;
+            }
+
+            var other = cacheType == ResourceCacheType.ABS ? _redisCache : _absCache;
+            var otherResources = await other.GetAsync(cacheKey, cancellationToken) ?? [];
+            if (otherResources.Count > 0)
+            {
+                RememberCacheType(correlationId, cacheType == ResourceCacheType.ABS ? ResourceCacheType.Redis : ResourceCacheType.ABS);
+            }
+
+            return otherResources;
         }
 
         /// <inheritdoc/>
@@ -115,15 +132,24 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <inheritdoc/>
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            var byType = cacheKeys
-                .GroupBy(k => TryGetRecordedCacheType(ExtractCorrelationId(k), out var cacheType)
-                    ? cacheType
-                    : ResourceCacheType.Redis);
+            var groups = new Dictionary<ResourceCacheType, List<string>>();
+            foreach (var key in cacheKeys)
+            {
+                var cacheType = await TryGetRecordedCacheTypeAsync(ExtractCorrelationId(key), cancellationToken)
+                    ?? ResourceCacheType.Redis;
+                if (!groups.TryGetValue(cacheType, out var list))
+                {
+                    list = [];
+                    groups[cacheType] = list;
+                }
 
-            foreach (var group in byType)
+                list.Add(key);
+            }
+
+            foreach (var group in groups)
             {
                 var cache = group.Key == ResourceCacheType.ABS ? _absCache : _redisCache;
-                await cache.DeleteAsync(group.ToList(), cancellationToken);
+                await cache.DeleteAsync(group.Value, cancellationToken);
             }
 
             // Keep the Redis-vs-ABS decision for the correlation. Deleting one resource-type
@@ -136,15 +162,49 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <inheritdoc/>
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
         {
-            return TryGetRecordedCacheType(ExtractCorrelationId(correlationId), out var cacheType)
+            return TryGetInProcessCacheType(ExtractCorrelationId(correlationId), out var cacheType)
                 ? cacheType
                 : ResourceCacheType.Redis;
+        }
+
+        /// <inheritdoc/>
+        public async Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            return await TryGetRecordedCacheTypeAsync(ExtractCorrelationId(correlationId), cancellationToken)
+                ?? ResourceCacheType.Redis;
         }
 
         /// <inheritdoc/>
         public IResourceCache GetImplementation(ResourceCacheType cacheType)
         {
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var correlationId = ExtractCorrelationId(cacheKey);
+            var recorded = await TryGetRecordedCacheTypeAsync(correlationId, cancellationToken);
+            var cacheType = recorded ?? ResourceCacheType.Redis;
+            var cache = cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+            if (await cache.HasResourcesAsync(cacheKey, cancellationToken))
+            {
+                return true;
+            }
+
+            if (recorded.HasValue)
+            {
+                return false;
+            }
+
+            var other = cacheType == ResourceCacheType.ABS ? _redisCache : _absCache;
+            if (await other.HasResourcesAsync(cacheKey, cancellationToken))
+            {
+                RememberCacheType(correlationId, cacheType == ResourceCacheType.ABS ? ResourceCacheType.Redis : ResourceCacheType.ABS);
+                return true;
+            }
+
+            return false;
         }
 
         /// <inheritdoc/>
@@ -163,19 +223,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private async Task<IResourceCache> DetermineAndRecordCacheAsync(string correlationId, CancellationToken cancellationToken)
         {
             var key = ExtractCorrelationId(correlationId);
-            if (!TryGetRecordedCacheType(key, out var cacheType))
+            var recorded = await TryGetRecordedCacheTypeAsync(key, cancellationToken);
+            if (recorded.HasValue)
             {
-                cacheType = await SelectCacheTypeAsync(cancellationToken);
-                cacheType = RememberCacheType(key, cacheType);
+                return recorded.Value == ResourceCacheType.ABS ? _absCache : _redisCache;
             }
 
-            return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+            var selected = await SelectCacheTypeAsync(cancellationToken);
+            selected = await PersistCacheTypeAsync(key, selected, cancellationToken);
+            RememberCacheType(key, selected);
+            return selected == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
         private IResourceCache ResolveFromKey(string cacheKey)
         {
             var correlationId = ExtractCorrelationId(cacheKey);
-            var cacheType = TryGetRecordedCacheType(correlationId, out var recorded)
+            var cacheType = TryGetInProcessCacheType(correlationId, out var recorded)
                 ? recorded
                 : ResourceCacheType.Redis;
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
@@ -192,7 +255,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return entry.Type;
         }
 
-        private bool TryGetRecordedCacheType(string correlationId, out ResourceCacheType cacheType)
+        private bool TryGetInProcessCacheType(string correlationId, out ResourceCacheType cacheType)
         {
             MaybeSweepExpired();
 
@@ -211,6 +274,82 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             cacheType = default;
             return false;
         }
+
+        private async Task<ResourceCacheType?> TryGetRecordedCacheTypeAsync(string correlationId, CancellationToken cancellationToken)
+        {
+            if (TryGetInProcessCacheType(correlationId, out var inProcess))
+            {
+                return inProcess;
+            }
+
+            var fromRedis = await LoadCacheTypeFromRedisAsync(correlationId, cancellationToken);
+            if (fromRedis.HasValue)
+            {
+                RememberCacheType(correlationId, fromRedis.Value);
+            }
+
+            return fromRedis;
+        }
+
+        private async Task<ResourceCacheType> PersistCacheTypeAsync(
+            string correlationId,
+            ResourceCacheType cacheType,
+            CancellationToken cancellationToken)
+        {
+            var memoKey = CacheTypeMemoKey(correlationId);
+            try
+            {
+                var created = await _redisDatabase.Database.StringSetAsync(
+                    memoKey,
+                    cacheType.ToString(),
+                    _correlationCacheTypeTtl,
+                    When.NotExists).WaitAsync(cancellationToken);
+
+                if (created)
+                {
+                    return cacheType;
+                }
+
+                var winner = await LoadCacheTypeFromRedisAsync(correlationId, cancellationToken);
+                return winner ?? cacheType;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to persist Hybrid cache type {CacheType} for correlation {CorrelationId}; using the in-process decision.",
+                    cacheType,
+                    correlationId);
+                return cacheType;
+            }
+        }
+
+        private async Task<ResourceCacheType?> LoadCacheTypeFromRedisAsync(string correlationId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var value = await _redisDatabase.Database.StringGetAsync(CacheTypeMemoKey(correlationId))
+                    .WaitAsync(cancellationToken);
+                if (value.IsNullOrEmpty)
+                {
+                    return null;
+                }
+
+                return Enum.TryParse<ResourceCacheType>(value.ToString(), ignoreCase: true, out var parsed)
+                    ? parsed
+                    : null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to load Hybrid cache type for correlation {CorrelationId} from Redis.",
+                    correlationId);
+                return null;
+            }
+        }
+
+        private static string CacheTypeMemoKey(string correlationId) => correlationId + CacheTypeMemoSuffix;
 
         private bool IsExpired(CacheTypeEntry entry)
         {

@@ -107,11 +107,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return ResourceCacheType.Redis;
         }
 
+        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(ResourceCacheType.Redis);
+        }
+
         public IResourceCache GetImplementation(ResourceCacheType cacheType)
         {
             if (cacheType != ResourceCacheType.Redis)
                 throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
             return this;
+        }
+
+        public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
+            return length > 0;
         }
 
         public void ForgetCacheTypeForCorrelationId(string correlationId)

@@ -1,4 +1,5 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -46,20 +47,27 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         var listed = tail.ResourcesAcquired.CacheKeys ?? [];
         if (listed.Count == 0)
         {
-            // CacheType is already stamped on the tail; Hybrid no longer needs the memo.
+            // CacheType is already stamped on the tail; Hybrid no longer needs the in-process memo.
             _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
             return;
         }
 
-        var cache = _resourceCache.GetImplementation(tail.ResourcesAcquired.CacheType) ?? _resourceCache;
         var kept = new List<string>(listed.Count);
+        var sawAbs = false;
+        var sawRedis = false;
+
         foreach (var key in listed)
         {
-            var resources = await cache.GetAsync(key, cancellationToken);
-            if (resources.Count > 0)
+            var inAbs = await KeyHasResourcesAsync(ResourceCacheType.ABS, key, cancellationToken);
+            var inRedis = await KeyHasResourcesAsync(ResourceCacheType.Redis, key, cancellationToken);
+            if (!inAbs && !inRedis)
             {
-                kept.Add(key);
+                continue;
             }
+
+            kept.Add(key);
+            sawAbs |= inAbs;
+            sawRedis |= inRedis;
         }
 
         if (kept.Count != listed.Count)
@@ -73,11 +81,39 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
                 kept.Count);
         }
 
+        // Prefer ABS when a correlation has data in both stores (a replica split) so
+        // Normalization does not look only in Redis and miss the ABS payload.
+        if (sawAbs)
+        {
+            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
+        }
+        else if (sawRedis)
+        {
+            tail.ResourcesAcquired.CacheType = ResourceCacheType.Redis;
+        }
+
         tail.ResourcesAcquired.CacheKeys = kept;
 
-        // CacheType is already on the Kafka payload. Drop the in-process Hybrid memo so
-        // _correlationCacheTypes cannot grow without bound now that DeleteAsync no longer
-        // TryRemove's it (strip deletes Encounter only; Patient/Location are purged downstream).
+        // Drop the in-process Hybrid memo. The Redis {correlation}:__cacheType memo stays
+        // so a later retry or replica can still resolve ABS vs Redis.
         _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
+    }
+
+    private async Task<bool> KeyHasResourcesAsync(
+        ResourceCacheType cacheType,
+        string cacheKey,
+        CancellationToken cancellationToken)
+    {
+        IResourceCache implementation;
+        try
+        {
+            implementation = _resourceCache.GetImplementation(cacheType);
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+
+        return await implementation.HasResourcesAsync(cacheKey, cancellationToken);
     }
 }

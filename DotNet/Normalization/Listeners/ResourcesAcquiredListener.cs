@@ -233,16 +233,13 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // A listed key with no data is a producer defect (or a still-propagating write).
-                    // Skip this type so a single empty key cannot dead-letter the whole patient.
-                    // If EVERY listed key is empty, fail transiently after the loop — that is the
-                    // cache-not-ready race, not an intentional empty type.
-                    _logger.LogWarning(
-                        "ResourcesAcquired listed cache key '{CacheKey}' but it contained no resources. Skipping this type. CacheType={CacheType}, FacilityId={FacilityId}.",
-                        cacheKey.SanitizeForLog(),
-                        result.Message.Value.CacheType,
-                        result.Message.Key.FacilityId.SanitizeForLog());
-                    continue;
+                    // Data Acquisition only lists a cache key when that key currently has resources
+                    // (empty keys are dropped in ResourcesAcquiredTailFinalizer). An empty read here
+                    // means the cache copy is not ready. Fail transiently so the source keys are NOT
+                    // deleted and MeasureEval does not evaluate a partial bundle.
+                    throw new TransientException(
+                        $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
+                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }
 
                 if (sequences == null || sequences.Count == 0)
@@ -334,12 +331,12 @@ public class ResourcesAcquiredListener : BackgroundService
                 copiedKeys.Add(cacheKey);
             }
 
-            if (copiedKeys.Count == 0 && cacheKeys.Count > 0)
+            if (cacheKeys.Count == 0)
             {
-                var emptyKeys = string.Join(", ", cacheKeys.Select(key => key.SanitizeForLog()));
-                throw new TransientException(
-                    $"All {cacheKeys.Count} ResourcesAcquired cache key(s) were empty: {emptyKeys}. " +
-                    $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                _logger.LogInformation(
+                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);

@@ -33,6 +33,16 @@ public class HybridResourceCacheTests
     {
         _redisDatabase.SetupGet(database => database.Database).Returns(_database.Object);
         _database.SetupGet(database => database.Multiplexer).Returns(_multiplexer.Object);
+        _database
+            .Setup(database => database.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(RedisValue.Null);
+        _database
+            .Setup(database => database.StringSetAsync(
+                It.IsAny<RedisKey>(),
+                It.IsAny<RedisValue>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<When>()))
+            .ReturnsAsync(true);
     }
 
     private HybridResourceCache CreateSut(ResourceCacheRedisSettings redisSettings, TimeProvider? timeProvider = null)
@@ -245,11 +255,13 @@ public class HybridResourceCacheTests
         _redisCache
             .Setup(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DomainResource>());
+        _absCache
+            .Setup(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>());
 
         await sut.GetAsync("corr-forget:Patient");
 
         _redisCache.Verify(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()), Times.Once);
-        _absCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -298,6 +310,51 @@ public class HybridResourceCacheTests
 
         clock.Advance(TimeSpan.FromDays(7));
         sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.Redis);
+    }
+
+    [Fact]
+    public async Task Cache_type_persisted_to_Redis_is_visible_to_another_instance()
+    {
+        SetupRedisUsedMemory(900L * 1024 * 1024);
+        RedisValue stored = RedisValue.Null;
+        _database
+            .Setup(database => database.StringSetAsync(
+                It.IsAny<RedisKey>(),
+                It.IsAny<RedisValue>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<When>()))
+            .Callback<RedisKey, RedisValue, TimeSpan?, When>((_, value, _, _) => stored = value)
+            .ReturnsAsync(true);
+        _database
+            .Setup(database => database.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .Returns(() => Task.FromResult(stored));
+
+        var settings = new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 };
+        var writer = CreateSut(settings);
+        await Write(writer, "corr-shared");
+
+        var reader = CreateSut(settings);
+        (await reader.GetCacheTypeForCorrelationIdAsync("corr-shared")).Should().Be(ResourceCacheType.ABS);
+    }
+
+    [Fact]
+    public async Task GetAsync_falls_back_to_ABS_when_no_memo_exists()
+    {
+        SetupRedisUsedMemory(100L * 1024 * 1024);
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        _redisCache
+            .Setup(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>());
+        _absCache
+            .Setup(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource> { new Patient { Id = "p1" } });
+
+        var resources = await sut.GetAsync("corr-miss:Patient");
+
+        resources.Should().ContainSingle();
+        sut.GetCacheTypeForCorrelationId("corr-miss").Should().Be(ResourceCacheType.ABS);
+        _absCache.Verify(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
