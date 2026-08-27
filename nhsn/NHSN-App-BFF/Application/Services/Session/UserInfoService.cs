@@ -16,12 +16,18 @@ public class UserInfoService : IUserInfoService
     private readonly NhsnAppDbContext _dbContext;
     private readonly INhsnUserContext _userContext;
     private readonly NhsnJwtSettings _jwtSettings;
+    private readonly LinkCapabilitiesSettings _capabilities;
 
-    public UserInfoService(NhsnAppDbContext dbContext, INhsnUserContext userContext, IOptions<NhsnJwtSettings> jwtOptions)
+    public UserInfoService(
+        NhsnAppDbContext dbContext,
+        INhsnUserContext userContext,
+        IOptions<NhsnJwtSettings> jwtOptions,
+        IOptions<LinkCapabilitiesSettings> capabilityOptions)
     {
         _dbContext = dbContext;
         _userContext = userContext;
         _jwtSettings = jwtOptions.Value;
+        _capabilities = capabilityOptions.Value;
     }
 
     public async Task<UserInfoResponse> GetUserInfoAsync(CancellationToken cancellationToken = default)
@@ -50,7 +56,15 @@ public class UserInfoService : IUserInfoService
             FacilityId = _userContext.FacilityId,
             Groups = _userContext.Groups,
             AvailableNavigation = availableNavigation,
-            AccessRequestUrl = _jwtSettings.AccessRequestUrl
+            AccessRequestUrl = _jwtSettings.AccessRequestUrl,
+            Vendor = facility?.Vendor?.ToString(),
+            OnboardingStatus = facility?.OnboardingStatus.ToString(),
+            CurrentStepId = facility?.CurrentStepId,
+            Capabilities = new CapabilitiesResponse
+            {
+                FhirConnectionProbe = _capabilities.FhirConnectionProbe,
+                PatientListWithNames = _capabilities.PatientListWithNames
+            }
         };
     }
 
@@ -73,7 +87,9 @@ public class UserInfoService : IUserInfoService
         facility = new NhsnFacility
         {
             FacilityId = facilityId,
-            IsOnboarded = false
+            OnboardingStatus = OnboardingStatus.NotStarted,
+            CreatedBy = UserInfoActor,
+            LastModifiedBy = UserInfoActor
         };
 
         _dbContext.Facilities.Add(facility);

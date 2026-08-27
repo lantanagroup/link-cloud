@@ -36,9 +36,9 @@ export function WelcomeStep({onNext}: StepProps) {
       <h2>{t('onboarding:welcome.workflowTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.workflowBody')}</p>
 
-      {user.Vendor && (
+      {user.vendor && (
         <p className="nhsn-link__subtitle">
-          {t('onboarding:welcome.vendorNote', {vendor: user.Vendor})}
+          {t('onboarding:welcome.vendorNote', {vendor: user.vendor})}
         </p>
       )}
 

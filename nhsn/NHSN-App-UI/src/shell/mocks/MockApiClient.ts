@@ -1,7 +1,6 @@
 import type {ApiClient, DraftEnvelope} from '../../core/api/ApiClient';
 import type {FacilityDraft} from '../../core/onboarding/types';
 import {createEmptyDraft, migrateDraft} from '../../core/onboarding/types';
-import {DraftConflictError} from '../../core/api/http';
 import type {Operation} from '../../core/api/http';
 import type * as C from '../../core/api/contracts';
 
@@ -19,8 +18,16 @@ import type * as C from '../../core/api/contracts';
  * for real facility data.
  */
 const DRAFT_KEY = 'nhsn-app-ui.mockDraft';
-const VERSION_KEY = 'nhsn-app-ui.mockDraftVersion';
 const LATENCY_MS = 120;
+
+// Every section healthy - mock mode reads from localStorage, so nothing can be unavailable.
+// Build a step's Unavailable state against the real BFF with a service stopped, not against this.
+const MOCK_SOURCES: C.SectionSource[] = [
+  {section: 'workflow', origin: 'Bff', status: 'Ok'},
+  {section: 'facilityInfo', origin: 'Tenant', status: 'Ok'},
+  {section: 'fhir', origin: 'DataAcquisition', status: 'Ok'},
+  {section: 'census', origin: 'Census', status: 'Ok'}
+];
 
 export class MockApiClient implements ApiClient {
   constructor(private readonly facilityId = 'MOCK-FACILITY-001') {}
@@ -30,23 +37,22 @@ export class MockApiClient implements ApiClient {
   async getUserInfo(): Promise<C.UserInfoResponse> {
     await tick();
     return {
-      AccessState: 'Allowed',
-      Email: 'facility.admin@example.invalid',
-      Name: 'Sample Facility Admin',
-      IsFacilityAdmin: true,
-      IsOnboarded: false,
-      HasFacility: true,
-      FacilityId: this.facilityId,
-      Groups: ['FACADMIN'],
-      AvailableNavigation: ['onboarding'],
-      Vendor: 'Epic',
-      OnboardingStatus: 'InProgress',
-      // All three off, matching every non-development environment. Steps must
+      accessState: 'Allowed',
+      email: 'facility.admin@example.invalid',
+      name: 'Sample Facility Admin',
+      isFacilityAdmin: true,
+      isOnboarded: false,
+      hasFacility: true,
+      facilityId: this.facilityId,
+      groups: ['FACADMIN'],
+      availableNavigation: ['onboarding'],
+      vendor: 'Epic',
+      onboardingStatus: 'InProgress',
+      // Both off, matching every non-development environment. Steps must
       // render their "not yet connected" state rather than showing fixtures.
-      Capabilities: {
-        PatientListWithNames: false,
-        SftpFileListing: false,
-        FhirMetadataProbe: false
+      capabilities: {
+        patientListWithNames: false,
+        fhirConnectionProbe: false
       }
     };
   }
@@ -59,21 +65,15 @@ export class MockApiClient implements ApiClient {
     return {
       draft: raw ? migrateDraft(JSON.parse(raw)) : createEmptyDraft(),
       commitState: null,
-      etag: currentVersion()
+      sources: MOCK_SOURCES
     };
   }
 
-  async saveDraft(draft: FacilityDraft, etag?: string): Promise<DraftEnvelope> {
+  async saveDraft(draft: FacilityDraft): Promise<DraftEnvelope> {
     await tick();
-    // Reproduces the BFF's If-Match check so the conflict path is exercised
-    // offline — open two tabs and the second save fails, as it would live.
-    const version = currentVersion();
-    if (etag && etag !== version) {
-      throw new DraftConflictError('mock://onboarding');
-    }
-    const next = bumpVersion();
+    // No conflict simulation - the BFF scopes each write to its own step, so there's nothing to simulate.
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    return {draft, commitState: null, etag: next};
+    return {draft, commitState: null, sources: MOCK_SOURCES};
   }
 
   async importDraft(): Promise<C.ImportResult> {
@@ -203,26 +203,12 @@ export class MockApiClient implements ApiClient {
     await tick();
     return [
       {
-        fileId: 'simulated-file-1',
-        name: 'census-simulated-0001.csv',
-        sizeBytes: 1024,
-        modifiedOn: '2026-01-01T00:00:00Z',
+        fileName: 'census-simulated-0001.csv',
+        queriedAt: '2026-01-01T00:00:00Z',
+        patients: [{patientId: 'SIMULATED-PATIENT-0001', patientName: 'Jane Doe'}],
         simulated: true
       }
     ];
-  }
-
-  async previewSftpFile(fileId: string): Promise<C.SftpFilePreview> {
-    await tick();
-    return {
-      fileId,
-      rows: [
-        ['PatientId', 'AdmitDate'],
-        ['SIMULATED-PATIENT-0001', '2026-01-01']
-      ],
-      truncated: false,
-      simulated: true
-    };
   }
 
   async testSftpConnection(): Promise<C.ConnectionResult> {
@@ -371,16 +357,6 @@ export class MockApiClient implements ApiClient {
 
 function ids(count: number): string[] {
   return Array.from({length: count}, (_, i) => `SIMULATED-PATIENT-${String(i + 1).padStart(4, '0')}`);
-}
-
-function currentVersion(): string {
-  return window.localStorage.getItem(VERSION_KEY) ?? '0';
-}
-
-function bumpVersion(): string {
-  const next = String(Number(currentVersion()) + 1);
-  window.localStorage.setItem(VERSION_KEY, next);
-  return next;
 }
 
 function tick(): Promise<void> {

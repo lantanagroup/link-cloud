@@ -13,7 +13,7 @@ import {useOnboarding} from './OnboardingProvider';
  */
 export function StepHost() {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {loadState, error, draft, user, target, goTo, saving, conflict, reloadDraft} =
+  const {loadState, error, draft, user, target, goTo, saving} =
     useOnboarding();
 
   if (loadState === 'loading') {
@@ -60,15 +60,8 @@ export function StepHost() {
         })}
       </ol>
 
+      {/* No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict. */}
       <section className="nhsn-link__step-panel" aria-live="polite">
-        {conflict && (
-          <div className="nhsn-link__state nhsn-link__state--warning" role="alert">
-            {t('onboarding:messages.draftConflict')}{' '}
-            <button type="button" onClick={() => void reloadDraft()}>
-              {t('common:actions.reload')}
-            </button>
-          </div>
-        )}
 
         {saving && <span className="nhsn-link__saving">{t('common:status.saving')}</span>}
 

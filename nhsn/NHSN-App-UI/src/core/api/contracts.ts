@@ -11,6 +11,18 @@
 
 export type AccessState = 'Allowed' | 'MissingFacility' | 'MissingRequiredRole';
 
+/** Where one section of the assembled draft came from, and whether it arrived. */
+export interface SectionSource {
+  section: string;
+  /** "Tenant", "DataAcquisition", "Census" or "Bff". */
+  origin: string;
+  status: SectionStatus;
+  traceId?: string;
+  detail?: string;
+}
+
+export type SectionStatus = 'Ok' | 'Unavailable';
+
 export type EhrVendor = 'Epic' | 'Cerner';
 
 export type OnboardingStatus =
@@ -27,32 +39,31 @@ export type OnboardingStatus =
  * as facility data.
  */
 export interface Capabilities {
-  PatientListWithNames: boolean;
-  SftpFileListing: boolean;
-  FhirMetadataProbe: boolean;
+  patientListWithNames: boolean;
+  fhirConnectionProbe: boolean;
 }
 
 export interface UserInfoResponse {
-  AccessState: AccessState;
-  Email: string;
-  Name: string;
-  IsFacilityAdmin: boolean;
-  IsOnboarded: boolean;
-  HasFacility: boolean;
-  FacilityId?: string;
-  Groups: string[];
-  AvailableNavigation: string[];
-  AccessRequestUrl?: string;
-  Vendor?: EhrVendor;
-  OnboardingStatus?: OnboardingStatus;
-  CurrentStepId?: string;
-  Capabilities?: Capabilities;
+  accessState: AccessState;
+  email: string;
+  name: string;
+  isFacilityAdmin: boolean;
+  isOnboarded: boolean;
+  hasFacility: boolean;
+  facilityId?: string;
+  groups: string[];
+  availableNavigation: string[];
+  accessRequestUrl?: string;
+  vendor?: EhrVendor;
+  onboardingStatus?: OnboardingStatus;
+  currentStepId?: string;
+  capabilities?: Capabilities;
 }
 
 export interface FacilitySummaryResponse {
-  Id: string;
-  FacilityId: string;
-  IsOnboarded: boolean;
+  id: string;
+  facilityId: string;
+  isOnboarded: boolean;
 }
 
 // ---------------------------------------------------------------- reference data
@@ -144,19 +155,17 @@ export interface CensusListResult {
   simulated?: boolean;
 }
 
+/** Identified by fileName - the endpoint has no file id. Patients arrive attached, no separate preview call. */
 export interface SftpFile {
-  fileId: string;
-  name: string;
-  sizeBytes: number;
-  modifiedOn: string;
+  fileName: string;
+  queriedAt: string;
+  patients: SftpFilePatient[];
   simulated?: boolean;
 }
 
-export interface SftpFilePreview {
-  fileId: string;
-  rows: string[][];
-  truncated: boolean;
-  simulated?: boolean;
+export interface SftpFilePatient {
+  patientId: string;
+  patientName: string;
 }
 
 export interface SftpConfig {

@@ -4,6 +4,9 @@ using System.Security.Cryptography.X509Certificates;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.PatientsOfInterest;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Errors;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.DependencyInjection;
@@ -23,6 +26,8 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 using Serilog.Enrichers.Span;
 
@@ -133,6 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 
     builder.Services.AddLinkGateways(builder.Configuration);
+    builder.Services.AddExceptionHandler<FacilityWriteLockExceptionHandler>();
     builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
 
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
@@ -145,6 +151,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<INhsnUserContext, NhsnUserContext>();
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
+    builder.Services.AddScoped<IOnboardingDraftStore, OnboardingDraftStore>();
+    builder.Services.AddScoped<IOnboardingReadService, OnboardingReadService>();
+    builder.Services.AddScoped<IOnboardingWriteService, OnboardingWriteService>();
+    builder.Services.AddSingleton<IReferenceDataService, ReferenceDataService>();
+    builder.Services.AddScoped<IPatientsOfInterestService, PatientsOfInterestService>();
+    builder.Services.Configure<OnboardingReadSettings>(builder.Configuration.GetSection(OnboardingReadSettings.SectionName));
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
     builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));
@@ -152,6 +164,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
     builder.Services.AddTransient<IApi, LocalizationEndpoints>();
+    builder.Services.AddTransient<IApi, OnboardingEndpoints>();
+    builder.Services.AddTransient<IApi, ReferenceEndpoints>();
+    builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -164,12 +179,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Description = "JWT Authorization header using the Bearer scheme.",
+            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' followed by your token.",
             Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Scheme = JwtBearerDefaults.AuthenticationScheme
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header
         });
 
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -190,7 +203,21 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.DocumentFilter<HealthChecksFilter>();
     });
 
-    builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.PropertyNamingPolicy = null);
+    // camelCase on every route, both directions. Stated explicitly rather than left to the
+    // framework default so a new endpoint cannot pick the other convention by accident.
+    // Browsers cache nhsn-link.js independently of BFF releases, so once a bundle ships a casing
+    // change breaks every cached copy until it refreshes - which is why this is settled now, while
+    // nothing is deployed.
+    builder.Services.Configure<JsonOptions>(opt =>
+    {
+        opt.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+
+        // Enums travel as their names, not their ordinals. A numeric status is opaque to the UI and
+        // silently reinterprets every stored value if a member is ever inserted. Names are left
+        // PascalCase to match the unions the UI already declares - AccessState, EhrVendor,
+        // OnboardingStatus are all "Allowed" / "Epic" / "NotStarted".
+        opt.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()

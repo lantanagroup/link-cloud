@@ -15,7 +15,4 @@ public class LinkCapabilitiesSettings
 
     // Epic — blocked on the ehrPatientLists shape not yet carrying a patient collection.
     public bool PatientListWithNames { get; set; }
-
-    // Cerner — blocked on the sFTP file listing and preview endpoints not existing yet.
-    public bool SftpFileListing { get; set; }
 }
