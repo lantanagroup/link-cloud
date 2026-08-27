@@ -1,6 +1,8 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,13 +10,9 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
@@ -99,49 +97,23 @@ public class EpicAuth : IAuth
             throw new ArgumentException("A facilityId must be provided for Epic authentication.");
 
         var resolvedPem = await ResolvePem(facilityId, authSettings);
-        var key = resolvedPem.Replace("\\r\\n\\t", "\r\n\t");
 
-        var handler = new JsonWebTokenHandler();
-        var now = DateTime.UtcNow;
-        RsaSecurityKey rsaKey;
-
-        Dictionary<string, object> headers = new Dictionary<string, object>();
-        headers.Add("typ", "JWT");
-
-        using (var stream = new StringReader(key))
-        {
-            var reader = new Org.BouncyCastle.OpenSsl.PemReader(stream);
-            var keyPair = reader.ReadObject() as AsymmetricCipherKeyPair;
-            var privateRsaParams = keyPair.Private as RsaPrivateCrtKeyParameters;
-            var rsaParams = DotNetUtilities.ToRSAParameters(privateRsaParams);
-            rsaKey = new RsaSecurityKey(rsaParams);
-        }
-
-        var signingCredentials = new SigningCredentials(rsaKey, SecurityAlgorithms.RsaSha256);
+        var signingCredentials =
+            TryGetECDsaSigningCredentials(resolvedPem)
+            ?? TryGetRSASigningCredentials(resolvedPem)
+            ?? throw new InvalidOperationException("PEM uses unsupported algorithm.");
 
         if (string.IsNullOrWhiteSpace(authSettings.ClientId))
                 throw new ArgumentException("A secret name for ClientId must be provided for Epic authentication.");
-
         var clientId = await _secretManager.GetSecretAsync(authSettings.ClientId, CancellationToken.None);
-
         if (string.IsNullOrWhiteSpace(clientId))
             throw new InvalidOperationException($"No value found in secret manager for ClientId");
 
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Issuer = clientId,
-            Audience = authSettings.TokenUrl,
-            IssuedAt = now,
-            NotBefore = now,
-            Expires = now.AddMinutes(4),
-            AdditionalHeaderClaims = headers,
-            Claims = new Dictionary<string, object> { { "jti", Guid.NewGuid().ToString() } },
-            Subject = new ClaimsIdentity(new List<Claim> { new Claim("sub", clientId) }),
-            SigningCredentials = signingCredentials
-        };
+        var audience = authSettings.Audience ?? authSettings.TokenUrl;
+        if (string.IsNullOrWhiteSpace(audience))
+            throw new InvalidOperationException("An Audience or TokenUrl must be provided for Epic authentication.");
 
-        string token = handler.CreateToken(descriptor);
-        return token;
+        return GetToken(clientId, audience, signingCredentials);
     }
 
     private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings)
@@ -165,5 +137,82 @@ public class EpicAuth : IAuth
                 $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
 
         return resolvedPem;
+    }
+
+    private SigningCredentials? TryGetECDsaSigningCredentials(string pem)
+    {
+        ECDsa ecdsa = ECDsa.Create();
+        try
+        {
+            ecdsa.ImportFromPem(pem);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        string? algorithm = ecdsa.KeySize switch
+        {
+            256 => SecurityAlgorithms.EcdsaSha256,
+            384 => SecurityAlgorithms.EcdsaSha384,
+            512 => SecurityAlgorithms.EcdsaSha512,
+            _ => null
+        };
+        if (algorithm == null)
+        {
+            return null;
+        }
+        return new SigningCredentials(new ECDsaSecurityKey(ecdsa), algorithm);
+    }
+
+    private SigningCredentials? TryGetRSASigningCredentials(string pem)
+    {
+        RSA rsa = RSA.Create();
+        try
+        {
+            rsa.ImportFromPem(pem);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        string? algorithm = rsa.KeySize switch
+        {
+            2048 => SecurityAlgorithms.RsaSha256,
+            3072 => SecurityAlgorithms.RsaSha384,
+            4096 => SecurityAlgorithms.RsaSha512,
+            _ => null
+        };
+        if (algorithm == null)
+        {
+            return null;
+        }
+        return new SigningCredentials(new RsaSecurityKey(rsa), algorithm);
+    }
+
+    private string GetToken(string clientId, string audience, SigningCredentials credentials)
+    {
+        DateTime now = DateTime.Now;
+        SecurityTokenDescriptor tokenDescriptor = new()
+        {
+            AdditionalHeaderClaims = new Dictionary<string, object>
+            {
+                { JwtRegisteredClaimNames.Typ, "JWT" }
+            },
+            Issuer = clientId,
+            Subject = new([
+                new Claim(JwtRegisteredClaimNames.Sub, clientId)
+            ]),
+            Audience = audience,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now.AddMinutes(4.0),
+            Claims = new Dictionary<string, object>
+            {
+                { JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString() }
+            },
+            SigningCredentials = credentials
+        };
+        JsonWebTokenHandler tokenHandler = new();
+        return tokenHandler.CreateToken(tokenDescriptor);
     }
 }
