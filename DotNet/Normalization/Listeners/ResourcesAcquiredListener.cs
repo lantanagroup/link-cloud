@@ -20,6 +20,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Normalization.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -45,6 +47,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
+    private readonly IProducer<ResourceKey, MappingOutcomeValue> _mappingOutcomeProducer;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -63,7 +66,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache,
-        IResourceCachePurger resourceCachePurger)
+        IResourceCachePurger resourceCachePurger,
+        IProducer<ResourceKey, MappingOutcomeValue> mappingOutcomeProducer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -91,6 +95,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
+        _mappingOutcomeProducer = mappingOutcomeProducer ?? throw new ArgumentNullException(nameof(mappingOutcomeProducer));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -218,6 +223,8 @@ public class ResourcesAcquiredListener : BackgroundService
 
         using (var scope = _scopeFactory.CreateScope())
         {
+            var mappingOutcomes = new MappingOutcomeAccumulator();
+
             foreach (var cacheKey in cacheKeys)
             {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
@@ -288,7 +295,8 @@ public class ResourcesAcquiredListener : BackgroundService
                             if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:{operationResult.SuccessCode}");
-
+                                mappingOutcomes.Add(operationResult.CodeMapping);
+                                
                                 if (operationResult.SuccessCode == OperationStatus.Success)
                                 {
                                     _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
@@ -303,6 +311,11 @@ public class ResourcesAcquiredListener : BackgroundService
                             else
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:Failure");
+                                if (operation is CodeMapOperation codeMapOperation)
+                                {
+                                    mappingOutcomes.AddFailure(codeMapOperation); 
+                                }
+
                                 _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
                             }
                         }
@@ -331,6 +344,13 @@ public class ResourcesAcquiredListener : BackgroundService
                 copiedKeys.Add(cacheKey);
             }
 
+            await ProduceMappingOutcomeEvaluatedMessage(
+                result.Message.Key.FacilityId,
+                result.Message.Key.PatientId,
+                correlationId,
+                result.Message.Value,
+                mappingOutcomes,
+                cancellationToken);
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
             await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
@@ -404,6 +424,59 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
+        }
+    }
+
+    private async Task ProduceMappingOutcomeEvaluatedMessage(
+        string? facilityId,
+        string? patientId,
+        string? correlationId,
+        ResourcesAcquiredValue acquiredValue,
+        MappingOutcomeAccumulator mappingOutcomes,
+        CancellationToken cancellationToken = default)
+    {
+        var outcomes = mappingOutcomes.BuildAll().ToList();
+        var value = new MappingOutcomeValue
+        {
+            Source = MappingOutcomeSource.Normalization,
+            ScheduledReports = acquiredValue.ScheduledReports,
+            CodeMapOutcomes = outcomes
+        };
+        var headers = new Headers
+        {
+            new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId ?? ""))
+        };
+
+        if (outcomes.Count != 0)
+        {
+            _logger.LogDebug(
+                "Mapping outcomes for {FacilityId}/{CorrelationId}: {Outcomes}",
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog(),
+                string.Join(", ", outcomes.Select(o => $"{o.TargetSystem}={o.Status}")));
+        }
+
+        try
+        {
+            await _mappingOutcomeProducer.ProduceAsync(KafkaTopic.MappingOutcomeEvaluated.ToString(),
+                new Message<ResourceKey, MappingOutcomeValue>
+                {
+                    Key = new ResourceKey
+                    {
+                        FacilityId = facilityId ?? string.Empty,
+                        PatientId = patientId ?? string.Empty
+                    },
+                    Headers = headers,
+                    Value = value
+                }, cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _logger.LogError(e, "Failed to produce MappingOutcomeEvaluated message. " +
+                                "FacilityId: {FacilityId}, PatientId: {PatientId}, CorrelationId: {CorrelationId}",
+                facilityId.SanitizeForLog(), 
+                patientId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
         }
     }
 
