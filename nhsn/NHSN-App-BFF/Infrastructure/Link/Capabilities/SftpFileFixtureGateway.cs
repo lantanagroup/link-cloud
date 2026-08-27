@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Capabilities;
 // mistaken for a real facility's files.
 internal sealed class SftpFileFixtureGateway : ISftpFileGateway
 {
-    public Task<IReadOnlyList<SftpFile>> ListFilesAsync(string facilityId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<SftpFile>> TestConnectionAsync(string facilityId, SftpConfig config, CancellationToken cancellationToken = default)
     {
         var queriedAt = DateTimeOffset.UtcNow;
 

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Acknowledgements;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.PatientsOfInterest;
@@ -149,11 +150,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     builder.Services.AddHttpContextAccessor();
+    builder.Services.AddMemoryCache();
     builder.Services.AddScoped<INhsnUserContext, NhsnUserContext>();
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
     builder.Services.AddScoped<IOnboardingDraftStore, OnboardingDraftStore>();
     builder.Services.AddScoped<IOnboardingReadService, OnboardingReadService>();
     builder.Services.AddScoped<IOnboardingWriteService, OnboardingWriteService>();
+    builder.Services.AddScoped<IAcknowledgementService, AcknowledgementService>();
     builder.Services.AddSingleton<IReferenceDataService, ReferenceDataService>();
     builder.Services.AddScoped<IPatientsOfInterestService, PatientsOfInterestService>();
     builder.Services.Configure<OnboardingReadSettings>(builder.Configuration.GetSection(OnboardingReadSettings.SectionName));

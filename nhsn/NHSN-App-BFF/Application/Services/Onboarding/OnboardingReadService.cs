@@ -2,6 +2,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
@@ -29,6 +30,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IFhirConfigurationGateway _fhirGateway;
     private readonly ICensusConfigurationGateway _censusGateway;
     private readonly IQueryDispatchGateway _queryDispatchGateway;
+    private readonly IAcknowledgementService _acknowledgementService;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
 
@@ -40,6 +42,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IFhirConfigurationGateway fhirGateway,
         ICensusConfigurationGateway censusGateway,
         IQueryDispatchGateway queryDispatchGateway,
+        IAcknowledgementService acknowledgementService,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
     {
@@ -50,6 +53,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _fhirGateway = fhirGateway;
         _censusGateway = censusGateway;
         _queryDispatchGateway = queryDispatchGateway;
+        _acknowledgementService = acknowledgementService;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -72,6 +76,9 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
         var storedDraft = await _draftStore.GetAsync(facilityId, cancellationToken);
         sources.Add(Ok("workflow", "Bff"));
+
+        var censusAccuracyAcknowledged = await _acknowledgementService.GetLatestAsync(
+            facilityId, AcknowledgementKind.CensusAccuracy, cancellationToken: cancellationToken);
 
         // Fan out. Each section carries its own deadline so one hung service cannot hold the rest.
         var facilityInfoTask = ReadSectionAsync("facilityInfo", "Tenant",
@@ -102,7 +109,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
         return new DraftEnvelopeResponse
         {
-            Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value),
+            Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value, censusAccuracyAcknowledged),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -114,7 +121,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         FacilityInfo? facilityInfo,
         FhirSection? fhir,
         string? acquisitionFrequency,
-        string? lagDuration) => new()
+        string? lagDuration,
+        bool? censusAccuracyAcknowledged) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -144,11 +152,17 @@ public sealed class OnboardingReadService : IOnboardingReadService
                 LagDuration = lagDuration
             },
 
-            Census = new CensusSection { AcquisitionFrequency = acquisitionFrequency },
+            Census = new CensusSection
+            {
+                AcquisitionFrequency = acquisitionFrequency,
+                AccuracyAcknowledged = censusAccuracyAcknowledged
+            },
 
-            // Data Acquisition owns these, and the SDK cannot reach them yet: location
-            // configuration and encounter mappings have no read method on the client. They arrive
-            // with the SDK work, and their section entries move from Bff to DataAcquisition then.
+            // LocationOrg: Data Acquisition has read methods for both resources
+            // (GetOrganizationLocationConfigurationsAsync, GetOrganizationLocationMappingsAsync) —
+            // not wired yet.
+            // Encounter: owned by Normalization (SearchFacilityOperationsAsync), not Data
+            // Acquisition — also not wired yet.
             LocationOrg = new LocationOrgSection(),
             Encounter = new EncounterSection(),
 
