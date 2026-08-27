@@ -15,6 +15,8 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
@@ -97,6 +99,18 @@ public class ArtifactService {
 
     private synchronized void invalidateValidationSupport() {
         validationSupport = null;
+    }
+
+    /**
+     * Load IG packages at startup so the first ReadyForValidation does not pay that cost
+     * while an 18k-entry bundle is already on the heap. Artifact updates still call
+     * {@link #invalidateValidationSupport()} and the next {@link #getValidationSupport()} rebuilds.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmValidationSupport() throws IOException {
+        logger.info("Warming artifact validation support");
+        getValidationSupport();
+        logger.info("Artifact validation support ready");
     }
 
     public synchronized ArtifactValidationSupport getValidationSupport() throws IOException {
