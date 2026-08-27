@@ -106,7 +106,7 @@ public sealed record HslocSection
     public IReadOnlyList<HslocMappingState> Mappings { get; init; } = [];
 }
 
-// Data Acquisition.
+// Normalization (SearchFacilityOperationsAsync / CreateOperationAsync) — not Data Acquisition.
 public sealed record EncounterSection
 {
     public IReadOnlyList<string> CodeSystems { get; init; } = [];

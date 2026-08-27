@@ -13,6 +13,7 @@ public class NhsnAppDbContext : DbContext
     public DbSet<NhsnUser> Users { get; set; } = null!;
     public DbSet<NhsnFacility> Facilities { get; set; } = null!;
     public DbSet<OnboardingDraft> OnboardingDrafts { get; set; } = null!;
+    public DbSet<Acknowledgement> Acknowledgements { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

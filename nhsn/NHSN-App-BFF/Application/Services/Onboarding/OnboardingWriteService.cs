@@ -32,6 +32,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IOnboardingDraftStore _draftStore;
     private readonly IOnboardingReadService _readService;
     private readonly IFacilityGateway _facilityGateway;
+    private readonly ICensusConfigurationGateway _censusGateway;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -41,6 +42,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IOnboardingDraftStore draftStore,
         IOnboardingReadService readService,
         IFacilityGateway facilityGateway,
+        ICensusConfigurationGateway censusGateway,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -49,6 +51,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _draftStore = draftStore;
         _readService = readService;
         _facilityGateway = facilityGateway;
+        _censusGateway = censusGateway;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -200,15 +203,29 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 await MirrorVendorAsync(facility, draft.FacilityInfo.Vendor, cancellationToken);
                 break;
 
-            case "fhir":
             case "census":
+                if (!string.IsNullOrWhiteSpace(draft.Census.AcquisitionFrequency))
+                {
+                    await _censusGateway.SaveAcquisitionFrequencyAsync(facility.FacilityId, draft.Census.AcquisitionFrequency, cancellationToken);
+                }
+                break;
+
+            case "fhir":
             case "location-org":
-            case "encounter":
                 // Data Acquisition owns these, and its SDK client exposes no update operation on
                 // any configuration resource yet. Workflow state above is still saved, so a user
                 // keeps their place; the configuration write lands once the SDK has one.
                 _logger.LogWarning(
                     "Step {StepId} for facility {FacilityId}: configuration not written. Data Acquisition writes are unavailable until the SDK exposes an update operation.",
+                    stepId, facility.FacilityId);
+                break;
+
+            case "encounter":
+                // Normalization owns this, not Data Acquisition — CreateOperationAsync already
+                // exists. Not wired yet; workflow state above is still saved, so a user keeps
+                // their place.
+                _logger.LogWarning(
+                    "Step {StepId} for facility {FacilityId}: configuration not written. Normalization write path exists but is not yet wired.",
                     stepId, facility.FacilityId);
                 break;
 

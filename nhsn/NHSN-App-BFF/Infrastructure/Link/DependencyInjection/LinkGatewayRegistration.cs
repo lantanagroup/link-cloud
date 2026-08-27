@@ -45,6 +45,9 @@ public static class LinkGatewayRegistration
         // registration until one can replace it.
         services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
 
+        // Fixture until Q-21 settles the Epic patient-list shape.
+        services.AddSingleton<IPatientListGateway, PatientListFixtureGateway>();
+
         return services;
     }
 }
