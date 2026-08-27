@@ -131,7 +131,8 @@ async function createSignedJwt(profile: TestUserProfile): Promise<string> {
     userName: profile.name,
     userLoggedInAs: profile.name,
     groups: profile.groups,
-    facility: profile.facilityId
+    facility: profile.facilityId,
+    facilityName: profile.facilityName
   })
     .setProtectedHeader(header)
     .setIssuer(profile.issuer)

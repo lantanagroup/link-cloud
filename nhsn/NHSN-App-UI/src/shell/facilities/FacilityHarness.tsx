@@ -35,6 +35,7 @@ type EditorState = {
   name: string;
   groups: string;
   facilityId: string;
+  facilityName: string;
   issuer: string;
   keyId: string;
   privateKeyPem: string;
@@ -57,6 +58,7 @@ function createEmptyEditor(): EditorState {
     name: '',
     groups: '',
     facilityId: '',
+    facilityName: '',
     issuer: defaults.issuer,
     keyId: defaults.keyId,
     privateKeyPem: defaults.privateKeyPem
@@ -120,6 +122,7 @@ export function FacilityHarness() {
       name: profile.name,
       groups: profile.groups.join(', '),
       facilityId: profile.facilityId,
+      facilityName: profile.facilityName,
       issuer: profile.issuer,
       keyId: profile.keyId,
       privateKeyPem: profile.privateKeyPem
@@ -147,6 +150,7 @@ export function FacilityHarness() {
       name: editor.name.trim(),
       groups: editor.groups.split(',').map(item => item.trim()).filter(Boolean),
       facilityId: editor.facilityId.trim(),
+      facilityName: editor.facilityName.trim(),
       issuer: editor.issuer.trim(),
       keyId: editor.keyId.trim(),
       privateKeyPem: editor.privateKeyPem.trim(),
@@ -231,6 +235,10 @@ export function FacilityHarness() {
             <div className="shell__row">
               <label htmlFor="facilityId">{t('shell.form.facilityId')}</label>
               <input id="facilityId" value={editor.facilityId} onChange={event => setEditor({ ...editor, facilityId: event.target.value })} required />
+            </div>
+            <div className="shell__row">
+              <label htmlFor="facilityName">{t('shell.form.facilityName')}</label>
+              <input id="facilityName" value={editor.facilityName} onChange={event => setEditor({ ...editor, facilityName: event.target.value })} />
             </div>
             <div className="shell__row">
               <label htmlFor="issuer">{t('shell.form.jwtIssuer')}</label>

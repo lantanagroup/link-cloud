@@ -12,6 +12,7 @@ public class NhsnJwtSettings
     public string NameDisplayClaimType { get; set; } = "userName";
     public string GroupsClaimType { get; set; } = "groups";
     public string FacilityIdClaimType { get; set; } = "facility";
+    public string FacilityNameClaimType { get; set; } = "facilityName";
     public string PublicCertificatePem { get; set; } = string.Empty;
     public string AccessRequestUrl { get; set; } = string.Empty;
     public int? MaxTokenAgeMinutes { get; set; }

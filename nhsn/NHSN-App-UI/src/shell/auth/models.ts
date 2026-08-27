@@ -13,6 +13,7 @@ export interface TestUserProfile {
   name: string;
   groups: string[];
   facilityId: string;
+  facilityName: string;
   issuer: string;
   keyId: string;
   privateKeyPem: string;

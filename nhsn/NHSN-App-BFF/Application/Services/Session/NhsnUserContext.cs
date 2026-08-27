@@ -61,6 +61,15 @@ public sealed class NhsnUserContext : INhsnUserContext
         }
     }
 
+    public string? FacilityName
+    {
+        get
+        {
+            var facilityName = Principal.FindFirstValue(_jwtSettings.FacilityNameClaimType);
+            return string.IsNullOrWhiteSpace(facilityName) ? null : facilityName.Trim();
+        }
+    }
+
     public bool HasFacility => FacilityId is not null;
 
     public bool IsFacilityAdmin => Groups.Contains(FacilityAdminGroup, StringComparer.OrdinalIgnoreCase);
