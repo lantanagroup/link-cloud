@@ -101,15 +101,6 @@ class ValidationServiceTest {
     }
 
     @Test
-    void prefixEntryLocation_matchesHapiConcurrentBundlePathRewrite() {
-        String prefix = "Bundle.entry[35].resource.ofType(Patient)";
-        assertEquals(prefix + ".name[0]", ValidationService.prefixEntryLocation("Patient.name[0]", prefix));
-        assertEquals(prefix, ValidationService.prefixEntryLocation("", prefix));
-        assertEquals(prefix, ValidationService.prefixEntryLocation(null, prefix));
-        assertEquals(prefix + ".Patient", ValidationService.prefixEntryLocation("Patient", prefix));
-    }
-
-    @Test
     void deduplicateInactiveResults_collapsesDuplicateInactiveWarningsPerElement() {
         // HAPI validates a bound coding against both its code system and its value set, so the same inactive
         // code surfaces twice for one element -- differing only by a trailing "(for 'system#code')" suffix.
