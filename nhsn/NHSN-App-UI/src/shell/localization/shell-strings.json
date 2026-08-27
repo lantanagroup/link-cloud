@@ -14,6 +14,7 @@
       "groups": "Groups (comma separated)",
       "groupsPlaceholder": "FACADMIN, AUTHENTICATED",
       "facilityId": "Facility ID",
+      "facilityName": "Facility Name",
       "jwtIssuer": "JWT Issuer",
       "jwtKeyId": "JWT Key ID (kid)",
       "jwtKeyIdPlaceholder": "Certificate thumbprint / key id",

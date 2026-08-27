@@ -24,6 +24,9 @@ public interface INhsnUserContext
     /// <summary>The <c>facility</c> claim, or null when the token carries none.</summary>
     string? FacilityId { get; }
 
+    /// <summary>The <c>facilityName</c> claim, or null when the token carries none.</summary>
+    string? FacilityName { get; }
+
     bool HasFacility { get; }
 
     bool IsFacilityAdmin { get; }

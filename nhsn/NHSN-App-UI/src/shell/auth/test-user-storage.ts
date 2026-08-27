@@ -7,6 +7,7 @@ const defaultIssuer = 'https://dev-nhsn-app.example.org';
 function normalizeProfile(profile: Partial<TestUserProfile> & Pick<TestUserProfile, 'id' | 'label' | 'email' | 'name' | 'groups' | 'facilityId' | 'lastUsedOn'>): TestUserProfile {
   return {
     ...profile,
+    facilityName: profile.facilityName ?? '',
     issuer: profile.issuer?.trim() || defaultIssuer,
     keyId: profile.keyId?.trim() || '',
     privateKeyPem: profile.privateKeyPem ?? ''

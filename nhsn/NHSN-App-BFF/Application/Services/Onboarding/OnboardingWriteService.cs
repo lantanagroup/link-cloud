@@ -194,6 +194,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 await _facilityGateway.SaveAsync(new FacilityInfo
                 {
                     FacilityId = facility.FacilityId,
+                    FacilityName = _userContext.FacilityName,
                     TimeZone = draft.FacilityInfo.TimeZone,
                     Vendor = draft.FacilityInfo.Vendor
                 }, cancellationToken);
