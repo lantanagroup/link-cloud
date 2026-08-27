@@ -8,6 +8,17 @@ namespace Automation.UI.Services;
 public sealed class MetricsRunPresenter
 {
     public const int WindowDays = 14;
+    public const int HistoryDays = 90;
+
+    private static readonly (string Key, string Name, string Hint)[] ServiceOrder =
+    [
+        ("acquisition", "Data Acquisition", "Pulling FHIR from the server"),
+        ("dispatch", "Query Dispatch", "Telling Data Acquisition who to pull"),
+        ("normalization", "Normalization", "Cleaning and reshaping FHIR"),
+        ("measureeval", "Measure Evaluation", "Running the measure"),
+        ("validation", "Validation", "Checking the measure report"),
+        ("submission", "Submission", "Uploading the report package")
+    ];
 
     private readonly IRunMetricsStore _store;
     private readonly IAutomationRunManager _runManager;
@@ -33,7 +44,7 @@ public sealed class MetricsRunPresenter
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
-        var (records, total) = await _store.ListPageAsync(pageNumber, pageSize, cancellationToken);
+        var (records, total) = await _store.ListPageAsync(pageNumber, pageSize, cancellationToken: cancellationToken);
         return (records.Select(ToListItem).ToList(), new PaginationMetadata(pageSize, pageNumber, total));
     }
 
@@ -43,14 +54,16 @@ public sealed class MetricsRunPresenter
         CancellationToken cancellationToken = default)
     {
         var (records, metadata) = await ListAsync(pageNumber, pageSize, cancellationToken);
-        var since = DateTimeOffset.UtcNow.AddDays(-WindowDays);
+        var since = DateTimeOffset.UtcNow.AddDays(-HistoryDays);
         var recent = await _store.ListSinceAsync(since, cancellationToken);
-        var lastDoc = recent.FirstOrDefault();
+        var last14 = recent.Where(d => d.FinishedAt >= DateTimeOffset.UtcNow.AddDays(-WindowDays)).ToList();
+        var lastDoc = last14.FirstOrDefault() ?? recent.FirstOrDefault();
 
         var scenarios = (await _scenarioStore.GetAllAsync(cancellationToken))
             .Where(s => s.IsMetricsRun)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var names = scenarios.ToDictionary(s => s.Id, s => s.Name);
 
         return new MetricsDashboardViewModel
         {
@@ -59,20 +72,58 @@ public sealed class MetricsRunPresenter
             LastRunStagesUnavailable = lastDoc == null
                 ? records.FirstOrDefault()?.StagesUnavailable ?? true
                 : AreStagesUnavailable(lastDoc),
-            RegressionFlagCount = recent.Sum(d => d.Regression.Flags.Count),
+            RegressionFlagCount = last14.Sum(d => d.Regression.Flags.Count),
+            FleetPatientsPerMinute = Median(last14
+                .Where(d => d.Outcome == "Succeeded" && d.Throughput.PatientsPerMinute > 0)
+                .Select(d => d.Throughput.PatientsPerMinute)),
+            ScenarioCount = scenarios.Count,
+            RecentRunCount = last14.Count,
+            Services = BuildServiceStrip(last14),
+            ScenarioCards = BuildScenarioCards(recent, names),
             Runs = records,
             Metadata = metadata,
             MetricsScenarios = scenarios,
-            DurationTrend = recent
+            DurationTrend = last14
                 .OrderBy(d => d.FinishedAt)
-                .Select(d => new MetricsDurationPoint
-                {
-                    RunId = d.RunId,
-                    FinishedAt = d.FinishedAt,
-                    E2eDurationSeconds = d.E2eDurationSeconds
-                })
+                .Select(ToPoint)
                 .ToList()
         };
+    }
+
+    public async Task<MetricsScenarioHistoryViewModel?> GetScenarioHistoryAsync(
+        Guid scenarioId,
+        CancellationToken cancellationToken = default)
+    {
+        var docs = await _store.ListByScenarioAsync(scenarioId, cancellationToken);
+        var scenario = await _scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+        if (docs.Count == 0 && scenario == null)
+            return null;
+
+        var latest = docs.LastOrDefault();
+        var versions = docs.Select(d => d.ScenarioVersion).Where(v => v > 0).Distinct().Count();
+        return new MetricsScenarioHistoryViewModel
+        {
+            ScenarioId = scenarioId,
+            Name = scenario?.Name ?? latest?.ScenarioName ?? "Scenario",
+            SetupSummary = latest?.SetupSummary,
+            CurrentVersion = latest?.ScenarioVersion ?? 1,
+            HasVersionChange = versions > 1,
+            DurationTrend = docs.Select(ToPoint).ToList(),
+            Runs = docs.OrderByDescending(d => d.FinishedAt).Select(ToListItem).ToList()
+        };
+    }
+
+    public async Task<MetricsCompareViewModel?> GetCompareAsync(
+        Guid leftId,
+        Guid rightId,
+        CancellationToken cancellationToken = default)
+    {
+        var left = await GetDetailAsync(leftId, cancellationToken);
+        var right = await GetDetailAsync(rightId, cancellationToken);
+        if (left == null || right == null)
+            return null;
+
+        return new MetricsCompareViewModel { Left = left, Right = right };
     }
 
     public async Task<MetricsRunDetailViewModel?> GetDetailAsync(Guid runId, CancellationToken cancellationToken = default)
@@ -131,7 +182,10 @@ public sealed class MetricsRunPresenter
             E2eDurationSeconds = document.E2eDurationSeconds,
             BenchmarkPass = document.Benchmark.Pass,
             StagesUnavailable = AreStagesUnavailable(document),
-            FinishedAt = document.FinishedAt
+            FinishedAt = document.FinishedAt,
+            ScenarioVersion = Math.Max(1, document.ScenarioVersion),
+            SetupSummary = document.SetupSummary,
+            PatientsPerMinute = document.Throughput.PatientsPerMinute > 0 ? document.Throughput.PatientsPerMinute : null
         };
     }
 
@@ -148,12 +202,16 @@ public sealed class MetricsRunPresenter
             BenchmarkPass = item.BenchmarkPass,
             StagesUnavailable = item.StagesUnavailable,
             FinishedAt = item.FinishedAt,
+            ScenarioVersion = item.ScenarioVersion,
+            SetupSummary = item.SetupSummary,
+            PatientsPerMinute = item.PatientsPerMinute,
             BenchmarkKey = document.BenchmarkKey,
             PatientCount = document.PatientCount,
-            PatientsPerMinute = document.Throughput.PatientsPerMinute,
             ResourcesPerSecond = document.Throughput.ResourcesPerSecond,
             ThetisGitSha = document.Thetis.GitSha,
             Seed = document.Thetis.Seed,
+            GenerationDurationMs = document.Thetis.DurationMs,
+            ScenarioFingerprint = document.ScenarioFingerprint,
             Stages = ToStages(document),
             BenchmarkViolations = document.Benchmark.Violations,
             RegressionFlags = document.Regression.Flags,
@@ -229,5 +287,78 @@ public sealed class MetricsRunPresenter
             s => s.Stage,
             _ => new StageSnapshot { Unavailable = true },
             StringComparer.Ordinal);
+    }
+
+    private static MetricsDurationPoint ToPoint(AutomationRunMetricsDocument d) => new()
+    {
+        RunId = d.RunId,
+        FinishedAt = d.FinishedAt,
+        E2eDurationSeconds = d.E2eDurationSeconds,
+        PatientsPerMinute = d.Throughput.PatientsPerMinute > 0 ? d.Throughput.PatientsPerMinute : null,
+        ScenarioVersion = Math.Max(1, d.ScenarioVersion)
+    };
+
+    private static IReadOnlyList<MetricsServiceHealthItem> BuildServiceStrip(
+        IReadOnlyList<AutomationRunMetricsDocument> recent)
+    {
+        return ServiceOrder.Select(s =>
+        {
+            var values = recent
+                .Select(d => d.Stages.TryGetValue(s.Key, out var stage) ? stage : null)
+                .Where(stage => stage is { Unavailable: false, P95Ms: > 0 })
+                .Select(stage => stage!.P95Ms)
+                .ToList();
+            return new MetricsServiceHealthItem
+            {
+                Key = s.Key,
+                Name = s.Name,
+                Hint = s.Hint,
+                SlowMs = Median(values),
+                Unavailable = values.Count == 0
+            };
+        }).ToList();
+    }
+
+    private static IReadOnlyList<MetricsScenarioCardViewModel> BuildScenarioCards(
+        IReadOnlyList<AutomationRunMetricsDocument> recent,
+        IReadOnlyDictionary<Guid, string> names)
+    {
+        return recent
+            .Where(d => d.ScenarioId is Guid id && id != Guid.Empty)
+            .GroupBy(d => d.ScenarioId!.Value)
+            .Select(g =>
+            {
+                var ordered = g.OrderBy(d => d.FinishedAt).ToList();
+                var last = ordered[^1];
+                var versions = ordered.Select(d => d.ScenarioVersion).Where(v => v > 0).Distinct().Count();
+                return new MetricsScenarioCardViewModel
+                {
+                    ScenarioId = g.Key,
+                    Name = names.TryGetValue(g.Key, out var name) ? name : last.ScenarioName,
+                    SetupSummary = last.SetupSummary,
+                    RunCount = ordered.Count,
+                    ScenarioVersion = Math.Max(1, last.ScenarioVersion),
+                    VersionChanged = versions > 1,
+                    Outcome = last.Outcome,
+                    LastE2eSeconds = last.E2eDurationSeconds,
+                    LastPatientsPerMinute = last.Throughput.PatientsPerMinute > 0 ? last.Throughput.PatientsPerMinute : null,
+                    LastStagesUnavailable = AreStagesUnavailable(last),
+                    GotSlower = last.Regression.Flags.Count > 0,
+                    LastFinishedAt = last.FinishedAt,
+                    LastRunId = last.RunId,
+                    Sparkline = ordered.TakeLast(12).Select(d => d.E2eDurationSeconds).ToList()
+                };
+            })
+            .OrderByDescending(c => c.LastFinishedAt)
+            .ToList();
+    }
+
+    private static double? Median(IEnumerable<double> values)
+    {
+        var list = values.OrderBy(v => v).ToList();
+        if (list.Count == 0)
+            return null;
+        var mid = list.Count / 2;
+        return list.Count % 2 == 1 ? list[mid] : (list[mid - 1] + list[mid]) / 2.0;
     }
 }

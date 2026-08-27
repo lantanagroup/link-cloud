@@ -139,9 +139,9 @@ public class RunsController(
 
             // Build the run request from the complete persisted scenario rather than
             // relying on the default hidden values submitted by the Quick Launch form.
-            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+            var runId = await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
 
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Details), new { id = runId });
         }
 
         if (!ModelState.IsValid)
@@ -158,8 +158,8 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Index));
+        var startedRunId = await runManager.StartAsync(request, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id = startedRunId });
     }
 
     [HttpGet]

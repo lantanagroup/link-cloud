@@ -73,7 +73,6 @@ internal static class AutomationUiScenarioRunner
     }
 
     internal static Guid AdhocReportScenarioId => new("00000000-0000-0000-0000-000000000001");
-    internal static Guid AdhocReportDailyAchScenarioId => new("00000000-0000-0000-0000-000000000009");
     internal static Guid MultiPatientScenarioId => new("00000000-0000-0000-0000-000000000002");
     internal static Guid MegaPatientScenarioId => new("00000000-0000-0000-0000-000000000003");
     internal static Guid ScheduledReportScenarioId => new("00000000-0000-0000-0000-000000000004");

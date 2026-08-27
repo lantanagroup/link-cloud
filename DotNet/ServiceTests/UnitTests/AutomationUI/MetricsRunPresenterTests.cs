@@ -1,4 +1,5 @@
 using Automation.UI.Controllers.Api;
+using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
@@ -110,10 +111,42 @@ public class MetricsRunPresenterTests
     }
 
     [Fact]
+    public async Task GetDashboard_groups_runs_into_scenario_cards()
+    {
+        var scenarioId = Guid.NewGuid();
+        var older = Document(scenarioId);
+        older.FinishedAt = DateTimeOffset.UtcNow.AddDays(-2);
+        older.E2eDurationSeconds = 80;
+        var newer = Document(scenarioId);
+        newer.FinishedAt = DateTimeOffset.UtcNow.AddHours(-1);
+        newer.E2eDurationSeconds = 90;
+        newer.Regression = new RegressionResultSnapshot { Flags = ["slower"] };
+
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.ListPageAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new[] { newer, older }.ToList(), 2L));
+        store.Setup(s => s.ListSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { newer, older });
+        var scenarios = new Mock<IScenarioStore>();
+        scenarios.Setup(s => s.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestScenarioDefinition { Id = scenarioId, Name = "Monthly 150", IsMetricsRun = true }]);
+
+        var presenter = new MetricsRunPresenter(store.Object, Mock.Of<IAutomationRunManager>(), scenarios.Object);
+        var dashboard = await presenter.GetDashboardAsync(1, 20);
+
+        dashboard.ScenarioCards.Should().ContainSingle();
+        dashboard.ScenarioCards[0].Name.Should().Be("Monthly 150");
+        dashboard.ScenarioCards[0].RunCount.Should().Be(2);
+        dashboard.ScenarioCards[0].GotSlower.Should().BeTrue();
+        dashboard.ScenarioCards[0].LastE2eSeconds.Should().Be(90);
+        dashboard.Services.Should().HaveCount(6);
+    }
+
+    [Fact]
     public async Task ListAsync_returns_empty_records_and_metadata()
     {
         var store = new Mock<IRunMetricsStore>();
-        store.Setup(s => s.ListPageAsync(1, 20, It.IsAny<CancellationToken>()))
+        store.Setup(s => s.ListPageAsync(1, 20, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Array.Empty<AutomationRunMetricsDocument>(), 0L));
         var presenter = new MetricsRunPresenter(store.Object, Mock.Of<IAutomationRunManager>(), Mock.Of<IScenarioStore>());
 
@@ -128,7 +161,7 @@ public class MetricsRunPresenterTests
     public async Task Api_list_metrics_returns_records_and_metadata()
     {
         var store = new Mock<IRunMetricsStore>();
-        store.Setup(s => s.ListPageAsync(1, 20, It.IsAny<CancellationToken>()))
+        store.Setup(s => s.ListPageAsync(1, 20, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Array.Empty<AutomationRunMetricsDocument>(), 0L));
         var presenter = new MetricsRunPresenter(store.Object, Mock.Of<IAutomationRunManager>(), Mock.Of<IScenarioStore>());
         var controller = new AutomationRunsApiController(

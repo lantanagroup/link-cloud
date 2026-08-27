@@ -69,6 +69,10 @@
                 </div>
             </div>
             <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Generation seed</span><span class="au-value">@Model.Seed</span></div></div>
+            @if (Model.GenerationDurationMs > 0)
+            {
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Patient generation time</span><span class="au-value">@FormatDuration(Model.GenerationDurationMs / 1000.0)</span></div></div>
+            }
         </div>
     </div>
 </div>
@@ -184,7 +188,7 @@
                     <span class="au-label">Previous successful run</span>
                     @if (Model.PreviousRunId is Guid previous)
                     {
-                        <a asp-controller="Runs" asp-action="Details" asp-route-id="@previous">View previous run</a>
+                        <a asp-controller="Metrics" asp-action="Details" asp-route-id="@previous">View previous run</a>
                     }
                     else
                     {

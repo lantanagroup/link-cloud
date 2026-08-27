@@ -1,0 +1,132 @@
+@model MetricsCompareViewModel
+@{
+    ViewData["Title"] = "Compare runs";
+    var stages = new[] { "acquisition", "dispatch", "normalization", "measureeval", "validation", "submission" };
+    string DisplayName(string key) => key switch
+    {
+        "acquisition" => "Data Acquisition",
+        "dispatch" => "Query Dispatch",
+        "normalization" => "Normalization",
+        "measureeval" => "Measure Evaluation",
+        "validation" => "Validation",
+        "submission" => "Submission",
+        _ => key
+    };
+    string FormatDuration(double seconds)
+    {
+        if (seconds <= 0) return "—";
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours} hr {ts.Minutes} min";
+        if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes} min {ts.Seconds} sec";
+        return $"{Math.Max(1, ts.Seconds)} sec";
+    }
+    string FormatMs(double? ms)
+    {
+        if (ms is null) return "—";
+        if (ms.Value >= 1000) return $"{ms.Value / 1000.0:0.0} sec";
+        return $"{ms.Value:0} ms";
+    }
+    string FormatWhen(DateTimeOffset? value) =>
+        value is null ? "—" : value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+    string DeltaClass(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value;
+        if (change > 0.05) return "text-danger";
+        if (change < -0.05) return "text-success";
+        return "text-muted";
+    }
+    string DeltaText(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value * 100;
+        if (Math.Abs(change) < 1) return "about the same";
+        return change > 0 ? $"{change:0}% slower" : $"{Math.Abs(change):0}% faster";
+    }
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="fw-bold mb-1">Compare two runs</h2>
+            <p class="text-muted mb-0">@Model.Left.ScenarioName</p>
+        </div>
+        <a asp-action="Scenario" asp-route-id="@Model.Left.ScenarioId" class="btn btn-sm btn-outline-secondary">Back to history</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="au-card h-100">
+                <div class="card-header">Earlier / left</div>
+                <div class="card-body">
+                    <div class="fw-semibold">@FormatWhen(Model.Left.FinishedAt)</div>
+                    <div class="small text-muted">@Model.Left.SetupSummary</div>
+                    <a asp-action="Details" asp-route-id="@Model.Left.RunId">Open this run</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="au-card h-100">
+                <div class="card-header">Later / right</div>
+                <div class="card-body">
+                    <div class="fw-semibold">@FormatWhen(Model.Right.FinishedAt)</div>
+                    <div class="small text-muted">@Model.Right.SetupSummary</div>
+                    <a asp-action="Details" asp-route-id="@Model.Right.RunId">Open this run</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header">What changed</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table au-table mb-0">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Left</th>
+                            <th>Right</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Result</td>
+                            <td>@(Model.Left.Outcome == "Succeeded" ? "Passed" : Model.Left.Outcome)</td>
+                            <td>@(Model.Right.Outcome == "Succeeded" ? "Passed" : Model.Right.Outcome)</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td>Total time</td>
+                            <td>@FormatDuration(Model.Left.E2eDurationSeconds)</td>
+                            <td>@FormatDuration(Model.Right.E2eDurationSeconds)</td>
+                            <td class="@DeltaClass(Model.Left.E2eDurationSeconds, Model.Right.E2eDurationSeconds)">@DeltaText(Model.Left.E2eDurationSeconds, Model.Right.E2eDurationSeconds)</td>
+                        </tr>
+                        <tr>
+                            <td>Patients / min</td>
+                            <td>@(Model.Left.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
+                            <td>@(Model.Right.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
+                            <td class="@DeltaClass(Model.Right.PatientsPerMinute, Model.Left.PatientsPerMinute)">@DeltaText(Model.Right.PatientsPerMinute, Model.Left.PatientsPerMinute)</td>
+                        </tr>
+                        @foreach (var key in stages)
+                        {
+                            Model.Left.Stages.TryGetValue(key, out var leftStage);
+                            Model.Right.Stages.TryGetValue(key, out var rightStage);
+                            leftStage ??= new StageSnapshot { Unavailable = true };
+                            rightStage ??= new StageSnapshot { Unavailable = true };
+                            <tr>
+                                <td>@DisplayName(key) (slow)</td>
+                                <td>@(leftStage.Unavailable ? "—" : FormatMs(leftStage.P95Ms))</td>
+                                <td>@(rightStage.Unavailable ? "—" : FormatMs(rightStage.P95Ms))</td>
+                                <td class="@DeltaClass(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)">
+                                    @DeltaText(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

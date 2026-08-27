@@ -14,6 +14,9 @@ public sealed class AutomationRunMetricsDocument
     public Guid? ScenarioId { get; set; }
 
     public string ScenarioName { get; set; } = string.Empty;
+    public string? ScenarioFingerprint { get; set; }
+    public int ScenarioVersion { get; set; } = 1;
+    public string? SetupSummary { get; set; }
     public string? BenchmarkKey { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public string ReportId { get; set; } = string.Empty;

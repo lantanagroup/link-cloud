@@ -27,19 +27,30 @@ public sealed record RunMetricsCaptureInput(
     int ResourcesPerPatientMax,
     int ManifestResourceCount,
     IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> Validators,
-    int? TargetDurationSeconds = null);
+    int? TargetDurationSeconds = null,
+    int? Concurrency = null,
+    IReadOnlyList<string>? Measures = null,
+    Guid? QueryPlanTemplateId = null,
+    Guid? NormalizationSuiteId = null,
+    long? GenerationDurationMs = null);
 
 public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 {
-    internal static readonly (string Stage, string HistogramBase)[] StageHistograms =
+    internal static readonly StageQuery[] StageHistograms =
     [
-        ("acquisition", "link_data_acq_query_duration_milliseconds"),
-        ("dispatch", "link_querydispatch_dispatch_duration_milliseconds"),
-        ("normalization", "link_normalization_duration_milliseconds"),
-        ("measureeval", "link_measureeval_eval_duration_milliseconds"),
-        ("validation", "link_validation_validate_duration_milliseconds"),
-        ("submission", "link_submission_upload_duration_milliseconds")
+        new("acquisition", "link_data_acq_query_duration_milliseconds", null, null),
+        new("dispatch", "link_querydispatch_dispatch_duration_milliseconds", "link_querydispatch_patients_dispatched_count", "failure"),
+        new("normalization", "link_normalization_duration_milliseconds", null, null),
+        new("measureeval", "link_measureeval_eval_duration_milliseconds", "link_measureeval_eval_count", "failure"),
+        new("validation", "link_validation_validate_duration_milliseconds", "link_validation_counter", "Failed"),
+        new("submission", "link_submission_upload_duration_milliseconds", "link_submission_upload_count", "failure")
     ];
+
+    internal readonly record struct StageQuery(
+        string Stage,
+        string HistogramBase,
+        string? ErrorCounter,
+        string? ErrorOutcome);
 
     private readonly IRunMetricsStore _store;
     private readonly IMetricsBenchmarkStore _benchmarks;
@@ -86,12 +97,13 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             try
             {
                 await DelayAsync(wait, cancellationToken);
-                var windowSeconds = Math.Max(60, (int)Math.Ceiling(e2eSeconds + 1));
+                var evaluationTime = _time.GetUtcNow();
+                var windowSeconds = Math.Max(60, (int)Math.Ceiling(e2eSeconds + wait.TotalSeconds + 5));
                 var anyStage = false;
-                foreach (var (stage, histogram) in StageHistograms)
+                foreach (var stageQuery in StageHistograms)
                 {
-                    var snapshot = await QueryStageAsync(histogram, input.FacilityId, windowSeconds, input.FinishedAt, cancellationToken);
-                    stages[stage] = snapshot;
+                    var snapshot = await QueryStageAsync(stageQuery, input.FacilityId, windowSeconds, evaluationTime, cancellationToken);
+                    stages[stageQuery.Stage] = snapshot;
                     if (!snapshot.Unavailable)
                         anyStage = true;
                 }
@@ -134,7 +146,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 GitSha = ThetisRevision.TryGetGitSha(),
                 AssemblyInformationalVersion = ThetisRevision.TryGetAssemblyInformationalVersion(),
                 Seed = input.Seed,
-                DurationMs = (long)Math.Round(e2eSeconds * 1000)
+                DurationMs = input.GenerationDurationMs ?? 0
             },
             PrometheusWaitMs = (long)wait.TotalMilliseconds,
             Stages = stages,
@@ -144,6 +156,23 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 ResourcesPerSecond = e2eSeconds > 0 ? input.ManifestResourceCount / e2eSeconds : 0
             },
             E2eDurationSeconds = e2eSeconds,
+            SetupSummary = MetricsScenarioFingerprint.Describe(
+                input.PatientCount,
+                input.Seed,
+                input.ResourcesPerPatientMin,
+                input.ResourcesPerPatientMax,
+                input.Concurrency),
+            ScenarioFingerprint = MetricsScenarioFingerprint.Compute(
+                input.PatientCount,
+                input.Seed,
+                input.ResourcesPerPatientMin,
+                input.ResourcesPerPatientMax,
+                input.Concurrency,
+                input.BenchmarkKey,
+                input.Measures,
+                ThetisRevision.TryGetGitSha(),
+                input.QueryPlanTemplateId,
+                input.NormalizationSuiteId),
             Validators = input.Validators.Select(v => new ValidatorOutcomeSnapshot
             {
                 Name = v.Name,
@@ -159,7 +188,22 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         AutomationRunMetricsDocument? previous = null;
         if (input.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
         {
-            previous = await _store.GetPreviousSucceededAsync(
+            var previousAny = await _store.GetPreviousAsync(
+                scenarioId,
+                input.FinishedAt,
+                input.RunId,
+                cancellationToken);
+            document.ScenarioVersion = MetricsScenarioFingerprint.NextVersion(
+                previousAny?.ScenarioFingerprint,
+                previousAny?.ScenarioVersion ?? 1,
+                document.ScenarioFingerprint ?? "");
+
+            previous = await _store.GetPreviousSucceededSameFingerprintAsync(
+                scenarioId,
+                document.ScenarioFingerprint ?? "",
+                input.FinishedAt,
+                input.RunId,
+                cancellationToken) ?? await _store.GetPreviousSucceededAsync(
                 scenarioId,
                 input.FinishedAt,
                 input.RunId,
@@ -228,14 +272,15 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     }
 
     private async Task<StageLatencySnapshot> QueryStageAsync(
-        string histogramBase,
+        StageQuery stage,
         string facilityId,
         int windowSeconds,
         DateTimeOffset evaluationTime,
         CancellationToken cancellationToken)
     {
-        var selector = $"{histogramBase}_bucket{{facility_id=\"{EscapePromLabel(facilityId)}\"}}[{windowSeconds}s]";
-        var countSelector = $"sum(increase({histogramBase}_count{{facility_id=\"{EscapePromLabel(facilityId)}\"}}[{windowSeconds}s]))";
+        var facility = EscapePromLabel(facilityId);
+        var selector = $"{stage.HistogramBase}_bucket{{facility_id=\"{facility}\"}}[{windowSeconds}s]";
+        var countSelector = $"sum(increase({stage.HistogramBase}_count{{facility_id=\"{facility}\"}}[{windowSeconds}s]))";
 
         var count = await _prometheus.QueryScalarAsync(countSelector, evaluationTime, cancellationToken);
         if (count is null or <= 0)
@@ -248,13 +293,22 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         var p99 = await _prometheus.QueryScalarAsync(
             $"histogram_quantile(0.99, sum by (le) (increase({selector})))", evaluationTime, cancellationToken);
 
+        double errorCount = 0;
+        if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) && !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
+        {
+            var errorSelector =
+                $"sum(increase({stage.ErrorCounter}{{facility_id=\"{facility}\",outcome=\"{EscapePromLabel(stage.ErrorOutcome)}\"}}[{windowSeconds}s]))";
+            errorCount = await _prometheus.QueryScalarAsync(errorSelector, evaluationTime, cancellationToken) ?? 0;
+        }
+
         return new StageLatencySnapshot
         {
             Unavailable = p50 is null && p95 is null && p99 is null,
             Count = count.Value,
             P50Ms = p50 ?? 0,
             P95Ms = p95 ?? 0,
-            P99Ms = p99 ?? 0
+            P99Ms = p99 ?? 0,
+            ErrorCount = Math.Max(0, errorCount)
         };
     }
 

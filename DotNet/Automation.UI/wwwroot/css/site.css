@@ -649,6 +649,60 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   margin-top: .3rem;
 }
 
+.au-service-chip {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .75rem .8rem;
+  height: 100%;
+}
+.au-service-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.au-service-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: .15rem 0;
+}
+.au-service-hint {
+  font-size: .72rem;
+  color: var(--au-muted);
+}
+
+a.au-scenario-card {
+  display: block;
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1rem 1.1rem;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+  border: 1px solid transparent;
+}
+a.au-scenario-card:hover {
+  border-color: rgba(77,163,255,.45);
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  color: inherit;
+}
+.au-scenario-card-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.au-scenario-card-metric {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-sparkline {
+  color: var(--au-accent);
+  flex-shrink: 0;
+}
+
 /* ===================================================================
    Patient configuration editor
    =================================================================== */

@@ -34,4 +34,15 @@ public class KafkaHeaderHelperTests
         Assert.Null(KafkaHeaderHelper.GetMetricsMode(destination));
         Assert.False(KafkaHeaderHelper.IsPerformanceMode(destination));
     }
+
+    [Fact]
+    public void ApplyIfPerformance_SetsHeaderOnlyForPerformance()
+    {
+        var headers = new Headers();
+        KafkaHeaderHelper.ApplyIfPerformance(headers, "lightweight");
+        Assert.False(KafkaHeaderHelper.IsPerformanceMode(headers));
+
+        KafkaHeaderHelper.ApplyIfPerformance(headers, "performance");
+        Assert.True(KafkaHeaderHelper.IsPerformanceMode(headers));
+    }
 }

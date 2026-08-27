@@ -193,7 +193,7 @@
                                 <label class="form-check-label" for="IsMetricsRun">Record extra performance data for this scenario. Off keeps ordinary runs cheap (pass/fail, evidence, high-level counts only).</label>
                             </div>
                             <div id="metricsRunHelp" class="au-help-text mb-2" hidden>
-                                Ordinary runs already tell you whether the pipeline succeeded. A metrics run also records how long it took, throughput, and (if Prometheus is reachable) per-stage latency. Results land on the Metrics page after the run finishes. Use this for performance comparisons, not for everyday functional tests.
+                                Ordinary runs already tell you whether the pipeline succeeded. A metrics run also records how long it took, how fast patients moved, and how long each pipeline step took. The Performance page treats this scenario as a use case you can track over time — including when you change patient count, seed, or concurrency (that starts a new setup version). Use this for comparisons, not everyday pass/fail tests.
                             </div>
                             <div class="row g-2" id="metricsRunOptions" style="display:none;">
                                 <div class="col-md-4">

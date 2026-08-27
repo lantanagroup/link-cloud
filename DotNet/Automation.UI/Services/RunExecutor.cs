@@ -161,6 +161,7 @@ internal sealed class RunExecutor
         await callbacks.BroadcastStatus();
 
         GenerationManifest? generationManifest = null;
+        long generationDurationMs = 0;
         IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults = [];
 
         try
@@ -328,6 +329,7 @@ internal sealed class RunExecutor
                 importedPatients,
                 _generatedTemplateCache);
 
+            var generationStarted = DateTimeOffset.UtcNow;
             var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                 output,
                 fhirDataLoader,
@@ -345,6 +347,7 @@ internal sealed class RunExecutor
 
             patientIds = pipelineResult.PatientIds;
             generationManifest = pipelineResult.Manifest;
+            generationDurationMs = (long)Math.Max(0, (DateTimeOffset.UtcNow - generationStarted).TotalMilliseconds);
             await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
 
             expectedSubmittedPatientIds = generationManifest.PatientIds
@@ -951,23 +954,26 @@ internal sealed class RunExecutor
 
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
-            var metricsSnapshot = await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
+            await _orchestrator.CompleteRunAsync(state.RunId);
+            await callbacks.BroadcastStatus();
+            if (state.Options.IsMetricsRun)
+                output.WriteLine("Collecting step timings… this can take about a minute.");
+            var metricsSnapshot = await CaptureMetricsSnapshotAsync(
+                state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
             if (state.Options.FailRunOnBenchmark
                 && metricsSnapshot?.Benchmark.Pass == false)
             {
                 state.Status = AutomationRunStatus.Failed;
-                state.Error = "Benchmark failed: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                state.Error = "Missed the time budget or saved limits: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
                 metricsSnapshot.Outcome = state.Status.ToString();
                 var store = _hostServices.GetService<IRunMetricsStore>();
                 if (store != null)
                     await store.UpsertAsync(metricsSnapshot, cancellationToken);
-                await _orchestrator.CompleteRunAsync(state.RunId);
                 await callbacks.BroadcastStatus();
                 output.WriteLine($"Run failed: {state.Error}");
                 return;
             }
 
-            await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -988,7 +994,7 @@ internal sealed class RunExecutor
             state.Error = ex.Message;
             state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
-            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, cancellationToken);
+            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
         }
@@ -1003,6 +1009,7 @@ internal sealed class RunExecutor
         MutableRunState state,
         IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults,
         GenerationManifest? generationManifest,
+        long generationDurationMs,
         CancellationToken cancellationToken)
     {
         if (!state.Options.IsMetricsRun)
@@ -1043,7 +1050,12 @@ internal sealed class RunExecutor
                     resourcesMax,
                     manifest?.TotalResourceCount ?? 0,
                     validatorResults,
-                    state.Options.TargetDurationSeconds),
+                    state.Options.TargetDurationSeconds,
+                    state.Options.Concurrency,
+                    state.Options.SelectedMeasures.Select(m => m.ToString()).ToList(),
+                    state.Options.QueryPlanTemplateId,
+                    state.Options.NormalizationSuiteId,
+                    generationDurationMs),
                 cancellationToken);
         }
         catch (Exception ex)

@@ -16,6 +16,16 @@ public class MetricsController(MetricsRunPresenter presenter) : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> Scenario(Guid id, CancellationToken cancellationToken)
+    {
+        var history = await presenter.GetScenarioHistoryAsync(id, cancellationToken);
+        if (history == null)
+            return NotFound();
+
+        return View(history);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {
         var detail = await presenter.GetDetailAsync(id, cancellationToken);
@@ -23,5 +33,15 @@ public class MetricsController(MetricsRunPresenter presenter) : Controller
             return NotFound();
 
         return View(detail);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Compare(Guid a, Guid b, CancellationToken cancellationToken)
+    {
+        var compare = await presenter.GetCompareAsync(a, b, cancellationToken);
+        if (compare == null)
+            return NotFound();
+
+        return View(compare);
     }
 }

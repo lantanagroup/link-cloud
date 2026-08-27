@@ -49,6 +49,19 @@ public class KafkaHeaderHelper
     public static bool IsPerformanceMode(Headers? headers)
     {
         var mode = GetMetricsMode(headers);
-        return string.Equals(mode, "performance", StringComparison.OrdinalIgnoreCase);
+        return IsPerformanceMode(mode);
+    }
+
+    public static bool IsPerformanceMode(string? mode) =>
+        string.Equals(mode, "performance", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Sets X-Metrics-Mode=performance when <paramref name="mode"/> is performance.
+    /// Missing/unknown is lightweight (header omitted).
+    /// </summary>
+    public static void ApplyIfPerformance(Headers headers, string? mode)
+    {
+        if (IsPerformanceMode(mode))
+            SetMetricsMode(headers, "performance");
     }
 }

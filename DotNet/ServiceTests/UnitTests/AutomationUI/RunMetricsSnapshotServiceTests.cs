@@ -126,7 +126,36 @@ public class RunMetricsSnapshotServiceTests
         saved.Stages["acquisition"].Count.Should().Be(8);
         saved.Stages["acquisition"].P50Ms.Should().Be(100);
         saved.Stages["acquisition"].P95Ms.Should().Be(1234);
+        saved.ScenarioFingerprint.Should().NotBeNullOrWhiteSpace();
+        saved.ScenarioVersion.Should().Be(1);
+        saved.Thetis.DurationMs.Should().Be(0);
         metrics.Verify(m => m.IncrementSnapshotMissing(), Times.Never);
+    }
+
+    [Fact]
+    public async Task Capture_queries_prometheus_after_the_wait_not_at_finish_time()
+    {
+        var finishedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        DateTimeOffset? queriedAt = null;
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .Callback<string, DateTimeOffset, CancellationToken>((_, time, _) => queriedAt = time)
+            .ReturnsAsync(1);
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var clock = new FrozenTimeProvider(finishedAt.AddSeconds(71));
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            clock);
+
+        await service.CaptureAsync(Input(isMetricsRun: true, startedAt: finishedAt.AddMinutes(-2), finishedAt: finishedAt));
+
+        queriedAt.Should().NotBeNull();
+        queriedAt!.Value.Should().BeAfter(finishedAt);
     }
 
     private static RunMetricsSnapshotService CreateService(
@@ -149,9 +178,10 @@ public class RunMetricsSnapshotServiceTests
         bool isMetricsRun,
         int patientCount = 4,
         DateTimeOffset? startedAt = null,
-        int? targetDurationSeconds = null)
+        int? targetDurationSeconds = null,
+        DateTimeOffset? finishedAt = null)
     {
-        var finished = DateTimeOffset.UtcNow;
+        var finished = finishedAt ?? DateTimeOffset.UtcNow;
         return new RunMetricsCaptureInput(
             Guid.NewGuid(),
             Guid.NewGuid(),
@@ -190,6 +220,24 @@ public class RunMetricsSnapshotServiceTests
         }
 
         private sealed class CompletedTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+            public void Dispose() { }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FrozenTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            callback(state);
+            return new NopTimer();
+        }
+
+        private sealed class NopTimer : ITimer
         {
             public bool Change(TimeSpan dueTime, TimeSpan period) => true;
             public void Dispose() { }

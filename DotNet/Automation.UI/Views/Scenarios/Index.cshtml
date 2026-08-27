@@ -85,6 +85,10 @@
                                 data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
                                 <td>
                                     <strong>@s.Name</strong>
+                                    @if (s.IsMetricsRun)
+                                    {
+                                        <span class="badge rounded-pill au-badge-active ms-1">Metrics</span>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(s.Description))
                                     {
                                         <br /><small class="text-muted">@s.Description</small>

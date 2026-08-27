@@ -1,0 +1,160 @@
+@model MetricsScenarioHistoryViewModel
+@{
+    ViewData["Title"] = Model.Name;
+    string FormatDuration(double seconds)
+    {
+        if (seconds <= 0) return "—";
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours} hr {ts.Minutes} min";
+        if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes} min {ts.Seconds} sec";
+        return $"{Math.Max(1, ts.Seconds)} sec";
+    }
+    string FormatWhen(DateTimeOffset? value)
+    {
+        if (value is null) return "—";
+        return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+    }
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="fw-bold mb-1">@Model.Name</h2>
+            <p class="text-muted mb-0">
+                @Model.SetupSummary
+                @if (Model.HasVersionChange)
+                {
+                    <span class="ms-2 badge bg-light text-dark border">Setup changed · now v@Model.CurrentVersion</span>
+                }
+            </p>
+        </div>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>All use cases</a>
+    </div>
+
+    <div class="au-card mb-4">
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Total time over runs</div>
+        <div class="card-body">
+            @if (Model.DurationTrend.Count == 0)
+            {
+                <p class="text-muted mb-0">No finished metrics runs for this scenario yet.</p>
+            }
+            else
+            {
+                <p class="small text-muted mb-2">Each point is one finished run of this use case. A jump usually means the pipeline got heavier — or the scenario setup changed (new version).</p>
+                <canvas id="scenarioDurationChart" height="120"></canvas>
+            }
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header">Runs of this use case</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table au-table mb-0">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Result</th>
+                            <th>Total time</th>
+                            <th>Patients / min</th>
+                            <th>Finished</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @if (Model.Runs.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted text-center py-4">No runs yet.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var run in Model.Runs)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input compare-run" value="@run.RunId" aria-label="Select for compare" />
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill @(run.Outcome == "Succeeded" ? "au-badge-success" : run.Outcome == "Failed" ? "au-badge-danger" : "au-badge-muted")">
+                                        @(run.Outcome == "Succeeded" ? "Passed" : run.Outcome == "Failed" ? "Failed" : run.Outcome)
+                                    </span>
+                                    @if (run.ScenarioVersion > 1)
+                                    {
+                                        <span class="badge bg-light text-dark border ms-1">v@run.ScenarioVersion</span>
+                                    }
+                                </td>
+                                <td>@FormatDuration(run.E2eDurationSeconds)</td>
+                                <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
+                                <td>@FormatWhen(run.FinishedAt)</td>
+                                <td><a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action">View</a></td>
+                            </tr>
+                        }
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-body border-top d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Select two runs and compare them side by side.</span>
+            <button type="button" class="btn btn-sm btn-au-action" id="btnCompare" disabled>Compare selected</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const boxes = Array.from(document.querySelectorAll('.compare-run'));
+        const button = document.getElementById('btnCompare');
+        if (button) {
+            function selected() { return boxes.filter(b => b.checked).map(b => b.value); }
+            boxes.forEach(box => box.addEventListener('change', function () {
+                if (selected().length > 2) this.checked = false;
+                button.disabled = selected().length !== 2;
+            }));
+            button.addEventListener('click', function () {
+                const ids = selected();
+                if (ids.length === 2) {
+                    window.location = '@Url.Action("Compare")' + '?a=' + encodeURIComponent(ids[0]) + '&b=' + encodeURIComponent(ids[1]);
+                }
+            });
+        }
+    })();
+</script>
+@if (Model.DurationTrend.Count > 0)
+{
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const points = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.DurationTrend.Select(p => new {
+                finishedAt = p.FinishedAt.UtcDateTime.ToString("MMM d h:mm tt"),
+                seconds = p.E2eDurationSeconds,
+                runId = p.RunId,
+                version = p.ScenarioVersion
+            }),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        const canvas = document.getElementById('scenarioDurationChart');
+        if (!canvas || !points.length) return;
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.finishedAt),
+                datasets: [{
+                    label: 'Total time (seconds)',
+                    data: points.map(p => p.seconds),
+                    borderColor: '#4da3ff',
+                    backgroundColor: 'rgba(77,163,255,.15)',
+                    fill: true,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Seconds' } }
+                }
+            }
+        });
+    })();
+</script>
+}
