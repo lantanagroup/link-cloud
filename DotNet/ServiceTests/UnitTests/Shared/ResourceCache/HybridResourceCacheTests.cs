@@ -196,6 +196,31 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
+    public async Task DeleteAsync_does_not_forget_cache_type_for_remaining_keys_of_the_same_correlation()
+    {
+        SetupRedisUsedMemory(900L * 1024 * 1024);
+        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+
+        await sut.UpdateCorrelationCacheAsync("corr-1:Patient", new List<DomainResource>(), ResourceType.Patient);
+
+        _absCache
+            .Setup(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _absCache
+            .Setup(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>());
+
+        await sut.DeleteAsync(new List<string> { "corr-1:Encounter" });
+
+        sut.GetCacheTypeForCorrelationId("corr-1").Should().Be(ResourceCacheType.ABS);
+
+        await sut.GetAsync("corr-1:Patient");
+
+        _absCache.Verify(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()), Times.Once);
+        _redisCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task No_connected_server_uses_ABS()
     {
         SetupNoConnectedServer();

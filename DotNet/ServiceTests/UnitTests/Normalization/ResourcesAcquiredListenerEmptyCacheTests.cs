@@ -24,8 +24,9 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Normalization;
 
 /// <summary>
-/// Data Acquisition lists a cache key only after acquiring at least one resource of that type.
-/// An empty read must fail the copy without deleting source keys or emitting ResourcesNormalized.
+/// Data Acquisition should list a cache key only when that key currently has resources.
+/// A single empty listed key is skipped so it cannot dead-letter the patient. Every listed
+/// key empty is still treated as a cache-not-ready race and fails transiently.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class ResourcesAcquiredListenerEmptyCacheTests
@@ -34,6 +35,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     private const string PatientId = "patient-1";
     private const string CorrelationId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
     private static readonly string PatientCacheKey = $"{CorrelationId}:Patient";
+    private static readonly string EncounterCacheKey = $"{CorrelationId}:Encounter";
 
     [Fact]
     public async Task ProcessMessageAsync_ListedCacheKeyEmpty_ThrowsTransientAndDoesNotDeleteOrProduce()
@@ -53,9 +55,9 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var listener = BuildListener(resourceCache, producer);
 
         var ex = await Assert.ThrowsAsync<TransientException>(() =>
-            listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None));
+            listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None));
 
-        Assert.Contains(PatientCacheKey, ex.Message);
+        Assert.Contains("All 1 ResourcesAcquired cache key(s) were empty", ex.Message);
         resourceCache.Verify(
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -109,7 +111,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
 
         var listener = BuildListener(resourceCache, producer);
 
-        await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
+        await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
 
         resourceCache.Verify(
             item => item.UpdateCorrelationCacheAsync(
@@ -123,6 +125,112 @@ public class ResourcesAcquiredListenerEmptyCacheTests
                 It.Is<List<string>>(keys => keys.Count == 1 && keys[0] == PatientCacheKey),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+        producer.Verify(
+            item => item.ProduceAsync(
+                KafkaTopic.ResourcesNormalized.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_MixedKeys_SkipsEmptyTypeAndProducesForPopulatedType()
+    {
+        var patient = new Patient { Id = "patient-1" };
+        var resourceCache = new Mock<IResourceCache>();
+        resourceCache
+            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
+            .Returns(resourceCache.Object);
+        resourceCache
+            .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
+            .Returns(FhirResourceType.Patient);
+        resourceCache
+            .Setup(item => item.GetResourceTypeByCacheKey(EncounterCacheKey))
+            .Returns(FhirResourceType.Encounter);
+        resourceCache
+            .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([patient]);
+        resourceCache
+            .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        resourceCache
+            .Setup(item => item.UpdateCorrelationCacheAsync(
+                CorrelationId,
+                It.IsAny<List<DomainResource>>(),
+                FhirResourceType.Patient,
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        resourceCache
+            .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        producer
+            .Setup(item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+
+        var listener = BuildListener(resourceCache, producer);
+
+        await listener.ProcessMessageAsync(
+            BuildConsumeResult([PatientCacheKey, EncounterCacheKey]),
+            CancellationToken.None);
+
+        resourceCache.Verify(
+            item => item.UpdateCorrelationCacheAsync(
+                CorrelationId,
+                It.Is<List<DomainResource>>(resources => resources.Count == 1),
+                FhirResourceType.Patient,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        resourceCache.Verify(
+            item => item.UpdateCorrelationCacheAsync(
+                It.IsAny<string>(),
+                It.IsAny<List<DomainResource>>(),
+                FhirResourceType.Encounter,
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        resourceCache.Verify(
+            item => item.DeleteAsync(
+                It.Is<List<string>>(keys => keys.Count == 1 && keys[0] == PatientCacheKey),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        producer.Verify(
+            item => item.ProduceAsync(
+                KafkaTopic.ResourcesNormalized.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_NoCacheKeys_ProducesWithoutRetry()
+    {
+        var resourceCache = new Mock<IResourceCache>();
+        resourceCache
+            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
+            .Returns(resourceCache.Object);
+        resourceCache
+            .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        producer
+            .Setup(item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+
+        var listener = BuildListener(resourceCache, producer);
+
+        await listener.ProcessMessageAsync(BuildConsumeResult([]), CancellationToken.None);
+
+        resourceCache.Verify(
+            item => item.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         producer.Verify(
             item => item.ProduceAsync(
                 KafkaTopic.ResourcesNormalized.ToString(),
@@ -180,7 +288,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             Mock.Of<IResourceCachePurger>());
     }
 
-    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult()
+    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
     {
         var headers = new Headers
         {
@@ -202,7 +310,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
                     ReportableEvent = "Adhoc",
                     ScheduledReports = new List<ScheduledReport> { new() { ReportTrackingId = "tracking-1" } },
                     CacheType = ResourceCacheType.ABS,
-                    CacheKeys = new List<string> { PatientCacheKey }
+                    CacheKeys = cacheKeys
                 }
             }
         };

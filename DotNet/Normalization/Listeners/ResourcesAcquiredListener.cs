@@ -233,13 +233,16 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // Data Acquisition only lists a cache key when it acquired at least one
-                    // resource of that type. An empty read means the cache copy is not ready
-                    // (or used a blob type the reader could not see). Fail transiently so the
-                    // source keys are NOT deleted and MeasureEval does not evaluate an empty bundle.
-                    throw new TransientException(
-                        $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
-                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                    // A listed key with no data is a producer defect (or a still-propagating write).
+                    // Skip this type so a single empty key cannot dead-letter the whole patient.
+                    // If EVERY listed key is empty, fail transiently after the loop — that is the
+                    // cache-not-ready race, not an intentional empty type.
+                    _logger.LogWarning(
+                        "ResourcesAcquired listed cache key '{CacheKey}' but it contained no resources. Skipping this type. CacheType={CacheType}, FacilityId={FacilityId}.",
+                        cacheKey.SanitizeForLog(),
+                        result.Message.Value.CacheType,
+                        result.Message.Key.FacilityId.SanitizeForLog());
+                    continue;
                 }
 
                 if (sequences == null || sequences.Count == 0)
@@ -329,6 +332,13 @@ public class ResourcesAcquiredListener : BackgroundService
 
                 await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
                 copiedKeys.Add(cacheKey);
+            }
+
+            if (copiedKeys.Count == 0 && cacheKeys.Count > 0)
+            {
+                throw new TransientException(
+                    $"All {cacheKeys.Count} ResourcesAcquired cache key(s) were empty. " +
+                    $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);

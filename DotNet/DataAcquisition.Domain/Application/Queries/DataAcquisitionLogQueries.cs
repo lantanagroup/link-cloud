@@ -154,33 +154,28 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             reportTrackingGuid = parsedReportTrackingGuid;
         }
 
-        var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
-                                       join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
-                                       join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
-                                       where query.FacilityId == facilityId
-                                             && log.CorrelationId == correlationId
-                                             && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
-                                             && resourceTypeEntry.ResourceType == parsedResourceType
-                                       select log.ResourceIds.Select(r => r.ResourceId).ToList()).ToListAsync(cancellationToken);
+        // Drive from DataAcquisitionLog (FacilityId + CorrelationId are indexed) instead of
+        // FhirQuery.FacilityId (nvarchar(max), no index). SelectMany ResourceIds rather than
+        // joining FhirQuery × FhirQueryResourceType × ResourceIds, which timed out at 30s
+        // under load on the shared test Azure SQL.
+        var resourceIds = await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(log => log.FacilityId == facilityId
+                          && log.CorrelationId == correlationId
+                          && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
+                          && log.FhirQueries.Any(query =>
+                              query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                  resourceTypeEntry.ResourceType == parsedResourceType)))
+            .SelectMany(log => log.ResourceIds.Select(r => r.ResourceId))
+            .ToListAsync(cancellationToken);
 
-        var result = new List<string>();
         var resourceTypePrefix = $"{resourceType}/";
-
-        foreach (var resourceReferences in logsWithResources)
-        {
-            if (resourceReferences != null)
-            {
-                var filteredIds = resourceReferences
-                    .Select(r => NormalizeResourceId(r, resourceTypePrefix))
-                    .Where(r => !string.IsNullOrWhiteSpace(r))
-                    .Select(r => r!)
-                    .ToList();
-
-                result.AddRange(filteredIds);
-            }
-        }
-
-        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return resourceIds
+            .Select(r => NormalizeResourceId(r, resourceTypePrefix))
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static string? NormalizeResourceId(string? resourceId, string resourceTypePrefix)
@@ -1126,7 +1121,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         CompletionDate = log.CompletionDate,
                         CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                        ResourceAcquiredIds = log.ResourceIds.Select(r => r.ResourceId).ToList(),
+                        ResourceAcquiredIds = new List<string>(),
                         Notes = null,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
@@ -1140,9 +1135,30 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         } : null
                     };
 
-        return await query
+        var logs = await query
             .Take(batchSize)
             .ToListAsync(cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            return logs;
+        }
+
+        var logIds = logs.Select(log => log.Id).ToList();
+        var resourceIds = await _dbContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(resourceId => resourceId.DataAcquisitionLogId != null
+                                 && logIds.Contains(resourceId.DataAcquisitionLogId.Value))
+            .Select(resourceId => new { resourceId.DataAcquisitionLogId, resourceId.ResourceId })
+            .ToListAsync(cancellationToken);
+
+        var resourceIdsByLogId = resourceIds.ToLookup(row => row.DataAcquisitionLogId!.Value, row => row.ResourceId);
+        foreach (var log in logs)
+        {
+            log.ResourceAcquiredIds = resourceIdsByLogId[log.Id].ToList();
+        }
+
+        return logs;
     }
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)

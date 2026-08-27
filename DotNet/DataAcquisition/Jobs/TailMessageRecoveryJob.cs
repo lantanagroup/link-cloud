@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -80,6 +81,9 @@ public class TailMessageRecoveryJob : IJob
                         processed++;
                         continue;
                     }
+
+                    var tailFinalizer = scope.ServiceProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+                    await tailFinalizer.FinalizeAsync(tailResult, context.CancellationToken);
 
                     var headers = new Headers
                     {

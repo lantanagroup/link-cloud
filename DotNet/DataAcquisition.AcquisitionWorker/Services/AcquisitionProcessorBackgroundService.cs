@@ -259,17 +259,8 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return; // Group not yet complete.
             }
 
-            // Remove non-org encounters from the cache before the bundle reaches MeasureEval. The
-            // Encounter was cached by its own (ungated) primary log, so the NotReportable status on a
-            // dependent log doesn't keep it out of evaluation. Stripping here means an all-non-org patient
-            // has no qualifying encounter (non-reportable outcome), and a mixed patient keeps only org
-            // encounters. Runs before ProduceAsync so Normalization rehydrates the already-filtered cache.
-            var locationMappingService = scopeProvider.GetRequiredService<ILocationMappingService>();
-            
-            // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
-            // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
-            await locationMappingService.StripNonOrgEncountersFromCacheAsync(
-                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
+            var tailFinalizer = scopeProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+            await tailFinalizer.FinalizeAsync(tailResult, ct);
 
             var headers = new Headers
             {

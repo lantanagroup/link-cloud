@@ -96,11 +96,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 await cache.DeleteAsync(group.ToList(), cancellationToken);
             }
 
-            // Clean up recorded decisions for deleted keys
-            foreach (var key in cacheKeys)
-            {
-                _correlationCacheTypes.TryRemove(ExtractCorrelationId(key), out _);
-            }
+            // Keep the Redis-vs-ABS decision for the correlation. Deleting one resource-type
+            // key (org-location Encounter strip) must not make later Patient/Location reads
+            // fall back to Redis while the remaining blobs still live in ABS.
         }
 
         /// <inheritdoc/>
