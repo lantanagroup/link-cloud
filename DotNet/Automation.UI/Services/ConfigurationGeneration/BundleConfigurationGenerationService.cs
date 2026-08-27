@@ -68,7 +68,7 @@ public sealed class BundleConfigurationGenerationService(
         {
             $"{fingerprint.PatientCount} Patient, {fingerprint.LocationCount} Location, {fingerprint.ResourceCounts.Values.Sum()} total resource(s) across {sources.Count} source(s).",
             fingerprint.LocationIdentifiers.Count > 0
-                ? $"{fingerprint.LocationIdentifiers.Count} distinct Location identifier(s) / {DistinctSystems(fingerprint)} identifier system(s)."
+                ? $"{fingerprint.LocationIdentifiers.Count} distinct Location identifier(s) / {DistinctSystems(fingerprint)} identifier system(s). Org mapping uses this raw shape during acquisition."
                 : "No Location identifiers found.",
             fingerprint.Extensions.Count > 0
                 ? $"{fingerprint.Extensions.Count} distinct extension(s) across resource types."
