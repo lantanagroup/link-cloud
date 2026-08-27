@@ -23,7 +23,7 @@ public static class OrgResourceMapProposalBuilder
             SuggestedName = refineExisting is { IsSystem: false }
                 ? refineExisting.Name
                 : "",
-            SuggestedDescription = "Auto-built so every Location found in the uploaded bundle can pass org-location mapping (any-match)."
+            SuggestedDescription = "Auto-built so every Location can pass org mapping during acquisition (any-match), using identifiers or type codes already on the raw resource — not codes cleanup adds later."
         };
 
         var conditions = new List<OrganizationResourceMapCondition>();
@@ -51,6 +51,9 @@ public static class OrgResourceMapProposalBuilder
             conditions.Add(new OrganizationResourceMapCondition { FhirPath = path, Priority = priority++ });
         }
 
+        // Type conditions are a fallback for Locations that already have type codes on the
+        // raw upload. Acquisition evaluates org mapping before Copy Location / CodeMap, so
+        // never propose type matches that cleanup would invent later.
         var needTypeFallback = fingerprint.LocationsWithoutIdentifier > 0 || DistinctIdentifierSystems(fingerprint).Count == 0;
         if (needTypeFallback)
         {
@@ -72,10 +75,15 @@ public static class OrgResourceMapProposalBuilder
         else if (conditions.Count == 0)
             proposal.Notes.Add("Locations were present but had no identifier system or type coding that can become a match row.");
         else
-            proposal.Notes.Add($"Proposed {conditions.Count} match condition(s). Any matching condition lets a Location pass, so every distinct identifier system{(needTypeFallback ? " or type" : "")} from the upload is covered.");
+            proposal.Notes.Add($"Proposed {conditions.Count} match condition(s) against the raw Location shape acquisition sees. Any matching condition lets a Location pass.");
+
+        proposal.Notes.Add("Org mapping runs during acquisition, before cleanup copies identifiers or aliases onto Location.type. Maps must match identifiers (or type codes already on the upload), not codes Copy Location / CodeMap add later.");
+
+        if (needTypeFallback && fingerprint.LocationTypes.Count > 0)
+            proposal.Notes.Add("Type-coding conditions were added only for type codes already present on the uploaded Locations.");
 
         if (fingerprint.LocationsWithoutIdentifier > 0)
-            proposal.Notes.Add($"{fingerprint.LocationsWithoutIdentifier} Location(s) had no identifier. Type-coding conditions were added so those can still pass.");
+            proposal.Notes.Add($"{fingerprint.LocationsWithoutIdentifier} Location(s) had no identifier.");
 
         proposal.Reuse = ScoreExisting(fingerprint, existing);
         return proposal;
@@ -85,11 +93,10 @@ public static class OrgResourceMapProposalBuilder
         BundleConfigFingerprint fingerprint,
         IReadOnlyList<OrganizationResourceMapTemplate> existing)
     {
-        var needed = NeededKeys(fingerprint);
-        if (needed.Count == 0)
-            return [];
-
+        var neededIdentifiers = NeededIdentifierKeys(fingerprint);
+        var rawTypeKeys = NeededRawTypeKeys(fingerprint);
         var results = new List<ReuseCandidate>();
+
         foreach (var template in existing)
         {
             var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -99,48 +106,119 @@ public static class OrgResourceMapProposalBuilder
                     covered.Add(key);
             }
 
-            var hit = needed.Count(neededKey => IsCovered(neededKey, covered));
-            if (hit == 0)
+            var hasIdentifier = covered.Any(IsIdentifierKey);
+            var hasType = covered.Any(IsTypeKey);
+
+            if (hasIdentifier)
+            {
+                if (neededIdentifiers.Count == 0)
+                    continue;
+
+                var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
+                if (hit == 0)
+                    continue;
+
+                var score = (double)hit / neededIdentifiers.Count;
+                results.Add(ToCandidate(
+                    template,
+                    score,
+                    score >= 0.999
+                        ? "This map already matches the Location identifiers acquisition will see."
+                        : template.IsSystem
+                            ? $"This system map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload. Extending clones a custom copy so the system map stays unchanged."
+                            : $"This map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload."));
+                continue;
+            }
+
+            if (!hasType)
                 continue;
 
-            var score = (double)hit / needed.Count;
-            results.Add(new ReuseCandidate
+            // Type-only maps are reusable only when those type codes are already on the raw
+            // upload. Cleanup cannot make them true in time for org mapping.
+            if (rawTypeKeys.Count == 0)
             {
-                Id = template.Id,
-                Name = template.Name,
-                Kind = template.IsSystem ? "System ORM" : "Custom ORM",
-                Score = Math.Round(score, 2),
-                Recommendation = score >= 0.999 ? "Reuse" : "Extend",
-                Reason = score >= 0.999
-                    ? "This map already covers every Location identifier/type found in the upload."
-                    : template.IsSystem
-                        ? $"This system map covers {hit} of {needed.Count} Location fingerprints. Extending clones a custom copy so the system map stays unchanged."
-                        : $"This map covers {hit} of {needed.Count} Location fingerprints. Extending it would keep one map for all uploaded patients."
-            });
+                if (neededIdentifiers.Count == 0)
+                    continue;
+
+                results.Add(ToCandidate(
+                    template,
+                    score: 0,
+                    "This map matches Location.type. Acquisition decides org membership before cleanup copies identifiers onto type, so this upload would not match as-is. Extending adds identifier conditions from the raw Locations.",
+                    forceExtend: true));
+                continue;
+            }
+
+            var typeHit = rawTypeKeys.Count(neededKey => IsCovered(neededKey, covered));
+            if (typeHit == 0)
+            {
+                if (neededIdentifiers.Count == 0)
+                    continue;
+
+                results.Add(ToCandidate(
+                    template,
+                    score: 0,
+                    "This map matches Location.type codes that are not on the uploaded Locations. Acquisition will not see codes cleanup adds later. Extending adds identifier conditions from the raw Locations.",
+                    forceExtend: true));
+                continue;
+            }
+
+            var typeScore = (double)typeHit / rawTypeKeys.Count;
+            results.Add(ToCandidate(
+                template,
+                typeScore,
+                typeScore >= 0.999
+                    ? "This map matches type codes already present on the uploaded Locations, which acquisition can see."
+                    : $"This map matches {typeHit} of {rawTypeKeys.Count} type codes already on the uploaded Locations."));
         }
 
         return results
-            .OrderByDescending(r => r.Score)
+            .OrderByDescending(r => r.Recommendation == "Reuse")
+            .ThenByDescending(r => r.Score)
             .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .Take(5)
             .ToList();
     }
 
-    private static HashSet<string> NeededKeys(BundleConfigFingerprint fingerprint)
+    private static ReuseCandidate ToCandidate(
+        OrganizationResourceMapTemplate template,
+        double score,
+        string reason,
+        bool forceExtend = false)
+        => new()
+        {
+            Id = template.Id,
+            Name = template.Name,
+            Kind = template.IsSystem ? "System ORM" : "Custom ORM",
+            Score = Math.Round(score, 2),
+            Recommendation = !forceExtend && score >= 0.999 ? "Reuse" : "Extend",
+            Reason = reason
+        };
+
+    private static HashSet<string> NeededIdentifierKeys(BundleConfigFingerprint fingerprint)
     {
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var systems = DistinctIdentifierSystems(fingerprint);
-        foreach (var system in systems)
-            keys.Add($"idsys|{system}");
-
-        if (systems.Count == 0 || fingerprint.LocationsWithoutIdentifier > 0)
+        foreach (var identifier in fingerprint.LocationIdentifiers)
         {
-            foreach (var type in fingerprint.LocationTypes.Where(t => !string.IsNullOrWhiteSpace(t.System)))
-            {
-                keys.Add(string.IsNullOrWhiteSpace(type.Code)
-                    ? $"typesys|{type.System}"
-                    : $"type|{type.System}|{type.Code}");
-            }
+            var system = identifier.System?.Trim() ?? "";
+            var value = identifier.Value?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(system))
+                continue;
+            keys.Add(string.IsNullOrWhiteSpace(value)
+                ? $"idsys|{system}"
+                : $"id|{system}|{value}");
+        }
+
+        return keys;
+    }
+
+    private static HashSet<string> NeededRawTypeKeys(BundleConfigFingerprint fingerprint)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var type in fingerprint.LocationTypes.Where(t => !string.IsNullOrWhiteSpace(t.System)))
+        {
+            keys.Add(string.IsNullOrWhiteSpace(type.Code)
+                ? $"typesys|{type.System}"
+                : $"type|{type.System}|{type.Code}");
         }
 
         return keys;
@@ -163,9 +241,12 @@ public static class OrgResourceMapProposalBuilder
             var id = IdentifierExists.Match(part);
             if (id.Success)
             {
-                yield return $"idsys|{id.Groups[1].Value}";
+                // A value-specific condition must not count as covering every Location
+                // that merely shares the identifier system.
                 if (id.Groups[2].Success && !string.IsNullOrWhiteSpace(id.Groups[2].Value))
                     yield return $"id|{id.Groups[1].Value}|{id.Groups[2].Value}";
+                else
+                    yield return $"idsys|{id.Groups[1].Value}";
                 continue;
             }
 
@@ -181,8 +262,7 @@ public static class OrgResourceMapProposalBuilder
 
     private static bool CoversIdentifierSystem(string path, string system)
         => ParseKeys(path).Any(k =>
-            k.Equals($"idsys|{system}", StringComparison.OrdinalIgnoreCase)
-            || k.StartsWith($"id|{system}|", StringComparison.OrdinalIgnoreCase));
+            k.Equals($"idsys|{system}", StringComparison.OrdinalIgnoreCase));
 
     private static bool CoversType(string path, string system, string? code)
     {
@@ -212,6 +292,14 @@ public static class OrgResourceMapProposalBuilder
 
         return false;
     }
+
+    private static bool IsIdentifierKey(string key)
+        => key.StartsWith("idsys|", StringComparison.OrdinalIgnoreCase)
+           || key.StartsWith("id|", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsTypeKey(string key)
+        => key.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
+           || key.StartsWith("type|", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<string> SplitOr(string path)
         => path.Split([" or ", " OR ", " || "], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

@@ -18,9 +18,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly BlobContainerClient _containerClient;
         private readonly ResourceCacheBlobStorageSettings _settings;
-        private readonly ILogger<RedisResourceCache> _logger;
+        private readonly ILogger<ABSResourceCache> _logger;
 
-        public ABSResourceCache(IOptions<ResourceCacheBlobStorageSettings> settings, ILogger<RedisResourceCache> logger)
+        public ABSResourceCache(IOptions<ResourceCacheBlobStorageSettings> settings, ILogger<ABSResourceCache> logger)
         {
             _settings = settings.Value;
             _logger = logger;
@@ -91,6 +91,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     await writer.WriteLineAsync(resourceToWrite.Key.AsMemory(), cancellationToken);
                     await writer.WriteLineAsync(resourceToWrite.Value.ToJson().AsMemory(), cancellationToken);
                 }
+
+                await writer.FlushAsync(cancellationToken);
             }
 
             await using (Stream idsWriteStream = await writeIdsBlobClient.OpenWriteAsync(false, cancellationToken: cancellationToken))
@@ -100,6 +102,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 {
                     await idsWriter.WriteLineAsync(id.AsMemory(), cancellationToken);
                 }
+
+                await idsWriter.FlushAsync(cancellationToken);
             }
         }
 
@@ -112,7 +116,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             List<DomainResource> resources = new List<DomainResource>();
 
-            BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(cacheKey));
+            // Writes use AppendBlobClient. Reads must use the generic BlobClient: BlockBlobClient
+            // ExistsAsync/OpenReadAsync against an append blob reports not-found, which
+            // Normalization then treated as an empty cache and deleted the real source blobs.
+            BlobClient readBlobClient = _containerClient.GetBlobClient(GetBlobKey(cacheKey));
 
             if (!(await readBlobClient.ExistsAsync(cancellationToken)).Value)
             {

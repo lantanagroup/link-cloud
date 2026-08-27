@@ -213,10 +213,12 @@ public class ResourcesAcquiredListener : BackgroundService
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
+        var cacheKeys = result.Message.Value.CacheKeys ?? [];
+        var copiedKeys = new List<string>(cacheKeys.Count);
 
         using (var scope = _scopeFactory.CreateScope())
         {
-            foreach (var cacheKey in result.Message.Value.CacheKeys)
+            foreach (var cacheKey in cacheKeys)
             {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
@@ -229,6 +231,16 @@ public class ResourcesAcquiredListener : BackgroundService
                 }, cancellationToken: cancellationToken);
 
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
+                if (resources.Count == 0)
+                {
+                    // Data Acquisition only lists a cache key when it acquired at least one
+                    // resource of that type. An empty read means the cache copy is not ready
+                    // (or used a blob type the reader could not see). Fail transiently so the
+                    // source keys are NOT deleted and MeasureEval does not evaluate an empty bundle.
+                    throw new TransientException(
+                        $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
+                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                }
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -316,11 +328,12 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
 
                 await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+                copiedKeys.Add(cacheKey);
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
-            await resourceCache.DeleteAsync(result.Message.Value.CacheKeys, cancellationToken);
+            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
         }
     }
 
