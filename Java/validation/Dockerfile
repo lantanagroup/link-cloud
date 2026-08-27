@@ -25,4 +25,7 @@ RUN chmod -R 755 /app \
 
 USER 1001
 EXPOSE 5135
+# Heap tracks the container/cgroup (or host) memory. Override JAVA_TOOL_OPTIONS
+# only if you need a different percentage; do not replace this with a fixed -Xmx.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
 CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "validation.jar"]
