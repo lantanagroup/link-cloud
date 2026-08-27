@@ -439,9 +439,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 var first = groupLogs.First();
 
-                // Only include cache keys for resource types that had at least one resource actually acquired.
-                // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
-                // is the substring before the first '/'.
+                // Candidate cache keys: resource types that had at least one ResourceId recorded.
+                // ResourceId rows use "TypeName/id". Org-location strip can empty Encounter after
+                // those ids are recorded; ResourcesAcquiredTailFinalizer drops keys that no longer
+                // have cached resources so Normalization is never pointed at an empty location.
                 var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
                     .Join(_dbContext.DataAcquisitionLogs,
                         rid => rid.DataAcquisitionLogId,

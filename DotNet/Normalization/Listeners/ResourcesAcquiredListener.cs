@@ -233,11 +233,10 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // Data Acquisition only lists a cache key when that key currently has resources
-                    // (empty keys are dropped in ResourcesAcquiredTailFinalizer). An empty read here
-                    // means the cache copy is not ready. Fail transiently so the source keys are NOT
-                    // deleted and MeasureEval does not evaluate a partial bundle.
-                    throw new TransientException(
+                    // DA only lists a key after it has written (and not stripped) resources there.
+                    // An empty listed key is a producer defect, not a not-ready race: retries cannot
+                    // create data that was never cached (org-map filter, Encounter strip, etc.).
+                    throw new DeadLetterException(
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
                         $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }

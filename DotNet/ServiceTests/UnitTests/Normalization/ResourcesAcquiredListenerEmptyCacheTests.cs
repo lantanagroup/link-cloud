@@ -25,8 +25,7 @@ namespace UnitTests.Normalization;
 
 /// <summary>
 /// Data Acquisition lists a cache key only when that key currently has resources.
-/// An empty listed key is a cache-not-ready race and fails transiently so MeasureEval
-/// does not evaluate a partial bundle.
+/// An empty listed key is a producer defect and is dead-lettered (not retried).
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class ResourcesAcquiredListenerEmptyCacheTests
@@ -38,7 +37,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     private static readonly string EncounterCacheKey = $"{CorrelationId}:Encounter";
 
     [Fact]
-    public async Task ProcessMessageAsync_ListedCacheKeyEmpty_ThrowsTransientAndDoesNotDeleteOrProduce()
+    public async Task ProcessMessageAsync_ListedCacheKeyEmpty_ThrowsDeadLetterAndDoesNotDeleteOrProduce()
     {
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
@@ -54,7 +53,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);
 
-        var ex = await Assert.ThrowsAsync<TransientException>(() =>
+        var ex = await Assert.ThrowsAsync<DeadLetterException>(() =>
             listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None));
 
         Assert.Contains("contained no resources", ex.Message);
@@ -135,7 +134,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_MixedKeys_ThrowsTransientAndDoesNotProduce()
+    public async Task ProcessMessageAsync_MixedKeys_ThrowsDeadLetterAndDoesNotProduce()
     {
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
@@ -158,7 +157,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);
 
-        var ex = await Assert.ThrowsAsync<TransientException>(() =>
+        var ex = await Assert.ThrowsAsync<DeadLetterException>(() =>
             listener.ProcessMessageAsync(
                 BuildConsumeResult([PatientCacheKey, EncounterCacheKey]),
                 CancellationToken.None));
