@@ -97,6 +97,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
+        _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
