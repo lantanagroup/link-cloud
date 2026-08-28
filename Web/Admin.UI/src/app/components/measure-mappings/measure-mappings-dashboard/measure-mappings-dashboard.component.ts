@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { EMPTY, Subject, Subscription, catchError, switchMap } from 'rxjs';
+import { EMPTY, Subject, Subscription, catchError, debounceTime, switchMap } from 'rxjs';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -47,7 +47,9 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
   private initPageNumber = 0;
 
   private readonly search$ = new Subject<void>();
+  private readonly typing$ = new Subject<void>();
   private searchSubscription?: Subscription;
+  private typingSubscription?: Subscription;
 
   measureMappings: IMeasureMapping[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
@@ -109,12 +111,24 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
       this.paginationMetadata = response.metadata;
     });
 
+    // Text filters search as the admin types. The debounce collapses a burst of keystrokes into
+    // one request; switchMap above still cancels it if another lands anyway.
+    this.typingSubscription = this.typing$.pipe(
+      debounceTime(300)
+    ).subscribe(() => this.onSearchChange());
+
     this.getMeasureMappings();
   }
 
   ngOnDestroy(): void {
     this.searchSubscription?.unsubscribe();
+    this.typingSubscription?.unsubscribe();
     this.search$.complete();
+    this.typing$.complete();
+  }
+
+  onFilterTyped(): void {
+    this.typing$.next();
   }
 
   getMeasureMappings(): void {
