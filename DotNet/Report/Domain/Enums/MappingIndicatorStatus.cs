@@ -88,5 +88,19 @@ public enum MappingIndicatorStatus
     /// configuration. Reporting both as NotApplicable told an operator to go and check a code map that was
     /// already correct.
     /// </remarks>
-    NothingToEvaluate
+    NothingToEvaluate,
+
+    /// <summary>
+    /// The pipeline stopped before this mapping could be evaluated, and never will for this report --
+    /// none of the patient's encounters belonged to the reporting organization, so their resources were
+    /// stripped before normalization ran.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="NotEvaluated"/>, which means the answer has not arrived yet. Both look
+    /// identical in storage -- an unset status and a null timestamp -- so this is resolved when the row is
+    /// read rather than written: the acquisition columns are what reveal that nothing was left to
+    /// normalize, and letting the write path act on them would break the rule that each producer touches
+    /// only its own columns.
+    /// </remarks>
+    Excluded
 }

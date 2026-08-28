@@ -88,6 +88,7 @@ public class ReportSqlServerIntegrationTestFixture : IAsyncLifetime
         builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         builder.Services.AddDbContext<ReportDbContext>(options => options.UseSqlServer(connectionString));
         builder.Services.AddScoped<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+        builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
 
         _host = builder.Build();
         await _host.StartAsync();
