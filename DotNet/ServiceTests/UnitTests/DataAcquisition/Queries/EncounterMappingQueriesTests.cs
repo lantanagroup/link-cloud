@@ -113,8 +113,8 @@ public class EncounterMappingQueriesTests
 
         // Assert — widening the projection must not have turned the batched load into an N+1. The whole
         // reason the detail is free is that these two queries already materialized the entities.
-        _mockLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>()), Times.Once);
-        _mockOrgLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>()), Times.Once);
+        _mockLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockOrgLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>(), It.IsAny<CancellationToken>()), Times.Once);
 
         Assert.Equal(3, result.Count);
         Assert.All(result, mapping => Assert.Single(mapping.EncounterLocations));
@@ -131,8 +131,8 @@ public class EncounterMappingQueriesTests
 
         // Assert — nothing to join against, so neither location query runs.
         Assert.Empty(result);
-        _mockLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>()), Times.Never);
-        _mockOrgLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>()), Times.Never);
+        _mockLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockOrgLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private void SetupMappings(params EncounterMapping[] mappings) =>
@@ -142,11 +142,11 @@ public class EncounterMappingQueriesTests
 
     private void SetupEncounterLocations(params EncounterLocation[] locations) =>
         _mockLocationRepo
-            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>()))
+            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(locations.ToList());
 
     private void SetupOrganizationLocations(params OrganizationLocationMapping[] organizationLocations) =>
         _mockOrgLocationRepo
-            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>()))
+            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(organizationLocations.ToList());
 }

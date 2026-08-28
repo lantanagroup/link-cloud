@@ -88,7 +88,7 @@ public class EncounterMappingQueries : IEncounterMappingQueries
         var entities = await _database.EncounterMappingRepository
             .FindAsync(m => m.FacilityId == facilityId && encounterIds.Contains(m.EncounterId), cancellationToken);
 
-        var locations = await LoadEncounterLocationsAsync(entities.Select(m => m.EncounterMappingId));
+        var locations = await LoadEncounterLocationsAsync(entities.Select(m => m.EncounterMappingId), cancellationToken);
         return entities.Select(entity => ProjectToModel(entity, locations)).ToList();
     }
 
@@ -96,7 +96,7 @@ public class EncounterMappingQueries : IEncounterMappingQueries
     {
         var entities = await _database.EncounterMappingRepository
             .FindAsync(m => m.FacilityId == facilityId && m.PatientId == patientId, cancellationToken);
-        var locations = await LoadEncounterLocationsAsync(entities.Select(m => m.EncounterMappingId));
+        var locations = await LoadEncounterLocationsAsync(entities.Select(m => m.EncounterMappingId), cancellationToken);
         return entities.Select(entity => ProjectToModel(entity, locations)).ToList();
     }
 
@@ -132,14 +132,22 @@ public class EncounterMappingQueries : IEncounterMappingQueries
     // Loads the EncounterLocation rows for the given mappings and resolves each to its human-facing
     // LocationId by joining to OrganizationLocationMapping — done in two batched queries (not per-row)
     // to avoid N+1 access on the (non-lazy-loaded) EncounterLocation/OrganizationLocationMapping navigations.
-    private async Task<Dictionary<int, List<EncounterLocationModel>>> LoadEncounterLocationsAsync(IEnumerable<int> encounterMappingIds)
+    /// <remarks>
+    /// The token is optional so the callers whose own signatures do not take one still compile, but the
+    /// two that do must pass it: this sits on the acquisition-tail path reached from
+    /// AcquisitionProcessorBackgroundService, where a shutdown would otherwise wait on two uncancellable
+    /// round trips.
+    /// </remarks>
+    private async Task<Dictionary<int, List<EncounterLocationModel>>> LoadEncounterLocationsAsync(
+        IEnumerable<int> encounterMappingIds,
+        CancellationToken cancellationToken = default)
     {
         var mappingIds = encounterMappingIds.Distinct().ToList();
         if (mappingIds.Count == 0)
             return [];
 
         var encounterLocations = await _database.EncounterLocationRepository
-            .FindAsync(l => mappingIds.Contains(l.EncounterMappingId));
+            .FindAsync(l => mappingIds.Contains(l.EncounterMappingId), cancellationToken);
 
         var organizationLocationMappingIds = encounterLocations
             .Select(l => l.OrganizationLocationMappingId)
@@ -149,7 +157,7 @@ public class EncounterMappingQueries : IEncounterMappingQueries
         var organizationLocations = organizationLocationMappingIds.Count == 0
             ? []
             : await _database.LocationMappingRepository
-                .FindAsync(l => organizationLocationMappingIds.Contains(l.LocationMappingId));
+                .FindAsync(l => organizationLocationMappingIds.Contains(l.LocationMappingId), cancellationToken);
 
         var organizationLocationsById = organizationLocations.ToDictionary(l => l.LocationMappingId);
 

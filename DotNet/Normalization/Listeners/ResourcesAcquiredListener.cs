@@ -476,11 +476,15 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
             }
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Declaring the configured maps only sharpens the reported status; it is not the normalization
             // work itself. Failing the message here would stop a patient's resources from being normalized
             // over a reporting detail, so the run continues with the less precise result.
+            //
+            // Cancellation is excluded deliberately. The Search above takes the ambient token, so on
+            // shutdown this would otherwise absorb the OperationCanceledException and let the whole
+            // resource loop and both produces run on a cancelled token instead of unwinding.
             _logger.LogWarning(
                 exception,
                 "Could not read the configured code maps for {FacilityId}; a code map that never runs will report as unconfigured.",

@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Report.Domain.Models;
@@ -249,7 +250,7 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
                 exception,
                 "Stored NormalizationDetails for report schedule {ReportScheduleId} patient {PatientId} could not be read; merging as if absent.",
                 reportScheduleId,
-                patientId);
+                patientId.SanitizeForLog());
 
             return null;
         }

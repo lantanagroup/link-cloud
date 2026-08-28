@@ -37,14 +37,8 @@ public sealed record LocationOrgDetails(
     IReadOnlyList<LocationOrgMatch> Matches);
 
 /// <summary>
-/// The shape stored in <c>ReportEntryMappingOutcome.NormalizationDetails</c>.
-/// </summary>
-/// <param name="CodeMaps">
-/// Every code map the patient's resources exercised, including target systems no column recognizes. Without
-/// them a facility with a mistyped system would be invisible outside the logs.
-/// </param>
-/// <summary>
-/// The Normalization side of a patient's stored mapping outcome.
+/// The Normalization side of a patient's stored mapping outcome, as stored in
+/// <c>ReportEntryMappingOutcome.NormalizationDetails</c>.
 /// </summary>
 /// <param name="CodeMaps">
 /// The combined totals across every pass, which is what the indicator is derived from and what a reader

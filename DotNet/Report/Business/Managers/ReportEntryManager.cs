@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text.Json;
 using LantanaGroup.Link.Report.Domain.Models;
 using LantanaGroup.Link.Report.Domain;
@@ -108,14 +109,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         /// every patient of every report that ran before this feature, and any patient still in flight --
         /// silently shortening the grid rather than showing them as not yet evaluated.
         /// </remarks>
+        /// <remarks>
+        /// Deliberately excludes the two detail blobs. Both are unbounded nvarchar(max), and this
+        /// projection backs the paged entry grid -- selecting them would transfer the whole evidence set
+        /// for every row of every page only to discard it, and AcquisitionDetails grows with the distinct
+        /// locations a patient touched. The per-patient drill-down reads them in its own targeted query.
+        /// </remarks>
         private record MappingOutcomeProjection(
             MappingIndicatorStatus LocationOrgStatus,
             MappingIndicatorStatus EncounterMappingStatus,
             MappingIndicatorStatus HslocMappingStatus,
             DateTime? AcquisitionEvaluatedAt,
-            DateTime? NormalizationEvaluatedAt,
-            string? AcquisitionDetails,
-            string? NormalizationDetails
+            DateTime? NormalizationEvaluatedAt
         );
 
         private record MeasureReportProjection(
@@ -250,7 +255,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 _logger.LogWarning(
                     exception,
                     "Stored {Source} mapping details for report schedule {ReportScheduleId} patient {PatientId} could not be read; reporting them as absent.",
-                    source, reportScheduleId, patientId);
+                    source, reportScheduleId, patientId.SanitizeForLog());
 
                 return null;
             }
@@ -289,9 +294,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             o.EncounterMappingStatus,
                             o.HslocMappingStatus,
                             o.AcquisitionEvaluatedAt,
-                            o.NormalizationEvaluatedAt,
-                            o.AcquisitionDetails,
-                            o.NormalizationDetails))
+                            o.NormalizationEvaluatedAt))
                         .FirstOrDefault()
                 ))
                 .FirstOrDefaultAsync(cancellationToken);
@@ -332,9 +335,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             o.EncounterMappingStatus,
                             o.HslocMappingStatus,
                             o.AcquisitionEvaluatedAt,
-                            o.NormalizationEvaluatedAt,
-                            o.AcquisitionDetails,
-                            o.NormalizationDetails))
+                            o.NormalizationEvaluatedAt))
                         .FirstOrDefault()
                 ))
                 .ToListAsync(cancellationToken);
@@ -375,9 +376,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             o.EncounterMappingStatus,
                             o.HslocMappingStatus,
                             o.AcquisitionEvaluatedAt,
-                            o.NormalizationEvaluatedAt,
-                            o.AcquisitionDetails,
-                            o.NormalizationDetails))
+                            o.NormalizationEvaluatedAt))
                         .FirstOrDefault()
                 ))
                 .SingleOrDefaultAsync(cancellationToken);
@@ -755,9 +754,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         o.EncounterMappingStatus,
                         o.HslocMappingStatus,
                         o.AcquisitionEvaluatedAt,
-                        o.NormalizationEvaluatedAt,
-                        o.AcquisitionDetails,
-                        o.NormalizationDetails))
+                        o.NormalizationEvaluatedAt))
                     .FirstOrDefault()
             ));
 
