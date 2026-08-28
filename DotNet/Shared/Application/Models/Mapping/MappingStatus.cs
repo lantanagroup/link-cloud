@@ -33,5 +33,12 @@ public enum MappingStatus
     /// <see cref="Unmapped"/> so a processing fault is not reported as a gap in the facility's
     /// configuration.
     /// </summary>
-    Unknown
+    Unknown,
+
+    /// <summary>
+    /// A code map is configured for this pair but nothing exercised it, because no resource of its type
+    /// reached normalization. Distinct from <see cref="NotApplicable"/>, which means no code map is
+    /// configured at all -- one is a gap in the data, the other a gap in the facility's configuration.
+    /// </summary>
+    NothingToEvaluate
 }

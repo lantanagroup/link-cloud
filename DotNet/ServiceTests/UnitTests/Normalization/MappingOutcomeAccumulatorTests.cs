@@ -187,6 +187,51 @@ public class MappingOutcomeAccumulatorTests
         Assert.Equal(2, accumulator.BuildAll().Count);
     }
 
+    [Fact]
+    public void RegisteredMapNothingExercised_IsReportedWithZeroCounts()
+    {
+        var accumulator = new MappingOutcomeAccumulator();
+
+        accumulator.Register(CodeMapOperation(Map(LocalSystem, HslocSystem)));
+
+        // Absent and zero mean different things downstream: absent is "the facility configured no map",
+        // zero is "the map is configured and nothing reached it". Reporting nothing here collapses the two
+        // and points an operator at a code map that is already correct.
+        var outcome = Assert.Single(accumulator.BuildAll());
+        Assert.Equal(HslocSystem, outcome.TargetSystem);
+        Assert.Equal(0, outcome.MappedCount);
+        Assert.Equal(0, outcome.UnmappedCount);
+        Assert.Equal(0, outcome.FailureCount);
+        Assert.Equal(MappingStatus.NothingToEvaluate, outcome.Status);
+    }
+
+    [Fact]
+    public void RegisteringAMapThatLaterRuns_DoesNotDoubleCountOrMaskTheResult()
+    {
+        var accumulator = new MappingOutcomeAccumulator();
+
+        accumulator.Register(CodeMapOperation(Map(LocalSystem, HslocSystem)));
+        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 3, 0, [])]);
+
+        // Registration only declares the pair; it must not contribute counts of its own or leave the
+        // status stuck at the value it seeded.
+        var outcome = Assert.Single(accumulator.BuildAll());
+        Assert.Equal(3, outcome.MappedCount);
+        Assert.Equal(MappingStatus.Mapped, outcome.Status);
+    }
+
+    [Fact]
+    public void RegisteringTheSameMapTwice_ReportsItOnce()
+    {
+        var accumulator = new MappingOutcomeAccumulator();
+
+        accumulator.Register(CodeMapOperation(Map(LocalSystem, HslocSystem)));
+        accumulator.Register(CodeMapOperation(Map(LocalSystem, HslocSystem)));
+
+        // The same pair can be configured on more than one resource type.
+        Assert.Single(accumulator.BuildAll());
+    }
+
     private static CodeSystemMap Map(string sourceSystem, string targetSystem) =>
         new(sourceSystem, targetSystem, new Dictionary<string, CodeMap>());
 

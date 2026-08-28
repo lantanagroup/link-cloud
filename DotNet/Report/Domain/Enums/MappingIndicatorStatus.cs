@@ -75,5 +75,18 @@ public enum MappingIndicatorStatus
     /// it as mapped without being wrong. It is last so that adding it shifted no stored ordinal.
     /// </para>
     /// </remarks>
-    Assumed
+    Assumed,
+
+    /// <summary>
+    /// The mapping is configured but nothing reached it to be mapped -- no resource of the relevant type
+    /// was acquired for this patient. Distinct from <see cref="NotApplicable"/>, which means nothing is
+    /// configured to produce the value at all.
+    /// </summary>
+    /// <remarks>
+    /// The two are separated because they call for different action: this one points at the acquisition
+    /// side (a query plan that fetched nothing), <see cref="NotApplicable"/> at the facility's
+    /// configuration. Reporting both as NotApplicable told an operator to go and check a code map that was
+    /// already correct.
+    /// </remarks>
+    NothingToEvaluate
 }

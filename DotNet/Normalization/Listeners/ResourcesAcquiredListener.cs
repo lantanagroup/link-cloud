@@ -225,6 +225,9 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             var mappingOutcomes = new MappingOutcomeAccumulator();
 
+            await RegisterConfiguredCodeMapsAsync(
+                scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
+
             foreach (var cacheKey in cacheKeys)
             {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
@@ -424,6 +427,64 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Declares every code map the facility has configured, before any resource is looked at.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The loop below only visits resource types Data Acquisition actually acquired -- a type it fetched
+    /// nothing for has no cache key, so its operation sequences are never even read. That leaves a facility
+    /// with a configured code map and no matching resource indistinguishable from one with no code map at
+    /// all: both report an empty outcome list. Declaring the configured maps up front separates them, since
+    /// a map nothing exercised then reports zero counts instead of being absent.
+    /// </para>
+    /// <para>
+    /// Searched across every resource type rather than per type, for the same reason. Results are cached
+    /// per facility by <c>OperationSequenceQueries</c>, so this is one lookup per patient-correlation, not
+    /// one per resource.
+    /// </para>
+    /// </remarks>
+    private async Task RegisterConfiguredCodeMapsAsync(
+        IServiceScope scope,
+        string facilityId,
+        MappingOutcomeAccumulator mappingOutcomes,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
+
+            var sequences = await operationSequenceQueries.Search(
+                new OperationSequenceSearchModel { FacilityId = facilityId },
+                cancellationToken: cancellationToken);
+
+            foreach (var sequence in sequences ?? [])
+            {
+                var dbEntity = sequence.OperationResourceType?.Operation;
+
+                if (dbEntity is null || dbEntity.IsDisabled || dbEntity.OperationType != OperationType.CodeMap.ToString())
+                {
+                    continue;
+                }
+
+                if (OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson) is CodeMapOperation codeMapOperation)
+                {
+                    mappingOutcomes.Register(codeMapOperation);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            // Declaring the configured maps only sharpens the reported status; it is not the normalization
+            // work itself. Failing the message here would stop a patient's resources from being normalized
+            // over a reporting detail, so the run continues with the less precise result.
+            _logger.LogWarning(
+                exception,
+                "Could not read the configured code maps for {FacilityId}; a code map that never runs will report as unconfigured.",
+                facilityId.SanitizeForLog());
         }
     }
 

@@ -58,9 +58,33 @@ public class CodeMapIndicatorTests
     {
         var status = CodeMapIndicator.ResolveHsloc([]);
 
-        // The message was authoritative and reported nothing for HSLOC, which is a result. NotEvaluated
-        // would claim Normalization had not run for this patient at all.
+        // Normalization declares every code map the facility has configured, so an absent outcome means
+        // none targets HSLOC at all. NotEvaluated would instead claim Normalization never ran.
         Assert.Equal(MappingIndicatorStatus.NotApplicable, status);
+    }
+
+    [Fact]
+    public void HslocMapConfiguredButNeverExercised_IsNothingToEvaluate()
+    {
+        var status = CodeMapIndicator.ResolveHsloc([CodeMap(HslocSystem, mapped: 0, unmapped: 0)]);
+
+        // The counterpart to the case above, and the reason the two are separate states: this facility's
+        // code map is fine and nothing arrived for it to act on. Reporting NotApplicable sent an operator
+        // to check a configuration that was already correct.
+        Assert.Equal(MappingIndicatorStatus.NothingToEvaluate, status);
+    }
+
+    [Fact]
+    public void AConfiguredMapThatRanOnOnePassOnly_ReportsTheRunResult()
+    {
+        var details = Record(
+            Record(null, "Initial", CodeMap(HslocSystem, mapped: 0, unmapped: 0)),
+            "Supplemental",
+            CodeMap(HslocSystem, mapped: 2, unmapped: 0));
+
+        // The initial pass declared the map and had no Location; the supplemental one mapped two. A
+        // patient whose codes did map must not be reported as having nothing to evaluate.
+        Assert.Equal(MappingIndicatorStatus.Mapped, CodeMapIndicator.ResolveHsloc(details.CodeMaps));
     }
 
     [Fact]

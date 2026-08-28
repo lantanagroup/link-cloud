@@ -283,6 +283,54 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         ];
     }
 
+    [Fact]
+    public async Task ProcessMessageAsync_CodeMapConfiguredButNothingAcquired_ReportsItWithZeroCounts()
+    {
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var listener = BuildListener(
+            LocationWithTypeCodes("ICU"),
+            CodeMapSequence(("ICU", "1027-4")),
+            outcomeProducer);
+
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        Capture(outcomeProducer, message => produced = message);
+
+        // Data Acquisition lists a cache key only for a type it actually acquired, so a run that fetched
+        // no Location has none. The resource loop therefore never reads the Location sequences at all --
+        // which is why the configured maps have to be declared before it.
+        await listener.ProcessMessageAsync(BuildConsumeResult([]), CancellationToken.None);
+
+        var outcome = Assert.Single(produced!.Value.CodeMapOutcomes);
+        Assert.Equal(HslocSystem, outcome.TargetSystem);
+        Assert.Equal(0, outcome.MappedCount);
+        Assert.Equal(0, outcome.UnmappedCount);
+
+        // The distinction this exists for: the facility's code map is fine and nothing arrived for it to
+        // act on. An empty list here would have reported the facility as having no code map configured.
+        Assert.Equal(MappingStatus.NothingToEvaluate, outcome.Status);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_ConfiguredMapThatRuns_ReportsTheRunRatherThanTheDeclaration()
+    {
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var listener = BuildListener(
+            LocationWithTypeCodes("ICU"),
+            CodeMapSequence(("ICU", "1027-4")),
+            outcomeProducer);
+
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        Capture(outcomeProducer, message => produced = message);
+
+        await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
+
+        // Declaring the map up front must not shadow what it actually did, nor add a second outcome for
+        // the same pair.
+        var outcome = Assert.Single(produced!.Value.CodeMapOutcomes);
+        Assert.Equal(1, outcome.MappedCount);
+        Assert.Equal(MappingStatus.Mapped, outcome.Status);
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         List<DomainResource> resources,
         List<OperationSequenceModel> sequences,
@@ -349,7 +397,10 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             mappingOutcomeProducer.Object);
     }
 
-    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult()
+    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult() =>
+        BuildConsumeResult([LocationCacheKey]);
+
+    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
     {
         var headers = new Headers
         {
@@ -371,7 +422,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
                     ReportableEvent = "Adhoc",
                     ScheduledReports = [new ScheduledReport { ReportTrackingId = "tracking-1" }],
                     CacheType = ResourceCacheType.ABS,
-                    CacheKeys = [LocationCacheKey]
+                    CacheKeys = cacheKeys
                 }
             }
         };

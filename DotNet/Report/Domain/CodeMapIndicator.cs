@@ -94,7 +94,9 @@ public static class CodeMapIndicator
     /// <remarks>
     /// Takes a sequence because a facility may map several source systems into the same target, producing
     /// one outcome per source. Their counts sum and the status comes from the totals. An empty sequence is
-    /// <see cref="MappingIndicatorStatus.NotApplicable"/>: nothing was configured to write that system.
+    /// <see cref="MappingIndicatorStatus.NotApplicable"/>: nothing is configured to write that system at
+    /// all. A map that is configured but never ran reports zero counts rather than being absent, which is
+    /// what separates that case from this one.
     /// </remarks>
     public static MappingIndicatorStatus Resolve(IEnumerable<CodeMapOutcome> outcomes)
     {
@@ -127,14 +129,14 @@ public static class CodeMapIndicator
 
     private static MappingStatus Resolve(int mappedCount, int unmappedCount, int failureCount)
     {
-        // Nothing was counted either way. Either the code maps ran and had nothing to act on, or every one
-        // of them failed -- and a processing fault must not be reported as a gap in the facility's
-        // configuration, nor hidden as a success.
+        // Nothing was counted either way. Either every run of the map failed -- a processing fault, which
+        // must not be reported as a gap in the facility's configuration nor hidden as a success -- or the
+        // map is configured and never got a resource to act on.
         if (mappedCount == 0 && unmappedCount == 0)
         {
             return failureCount > 0
                 ? MappingStatus.Unknown
-                : MappingStatus.NotApplicable;
+                : MappingStatus.NothingToEvaluate;
         }
 
         if (unmappedCount == 0)
@@ -162,6 +164,7 @@ public static class CodeMapIndicator
         MappingStatus.PartiallyMapped => MappingIndicatorStatus.PartiallyMapped,
         MappingStatus.Unmapped => MappingIndicatorStatus.Unmapped,
         MappingStatus.Unknown => MappingIndicatorStatus.Unknown,
+        MappingStatus.NothingToEvaluate => MappingIndicatorStatus.NothingToEvaluate,
         _ => MappingIndicatorStatus.NotApplicable
     };
 

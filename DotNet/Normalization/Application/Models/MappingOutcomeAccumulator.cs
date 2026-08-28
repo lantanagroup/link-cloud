@@ -57,6 +57,22 @@ public sealed class MappingOutcomeAccumulator
     }
 
     /// <summary>
+    /// Declares a configured code map, so it is reported even when no resource ever exercised it.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a facility with no code map and a facility whose code map had nothing to act on both
+    /// produce an empty outcome list, and the report cannot tell a configuration gap from a data gap. A
+    /// declared map that is never exercised reports zero counts, which is what separates the two.
+    /// </remarks>
+    public void Register(CodeMapOperation operation)
+    {
+        foreach (var map in operation.CodeSystemMaps)
+        {
+            GetOrCreate(map.SourceSystem, map.TargetSystem);
+        }
+    }
+
+    /// <summary>
     /// Records that a code-map operation threw or returned <see cref="OperationStatus.Failure"/>.
     /// </summary>
     /// <remarks>
@@ -94,14 +110,14 @@ public sealed class MappingOutcomeAccumulator
     /// </summary>
     private static MappingStatus ResolveStatus(Tally tally)
     {
-        // Nothing was counted either way. Either the code maps ran and had nothing to act on, or every one
-        // of them failed -- and a processing fault must not be reported as a gap in the facility's
-        // configuration, nor hidden as a success.
+        // Nothing was counted either way. Either every run of the map failed -- a processing fault, which
+        // must not be reported as a gap in the facility's configuration nor hidden as a success -- or the
+        // map is configured and simply never got a resource to act on.
         if (tally.MappedCount == 0 && tally.UnmappedCount == 0)
         {
             return tally.FailureCount > 0
                 ? MappingStatus.Unknown
-                : MappingStatus.NotApplicable;
+                : MappingStatus.NothingToEvaluate;
         }
 
         if (tally.UnmappedCount == 0)
