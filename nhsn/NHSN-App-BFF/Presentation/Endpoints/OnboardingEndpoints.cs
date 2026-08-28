@@ -56,5 +56,56 @@ public class OnboardingEndpoints : IApi
                     "for this facility is in flight; retry.";
                 return operation;
             });
+
+        group.MapPost("/import", async (
+                IFormFile? file,
+                IManualUploadTemplateService templateService,
+                CancellationToken cancellationToken) =>
+            {
+                if (file is null || file.Length == 0)
+                {
+                    return Results.BadRequest(new {message = "No file was uploaded."});
+                }
+
+                await using var stream = file.OpenReadStream();
+                var result = await templateService.ImportAsync(stream, cancellationToken);
+                return Results.Ok(result);
+            })
+            .WithName("ImportOnboardingDraft")
+            .DisableAntiforgery()
+            .Accepts<IFormFile>("multipart/form-data")
+            .Produces<ImportResult>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Validate an uploaded manual-upload import sheet.";
+                operation.Description =
+                    "Parses the uploaded workbook and validates every recognized cell. Returns " +
+                    "accepted=false with per-cell errors rather than a 4xx when the file parses " +
+                    "but a value fails validation — that is a form-completion problem, not a " +
+                    "request problem. Writes nothing; the caller saves the draft separately once " +
+                    "the file is accepted.";
+                return operation;
+            });
+
+        group.MapGet("/export", async (
+                IManualUploadTemplateService templateService,
+                CancellationToken cancellationToken) =>
+            {
+                var content = await templateService.ExportAsync(cancellationToken);
+                return Results.File(
+                    content,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "manual-upload-import-sheet.xlsx");
+            })
+            .WithName("ExportOnboardingDraft")
+            .Produces(StatusCodes.Status200OK, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Download the manual-upload import sheet, pre-filled from the current draft.";
+                return operation;
+            });
     }
 }

@@ -35,6 +35,7 @@ public static class LinkGatewayRegistration
         services.AddSingleton<IDataAcquisitionRawClient, DataAcquisitionRawClient>();
         services.AddScoped<ICensusConfigurationGateway, CensusConfigurationGateway>();
         services.AddScoped<IQueryDispatchGateway, QueryDispatchGateway>();
+        services.AddScoped<IReportGateway, ReportGateway>();
         services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
         services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
         services.AddSingleton<ISftpConfigurationGateway, SftpConfigurationFixtureGateway>();

@@ -24,7 +24,7 @@
 
 .fhir-server-info .page-header {
   padding: 0;
-  border-bottom: none;
+  border-bottom: none !important;
   display: block;
 }
 

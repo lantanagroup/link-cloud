@@ -17,7 +17,7 @@ class NhsnLinkElement extends HTMLElement {
   private root?: Root;
 
   static get observedAttributes() {
-    return ['baseurl', 'apibaseurl', 'locale'];
+    return ['baseurl', 'apibaseurl', 'homeurl', 'locale'];
   }
 
   attributeChangedCallback() {
@@ -43,13 +43,14 @@ class NhsnLinkElement extends HTMLElement {
 
     const baseUrl = this.getAttribute('baseurl') || '/nhsnlink';
     const apiBaseUrl = this.getAttribute('apibaseurl') || '/api';
+    const homeUrl = this.getAttribute('homeurl') || '/';
     const locale = this.getAttribute('locale') || undefined;
 
     // The composition root: core never constructs a client.
     const client = new BffApiClient(apiBaseUrl);
 
     void ensureI18nInitialized({apiBaseUrl, locale}).then(() => {
-      this.root?.render(<AppRoot client={client} baseUrl={baseUrl} locale={locale} />);
+      this.root?.render(<AppRoot client={client} baseUrl={baseUrl} homeUrl={homeUrl} locale={locale} />);
     });
   }
 }

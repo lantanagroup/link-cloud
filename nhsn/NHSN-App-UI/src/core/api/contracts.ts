@@ -350,6 +350,10 @@ export interface CommitResult {
 export interface ImportResult {
   accepted: boolean;
   cellErrors: Array<{ sheet: string; cell: string; messageKey: string }>;
+  /** How many recognized fields had a non-empty value in the uploaded sheet. */
+  fieldsImported: number;
+  /** How many fields the import sheet defines in total. */
+  totalFields: number;
 }
 
 // ---------------------------------------------------------------- paging

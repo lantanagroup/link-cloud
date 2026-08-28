@@ -1,24 +1,85 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {Button, PageHeader, StepActions} from '../../../fields';
+import {useApiClient} from '../../../api/ApiClientContext';
+import {Button, DownloadLinkButton, FileUploadField, PageHeader, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 
-/**
- * Step scaffold. The screen's own fields, validation and API calls are LEGLINK story: manual upload.
- *
- * What is already wired and should not be rebuilt: draft access and patching
- * via useOnboarding(), navigation via onNext/onBack, gating and URL sync via
- * the provider, and every control through core/fields.
- */
+/** Manual Upload Option: download the import sheet, complete it offline, upload it back. */
 export function ManualUploadStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving} = useOnboarding();
+  const {saving, patch} = useOnboarding();
+  const api = useApiClient();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string>();
+  const [importSummary, setImportSummary] = useState<{fileName: string; imported: number; total: number}>();
+
+  async function handleSelect(file: File) {
+    setUploading(true);
+    setError(undefined);
+    setImportSummary(undefined);
+    try {
+      const result = await api.importDraft(file);
+      const isUnreadable =
+        !result.accepted &&
+        result.cellErrors.length === 1 &&
+        result.cellErrors[0].messageKey === 'onboarding:manualUpload.errors.invalidFormat';
+
+      if (result.accepted) {
+        // The file itself is never persisted - only the fact that a facility
+        // uploaded one, and when, is recorded on the draft.
+        patch('manualUpload', {uploadedFileName: file.name, uploadedOn: new Date().toISOString()});
+        setImportSummary({fileName: file.name, imported: result.fieldsImported, total: result.totalFields});
+      } else if (isUnreadable) {
+        setError(t('onboarding:manualUpload.readError'));
+      } else {
+        setError(
+          result.cellErrors.length > 0
+            ? result.cellErrors
+                .map(cellError => `${cellError.sheet} ${cellError.cell}: ${t(cellError.messageKey)}`)
+                .join('; ')
+            : t('onboarding:manualUpload.uploadRejected')
+        );
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
-    <div className="nhsn-link__content">
+    <div className="nhsn-link__content nhsn-link__manual-upload">
       <PageHeader title={t('onboarding:manualUpload.title')} />
-      <p className="nhsn-link__subtitle">{t('onboarding:messages.stepNotImplemented')}</p>
+      <p className="nhsn-link__subtitle">{t('onboarding:manualUpload.intro')}</p>
+
+      <DownloadLinkButton
+        buttonText={t('onboarding:manualUpload.downloadTemplate')}
+        hint={t('onboarding:manualUpload.downloadHint')}
+        fileName="manual-upload-import-sheet.xlsx"
+        onDownload={() => api.exportDraft()}
+        disabled={uploading}
+      />
+
+      <FileUploadField
+        id="manual-upload-file-input"
+        label={t('onboarding:manualUpload.uploadFile')}
+        accept=".xlsx,.xls"
+        onSelect={handleSelect}
+        disabled={uploading || saving}
+      />
+
+      {uploading && <p className="nhsn-link__status-message">{t('onboarding:manualUpload.reading')}</p>}
+      {!uploading && importSummary && (
+        <p className="nhsn-link__status-message">
+          {t('onboarding:manualUpload.imported', {
+            imported: importSummary.imported,
+            total: importSummary.total,
+            fileName: importSummary.fileName
+          })}
+        </p>
+      )}
+      {error && <p className="nhsn-link__error-message">{error}</p>}
 
       <StepActions>
         <Button variant="secondary" onClick={onBack}>

@@ -91,7 +91,7 @@ export class MockApiClient implements ApiClient {
 
   async importDraft(): Promise<C.ImportResult> {
     await tick();
-    return {accepted: true, cellErrors: []};
+    return {accepted: true, cellErrors: [], fieldsImported: 0, totalFields: 17};
   }
 
   async exportDraft(): Promise<Blob> {

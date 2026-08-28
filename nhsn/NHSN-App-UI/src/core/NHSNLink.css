@@ -1,8 +1,25 @@
+/*
+ * Palette, radius and font stack lifted from the POC (NHSN-Onboarding-POC/index.html)
+ * so this shell and the POC read as the same product. Scoped to `.nhsn-link` rather
+ * than `:root` because this component is embedded in a host page and must not leak
+ * variables onto it. The --kendo-* overrides retune @nhsn/nhsn-react-core's own
+ * components (Button, DataGrid2, etc.) to the same palette without touching the
+ * package, so "packages/nhsn-react-core" components pick this up automatically.
+ */
 .nhsn-link {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   color: var(--kendo-color-app-text, #1f2328);
   background: var(--kendo-color-surface, #f7f9fc);
   height: 100vh;
   overflow: hidden;
+}
+
+.nhsn-link h1,
+.nhsn-link h2,
+.nhsn-link h3 {
+  font-family: inherit;
 }
 
 * {
@@ -25,6 +42,16 @@
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+
+.nhsn-link h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
 }
 
 .nhsn-link__testing-banner {
@@ -60,6 +87,10 @@
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
+}
+
+.nhsn-link__content {
+  padding: 28px 32px;
 }
 
 .nhsn-link__content .page-header-title:focus {
@@ -146,6 +177,10 @@
   cursor: pointer;
 }
 
+.nhsn-link__action-button:hover:not(:disabled) {
+  background: var(--nhsn-blue-dark);
+}
+
 .nhsn-link__state {
   display: flex;
   align-items: center;
@@ -153,7 +188,8 @@
   min-height: 280px;
   background: white;
   margin: 2rem;
-  border-radius: 8px;
+  border: 1px solid var(--nhsn-gray-200);
+  border-radius: var(--nhsn-radius-lg);
 }
 
 .nhsn-link__state-card {
@@ -256,6 +292,8 @@
   list-style: none;
   margin: 22px 0 0 0;
   padding: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .nhsn-link__step {
@@ -286,6 +324,7 @@
 
 .nhsn-link__step--unlocked .nhsn-link__step-button {
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .nhsn-link__step--unlocked .nhsn-link__step-button:hover {
@@ -337,7 +376,9 @@
 .nhsn-link__subtitle {
   color: var(--kendo-color-app-text-subtle, #5a5f69);
   line-height: 1.6;
+  font-size: 14px;
   max-width: 70ch;
+  margin: 0 0 22px;
 }
 
 .nhsn-link__step-actions {
@@ -516,6 +557,107 @@
 
 .nhsn-facility-info .page-header {
   padding: 0;
+  border-bottom: none !important;
+}
+
+/* Reporting Plan, Manual Upload and Enrollment Complete read as one flowing
+   card in the POC design, so the header/footer dividers page-header and
+   step-actions normally draw are dropped on just these three steps. */
+.nhsn-link__reporting-plan .page-header,
+.nhsn-link__manual-upload .page-header,
+.nhsn-link__complete .page-header,
+.nhsn-link__welcome .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__reporting-plan .nhsn-link__step-actions,
+.nhsn-link__manual-upload .nhsn-link__step-actions,
+.nhsn-link__complete .nhsn-link__step-actions,
+.nhsn-link__welcome .nhsn-link__step-actions {
+  border-top: none;
+}
+
+.nhsn-link__reporting-plan-table-scroll {
+  display: inline-block;
+  max-width: 780px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.nhsn-link__reporting-plan-table {
+  width: auto;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.nhsn-link__reporting-plan-table th:last-child,
+.nhsn-link__reporting-plan-table td:last-child {
+  max-width: 380px;
+}
+
+.nhsn-link__reporting-plan-table {
+  font-size: 12.5px;
+}
+
+.nhsn-link__reporting-plan-table th {
+  padding: 9px 10px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__reporting-plan-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  vertical-align: top;
+}
+
+.nhsn-link__reporting-plan-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nhsn-link__reporting-plan-table td ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.nhsn-link__reporting-plan-table td ul li {
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------- complete step summary list */
+
+.nhsn-link__summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nhsn-link__summary-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--kendo-color-base-hover, #f2f4f7);
+  font-size: 13.5px;
+}
+
+.nhsn-link__summary-list li span:first-child {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__summary-list li span:last-child {
+  color: var(--kendo-color-app-text, #1f2328);
+  font-weight: 600;
+  text-align: right;
 }
 
 .nhsn-facility-info .page-header-title {
@@ -694,6 +836,101 @@
 
 .nhsn-facility-info .k-button.k-button-base:hover {
   background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+/* ------------------------------------------------------- manual upload */
+
+.nhsn-link__download-field {
+  margin: 1.25rem 0;
+}
+
+.nhsn-link__download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nhsn-link__download-button:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nhsn-link__download-icon {
+  flex: 0 0 auto;
+}
+
+.nhsn-link__hint-text {
+  margin: 0.4rem 0 0 0;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 0.85rem;
+}
+
+.nhsn-link__upload-field {
+  margin: 1.25rem 0;
+}
+
+.nhsn-link__upload-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__upload-field input[type='file'] {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  padding: 0.4rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 10px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 14px;
+}
+
+.nhsn-link__upload-field input[type='file']::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nhsn-link__upload-field input[type='file']::file-selector-button:hover {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__upload-field input[type='file']:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nhsn-link__status-message {
+  margin: 0.5rem 0 1.25rem 0;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 0.85rem;
+}
+
+.nhsn-link__error-message {
+  margin: 0.5rem 0 1.25rem 0;
+  color: var(--kendo-color-error, #cc1b22);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 768px) {

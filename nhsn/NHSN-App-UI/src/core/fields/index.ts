@@ -23,4 +23,5 @@ export * from './inputs';
 export * from './Select';
 export * from './DataTable';
 export * from './layout';
+export * from './upload';
 export type {BaseFieldProps} from './fieldProps';
