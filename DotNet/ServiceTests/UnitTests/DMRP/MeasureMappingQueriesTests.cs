@@ -133,5 +133,75 @@ namespace UnitTests.DMRP
             Assert.Equal(matchingMapping.Id, record.Id);
             Assert.Equal(1, result.Metadata.TotalCount);
         }
+
+        [Theory]
+        [InlineData("cms130", null)]     // lower-case measure
+        [InlineData("cMs130V", null)]    // mixed-case measure
+        [InlineData(null, "preventive")] // lower-case DQM
+        [InlineData(null, "pReVeNtIvE")] // mixed-case DQM
+        public async Task PagedSearchAsync_MeasureAndDqm_MatchCaseInsensitively(string? measure, string? dqm)
+        {
+            using var context = CreateContext();
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "CMS122v12", DQM = "Diabetes Care" });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            // SQLite's LIKE happens to be ASCII-case-insensitive, so these pass here even
+            // without explicit lower-casing — they pin the contract. The case that motivates
+            // the explicit ToLower in the query is a case-sensitive SQL Server collation,
+            // which this harness cannot reproduce.
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto
+            {
+                Measure = measure,
+                DQM = dqm
+            });
+
+            var record = Assert.Single(result.Records);
+            Assert.Equal("CMS130v13", record.Measure);
+        }
+
+        [Fact]
+        public async Task PagedSearchAsync_PartialMeasureAndDqm_MatchAsSubstrings()
+        {
+            using var context = CreateContext();
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "CMS122v12", DQM = "Diabetes Care" },
+                new MeasureMapping { Measure = "ACH", DQM = "Immunization Status" });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            // The Admin UI searches on every keystroke, so a prefix has to narrow the list.
+            var byMeasure = await queries.PagedSearchAsync(new SearchMeasureMappingDto { Measure = "CMS1" });
+            Assert.Equal(2, byMeasure.Records.Count);
+
+            // Substring anywhere, not only a prefix.
+            var byDqm = await queries.PagedSearchAsync(new SearchMeasureMappingDto { DQM = "Care" });
+            Assert.Equal(2, byDqm.Records.Count);
+
+            var noMatch = await queries.PagedSearchAsync(new SearchMeasureMappingDto { Measure = "CMS130v13X" });
+            Assert.Empty(noMatch.Records);
+        }
+
+        [Fact]
+        public async Task PagedSearchAsync_BothFiltersCased_CombineCaseInsensitively()
+        {
+            using var context = CreateContext();
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "ACH", DQM = "Immunization Status" });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto { Measure = "aCh", DQM = "immunization" });
+
+            var record = Assert.Single(result.Records);
+            Assert.Equal("ACH", record.Measure);
+        }
     }
 }

@@ -146,6 +146,48 @@ describe('MeasureMappingsDashboardComponent', () => {
     expect(component.measureMappings.length).toBe(2);
   });
 
+  it('searches as the user types, debounced, without waiting for Enter', fakeAsync(() => {
+    fixture.detectChanges();
+    const before = measureMappingService.searchMeasureMappings.calls.count();
+
+    component.filterMeasure = 'A';
+    component.onFilterTyped();
+    tick(100);
+    component.filterMeasure = 'AC';
+    component.onFilterTyped();
+
+    // Nothing yet: still inside the debounce window.
+    expect(measureMappingService.searchMeasureMappings.calls.count()).toBe(before);
+
+    tick(300);
+
+    // One search for the two keystrokes, from the first page.
+    expect(measureMappingService.searchMeasureMappings.calls.count()).toBe(before + 1);
+    expect(component.paginationMetadata.pageNumber).toBe(0);
+  }));
+
+  it('a keystroke cancels the in-flight search so its late response is never applied', fakeAsync(() => {
+    const typed: IPagedMeasureMapping = {
+      records: [mappings[0]],
+      metadata: { pageSize: 10, pageNumber: 0, totalCount: 1, totalPages: 1 }
+    };
+    measureMappingService.searchMeasureMappings.and.returnValues(
+      of(pagedResponse).pipe(delay(100)),  // initial load, slow
+      of(typed).pipe(delay(10)));          // the search for the typed filter
+
+    fixture.detectChanges();               // starts the slow initial request
+    tick(50);
+    component.filterMeasure = 'ACH';
+    component.onFilterTyped();             // cancels it mid-flight
+
+    tick(100);                             // past when the slow response would have arrived
+    expect(component.measureMappings).toEqual([]);
+
+    tick(200);                             // the typing debounce elapses, the new search runs
+    tick(10);
+    expect(component.measureMappings).toEqual([mappings[0]]);
+  }));
+
   it('resets to the first page when a filter changes', () => {
     fixture.detectChanges();
     component.paginationMetadata.pageNumber = 3;

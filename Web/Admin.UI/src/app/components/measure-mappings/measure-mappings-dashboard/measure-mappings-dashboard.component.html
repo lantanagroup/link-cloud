@@ -21,7 +21,7 @@
       <div class="filter-bar">
         <mat-form-field appearance="outline" class="compact-filter">
           <mat-label>Measure</mat-label>
-          <input matInput [(ngModel)]="filterMeasure" (keyup.enter)="onSearchChange()" placeholder="Search measure...">
+          <input matInput [(ngModel)]="filterMeasure" (ngModelChange)="onFilterTyped()" (keyup.enter)="onSearchChange()" placeholder="Search measure...">
           <button *ngIf="filterMeasure" matSuffix mat-icon-button aria-label="Clear measure filter"
                   (click)="filterMeasure=''; onSearchChange()">
             <mat-icon>close</mat-icon>
@@ -30,7 +30,7 @@
 
         <mat-form-field appearance="outline" class="compact-filter">
           <mat-label>dQM</mat-label>
-          <input matInput [(ngModel)]="filterDqm" (keyup.enter)="onSearchChange()" placeholder="Search dQM...">
+          <input matInput [(ngModel)]="filterDqm" (ngModelChange)="onFilterTyped()" (keyup.enter)="onSearchChange()" placeholder="Search dQM...">
           <button *ngIf="filterDqm" matSuffix mat-icon-button aria-label="Clear dqm filter"
                   (click)="filterDqm=''; onSearchChange()">
             <mat-icon>close</mat-icon>
