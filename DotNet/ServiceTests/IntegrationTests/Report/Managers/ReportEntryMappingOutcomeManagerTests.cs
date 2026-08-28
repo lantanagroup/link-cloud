@@ -178,6 +178,109 @@ public class ReportEntryMappingOutcomeManagerTests
         Assert.Equal(evaluatedAt.AddHours(1), row.ModifyDate);
     }
 
+    [Fact]
+    public async Task CopyToSchedule_CarriesEveryColumnAndBothTimestampsOntoTheNewSchedule()
+    {
+        var sourceScheduleId = await SeedScheduleAsync();
+        var targetScheduleId = await SeedScheduleAsync();
+
+        var acquisitionAt = new DateTime(2026, 8, 20, 9, 0, 0, DateTimeKind.Utc);
+        var normalizationAt = new DateTime(2026, 8, 20, 9, 5, 0, DateTimeKind.Utc);
+
+        await AcquisitionAsync(sourceScheduleId, MappingIndicatorStatus.Assumed, MappingIndicatorStatus.Unmapped, "acquisition-json", acquisitionAt);
+        await NormalizationAsync(sourceScheduleId, MappingIndicatorStatus.PartiallyMapped, "normalization-json", normalizationAt);
+
+        var copied = await CopyAsync(sourceScheduleId, targetScheduleId);
+
+        Assert.Equal(1, copied);
+
+        var row = await LoadAsync(targetScheduleId);
+        Assert.Equal(PatientId, row.PatientId);
+        Assert.Equal(MappingIndicatorStatus.Assumed, row.LocationOrgStatus);
+        Assert.Equal(MappingIndicatorStatus.Unmapped, row.EncounterMappingStatus);
+        Assert.Equal(MappingIndicatorStatus.PartiallyMapped, row.HslocMappingStatus);
+        Assert.Equal("acquisition-json", row.AcquisitionDetails);
+        Assert.Equal("normalization-json", row.NormalizationDetails);
+
+        // Carried verbatim rather than restamped: they record when the mapping was evaluated, and a
+        // timestamp predating the new schedule is the signal that these came from the original run.
+        Assert.Equal(acquisitionAt, row.AcquisitionEvaluatedAt);
+        Assert.Equal(normalizationAt, row.NormalizationEvaluatedAt);
+    }
+
+    [Fact]
+    public async Task CopyToSchedule_GivesTheNewRowsTheirOwnIdentity()
+    {
+        var sourceScheduleId = await SeedScheduleAsync();
+        var targetScheduleId = await SeedScheduleAsync();
+
+        await AcquisitionAsync(sourceScheduleId, MappingIndicatorStatus.Mapped, MappingIndicatorStatus.Mapped, "acquisition-json", DateTime.UtcNow);
+        await CopyAsync(sourceScheduleId, targetScheduleId);
+
+        var original = await LoadAsync(sourceScheduleId);
+        var copy = await LoadAsync(targetScheduleId);
+
+        // Fresh primary key, new schedule, and the source row left untouched -- a regenerate must not
+        // disturb the report it was generated from.
+        Assert.NotEqual(original.Id, copy.Id);
+        Assert.Equal(targetScheduleId, copy.ReportScheduleId);
+        Assert.Equal(sourceScheduleId, original.ReportScheduleId);
+    }
+
+    [Fact]
+    public async Task CopyToSchedule_SourceWithNoOutcomes_CopiesNothing()
+    {
+        var sourceScheduleId = await SeedScheduleAsync();
+        var targetScheduleId = await SeedScheduleAsync();
+
+        var copied = await CopyAsync(sourceScheduleId, targetScheduleId);
+
+        // A report predating this feature has nothing to carry forward. Leaving the rows absent is correct;
+        // inventing an outcome would claim the mapping was evaluated when it never was.
+        Assert.Equal(0, copied);
+        Assert.Empty(await AllRowsAsync(targetScheduleId));
+    }
+
+    [Fact]
+    public async Task CopyToSchedule_RegenerateOfARegenerate_KeepsTheOriginalTimestamps()
+    {
+        var originalScheduleId = await SeedScheduleAsync();
+        var firstRegenerateId = await SeedScheduleAsync();
+        var secondRegenerateId = await SeedScheduleAsync();
+
+        var acquisitionAt = new DateTime(2026, 8, 20, 9, 0, 0, DateTimeKind.Utc);
+        await AcquisitionAsync(originalScheduleId, MappingIndicatorStatus.Mapped, MappingIndicatorStatus.Mapped, "acquisition-json", acquisitionAt);
+
+        await CopyAsync(originalScheduleId, firstRegenerateId);
+        await CopyAsync(firstRegenerateId, secondRegenerateId);
+
+        // Each hop copies from its immediate predecessor, so the chain must not drift the evaluation time
+        // forward -- the resources being re-evaluated are still the ones the original acquisition wrote.
+        Assert.Equal(acquisitionAt, (await LoadAsync(secondRegenerateId)).AcquisitionEvaluatedAt);
+    }
+
+    [Fact]
+    public async Task CopyToSchedule_CopiesEveryPatientOnTheSourceSchedule()
+    {
+        var sourceScheduleId = await SeedScheduleAsync();
+        var targetScheduleId = await SeedScheduleAsync();
+
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
+            await manager.UpsertAcquisitionOutcomeAsync(FacilityId, sourceScheduleId, "patient-a", MappingIndicatorStatus.Mapped, MappingIndicatorStatus.Mapped, null, DateTime.UtcNow);
+            await manager.UpsertAcquisitionOutcomeAsync(FacilityId, sourceScheduleId, "patient-b", MappingIndicatorStatus.Unmapped, MappingIndicatorStatus.Unmapped, null, DateTime.UtcNow);
+        }
+
+        var copied = await CopyAsync(sourceScheduleId, targetScheduleId);
+
+        Assert.Equal(2, copied);
+        var rows = await AllRowsAsync(targetScheduleId);
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.PatientId == "patient-a" && row.LocationOrgStatus == MappingIndicatorStatus.Mapped);
+        Assert.Contains(rows, row => row.PatientId == "patient-b" && row.LocationOrgStatus == MappingIndicatorStatus.Unmapped);
+    }
+
     #region Helpers
 
     // Each call gets its own scope, and must await inside it: returning the task and letting the scope
@@ -207,6 +310,14 @@ public class ReportEntryMappingOutcomeManagerTests
 
         await manager.UpsertNormalizationOutcomeAsync(
             FacilityId, scheduleId, PatientId, hslocMappingStatus, details, evaluatedAt);
+    }
+
+    private async Task<int> CopyAsync(Guid sourceScheduleId, Guid targetScheduleId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
+
+        return await manager.CopyToScheduleAsync(sourceScheduleId, targetScheduleId);
     }
 
     private async Task<Guid> SeedScheduleAsync()

@@ -34,6 +34,15 @@ public interface IReportEntryMappingOutcomeManager
         string? normalizationDetails,
         DateTime evaluatedAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies every mapping outcome from one report schedule onto another, for regeneration.
+    /// </summary>
+    /// <returns>The number of rows copied.</returns>
+    Task<int> CopyToScheduleAsync(
+        Guid sourceReportScheduleId,
+        Guid targetReportScheduleId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -133,6 +142,70 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
                 ModifyDate = evaluatedAt
             },
             cancellationToken);
+
+    /// <remarks>
+    /// <para>
+    /// Regeneration re-evaluates the resources the original run already stored, so both mapping steps are
+    /// bypassed and neither producer fires. Without this the regenerated report would show every indicator
+    /// as never evaluated, permanently.
+    /// </para>
+    /// <para>
+    /// The copied values are that report's true values rather than inherited approximations: the org-location
+    /// strip and the code map both ran before those resources were written, so they describe exactly the
+    /// resource set the regenerated report evaluates.
+    /// </para>
+    /// <para>
+    /// Both evaluated-at timestamps are carried over verbatim rather than restamped. They honestly record
+    /// when the mapping was evaluated, and a timestamp predating the new schedule is itself the signal that
+    /// the values came from the original acquisition. That also lets a regenerate-of-a-regenerate chain
+    /// without each hop claiming to be fresher than it is.
+    /// </para>
+    /// </remarks>
+    public async Task<int> CopyToScheduleAsync(
+        Guid sourceReportScheduleId,
+        Guid targetReportScheduleId,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await _dbContext.ReportEntryMappingOutcome
+            .AsNoTracking()
+            .Where(outcome => outcome.ReportScheduleId == sourceReportScheduleId)
+            .ToListAsync(cancellationToken);
+
+        if (source.Count == 0)
+        {
+            // A report predating this feature has nothing to carry forward, which correctly leaves the new
+            // rows absent rather than inventing an outcome for them.
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+
+        _dbContext.ReportEntryMappingOutcome.AddRange(source.Select(outcome => new ReportEntryMappingOutcome
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = outcome.FacilityId,
+            ReportScheduleId = targetReportScheduleId,
+            PatientId = outcome.PatientId,
+            LocationOrgStatus = outcome.LocationOrgStatus,
+            EncounterMappingStatus = outcome.EncounterMappingStatus,
+            AcquisitionDetails = outcome.AcquisitionDetails,
+            AcquisitionEvaluatedAt = outcome.AcquisitionEvaluatedAt,
+            HslocMappingStatus = outcome.HslocMappingStatus,
+            NormalizationDetails = outcome.NormalizationDetails,
+            NormalizationEvaluatedAt = outcome.NormalizationEvaluatedAt,
+
+            // CreateDate describes this row, not the evaluation it carries.
+            CreateDate = now
+        }));
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Copied {Count} mapping outcome(s) from report schedule {SourceReportScheduleId} to {TargetReportScheduleId}.",
+            source.Count, sourceReportScheduleId, targetReportScheduleId);
+
+        return source.Count;
+    }
 
     private async Task UpsertAsync(
         Guid reportScheduleId,
