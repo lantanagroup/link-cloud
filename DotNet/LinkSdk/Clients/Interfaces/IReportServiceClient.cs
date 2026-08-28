@@ -21,7 +21,28 @@ public interface IReportServiceClient
     Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByPatientAsync(string patientId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<int>> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<ReportEntrySummaryApiModel>> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Gets one patient's entry within a schedule, including the evidence behind its mapping indicators.
+    /// </summary>
+    Task<LinkApiResponse<ReportEntryDetailApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches report entries, returning the mapping indicators alongside the reporting and submission
+    /// status for each patient. This is the operation behind the report detail patient table.
+    /// </summary>
+    /// <remarks>
+    /// Carries no mapping detail -- call <see cref="GetEntryByScheduleAndPatientAsync"/> for the counts and
+    /// the unmapped codes behind a single patient's indicator.
+    /// </remarks>
+    Task<LinkApiResponse<PagedConfigModel<ReportEntryApiModel>>> SearchEntriesAsync(
+        string? facilityId = null,
+        string? patientId = null,
+        string? reportScheduleId = null,
+        string? reportType = null,
+        string? sortBy = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default);
 
     // --- Resources ---
     Task<LinkApiResponse<ReportResourceApiModel>> GetResourceByIdAsync(string id, CancellationToken cancellationToken = default);

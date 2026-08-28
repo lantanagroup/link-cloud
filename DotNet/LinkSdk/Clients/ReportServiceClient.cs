@@ -62,8 +62,27 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
     public Task<LinkApiResponse<ReportEntrySummaryApiModel>> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendAsync<ReportEntrySummaryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
-        SendAsync<ReportEntryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<ReportEntryDetailApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntryDetailApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<ReportEntryApiModel>>> SearchEntriesAsync(
+        string? facilityId = null,
+        string? patientId = null,
+        string? reportScheduleId = null,
+        string? reportType = null,
+        string? sortBy = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<ReportEntryApiModel>>(() => Request("/entries/search")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("patientId", patientId)
+            .SetQueryParam("reportScheduleId", reportScheduleId)
+            .SetQueryParam("reportType", reportType)
+            .SetQueryParam("sortBy", sortBy)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<ReportResourceApiModel>> GetResourceByIdAsync(string id, CancellationToken cancellationToken = default) =>
         SendAsync<ReportResourceApiModel>(() => Request($"/resources/{id}").GetAsync(cancellationToken: cancellationToken));
