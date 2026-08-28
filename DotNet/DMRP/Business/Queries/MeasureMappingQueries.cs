@@ -31,15 +31,17 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
 
         public async Task<PagedMeasureMappingDto> PagedSearchAsync(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
         {
-            var measure = string.IsNullOrWhiteSpace(searchDto.Measure) ? null : searchDto.Measure;
-            var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM;
+            var measure = string.IsNullOrWhiteSpace(searchDto.Measure) ? null : searchDto.Measure.ToLower();
+            var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM.ToLower();
             var frequency = searchDto.Frequency;
 
             // Substring match: the Admin UI filters as the admin types, so every partial value has
-            // to narrow the list rather than answer empty until the full value matches.
+            // to narrow the list rather than answer empty until the full value matches. Lowering
+            // both sides makes the promised case-insensitivity explicit instead of an accident of
+            // the database collation (and holds under the tests' SQLite provider too).
             var (records, metadata) = await _repository.SearchAsync(
-                m => (measure == null || m.Measure.Contains(measure))
-                    && (dqm == null || m.DQM.Contains(dqm))
+                m => (measure == null || m.Measure.ToLower().Contains(measure))
+                    && (dqm == null || m.DQM.ToLower().Contains(dqm))
                     && (!frequency.HasValue || m.Frequency == frequency.Value),
                 searchDto.SortBy, searchDto.SortOrder,
                 searchDto.PageSize, searchDto.PageNumber, cancellationToken);

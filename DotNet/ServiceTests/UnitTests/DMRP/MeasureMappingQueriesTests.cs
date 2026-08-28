@@ -134,6 +134,34 @@ namespace UnitTests.DMRP
             Assert.Equal(1, result.Metadata.TotalCount);
         }
 
+        [Theory]
+        [InlineData("cms130", null)]     // lower-case measure
+        [InlineData("cMs130V", null)]    // mixed-case measure
+        [InlineData(null, "preventive")] // lower-case DQM
+        [InlineData(null, "pReVeNtIvE")] // mixed-case DQM
+        public async Task PagedSearchAsync_MeasureAndDqm_MatchCaseInsensitively(string? measure, string? dqm)
+        {
+            using var context = CreateContext();
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "CMS122v12", DQM = "Diabetes Care" });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            // SQLite translates Contains to the case-sensitive instr(), and a SQL Server
+            // deployment can carry a case-sensitive collation, so the query itself must
+            // lower-case both sides rather than lean on provider defaults.
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto
+            {
+                Measure = measure,
+                DQM = dqm
+            });
+
+            var record = Assert.Single(result.Records);
+            Assert.Equal("CMS130v13", record.Measure);
+        }
+
         [Fact]
         public async Task PagedSearchAsync_PartialMeasureAndDqm_MatchAsSubstrings()
         {
@@ -156,6 +184,23 @@ namespace UnitTests.DMRP
 
             var noMatch = await queries.PagedSearchAsync(new SearchMeasureMappingDto { Measure = "CMS130v13X" });
             Assert.Empty(noMatch.Records);
+        }
+
+        [Fact]
+        public async Task PagedSearchAsync_BothFiltersCased_CombineCaseInsensitively()
+        {
+            using var context = CreateContext();
+            context.MeasureMappings.AddRange(
+                new MeasureMapping { Measure = "CMS130v13", DQM = "Preventive Care" },
+                new MeasureMapping { Measure = "ACH", DQM = "Immunization Status" });
+            await context.SaveChangesAsync();
+
+            var queries = CreateQueries(context);
+
+            var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto { Measure = "aCh", DQM = "immunization" });
+
+            var record = Assert.Single(result.Records);
+            Assert.Equal("ACH", record.Measure);
         }
     }
 }
