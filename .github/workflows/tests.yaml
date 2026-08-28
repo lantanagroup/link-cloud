@@ -22,7 +22,7 @@ jobs:
     outputs: 
       run_job: ${{ steps.should.outputs.run_job }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -68,17 +68,20 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Thetis is a private sibling repo (project reference, no NuGet package yet).
       # Dockerfiles COPY --from=thetis; compose additional_contexts maps that to ../thetis.
       - name: Checkout thetis sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: lantanagroup/thetis
           path: _thetis
           ref: main
-          token: ${{ secrets.THETIS_CHECKOUT_TOKEN || secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN cannot read other private repos (GitHub reports "not found").
+          # THETIS_CHECKOUT_TOKEN must be a PAT or oauth token with repo read on lantanagroup/thetis.
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
+          persist-credentials: false
 
       - name: Expose thetis as ../thetis
         run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
@@ -295,16 +298,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Thetis is a private sibling repo (project reference, no NuGet package yet).
       - name: Checkout thetis sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: lantanagroup/thetis
           path: _thetis
           ref: main
-          token: ${{ secrets.THETIS_CHECKOUT_TOKEN || secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN cannot read other private repos (GitHub reports "not found").
+          # THETIS_CHECKOUT_TOKEN must be a PAT or oauth token with repo read on lantanagroup/thetis.
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
+          persist-credentials: false
 
       - name: Expose thetis as ../thetis
         run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
@@ -390,7 +396,7 @@ jobs:
 
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK
         uses: actions/setup-java@v3
@@ -435,7 +441,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
