@@ -1,0 +1,71 @@
+<div class="input-container list-item-container">
+  <form [formGroup]="measureMappingForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input">
+        <mat-label>Measure</mat-label>
+        <input matInput formControlName="measure" [readonly]="viewOnly" data-testid="measure-mapping-measure-input">
+        @if (measure.hasError('required')) {
+          <mat-error data-testid="measure-mapping-measure-required-error">
+            Measure is <strong>required</strong>
+          </mat-error>
+        }
+        @if (measure.hasError('maxlength')) {
+          <mat-error data-testid="measure-mapping-measure-length-error">
+            Measure must be 255 characters or fewer
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input">
+        <mat-label>dQM</mat-label>
+        @if (dqmOptions !== null) {
+          <mat-select formControlName="dqm" [disabled]="viewOnly" data-testid="measure-mapping-dqm-select">
+            @for (dqmId of dqmOptions; track dqmId) {
+              <mat-option [value]="dqmId">{{ dqmOptionLabel(dqmId) }}</mat-option>
+            }
+          </mat-select>
+        } @else {
+          <input matInput formControlName="dqm" [readonly]="viewOnly" data-testid="measure-mapping-dqm-input">
+        }
+        @if (dqmOptions !== null) {
+          <mat-hint>Measure definitions known to MeasureEval.</mat-hint>
+        } @else {
+          <mat-hint>Must match a measure definition known to MeasureEval.</mat-hint>
+        }
+        @if (dqm.hasError('required')) {
+          <mat-error data-testid="measure-mapping-dqm-required-error">
+            dQM is <strong>required</strong>
+          </mat-error>
+        }
+        @if (dqm.hasError('maxlength')) {
+          <mat-error data-testid="measure-mapping-dqm-length-error">
+            dQM must be 255 characters or fewer
+          </mat-error>
+        }
+        @if (dqm.hasError('unknownDqm')) {
+          <mat-error data-testid="measure-mapping-dqm-unknown-error">
+            This dQM no longer exists in MeasureEval — choose a current measure definition
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input">
+        <mat-label>Frequency</mat-label>
+        <mat-select formControlName="frequency" [disabled]="viewOnly" data-testid="measure-mapping-frequency-select">
+          @for (freq of frequencyOptions; track freq) {
+            <mat-option [value]="freq">{{ freq }}</mat-option>
+          }
+        </mat-select>
+        @if (frequency.hasError('required')) {
+          <mat-error data-testid="measure-mapping-frequency-required-error">
+            Frequency is <strong>required</strong>
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
+  </form>
+</div>
