@@ -13,8 +13,7 @@ import {useOnboarding} from './OnboardingProvider';
  */
 export function StepHost() {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {loadState, error, draft, user, target, goTo, saving} =
-    useOnboarding();
+  const {loadState, error, draft, user, target, goTo, saving} = useOnboarding();
 
   if (loadState === 'loading') {
     return <NHSNLoadingIndicator />;
@@ -80,7 +79,13 @@ export function StepHost() {
       {/* No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict. */}
       <section className="nhsn-link__step-panel" aria-live="polite">
 
-        {saving && <span className="nhsn-link__saving">{t('common:status.saving')}</span>}
+        {saving && (
+          <span
+            className="nhsn-link__saving"
+            role="status"
+            aria-label={t('common:status.saving')}
+          />
+        )}
 
         {step ? (
           <Suspense fallback={<NHSNLoadingIndicator />}>

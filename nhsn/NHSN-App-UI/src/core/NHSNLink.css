@@ -350,9 +350,19 @@
 
 .nhsn-link__saving {
   display: inline-block;
+  width: 1rem;
+  height: 1rem;
   margin-bottom: 0.75rem;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
-  font-size: 0.85rem;
+  border: 2px solid var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-app-text-subtle, #5a5f69);
+  border-radius: 50%;
+  animation: nhsn-link__spin 0.6s linear infinite;
+}
+
+@keyframes nhsn-link__spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .nhsn-link__grid {
