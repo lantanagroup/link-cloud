@@ -440,7 +440,12 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             Source = MappingOutcomeSource.Normalization,
             ScheduledReports = acquiredValue.ScheduledReports,
-            CodeMapOutcomes = outcomes
+            CodeMapOutcomes = outcomes,
+
+            // Names the pass rather than the message, so a redelivery carries the same identity and the
+            // consumer replaces that pass's contribution instead of adding it a second time.
+            CorrelationId = correlationId,
+            QueryType = acquiredValue.QueryType
         };
         var headers = new Headers
         {

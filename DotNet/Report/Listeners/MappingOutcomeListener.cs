@@ -166,65 +166,14 @@ public class MappingOutcomeListener(
                 facilityId,
                 scheduleId,
                 patientId,
-                MapCodeMap(value.CodeMapOutcomes.Where(outcome => MappingTargetSystems.IsHsloc(outcome.TargetSystem))),
-                SerializeNormalizationDetails(value.CodeMapOutcomes),
+                value.CorrelationId,
+                value.QueryType,
+                value.CodeMapOutcomes,
                 evaluatedAt,
                 cancellationToken),
 
             _ => throw new DeadLetterException($"Unknown mapping outcome source: {value.Source}")
         };
-
-    /// <summary>
-    /// Resolves an indicator from every outcome reported against one target system.
-    /// </summary>
-    /// <remarks>
-    /// Takes a sequence rather than a single outcome because a facility may map several source systems into
-    /// the same target, producing one outcome per source. Their counts sum and the status is projected from
-    /// the totals. An empty sequence is <see cref="MappingIndicatorStatus.NotApplicable"/>: the message was
-    /// authoritative and reported nothing for that target system.
-    /// </remarks>
-    private static MappingIndicatorStatus MapCodeMap(IEnumerable<CodeMapOutcome> outcomes)
-    {
-        var reported = false;
-        var mappedCount = 0;
-        var unmappedCount = 0;
-        var failureCount = 0;
-
-        foreach (var outcome in outcomes)
-        {
-            reported = true;
-            mappedCount += outcome.MappedCount;
-            unmappedCount += outcome.UnmappedCount;
-            failureCount += outcome.FailureCount;
-        }
-
-        // No outcome at all for this target system: nothing was configured to write it.
-        if (!reported)
-        {
-            return MappingIndicatorStatus.NotApplicable;
-        }
-
-        // Outcomes exist but nothing was counted. Either the code maps ran and had nothing to act on, or
-        // every one of them failed -- and a processing fault must not be reported as a configuration gap.
-        if (mappedCount == 0 && unmappedCount == 0)
-        {
-            return failureCount > 0
-                ? MappingIndicatorStatus.Unknown
-                : MappingIndicatorStatus.NotApplicable;
-        }
-
-        if (unmappedCount == 0)
-        {
-            return MappingIndicatorStatus.Mapped;
-        }
-
-        if (mappedCount == 0)
-        {
-            return MappingIndicatorStatus.Unmapped;
-        }
-
-        return MappingIndicatorStatus.PartiallyMapped;
-    }
 
     private static string? SerializeAcquisitionDetails(LocationOrgOutcome? locationOrgOutcome) =>
         locationOrgOutcome is null
@@ -236,11 +185,6 @@ public class MappingOutcomeListener(
                     locationOrgOutcome.OrgEncounterCount,
                     locationOrgOutcome.AssumedOrgEncounterCount,
                     locationOrgOutcome.Matches)));
-
-    // Every outcome is retained, including target systems no column recognizes -- without them a facility
-    // with a mistyped system is invisible outside the logs.
-    private static string SerializeNormalizationDetails(IReadOnlyList<CodeMapOutcome> codeMapOutcomes) =>
-        JsonSerializer.Serialize(new NormalizationMappingDetails(codeMapOutcomes));
 
     /// <summary>
     /// Resolves the Encounter Mapping indicator: were the patient's encounters mapped to locations at all?

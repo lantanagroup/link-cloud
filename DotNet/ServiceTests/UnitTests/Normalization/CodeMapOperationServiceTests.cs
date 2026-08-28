@@ -204,7 +204,7 @@ public class CodeMapOperationServiceTests
     {
         // A null CodeSystemMaps collection makes the operation throw, which BaseOperationService turns into
         // a Failure.
-        var operation = new CodeMapOperation("Broken map", "Location.type.coding", null!);
+        var operation = new CodeMapOperation("Broken map", "type.coding", null!);
         var location = LocationWithTypeCodes(LocalSystem, "ICU");
 
         var result = await _service.ProcessOperationAsync(operation, location);
@@ -262,5 +262,5 @@ public class CodeMapOperationServiceTests
             pair => new CodeMap(pair.Target, $"Display for {pair.Target}")));
 
     private static CodeMapOperation Operation(params CodeSystemMap[] maps) =>
-        new("Location type to HSLOC", "Location.type.coding", maps.ToList());
+        new("Location type to HSLOC", "type.coding", maps.ToList());
 }

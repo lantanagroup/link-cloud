@@ -43,4 +43,31 @@ public sealed record LocationOrgDetails(
 /// Every code map the patient's resources exercised, including target systems no column recognizes. Without
 /// them a facility with a mistyped system would be invisible outside the logs.
 /// </param>
-public sealed record NormalizationMappingDetails(IReadOnlyList<CodeMapOutcome> CodeMaps);
+/// <summary>
+/// The Normalization side of a patient's stored mapping outcome.
+/// </summary>
+/// <param name="CodeMaps">
+/// The combined totals across every pass, which is what the indicator is derived from and what a reader
+/// wants. Denormalized rather than summed on read so the stored status and the stored counts cannot
+/// disagree.
+/// </param>
+/// <param name="Passes">
+/// Each pass's own contribution, retained so the combination is idempotent: a redelivered pass replaces
+/// its entry rather than adding to the totals a second time.
+/// </param>
+public sealed record NormalizationMappingDetails(
+    IReadOnlyList<CodeMapOutcome> CodeMaps,
+    IReadOnlyList<NormalizationPassDetails> Passes);
+
+/// <summary>
+/// One acquisition pass's code map outcomes, identified by the pass that produced them.
+/// </summary>
+/// <remarks>
+/// The correlation id alone does not identify a pass -- a patient's initial and supplemental acquisitions
+/// share it -- so the query type is part of the identity. Both are nullable because a message produced
+/// before this field existed carries neither, and such a message is treated as a single unnamed pass.
+/// </remarks>
+public sealed record NormalizationPassDetails(
+    string? CorrelationId,
+    string? QueryType,
+    IReadOnlyList<CodeMapOutcome> CodeMaps);

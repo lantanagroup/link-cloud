@@ -31,6 +31,8 @@ public class MappingOutcomeListenerTests
     private const string HslocOid = "urn:oid:2.16.840.1.113883.6.259";
     private const string LocalSystem = "http://hospital.example.org/locations";
 
+    private const string CorrelationId = "correlation-1";
+
     private static readonly Guid ScheduleId = Guid.NewGuid();
 
     private readonly Mock<IReportEntryMappingOutcomeManager> _manager = new();
@@ -72,7 +74,8 @@ public class MappingOutcomeListenerTests
         // order the two sources arrive in.
         _manager.Verify(item => item.UpsertNormalizationOutcomeAsync(
             It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(),
-            It.IsAny<MappingIndicatorStatus>(), It.IsAny<string?>(), It.IsAny<DateTime>(),
+            It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<IReadOnlyList<CodeMapOutcome>>(), It.IsAny<DateTime>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -83,13 +86,50 @@ public class MappingOutcomeListenerTests
 
         _manager.Verify(item => item.UpsertNormalizationOutcomeAsync(
             FacilityId, ScheduleId, PatientId,
-            It.IsAny<MappingIndicatorStatus>(), It.IsAny<string?>(), It.IsAny<DateTime>(),
+            It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<IReadOnlyList<CodeMapOutcome>>(), It.IsAny<DateTime>(),
             It.IsAny<CancellationToken>()), Times.Once);
 
         _manager.Verify(item => item.UpsertAcquisitionOutcomeAsync(
             It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(),
             It.IsAny<MappingIndicatorStatus>(), It.IsAny<MappingIndicatorStatus>(),
             It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task NormalizationMessage_ForwardsEveryOutcomeUntouched()
+    {
+        IReadOnlyList<CodeMapOutcome>? captured = null;
+        CaptureNormalization(outcomes => captured = outcomes);
+
+        await ConsumeAsync(NormalizationMessage(
+            CodeMap(HslocSystem, MappingStatus.Mapped, 1, 0),
+            CodeMap(LocalSystem, MappingStatus.Unmapped, 0, 9)));
+
+        // The listener neither filters to HSLOC nor resolves a status. Both belong behind the combination in
+        // the manager, because a status derived from one acquisition pass cannot be combined with another's.
+        Assert.NotNull(captured);
+        Assert.Equal(2, captured!.Count);
+        Assert.Contains(captured, outcome => outcome.TargetSystem == LocalSystem);
+    }
+
+    [Fact]
+    public async Task NormalizationMessage_CarriesThePassIdentityThroughToTheManager()
+    {
+        string? correlationId = null;
+        string? queryType = null;
+        CaptureNormalization(pass: (correlation, query) =>
+        {
+            correlationId = correlation;
+            queryType = query;
+        });
+
+        await ConsumeAsync(NormalizationMessage(CodeMap(HslocSystem, MappingStatus.Mapped, 1, 0)));
+
+        // Without the identity the manager cannot tell a redelivery from a new pass, and a redelivered
+        // message would be counted twice.
+        Assert.Equal(CorrelationId, correlationId);
+        Assert.Equal("Initial", queryType);
     }
 
     #endregion
@@ -199,77 +239,6 @@ public class MappingOutcomeListenerTests
 
     #endregion
 
-    #region HSLOC resolution
-
-    [Fact]
-    public async Task HslocStatusIgnoresTargetSystemsThatAreNotHsloc()
-    {
-        MappingIndicatorStatus? captured = null;
-        CaptureNormalization(status => captured = status);
-
-        await ConsumeAsync(NormalizationMessage(
-            CodeMap(HslocSystem, MappingStatus.Mapped, mapped: 4, unmapped: 0),
-            CodeMap(LocalSystem, MappingStatus.Unmapped, mapped: 0, unmapped: 9)));
-
-        // The unrelated code map is fully unmapped; letting it contribute would report the HSLOC column as
-        // broken because of a map that has nothing to do with it.
-        Assert.Equal(MappingIndicatorStatus.Mapped, captured);
-    }
-
-    [Fact]
-    public async Task HslocStatusRecognizesTheOidAsWellAsTheUrl()
-    {
-        MappingIndicatorStatus? captured = null;
-        CaptureNormalization(status => captured = status);
-
-        await ConsumeAsync(NormalizationMessage(CodeMap(HslocOid, MappingStatus.Mapped, 2, 0)));
-
-        Assert.Equal(MappingIndicatorStatus.Mapped, captured);
-    }
-
-    [Fact]
-    public async Task HslocStatusSumsEverySourceSystemMappingIntoHsloc()
-    {
-        MappingIndicatorStatus? captured = null;
-        CaptureNormalization(status => captured = status);
-
-        await ConsumeAsync(NormalizationMessage(
-            CodeMap(HslocSystem, MappingStatus.Mapped, mapped: 4, unmapped: 0),
-            CodeMap(HslocSystem, MappingStatus.Unmapped, mapped: 0, unmapped: 3)));
-
-        // A facility may map several local systems into HSLOC. Taking either outcome alone would report
-        // the column as fully mapped or fully unmapped; the totals say partially.
-        Assert.Equal(MappingIndicatorStatus.PartiallyMapped, captured);
-    }
-
-    [Fact]
-    public async Task NoHslocOutcome_IsNotApplicableRatherThanNotEvaluated()
-    {
-        MappingIndicatorStatus? captured = null;
-        CaptureNormalization(status => captured = status);
-
-        await ConsumeAsync(NormalizationMessage());
-
-        // The message was authoritative and reported nothing for HSLOC, which is a result. NotEvaluated
-        // would claim Normalization had not run for this patient at all.
-        Assert.Equal(MappingIndicatorStatus.NotApplicable, captured);
-    }
-
-    [Fact]
-    public async Task FailuresWithNoCounts_ReportUnknown()
-    {
-        MappingIndicatorStatus? captured = null;
-        CaptureNormalization(status => captured = status);
-
-        await ConsumeAsync(NormalizationMessage(
-            new CodeMapOutcome(LocalSystem, HslocSystem, MappingStatus.Unknown, 0, 0, 2, [])));
-
-        // A processing fault is neither a mapping success nor a configuration gap.
-        Assert.Equal(MappingIndicatorStatus.Unknown, captured);
-    }
-
-    #endregion
-
     #region Details
 
     [Fact]
@@ -296,22 +265,6 @@ public class MappingOutcomeListenerTests
         // The non-resolving location is what a user would act on, so it must survive into storage.
         Assert.Equal(2, details.LocationOrg.Matches.Count);
         Assert.Contains(details.LocationOrg.Matches, match => match.LocationId == "loc-2" && !match.IsOrgLocation);
-    }
-
-    [Fact]
-    public async Task NormalizationDetailsRetainUnrecognizedTargetSystems()
-    {
-        string? captured = null;
-        CaptureNormalization(details: json => captured = json);
-
-        await ConsumeAsync(NormalizationMessage(
-            CodeMap(HslocSystem, MappingStatus.Mapped, 1, 0),
-            CodeMap("http://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html", MappingStatus.Mapped, 5, 0)));
-
-        // The second target system is a mistyped HSLOC URL and gets no column. Without the blob a facility
-        // in that state would be invisible outside the logs.
-        var details = JsonSerializer.Deserialize<NormalizationMappingDetails>(captured!);
-        Assert.Equal(2, details!.CodeMaps.Count);
     }
 
     #endregion
@@ -404,18 +357,19 @@ public class MappingOutcomeListenerTests
             .Returns(Task.CompletedTask);
 
     private void CaptureNormalization(
-        Action<MappingIndicatorStatus>? hsloc = null,
-        Action<string?>? details = null) =>
+        Action<IReadOnlyList<CodeMapOutcome>>? outcomes = null,
+        Action<string?, string?>? pass = null) =>
         _manager
             .Setup(item => item.UpsertNormalizationOutcomeAsync(
                 It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<MappingIndicatorStatus>(), It.IsAny<string?>(), It.IsAny<DateTime>(),
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<IReadOnlyList<CodeMapOutcome>>(), It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, Guid, string, MappingIndicatorStatus, string?, DateTime, CancellationToken>(
-                (_, _, _, hslocStatus, json, _, _) =>
+            .Callback<string, Guid, string, string?, string?, IReadOnlyList<CodeMapOutcome>, DateTime, CancellationToken>(
+                (_, _, _, correlationId, queryType, codeMapOutcomes, _, _) =>
                 {
-                    hsloc?.Invoke(hslocStatus);
-                    details?.Invoke(json);
+                    outcomes?.Invoke(codeMapOutcomes);
+                    pass?.Invoke(correlationId, queryType);
                 })
             .Returns(Task.CompletedTask);
 
@@ -441,7 +395,9 @@ public class MappingOutcomeListenerTests
         {
             Source = MappingOutcomeSource.Normalization,
             ScheduledReports = [new ScheduledReport { ReportTrackingId = ScheduleId.ToString() }],
-            CodeMapOutcomes = codeMapOutcomes.ToList()
+            CodeMapOutcomes = codeMapOutcomes.ToList(),
+            CorrelationId = CorrelationId,
+            QueryType = "Initial"
         });
 
     private static ConsumeResult<ResourceKey, MappingOutcomeEvaluatedValue> Message(

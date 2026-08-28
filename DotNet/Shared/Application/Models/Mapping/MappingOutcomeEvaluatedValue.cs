@@ -54,4 +54,20 @@ public class MappingOutcomeEvaluatedValue
     /// </para>
     /// </summary>
     public List<CodeMapOutcome> CodeMapOutcomes { get; set; } = [];
+
+    /// <summary>
+    /// Identifies the acquisition pass these outcomes describe, so a consumer can tell a genuinely new
+    /// pass from a redelivery of one it has already recorded.
+    /// </summary>
+    /// <remarks>
+    /// Kafka is at-least-once and Report commits its offset after writing, so a crash between the two
+    /// redelivers the message. A consumer that combines outcomes across passes -- which it must, because a
+    /// reportable patient is acquired twice and each pass sees only its own resources -- would otherwise
+    /// count the redelivered pass a second time. The correlation id alone is not enough: the initial and
+    /// supplemental passes of one patient share it, and they are the two passes being combined.
+    /// </remarks>
+    public string? CorrelationId { get; set; }
+
+    /// <inheritdoc cref="CorrelationId"/>
+    public string? QueryType { get; set; }
 }

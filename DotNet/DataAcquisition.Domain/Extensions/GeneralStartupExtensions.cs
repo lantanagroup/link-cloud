@@ -18,6 +18,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -390,6 +391,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourceAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourcesAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<ResourceKey, MappingOutcomeEvaluatedValue>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);

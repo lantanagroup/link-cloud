@@ -1,6 +1,10 @@
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
+using LantanaGroup.Link.Report.Domain.Models;
+using LantanaGroup.Link.Report.Domain;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,12 +30,19 @@ public interface IReportEntryMappingOutcomeManager
     /// Records the Normalization side of a patient's mapping outcome, inserting the row if this is the
     /// first source to report for the pair.
     /// </summary>
+    /// <remarks>
+    /// Takes the outcomes rather than a resolved status because Normalization reports once per acquisition
+    /// pass, and a reportable patient goes through two. The stored result is the combination of every pass,
+    /// so the status has to be derived after combining rather than before. The pass identity makes that
+    /// combination idempotent under redelivery.
+    /// </remarks>
     Task UpsertNormalizationOutcomeAsync(
         string facilityId,
         Guid reportScheduleId,
         string patientId,
-        MappingIndicatorStatus hslocMappingStatus,
-        string? normalizationDetails,
+        string? correlationId,
+        string? queryType,
+        IReadOnlyList<CodeMapOutcome> codeMapOutcomes,
         DateTime evaluatedAt,
         CancellationToken cancellationToken = default);
 
@@ -69,6 +80,12 @@ public interface IReportEntryMappingOutcomeManager
 /// </remarks>
 public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManager
 {
+    /// <summary>
+    /// How many times a Normalization write will re-read and recombine before giving up. Contention here is
+    /// a redelivery or a rebalance racing a live message, not sustained load, so a small budget is enough.
+    /// </summary>
+    private const int MaxConcurrentWriteAttempts = 3;
+
     private readonly ReportDbContext _dbContext;
     private readonly ILogger<ReportEntryMappingOutcomeManager> _logger;
 
@@ -89,6 +106,7 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
         string? acquisitionDetails,
         DateTime evaluatedAt,
         CancellationToken cancellationToken = default) =>
+        // The result is not checked: this update is unconditional, so it cannot report a lost race.
         UpsertAsync(
             reportScheduleId,
             patientId,
@@ -113,22 +131,84 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
             },
             cancellationToken);
 
-    public Task UpsertNormalizationOutcomeAsync(
+    public async Task UpsertNormalizationOutcomeAsync(
         string facilityId,
         Guid reportScheduleId,
         string patientId,
-        MappingIndicatorStatus hslocMappingStatus,
-        string? normalizationDetails,
+        string? correlationId,
+        string? queryType,
+        IReadOnlyList<CodeMapOutcome> codeMapOutcomes,
         DateTime evaluatedAt,
-        CancellationToken cancellationToken = default) =>
-        UpsertAsync(
+        CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var written = await TryUpsertNormalizationOutcomeAsync(
+                facilityId, reportScheduleId, patientId, correlationId, queryType, codeMapOutcomes,
+                evaluatedAt, cancellationToken);
+
+            if (written)
+            {
+                return;
+            }
+
+            if (attempt >= MaxConcurrentWriteAttempts)
+            {
+                // Every attempt read a value that another writer replaced before this one could write. The
+                // pass is lost rather than the row corrupted, so failing loudly is what surfaces it.
+                throw new DbUpdateConcurrencyException(
+                    $"Mapping outcome for report schedule {reportScheduleId} patient {patientId} was modified "
+                    + $"concurrently on all {MaxConcurrentWriteAttempts} attempts.");
+            }
+
+            _logger.LogDebug(
+                "Mapping outcome for report schedule {ReportScheduleId} changed between read and write; retrying (attempt {Attempt}).",
+                reportScheduleId, attempt);
+        }
+    }
+
+    /// <summary>
+    /// One read-combine-write cycle. Returns false when the row changed in between, which is the caller's
+    /// signal to read the new value and try again.
+    /// </summary>
+    /// <remarks>
+    /// The read and the write are separate statements, so unlike the acquisition path this cannot rely on
+    /// the row lock alone: two writers would each combine against the same stored value and the second
+    /// would drop the first's pass. The previously-read blob is therefore part of the update predicate, so
+    /// a write only lands on the value it was computed from.
+    /// </remarks>
+    private async Task<bool> TryUpsertNormalizationOutcomeAsync(
+        string facilityId,
+        Guid reportScheduleId,
+        string patientId,
+        string? correlationId,
+        string? queryType,
+        IReadOnlyList<CodeMapOutcome> codeMapOutcomes,
+        DateTime evaluatedAt,
+        CancellationToken cancellationToken)
+    {
+        var stored = await _dbContext.ReportEntryMappingOutcome
+            .AsNoTracking()
+            .Where(outcome => outcome.ReportScheduleId == reportScheduleId && outcome.PatientId == patientId)
+            .Select(outcome => outcome.NormalizationDetails)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var merged = CodeMapIndicator.Merge(
+            Deserialize(stored, reportScheduleId, patientId), correlationId, queryType, codeMapOutcomes);
+
+        var hslocMappingStatus = CodeMapIndicator.ResolveHsloc(merged.CodeMaps);
+        var normalizationDetails = JsonSerializer.Serialize(merged);
+
+        return await UpsertAsync(
             reportScheduleId,
             patientId,
-            update: rows => rows.ExecuteUpdateAsync(setters => setters
-                .SetProperty(outcome => outcome.HslocMappingStatus, hslocMappingStatus)
-                .SetProperty(outcome => outcome.NormalizationDetails, normalizationDetails)
-                .SetProperty(outcome => outcome.NormalizationEvaluatedAt, evaluatedAt)
-                .SetProperty(outcome => outcome.ModifyDate, evaluatedAt), cancellationToken),
+            update: rows => rows
+                .Where(outcome => outcome.NormalizationDetails == stored)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(outcome => outcome.HslocMappingStatus, hslocMappingStatus)
+                    .SetProperty(outcome => outcome.NormalizationDetails, normalizationDetails)
+                    .SetProperty(outcome => outcome.NormalizationEvaluatedAt, evaluatedAt)
+                    .SetProperty(outcome => outcome.ModifyDate, evaluatedAt), cancellationToken),
             newRow: () => new ReportEntryMappingOutcome
             {
                 Id = Guid.NewGuid(),
@@ -142,6 +222,38 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
                 ModifyDate = evaluatedAt
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads back what a previous pass stored. A blob that cannot be read is treated as absent
+    /// rather than throwing: losing an earlier pass's counts is bad, but dropping the current message means
+    /// losing this pass as well.
+    /// </summary>
+    private NormalizationMappingDetails? Deserialize(
+        string? normalizationDetails,
+        Guid reportScheduleId,
+        string patientId)
+    {
+        if (string.IsNullOrWhiteSpace(normalizationDetails))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<NormalizationMappingDetails>(normalizationDetails);
+        }
+        catch (JsonException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Stored NormalizationDetails for report schedule {ReportScheduleId} patient {PatientId} could not be read; merging as if absent.",
+                reportScheduleId,
+                patientId);
+
+            return null;
+        }
+    }
 
     /// <remarks>
     /// <para>
@@ -207,7 +319,12 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
         return source.Count;
     }
 
-    private async Task UpsertAsync(
+    /// <returns>
+    /// <c>true</c> when the write landed. <c>false</c> only when the caller's update carries a condition
+    /// that no longer holds -- the row exists but has moved on since it was read. A caller whose update is
+    /// unconditional always gets <c>true</c>.
+    /// </returns>
+    private async Task<bool> UpsertAsync(
         Guid reportScheduleId,
         string patientId,
         Func<IQueryable<ReportEntryMappingOutcome>, Task<int>> update,
@@ -219,27 +336,31 @@ public class ReportEntryMappingOutcomeManager : IReportEntryMappingOutcomeManage
 
         if (await update(rows) > 0)
         {
-            return;
+            return true;
         }
 
         try
         {
             _dbContext.ReportEntryMappingOutcome.Add(newRow());
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return true;
         }
         catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
-            // The other source inserted the row between the update and the insert. Retry as an update; it
-            // touches only this source's columns, so the row the other source just wrote is preserved.
+            // The row exists after all, so the zero above was either the update-then-insert race or a
+            // condition that no longer holds. Retry as an update; it touches only this source's columns, so
+            // whatever the other source just wrote is preserved. A second zero means the condition failed,
+            // which only a conditional caller can resolve -- by reading the new value and trying again.
             _logger.LogDebug(
-                "Mapping outcome row for schedule {ReportScheduleId} was inserted concurrently; retrying as an update.",
+                "Mapping outcome row for schedule {ReportScheduleId} was written concurrently; retrying as an update.",
                 reportScheduleId);
 
             // The failed Add is still tracked as Added; leaving it there would replay on the next
             // SaveChanges in this scope.
             _dbContext.ChangeTracker.Clear();
 
-            await update(rows);
+            return await update(rows) > 0;
         }
     }
 
