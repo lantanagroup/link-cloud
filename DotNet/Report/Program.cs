@@ -29,6 +29,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Swagger;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -222,6 +223,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
+
+        // IncludeXmlComments documents types, methods and properties but never enum members, so an enum
+        // reaches the spec as a bare list of integers. This adds their names and documentation.
+        c.SchemaFilter<EnumDescriptionSchemaFilter>();
     });
 
 
