@@ -54,6 +54,7 @@ public class UserInfoService : IUserInfoService
             IsOnboarded = facilityIsOnboarded,
             HasFacility = _userContext.HasFacility,
             FacilityId = _userContext.FacilityId,
+            FacilityName = _userContext.FacilityName,
             Groups = _userContext.Groups,
             AvailableNavigation = availableNavigation,
             AccessRequestUrl = _jwtSettings.AccessRequestUrl,

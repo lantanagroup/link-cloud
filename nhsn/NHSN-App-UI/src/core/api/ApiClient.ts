@@ -9,6 +9,7 @@ import type {
   EncounterCode,
   EncounterMapping,
   FhirConfig,
+  FhirServerInfoResponse,
   HslocCode,
   HslocMapping,
   ImportResult,
@@ -31,6 +32,7 @@ import type {
   SftpFile,
   Timezone,
   SectionSource,
+  UpdateFhirServerInfoRequest,
   UserInfoResponse,
   VendorProfile
 } from './contracts';
@@ -114,4 +116,8 @@ export interface ApiClient {
 
   // reporting plan
   getReportingPlan(): Promise<ReportingPlan>;
+
+  getFhirServerInfo(): Promise<FhirServerInfoResponse>;
+  updateFhirServerInfo(request: UpdateFhirServerInfoRequest): Promise<FhirServerInfoResponse>;
+  getJwksInstructionsUrl(vendor: string): string;
 }

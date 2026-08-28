@@ -156,12 +156,6 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
 
         <section className="nhsn-link__grid">
           {route === 'home' && <HomePanels userInfo={userInfo} />}
-
-          {/*
-            No shell-only gate here. This previously required a prop only the
-            standalone harness supplied, so embedded the nav item rendered and
-            clicking it produced nothing.
-          */}
           {route === 'onboarding' && !userInfo.isOnboarded && (
             <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl}>
               <StepHost />
@@ -227,8 +221,6 @@ function resolveRoute(pathname: string, baseUrl: string): RouteName {
   const withoutBase =
     baseUrl !== '/' && pathname.startsWith(baseUrl) ? pathname.slice(baseUrl.length) || '/' : pathname;
 
-  // The onboarding step machine owns everything below /onboarding, so match on
-  // the prefix rather than the whole path.
   if (withoutBase === routePathMap.onboarding || withoutBase.startsWith(`${routePathMap.onboarding}/`)) {
     return 'onboarding';
   }

@@ -35,6 +35,8 @@
     "title": "Navigation",
     "facility": "Facility",
     "home": "Home",
+    "facilityInformation": "Facility Information",
+    "fhirServerInformation": "FHIR Server Information",
     "onboarding": "Onboarding",
     "configuration": "Configuration"
   },
@@ -50,7 +52,8 @@
     "continue": "Continue",
     "back": "Back",
     "reload": "Reload",
-    "download": "Download"
+    "download": "Download",
+    "testConnection": "Test Connection"
   },
   "commonBoolean": {
     "yes": "Yes",

@@ -74,7 +74,7 @@ describe('onboarding walking skeleton', () => {
 
     // ...and the transition was saved, so a reload agrees with where we are.
     await waitFor(() => {
-      const saved = window.localStorage.getItem('nhsn-app-ui.mockDraft');
+      const saved = window.localStorage.getItem('nhsn-app-ui.mockDraft.MOCK-FACILITY-001');
       expect(saved).toBeTruthy();
       expect(JSON.parse(saved as string).currentStepId).toBe('reporting-plan');
     });

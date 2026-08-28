@@ -1,7 +1,6 @@
 body {
   margin: 0;
-  background: #eef3f8;
-  font-family: Arial, sans-serif;
+  background: var(--kendo-color-surface, #f7f9fc);
 }
 
 .shell {
@@ -10,12 +9,51 @@ body {
   min-height: 100vh;
 }
 
+.shell.shell--collapsed {
+  grid-template-columns: 3rem minmax(0, 1fr);
+}
+
 .shell__sidebar {
-  background: #0b2239;
-  color: white;
+  position: relative;
+  background: linear-gradient(180deg, #063f78, #0b5cab);
+  color: var(--kendo-color-on-inverse, #ffffff);
   padding: 1.25rem;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+.shell--collapsed .shell__sidebar {
+  padding: 1.25rem 0;
+}
+
+.shell__toggle {
+  position: sticky;
+  top: 0;
+  display: block;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: auto;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shell--collapsed .shell__toggle {
+  margin: 0 auto;
+}
+
+.shell__sidebar-content {
+  margin-top: 0.75rem;
+}
+
+.shell--collapsed .shell__sidebar-content {
+  display: none;
 }
 
 .shell__sidebar h1 {
@@ -29,7 +67,7 @@ body {
 .shell__card {
   background: rgba(255, 255, 255, 0.08);
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 1rem;
   min-width: 0;
   overflow: hidden;
@@ -52,17 +90,44 @@ body {
 .shell__list button,
 .shell__card button,
 .shell__card form button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  background: #005ea2;
-  color: white;
-  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   padding: 0.65rem 0.75rem;
-  border-radius: 4px;
+  border-radius: 10px;
+  text-align: center;
+  line-height: 1.3;
   cursor: pointer;
 }
 
+.shell__list button:hover,
+.shell__card button:hover,
+.shell__card form button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
 .shell__list button.active {
-  background: #00a0d2;
+  background: var(--nhsn-brand-teal-600, #00b1ce);
+  border-color: var(--nhsn-brand-teal-600, #00b1ce);
+  color: #032659;
+  font-weight: 700;
+}
+
+.shell__list button.active:hover {
+  background: var(--nhsn-brand-teal-600, #00b1ce);
+}
+
+.shell__card button.shell__button--danger {
+  background: rgba(214, 44, 44, 0.22);
+  border-color: rgba(255, 143, 143, 0.45);
+}
+
+.shell__card button.shell__button--danger:hover {
+  background: rgba(214, 44, 44, 0.34);
 }
 
 .shell__profile-meta {
@@ -82,7 +147,7 @@ body {
   word-break: break-word;
   white-space: normal;
   line-height: 1.3;
-  color: #d9e9f8;
+  color: var(--kendo-color-on-inverse, #ffffff);
 }
 
 .shell__row {
@@ -95,18 +160,18 @@ body {
 .shell__row input,
 .shell__row textarea {
   padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #c5d3e0;
+  border-radius: 10px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
 }
 
 .shell__tagline {
-  color: #cce0f5;
+  color: var(--kendo-color-on-inverse, #ffffff);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 768px) {
   .shell {
     grid-template-columns: 1fr;
   }

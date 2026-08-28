@@ -11,6 +11,7 @@ import type {
   EncounterCode,
   EncounterMapping,
   FhirConfig,
+  FhirServerInfoResponse,
   HslocCode,
   HslocMapping,
   ImportResult,
@@ -31,6 +32,7 @@ import type {
   SftpCredentials,
   SftpFile,
   Timezone,
+  UpdateFhirServerInfoRequest,
   UserInfoResponse,
   VendorProfile
 } from './contracts';
@@ -46,9 +48,11 @@ import type {
  */
 export class BffApiClient implements ApiClient {
   private readonly http: HttpClient;
+  private readonly bffBaseUrl: string;
 
   constructor(apiBaseUrl = '/api') {
-    this.http = new HttpClient(`${normalizeBase(apiBaseUrl)}/nhsn-app-bff`);
+    this.bffBaseUrl = `${normalizeBase(apiBaseUrl)}/nhsn-app-bff`;
+    this.http = new HttpClient(this.bffBaseUrl);
   }
 
   // ------------------------------------------------------------ session
@@ -275,6 +279,22 @@ export class BffApiClient implements ApiClient {
   async getReportingPlan(): Promise<ReportingPlan> {
     const {data} = await this.http.get<ReportingPlan>('/reporting-plan');
     return data;
+  }
+
+  // ------------------------------------------------------------ fhir server info
+
+  async getFhirServerInfo(): Promise<FhirServerInfoResponse> {
+    const {data} = await this.http.get<FhirServerInfoResponse>('/facilities/fhir-server-info');
+    return data;
+  }
+
+  async updateFhirServerInfo(request: UpdateFhirServerInfoRequest): Promise<FhirServerInfoResponse> {
+    const {data} = await this.http.put<FhirServerInfoResponse>('/facilities/fhir-server-info', request);
+    return data;
+  }
+
+  getJwksInstructionsUrl(vendor: string): string {
+    return `${this.bffBaseUrl}/static/jwks-instructions/${encodeURIComponent(vendor)}`;
   }
 }
 

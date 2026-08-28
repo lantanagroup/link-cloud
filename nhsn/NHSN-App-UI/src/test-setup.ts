@@ -62,8 +62,7 @@ void i18n.use(initReactI18next).init({
           audienceTitle: 'Intended Audience',
           audienceBody: 'Audience copy.',
           workflowTitle: 'Workflow',
-          workflowBody: 'Workflow copy.',
-          vendorNote: 'Your facility is configured for {{vendor}}.'
+          workflowBody: 'Workflow copy.'
         },
         reportingPlan: {title: 'Facility Reporting Plan'},
         messages: {

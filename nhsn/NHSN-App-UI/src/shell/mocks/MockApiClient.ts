@@ -17,7 +17,8 @@ import type * as C from '../../core/api/contracts';
  * synthetic values, so a lower-environment screenshot can never be mistaken
  * for real facility data.
  */
-const DRAFT_KEY = 'nhsn-app-ui.mockDraft';
+const DRAFT_KEY_PREFIX = 'nhsn-app-ui.mockDraft.';
+const FHIR_SERVER_INFO_KEY_PREFIX = 'nhsn-app-ui.mockFhirServerInfo.';
 const LATENCY_MS = 120;
 
 // Every section healthy - mock mode reads from localStorage, so nothing can be unavailable.
@@ -30,7 +31,18 @@ const MOCK_SOURCES: C.SectionSource[] = [
 ];
 
 export class MockApiClient implements ApiClient {
-  constructor(private readonly facilityId = 'MOCK-FACILITY-001') {}
+  constructor(
+    private readonly facilityId = 'MOCK-FACILITY-001',
+    private readonly facilityName = 'Mock Facility'
+  ) {}
+
+  private get draftKey(): string {
+    return `${DRAFT_KEY_PREFIX}${this.facilityId}`;
+  }
+
+  private get fhirServerInfoKey(): string {
+    return `${FHIR_SERVER_INFO_KEY_PREFIX}${this.facilityId}`;
+  }
 
   // ------------------------------------------------------------ session
 
@@ -44,6 +56,7 @@ export class MockApiClient implements ApiClient {
       isOnboarded: false,
       hasFacility: true,
       facilityId: this.facilityId,
+      facilityName: this.facilityName,
       groups: ['FACADMIN'],
       availableNavigation: ['onboarding'],
       vendor: 'Epic',
@@ -61,7 +74,7 @@ export class MockApiClient implements ApiClient {
 
   async getDraft(): Promise<DraftEnvelope> {
     await tick();
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    const raw = window.localStorage.getItem(this.draftKey);
     return {
       draft: raw ? migrateDraft(JSON.parse(raw)) : createEmptyDraft(),
       commitState: null,
@@ -72,7 +85,7 @@ export class MockApiClient implements ApiClient {
   async saveDraft(draft: FacilityDraft): Promise<DraftEnvelope> {
     await tick();
     // No conflict simulation - the BFF scopes each write to its own step, so there's nothing to simulate.
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    window.localStorage.setItem(this.draftKey, JSON.stringify(draft));
     return {draft, commitState: null, sources: MOCK_SOURCES};
   }
 
@@ -132,7 +145,7 @@ export class MockApiClient implements ApiClient {
       },
       {
         vendor: 'Cerner',
-        displayName: 'Oracle Cerner',
+        displayName: 'Cerner',
         censusAcquisition: 'Sftp',
         patientListKeys: [],
         locationMethods: [
@@ -154,10 +167,39 @@ export class MockApiClient implements ApiClient {
   async getTimezones(): Promise<C.Timezone[]> {
     await tick();
     return [
-      {id: 'America/New_York', displayName: 'Eastern Time'},
-      {id: 'America/Chicago', displayName: 'Central Time'},
-      {id: 'America/Denver', displayName: 'Mountain Time'},
-      {id: 'America/Los_Angeles', displayName: 'Pacific Time'}
+      {id: 'America/New_York', displayName: 'America/New_York — Eastern Time'},
+      {id: 'America/Detroit', displayName: 'America/Detroit — Eastern Time'},
+      {id: 'America/Kentucky/Louisville', displayName: 'America/Kentucky/Louisville — Eastern Time'},
+      {id: 'America/Kentucky/Monticello', displayName: 'America/Kentucky/Monticello — Eastern Time'},
+      {id: 'America/Indiana/Indianapolis', displayName: 'America/Indiana/Indianapolis — Eastern Time'},
+      {id: 'America/Indiana/Vincennes', displayName: 'America/Indiana/Vincennes — Eastern Time'},
+      {id: 'America/Indiana/Winamac', displayName: 'America/Indiana/Winamac — Eastern Time'},
+      {id: 'America/Indiana/Marengo', displayName: 'America/Indiana/Marengo — Eastern Time'},
+      {id: 'America/Indiana/Petersburg', displayName: 'America/Indiana/Petersburg — Eastern Time'},
+      {id: 'America/Indiana/Vevay', displayName: 'America/Indiana/Vevay — Eastern Time'},
+      {id: 'America/Indiana/Tell_City', displayName: 'America/Indiana/Tell_City — Central Time'},
+      {id: 'America/Indiana/Knox', displayName: 'America/Indiana/Knox — Central Time'},
+      {id: 'America/Chicago', displayName: 'America/Chicago — Central Time'},
+      {id: 'America/Menominee', displayName: 'America/Menominee — Central Time'},
+      {id: 'America/North_Dakota/Center', displayName: 'America/North_Dakota/Center — Central Time'},
+      {id: 'America/North_Dakota/New_Salem', displayName: 'America/North_Dakota/New_Salem — Central Time'},
+      {id: 'America/North_Dakota/Beulah', displayName: 'America/North_Dakota/Beulah — Central Time'},
+      {id: 'America/Denver', displayName: 'America/Denver — Mountain Time'},
+      {id: 'America/Boise', displayName: 'America/Boise — Mountain Time'},
+      {id: 'America/Phoenix', displayName: 'America/Phoenix — Mountain Time (no DST)'},
+      {id: 'America/Los_Angeles', displayName: 'America/Los_Angeles — Pacific Time'},
+      {id: 'America/Anchorage', displayName: 'America/Anchorage — Alaska Time'},
+      {id: 'America/Juneau', displayName: 'America/Juneau — Alaska Time'},
+      {id: 'America/Sitka', displayName: 'America/Sitka — Alaska Time'},
+      {id: 'America/Metlakatla', displayName: 'America/Metlakatla — Alaska Time'},
+      {id: 'America/Yakutat', displayName: 'America/Yakutat — Alaska Time'},
+      {id: 'America/Nome', displayName: 'America/Nome — Alaska Time'},
+      {id: 'America/Adak', displayName: 'America/Adak — Hawaii-Aleutian Time'},
+      {id: 'Pacific/Honolulu', displayName: 'Pacific/Honolulu — Hawaii Time (no DST)'},
+      {id: 'America/Puerto_Rico', displayName: 'America/Puerto_Rico — Atlantic Time (Puerto Rico / US Virgin Islands)'},
+      {id: 'Pacific/Guam', displayName: 'Pacific/Guam — Chamorro Time (Guam)'},
+      {id: 'Pacific/Saipan', displayName: 'Pacific/Saipan — Chamorro Time (N. Mariana Islands)'},
+      {id: 'Pacific/Pago_Pago', displayName: 'Pacific/Pago_Pago — Samoa Time (American Samoa)'}
     ];
   }
 
@@ -189,9 +231,12 @@ export class MockApiClient implements ApiClient {
 
   // ------------------------------------------------------------ capability-gated
 
-  async testFhirConnection(): Promise<C.ConnectionResult> {
+  async testFhirConnection(config: C.FhirConfig): Promise<C.ConnectionResult> {
     await tick();
-    return {success: true, messageKey: 'fhir.connection.simulated', simulated: true};
+    if (!isValidHttpUrl(config.fhirServerBaseUrl)) {
+      return {success: false, messageKey: 'fhirServerInfo.messages.invalidBaseUrl', simulated: true};
+    }
+    return {success: true, messageKey: 'fhirServerInfo.messages.testSuccess', simulated: true};
   }
 
   async queryPatientList(key: C.CensusListKey): Promise<C.CensusListResult> {
@@ -342,6 +387,27 @@ export class MockApiClient implements ApiClient {
     };
   }
 
+  async getFhirServerInfo(): Promise<C.FhirServerInfoResponse> {
+    await tick();
+    return this.loadFhirServerInfo();
+  }
+
+  async updateFhirServerInfo(request: C.UpdateFhirServerInfoRequest): Promise<C.FhirServerInfoResponse> {
+    await tick();
+    window.localStorage.setItem(this.fhirServerInfoKey, JSON.stringify(request));
+    return request;
+  }
+
+  getJwksInstructionsUrl(vendor: string): string {
+    const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
+    return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
+  }
+
+  private loadFhirServerInfo(): C.FhirServerInfoResponse {
+    const raw = window.localStorage.getItem(this.fhirServerInfoKey);
+    return raw ? (JSON.parse(raw) as C.FhirServerInfoResponse) : {};
+  }
+
   private buildReport(request: C.ReportRequest): C.ReportSummary {
     return {
       reportId: 'SIMULATED-REPORT-0001',
@@ -370,4 +436,13 @@ function immediate<T>(value: T): Operation<T> {
     result: () => Promise.resolve(value),
     cancel: () => undefined
   };
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }

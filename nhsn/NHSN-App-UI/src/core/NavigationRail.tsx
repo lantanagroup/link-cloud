@@ -58,12 +58,14 @@ export function NavigationRail({
         ))}
       </div>
 
-      <div className="nhsn-link__nav-userinfo">
-        <p>
-          {userName}
-          <br />
-          {userEmail}
-        </p>
+      <div className="nhsn-link__nav-footer">
+        <div className="nhsn-link__nav-userinfo">
+          <p>
+            {userName}
+            <br />
+            {userEmail}
+          </p>
+        </div>
       </div>
     </aside>
   );

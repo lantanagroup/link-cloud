@@ -51,6 +51,7 @@ export interface UserInfoResponse {
   isOnboarded: boolean;
   hasFacility: boolean;
   facilityId?: string;
+  facilityName?: string;
   groups: string[];
   availableNavigation: string[];
   accessRequestUrl?: string;
@@ -64,6 +65,29 @@ export interface FacilitySummaryResponse {
   id: string;
   facilityId: string;
   isOnboarded: boolean;
+}
+
+export interface FhirServerInfoResponse {
+  fhirServerBaseUrl?: string;
+  maxConcurrentRequests?: number;
+  maxRetries?: number;
+  /** HH:MM, facility-local. */
+  minAcquisitionPullTime?: string;
+  maxAcquisitionPullTime?: string;
+  lagDays?: number;
+  lagHours?: number;
+  lagMinutes?: number;
+}
+
+export interface UpdateFhirServerInfoRequest {
+  fhirServerBaseUrl: string;
+  maxConcurrentRequests: number;
+  maxRetries: number;
+  minAcquisitionPullTime: string;
+  maxAcquisitionPullTime: string;
+  lagDays: number;
+  lagHours: number;
+  lagMinutes: number;
 }
 
 // ---------------------------------------------------------------- reference data

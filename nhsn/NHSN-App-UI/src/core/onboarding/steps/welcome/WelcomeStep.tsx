@@ -24,8 +24,8 @@ export function WelcomeStep({onNext}: StepProps) {
           t={t}
           i18nKey="onboarding:welcome.intro"
           components={{
-            nhsnlink: <a href="https://www.cdc.gov/nhsn/fhirportal/about.html" />,
-            fhir: <a href="https://www.hl7.org/fhir/R4/index.html" />
+            nhsnlink: <a href="https://www.cdc.gov/nhsn/fhirportal/about.html" target="_blank" rel="noreferrer" />,
+            fhir: <a href="https://www.hl7.org/fhir/R4/index.html" target="_blank" rel="noreferrer" />
           }}
         />
       </p>
@@ -35,12 +35,6 @@ export function WelcomeStep({onNext}: StepProps) {
 
       <h2>{t('onboarding:welcome.workflowTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.workflowBody')}</p>
-
-      {user.vendor && (
-        <p className="nhsn-link__subtitle">
-          {t('onboarding:welcome.vendorNote', {vendor: user.vendor})}
-        </p>
-      )}
 
       <StepActions>
         <Button onClick={onNext} disabled={saving}>
