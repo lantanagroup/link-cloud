@@ -19,7 +19,6 @@ public class AcknowledgementConfiguration : IEntityTypeConfiguration<Acknowledge
         builder.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(x => x.ContextId).HasMaxLength(64);
         builder.Property(x => x.StatementKey).HasMaxLength(128).IsRequired();
-        builder.Property(x => x.StatementVersion).HasMaxLength(32).IsRequired();
         builder.Property(x => x.AcceptedByExternalUserId).HasMaxLength(256).IsRequired();
     }
 }

@@ -44,8 +44,9 @@ public static class LinkGatewayRegistration
         // No real adapter exists yet — LinkSdk has no sFTP coverage — so this is the only
         // registration until one can replace it.
         services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
+        services.AddSingleton<ISftpConfigurationGateway, SftpConfigurationFixtureGateway>();
 
-        // Fixture until Q-21 settles the Epic patient-list shape.
+        // Fixture until the client confirms the Epic patient-list shape.
         services.AddSingleton<IPatientListGateway, PatientListFixtureGateway>();
 
         return services;

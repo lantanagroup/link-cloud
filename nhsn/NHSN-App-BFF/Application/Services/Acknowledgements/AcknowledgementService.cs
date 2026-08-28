@@ -32,7 +32,6 @@ public sealed class AcknowledgementService : IAcknowledgementService
         string? contextId,
         bool accepted,
         string statementKey,
-        string statementVersion,
         string acceptedByExternalUserId,
         CancellationToken cancellationToken = default)
     {
@@ -43,7 +42,6 @@ public sealed class AcknowledgementService : IAcknowledgementService
             ContextId = contextId,
             Accepted = accepted,
             StatementKey = statementKey,
-            StatementVersion = statementVersion,
             AcceptedByExternalUserId = acceptedByExternalUserId
         });
 

@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
@@ -33,6 +34,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IOnboardingReadService _readService;
     private readonly IFacilityGateway _facilityGateway;
     private readonly ICensusConfigurationGateway _censusGateway;
+    private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -43,6 +45,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IOnboardingReadService readService,
         IFacilityGateway facilityGateway,
         ICensusConfigurationGateway censusGateway,
+        ISftpConfigurationGateway sftpConfigurationGateway,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -52,6 +55,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _readService = readService;
         _facilityGateway = facilityGateway;
         _censusGateway = censusGateway;
+        _sftpConfigurationGateway = sftpConfigurationGateway;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -73,13 +77,10 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         return await _readService.GetAsync(cancellationToken);
     }
 
-    // Merges the saved step's workflow slice onto what's stored, leaving every other step alone.
-    // Scoped for the same reason the Link write is: replacing the whole DraftJson blob from the
-    // payload would let a stale tab wipe every other step's workflow state.
-    //
-    // hsloc.mappings is the case where that would actually hurt — it's contract-pending
-    // configuration held here only until Normalization can own it, and a user may have mapped many
-    // locations. That's real work, not a cursor position.
+    // Merges the saved step's workflow slice onto what's stored, leaving every other step alone —
+    // same reason as the Link write: a whole-blob replace would let a stale tab wipe every other
+    // step. Protects hsloc.mappings especially: draft-held until Normalization can accept it,
+    // and potentially many mapped locations, not a cursor position.
     private async Task<NhsnFacility> SaveWorkflowStateAsync(string facilityId, string? stepId, FacilityDraftResponse draft, CancellationToken cancellationToken)
     {
         var stored = await _draftStore.GetAsync(facilityId, cancellationToken);
@@ -209,22 +210,27 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 {
                     await _censusGateway.SaveAcquisitionFrequencyAsync(facility.FacilityId, draft.Census.AcquisitionFrequency, cancellationToken);
                 }
+
+                if (!string.IsNullOrWhiteSpace(draft.Census.SftpHost) && draft.Census.SftpPort is not null)
+                {
+                    await _sftpConfigurationGateway.SaveConfigurationAsync(facility.FacilityId, new SftpConfig
+                    {
+                        Host = draft.Census.SftpHost,
+                        Port = draft.Census.SftpPort.Value,
+                        RemoteDirectory = draft.Census.SftpRemoteDirectory ?? "/",
+                        RemoveAfterProcessing = draft.Census.SftpRemoveAfterProcessing ?? false
+                    }, cancellationToken);
+                }
                 break;
 
             case "fhir":
             case "location-org":
-                // Data Acquisition owns these, and its SDK client exposes no update operation on
-                // any configuration resource yet. Workflow state above is still saved, so a user
-                // keeps their place; the configuration write lands once the SDK has one.
                 _logger.LogWarning(
                     "Step {StepId} for facility {FacilityId}: configuration not written. Data Acquisition writes are unavailable until the SDK exposes an update operation.",
                     stepId, facility.FacilityId);
                 break;
 
             case "encounter":
-                // Normalization owns this, not Data Acquisition — CreateOperationAsync already
-                // exists. Not wired yet; workflow state above is still saved, so a user keeps
-                // their place.
                 _logger.LogWarning(
                     "Step {StepId} for facility {FacilityId}: configuration not written. Normalization write path exists but is not yet wired.",
                     stepId, facility.FacilityId);

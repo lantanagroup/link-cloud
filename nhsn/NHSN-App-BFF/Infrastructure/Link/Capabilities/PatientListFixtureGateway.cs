@@ -4,7 +4,8 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Capabilities;
 
 // Registered unconditionally, same reasoning as SftpFileFixtureGateway — nothing to branch to
-// until Q-21 closes and the real adapter can be written against a settled shape.
+// until the client confirms the intended response shape and the real adapter can be written
+// against it.
 internal sealed class PatientListFixtureGateway : IPatientListGateway
 {
     public Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default)
