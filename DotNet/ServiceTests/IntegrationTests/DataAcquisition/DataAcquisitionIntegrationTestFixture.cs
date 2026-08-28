@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -11,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -182,6 +184,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
             builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
             builder.Services.AddTransient<ILocationMappingService, LocationMappingService>();
+            builder.Services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
 
             // In-memory cache used by LocationMappingService (read) and invalidated by
             // OrganizationLocationConfigurationManager (write).
@@ -200,6 +203,18 @@ namespace IntegrationTests.DataAcquisition
             // Mock Kafka producers for integration tests
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
             builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
+            ResourceCacheMock
+                .Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>()))
+                .Returns(ResourceCacheMock.Object);
+            ResourceCacheMock
+                .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<DomainResource>());
+            ResourceCacheMock
+                .Setup(c => c.GetCacheTypeForCorrelationIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(ResourceCacheType.Redis);
+            ResourceCacheMock
+                .Setup(c => c.HasResourcesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
             builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
 
             // AcquisitionProcessorBackgroundService dependencies: the real dependency checker exercises
