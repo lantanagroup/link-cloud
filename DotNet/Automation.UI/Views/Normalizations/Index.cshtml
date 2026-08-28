@@ -883,20 +883,24 @@
             return;
         }
 
-        const options = allOperations.map(o =>
-                `<option value="${o.id}" ${o.id === selectedOperationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`
-            ).join('');
-
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
-            <select class="form-select form-select-sm seq-op-select">${options}</select>
+            <select class="form-select form-select-sm seq-op-select"></select>
             <button type="button" class="btn btn-sm btn-outline-danger">
                 <i class="bi bi-x-lg"></i>
             </button>`;
 
         const select = row.querySelector('.seq-op-select');
+
+        allOperations.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o.id;
+            option.textContent = `${o.name} (${o.operationType})`;
+            option.selected = o.id === selectedOperationId;
+            select.appendChild(option);
+        });
 
         select.addEventListener('change', updateSeqOperationOptions);
 
