@@ -182,7 +182,7 @@ namespace IntegrationTests.Normalization
                 }
             };
 
-            var ex = await Assert.ThrowsAsync<TransientException>(() =>
+            var ex = await Assert.ThrowsAsync<DeadLetterException>(() =>
                 listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
 
             Assert.Contains(correlationId + ":Location", ex.Message);
