@@ -27,9 +27,6 @@ public class Acknowledgement
     [MaxLength(128)]
     public string StatementKey { get; set; } = string.Empty;
 
-    [MaxLength(32)]
-    public string StatementVersion { get; set; } = string.Empty;
-
     public DateTime AcceptedOn { get; set; } = DateTime.UtcNow;
 
     [MaxLength(256)]

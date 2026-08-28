@@ -58,11 +58,6 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("StatementVersion")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("FacilityId", "Kind", "AcceptedOn");

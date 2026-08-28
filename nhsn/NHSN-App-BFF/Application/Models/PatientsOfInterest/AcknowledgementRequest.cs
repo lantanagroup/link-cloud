@@ -4,5 +4,4 @@ public class AcknowledgementRequest
 {
     public required bool Accepted { get; set; }
     public required string StatementKey { get; set; }
-    public required string StatementVersion { get; set; }
 }

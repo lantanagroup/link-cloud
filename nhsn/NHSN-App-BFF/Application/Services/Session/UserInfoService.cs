@@ -63,7 +63,8 @@ public class UserInfoService : IUserInfoService
             Capabilities = new CapabilitiesResponse
             {
                 FhirConnectionProbe = _capabilities.FhirConnectionProbe,
-                PatientListWithNames = _capabilities.PatientListWithNames
+                PatientListWithNames = _capabilities.PatientListWithNames,
+                SftpFileListing = _capabilities.SftpFileListing
             }
         };
     }

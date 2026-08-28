@@ -11,6 +11,7 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
     private static readonly TimeSpan SftpFilesCacheDuration = TimeSpan.FromMinutes(30);
 
     private readonly ISftpFileGateway _sftpFileGateway;
+    private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IPatientListGateway _patientListGateway;
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly INhsnUserContext _userContext;
@@ -18,12 +19,14 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
 
     public PatientsOfInterestService(
         ISftpFileGateway sftpFileGateway,
+        ISftpConfigurationGateway sftpConfigurationGateway,
         IPatientListGateway patientListGateway,
         IAcknowledgementService acknowledgementService,
         INhsnUserContext userContext,
         IMemoryCache cache)
     {
         _sftpFileGateway = sftpFileGateway;
+        _sftpConfigurationGateway = sftpConfigurationGateway;
         _patientListGateway = patientListGateway;
         _acknowledgementService = acknowledgementService;
         _userContext = userContext;
@@ -51,6 +54,10 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
     public Task<CensusListResult> QueryPatientListAsync(string listKey, CancellationToken cancellationToken = default) =>
         _patientListGateway.QueryAsync(_userContext.RequireFacilityId(), listKey, cancellationToken);
 
+    public Task SaveSftpCredentialsAsync(SftpCredentialsRequest request, CancellationToken cancellationToken = default) =>
+        _sftpConfigurationGateway.SaveCredentialsAsync(
+            _userContext.RequireFacilityId(), request.Username, request.Password, cancellationToken);
+
     public Task AcknowledgeCensusAsync(AcknowledgementRequest request, CancellationToken cancellationToken = default) =>
         _acknowledgementService.RecordAsync(
             _userContext.RequireFacilityId(),
@@ -58,7 +65,6 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
             contextId: null,
             request.Accepted,
             request.StatementKey,
-            request.StatementVersion,
             _userContext.ExternalUserId,
             cancellationToken);
 

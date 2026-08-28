@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
@@ -29,6 +30,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IFacilityGateway _facilityGateway;
     private readonly IFhirConfigurationGateway _fhirGateway;
     private readonly ICensusConfigurationGateway _censusGateway;
+    private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IQueryDispatchGateway _queryDispatchGateway;
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly OnboardingReadSettings _settings;
@@ -41,6 +43,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IFacilityGateway facilityGateway,
         IFhirConfigurationGateway fhirGateway,
         ICensusConfigurationGateway censusGateway,
+        ISftpConfigurationGateway sftpConfigurationGateway,
         IQueryDispatchGateway queryDispatchGateway,
         IAcknowledgementService acknowledgementService,
         IOptions<OnboardingReadSettings> settings,
@@ -52,6 +55,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _facilityGateway = facilityGateway;
         _fhirGateway = fhirGateway;
         _censusGateway = censusGateway;
+        _sftpConfigurationGateway = sftpConfigurationGateway;
         _queryDispatchGateway = queryDispatchGateway;
         _acknowledgementService = acknowledgementService;
         _settings = settings.Value;
@@ -92,16 +96,25 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
         // lagDuration is a field within the fhir section, not a section of its own - its Source
         // is deliberately not added below, so a Query Dispatch outage doesn't mark the whole fhir
-        // section Unavailable over one supplementary field.
+        // section Unavailable over one supplementary field. sftpConfig and hasCredentials are the
+        // same relationship to the census section.
         var lagDurationTask = ReadSectionAsync("fhir", "QueryDispatch",
             ct => _queryDispatchGateway.GetLagDurationAsync(facilityId, ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask);
+        var sftpConfigTask = ReadSectionAsync("census", "DataAcquisition",
+            ct => _sftpConfigurationGateway.GetConfigurationAsync(facilityId, ct), overall.Token, cancellationToken);
+
+        var hasCredentialsTask = ReadSectionAsync<bool?>("census", "DataAcquisition",
+            async ct => await _sftpConfigurationGateway.GetHasCredentialsAsync(facilityId, ct), overall.Token, cancellationToken);
+
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
         var census = await censusTask;
         var lagDuration = await lagDurationTask;
+        var sftpConfig = await sftpConfigTask;
+        var hasCredentials = await hasCredentialsTask;
 
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
@@ -109,7 +122,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
         return new DraftEnvelopeResponse
         {
-            Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value, censusAccuracyAcknowledged),
+            Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
+                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -122,7 +136,9 @@ public sealed class OnboardingReadService : IOnboardingReadService
         FhirSection? fhir,
         string? acquisitionFrequency,
         string? lagDuration,
-        bool? censusAccuracyAcknowledged) => new()
+        bool? censusAccuracyAcknowledged,
+        SftpConfig? sftpConfig,
+        bool? hasCredentials) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -154,6 +170,11 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
             Census = new CensusSection
             {
+                SftpHost = sftpConfig?.Host,
+                SftpPort = sftpConfig?.Port,
+                SftpRemoteDirectory = sftpConfig?.RemoteDirectory,
+                SftpRemoveAfterProcessing = sftpConfig?.RemoveAfterProcessing,
+                HasCredentials = hasCredentials,
                 AcquisitionFrequency = acquisitionFrequency,
                 AccuracyAcknowledged = censusAccuracyAcknowledged
             },

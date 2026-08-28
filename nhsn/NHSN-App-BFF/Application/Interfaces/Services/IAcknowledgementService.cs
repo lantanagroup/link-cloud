@@ -15,7 +15,6 @@ public interface IAcknowledgementService
         string? contextId,
         bool accepted,
         string statementKey,
-        string statementVersion,
         string acceptedByExternalUserId,
         CancellationToken cancellationToken = default);
 }

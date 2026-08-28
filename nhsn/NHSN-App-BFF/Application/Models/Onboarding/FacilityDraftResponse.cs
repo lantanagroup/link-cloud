@@ -2,10 +2,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 
-// What GET /onboarding returns. Mirrors DraftEnvelope in
-// NHSN-App-UI/src/core/api/ApiClient.ts. Carries no ETag: DraftJson holds only workflow state, so
-// there's no RowVersion and PUT takes no If-Match. The stale-client hazard that would otherwise
-// need one is handled by scoping the write to the step being saved.
+// What GET /onboarding returns. Mirrors DraftEnvelope in NHSN-App-UI/src/core/api/ApiClient.ts.
 public sealed record DraftEnvelopeResponse
 {
     public FacilityDraftResponse? Draft { get; init; }

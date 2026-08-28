@@ -4,9 +4,6 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
 // The onboarding draft: one read and one write, for every step.
-//
-// The routes carry no facility segment. Facility comes from the validated token on every request —
-// a facility the client cannot name is a facility the client cannot spoof.
 public class OnboardingEndpoints : IApi
 {
     public void RegisterEndpoints(WebApplication app)

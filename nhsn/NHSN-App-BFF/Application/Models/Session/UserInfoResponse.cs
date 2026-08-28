@@ -37,4 +37,5 @@ public class CapabilitiesResponse
 {
     public bool FhirConnectionProbe { get; set; }
     public bool PatientListWithNames { get; set; }
+    public bool SftpFileListing { get; set; }
 }

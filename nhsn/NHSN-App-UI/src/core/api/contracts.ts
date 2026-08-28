@@ -187,7 +187,6 @@ export interface Acknowledgement {
   kind: AcknowledgementKind;
   accepted: boolean;
   statementKey: string;
-  statementVersion: string;
 }
 
 // ---------------------------------------------------------------- mapping steps

@@ -4,8 +4,8 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
 // The census step. Cerner's sFTP side and Epic's patient-list side are both fixture-backed —
-// Cerner because LinkSdk has no sFTP coverage yet, Epic pending Q-21 — so every simulated
-// response carries simulated: true.
+// Cerner because LinkSdk has no sFTP coverage yet, Epic pending client confirmation of the
+// list shape — so every simulated response carries simulated: true.
 public class PatientsOfInterestEndpoints : IApi
 {
     public void RegisterEndpoints(WebApplication app)
@@ -69,6 +69,26 @@ public class PatientsOfInterestEndpoints : IApi
                 operation.Summary = "Run one of Epic's six patient-list census queries.";
                 operation.Description =
                     "Epic only. Fixture-backed: every response carries simulated: true.";
+                return operation;
+            });
+
+        group.MapPut("/sftp-credentials", async (
+                SftpCredentialsRequest request,
+                IPatientsOfInterestService service,
+                CancellationToken cancellationToken) =>
+            {
+                await service.SaveSftpCredentialsAsync(request, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("SaveSftpCredentials")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Store Cerner sFTP credentials.";
+                operation.Description =
+                    "Write-only — never echoed back by any read. Forwarded toward Data " +
+                    "Acquisition's credentials store; the BFF does not retain the values itself.";
                 return operation;
             });
 
