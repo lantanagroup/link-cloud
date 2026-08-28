@@ -168,6 +168,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
     builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));
+    builder.Services.AddScoped<IManualUploadTemplateService, ManualUploadTemplateService>();
+    builder.Services.AddScoped<IDocumentProvider, DocumentProvider>();
+    builder.Services.Configure<DocumentSettings>(builder.Configuration.GetSection(DocumentSettings.SectionName));
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
@@ -177,6 +180,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, OnboardingEndpoints>();
     builder.Services.AddTransient<IApi, ReferenceEndpoints>();
     builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();
+    builder.Services.AddTransient<IApi, DocumentsEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>

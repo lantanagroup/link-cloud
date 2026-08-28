@@ -26,6 +26,8 @@ interface OnboardingContextValue {
   target: StepTarget;
   vendorProfile?: VendorProfile;
   commitState: CommitResult | null;
+  /** Where "Return to Home" sends the browser once enrollment is complete — the host page, not a step. */
+  homeUrl: string;
   /** True while a save is in flight; steps disable their Next button on it. */
   saving: boolean;
 
@@ -57,10 +59,12 @@ export function useDraftSection<K extends keyof DraftSections>(section: K): Draf
 export function OnboardingProvider({
   user,
   baseUrl,
+  homeUrl,
   children
 }: {
   user: UserInfoResponse;
   baseUrl: string;
+  homeUrl: string;
   children: React.ReactNode;
 }) {
   const api = useApiClient();
@@ -259,6 +263,7 @@ export function OnboardingProvider({
       target,
       vendorProfile,
       commitState,
+      homeUrl,
       saving,
       patch,
       goTo,
@@ -277,6 +282,7 @@ export function OnboardingProvider({
       target,
       vendorProfile,
       commitState,
+      homeUrl,
       saving,
       patch,
       goTo,

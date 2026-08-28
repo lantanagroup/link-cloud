@@ -18,6 +18,16 @@
     "title": "Incorporación",
     "intro": "Hola mundo..."
   },
+  "reportingPlan": {
+    "title": "Plan de Informes del Centro",
+    "subtitle": "Esta es una vista previa a seis meses de las medidas de NHSN que su centro tiene programado informar. Revise el cronograma antes de completar la inscripción.",
+    "columns": {
+      "month": "Mes del Informe",
+      "year": "Año del Informe",
+      "measures": "Medidas de NHSN"
+    },
+    "scheduleUnavailable": "No se pudo recuperar el cronograma del plan de informes. La inscripción no se puede completar hasta que esté disponible."
+  },
   "messages": {
     "completeSuccess": "Incorporación completada para el centro {{facilityId}}.",
     "completeError": "No se pudo completar la incorporación.",

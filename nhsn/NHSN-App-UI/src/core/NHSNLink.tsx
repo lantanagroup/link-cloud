@@ -12,6 +12,8 @@ import {setAppLocale} from './localization/i18n';
 
 export interface NHSNLinkProps {
   baseUrl?: string;
+  /** Where "Return to Home" on the completed-enrollment screen sends the browser. Host page, not a route inside this app. */
+  homeUrl?: string;
   locale?: string;
 }
 
@@ -30,7 +32,7 @@ const routePathMap: Record<RouteName, string> = {
  * point's composition root, and the user context is server-observed. There is
  * deliberately no prop by which a caller can assert a facility or a role.
  */
-export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
+export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) {
   const {t} = useTranslation('common');
   const api = useApiClient();
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
@@ -157,7 +159,7 @@ export function NHSNLink({baseUrl = '/', locale}: NHSNLinkProps) {
         <section className="nhsn-link__grid">
           {route === 'home' && <HomePanels userInfo={userInfo} />}
           {route === 'onboarding' && !userInfo.isOnboarded && (
-            <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl}>
+            <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl} homeUrl={homeUrl}>
               <StepHost />
             </OnboardingProvider>
           )}

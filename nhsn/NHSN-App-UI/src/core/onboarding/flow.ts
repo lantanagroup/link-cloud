@@ -32,6 +32,14 @@ export interface Step {
  */
 const COMPLETION_PENDING_STORY = () => true;
 
+/**
+ * TEMPORARY: forces every step to unlock the next one regardless of draft
+ * state, so the flow can be clicked through end-to-end while the `complete`
+ * step is being built. Grep this symbol and restore each step's real
+ * `isComplete` predicate once the enrollment-complete page is in place.
+ */
+const TEMP_ALWAYS_COMPLETE = () => true;
+
 const lazyStep = (loader: () => Promise<{default: React.ComponentType<StepProps>}>) =>
   React.lazy(loader);
 
@@ -56,19 +64,19 @@ export const STEPS: Step[] = [
     id: 'facility-info',
     labelKey: 'onboarding:steps.facilityInfo',
     Component: lazyStep(() => import('./steps/facility-info/FacilityInfoStep')),
-    isComplete: draft => Boolean(draft.facilityInfo.timeZone && draft.facilityInfo.vendor)
+    isComplete: TEMP_ALWAYS_COMPLETE
   },
   {
     id: 'manual-upload',
     labelKey: 'onboarding:steps.manualUpload',
     Component: lazyStep(() => import('./steps/manual-upload/ManualUploadStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: TEMP_ALWAYS_COMPLETE
   },
   {
     id: 'fhir',
     labelKey: 'onboarding:steps.fhir',
     Component: lazyStep(() => import('./steps/fhir/FhirStep')),
-    isComplete: draft => Boolean(draft.fhir.fhirServerBaseUrl && draft.fhir.connectionTested)
+    isComplete: TEMP_ALWAYS_COMPLETE
   },
   {
     id: 'census',
@@ -104,7 +112,7 @@ export const STEPS: Step[] = [
     id: 'report-results',
     labelKey: 'onboarding:steps.reportResults',
     Component: lazyStep(() => import('./steps/report-results/ReportResultsStep')),
-    isComplete: draft => Boolean(draft.reportResults.accuracyAcknowledged)
+    isComplete: TEMP_ALWAYS_COMPLETE
   },
   {
     id: 'mrn-intake',

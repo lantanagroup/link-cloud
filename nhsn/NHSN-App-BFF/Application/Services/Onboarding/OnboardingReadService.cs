@@ -32,6 +32,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly ICensusConfigurationGateway _censusGateway;
     private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IQueryDispatchGateway _queryDispatchGateway;
+    private readonly IReportGateway _reportGateway;
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
@@ -45,6 +46,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         ICensusConfigurationGateway censusGateway,
         ISftpConfigurationGateway sftpConfigurationGateway,
         IQueryDispatchGateway queryDispatchGateway,
+        IReportGateway reportGateway,
         IAcknowledgementService acknowledgementService,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
@@ -57,6 +59,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _censusGateway = censusGateway;
         _sftpConfigurationGateway = sftpConfigurationGateway;
         _queryDispatchGateway = queryDispatchGateway;
+        _reportGateway = reportGateway;
         _acknowledgementService = acknowledgementService;
         _settings = settings.Value;
         _logger = logger;
@@ -107,7 +110,10 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var hasCredentialsTask = ReadSectionAsync<bool?>("census", "DataAcquisition",
             async ct => await _sftpConfigurationGateway.GetHasCredentialsAsync(facilityId, ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask);
+        var reportTask = ReadSectionAsync("report", "Report",
+            ct => _reportGateway.GetLatestScheduleAsync(facilityId, ct), overall.Token, cancellationToken);
+
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
@@ -115,15 +121,17 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var lagDuration = await lagDurationTask;
         var sftpConfig = await sftpConfigTask;
         var hasCredentials = await hasCredentialsTask;
+        var report = await reportTask;
 
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
         sources.Add(census.Source);
+        sources.Add(report.Source);
 
         return new DraftEnvelopeResponse
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
-                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value),
+                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -138,7 +146,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         string? lagDuration,
         bool? censusAccuracyAcknowledged,
         SftpConfig? sftpConfig,
-        bool? hasCredentials) => new()
+        bool? hasCredentials,
+        ReportScheduleSummary? report) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -189,10 +198,14 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
             Hsloc = new HslocSection { Mappings = stored.State.Hsloc.Mappings },
 
+            // Measures and lastRequestedReportId both come from Report when a schedule exists —
+            // stored.State.Report.LastRequestedReportId is only the fallback for a request that's
+            // in flight and has no schedule yet.
             Report = new ReportSection
             {
+                Measures = report?.Measures ?? [],
                 PatientIds = stored.State.Report.PatientIds,
-                LastRequestedReportId = stored.State.Report.LastRequestedReportId
+                LastRequestedReportId = report?.ReportId ?? stored.State.Report.LastRequestedReportId
             },
 
             ReportResults = new ReportResultsSection

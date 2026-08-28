@@ -23,7 +23,14 @@
     "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time."
   },
   "reportingPlan": {
-    "title": "Facility Reporting Plan"
+    "title": "Facility Reporting Plan",
+    "subtitle": "This is a six-month look-ahead of the NHSN measures your facility is scheduled to report against. Review the schedule before completing enrollment.",
+    "columns": {
+      "month": "Report Month",
+      "year": "Report Year",
+      "measures": "NHSN Measures"
+    },
+    "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available."
   },
   "facilityInfo": {
     "title": "Facility Information",
@@ -43,7 +50,22 @@
     }
   },
   "manualUpload": {
-    "title": "Manual Upload"
+    "title": "Manual Upload Option",
+    "intro": "If you are not able to complete the onboarding form online, download the form, complete it with your facility's technical team, and upload it here. You can upload a partially completed form and return later to finish the process.",
+    "downloadTemplate": "Download Import Sheet & Instructions",
+    "downloadHint": "Downloads the .xlsx import sheet.",
+    "uploadFile": "Upload Completed Import Sheet",
+    "reading": "Reading file...",
+    "imported": "Imported {{imported}} of {{total}} field(s) from {{fileName}}.",
+    "readError": "Could not read that file — make sure it is the .xlsx import sheet downloaded from this page.",
+    "uploadRejected": "The file could not be imported. Please check the file and try again.",
+    "errors": {
+      "invalidFormat": "The file is not a valid import sheet.",
+      "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
+      "invalidUrl": "Enter a valid, fully-qualified URL.",
+      "invalidNumber": "Enter a whole number of zero or greater.",
+      "invalidLocationMethod": "Enter a valid organization identification method."
+    }
   },
   "fhirServerInfo": {
     "title": "FHIR Server Information",
