@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { EMPTY, Subject, Subscription, catchError, debounceTime, switchMap } from 'rxjs';
+import { EMPTY, Subject, Subscription, catchError, of, switchMap, timer } from 'rxjs';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -46,10 +46,11 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
   private initPageSize = 10;
   private initPageNumber = 0;
 
-  private readonly search$ = new Subject<void>();
-  private readonly typing$ = new Subject<void>();
+  /** Emits the delay to wait before searching: 0 for immediate triggers, the debounce for typing. */
+  private readonly search$ = new Subject<number>();
   private searchSubscription?: Subscription;
-  private typingSubscription?: Subscription;
+
+  private static readonly typingDebounceMs = 300;
 
   measureMappings: IMeasureMapping[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
@@ -77,23 +78,28 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
 
-    // Every reload goes through this one stream: switchMap drops the in-flight request when a
-    // newer search starts, so a slow earlier response can never overwrite a later one's results.
-    // Errors are caught per-request, or the first failure would end the stream for good.
+    // Every reload goes through this one stream: switchMap drops whatever the previous trigger
+    // was doing — a request already in flight OR a typing delay still pending — so a keystroke
+    // cancels the active request immediately and stale results can never be applied. The typing
+    // delay lives inside the chain for exactly that reason; immediate triggers skip it with a
+    // synchronous of(0). Errors are caught per-request, or the first failure would end the
+    // stream for good.
     this.searchSubscription = this.search$.pipe(
-      switchMap(() => this.measureMappingService.searchMeasureMappings(
-        this.filterMeasure,
-        this.filterDqm,
-        this.filterFrequency,
-        this.sortBy,
-        this.sortOrder,
-        this.paginationMetadata.pageSize,
-        this.paginationMetadata.pageNumber
-      ).pipe(
-        catchError(() => {
-          this.loading = false;
-          return EMPTY;
-        })
+      switchMap((delayMs) => (delayMs > 0 ? timer(delayMs) : of(0)).pipe(
+        switchMap(() => this.measureMappingService.searchMeasureMappings(
+          this.filterMeasure,
+          this.filterDqm,
+          this.filterFrequency,
+          this.sortBy,
+          this.sortOrder,
+          this.paginationMetadata.pageSize,
+          this.paginationMetadata.pageNumber
+        ).pipe(
+          catchError(() => {
+            this.loading = false;
+            return EMPTY;
+          })
+        ))
       ))
     ).subscribe((response) => {
       this.loading = false;
@@ -111,29 +117,27 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
       this.paginationMetadata = response.metadata;
     });
 
-    // Text filters search as the admin types. The debounce collapses a burst of keystrokes into
-    // one request; switchMap above still cancels it if another lands anyway.
-    this.typingSubscription = this.typing$.pipe(
-      debounceTime(300)
-    ).subscribe(() => this.onSearchChange());
-
     this.getMeasureMappings();
   }
 
   ngOnDestroy(): void {
     this.searchSubscription?.unsubscribe();
-    this.typingSubscription?.unsubscribe();
     this.search$.complete();
-    this.typing$.complete();
   }
 
+  /**
+   * Text filters search as the admin types: each keystroke restarts the wait AND cancels any
+   * request already in flight, so results for an abandoned filter value are never applied.
+   */
   onFilterTyped(): void {
-    this.typing$.next();
+    this.paginationMetadata.pageNumber = 0;
+    this.loading = true;
+    this.search$.next(MeasureMappingsDashboardComponent.typingDebounceMs);
   }
 
   getMeasureMappings(): void {
     this.loading = true;
-    this.search$.next();
+    this.search$.next(0);
   }
 
   onSearchChange(): void {
