@@ -178,6 +178,20 @@ describe('MeasureMappingFormComponent', () => {
     expect(input).toBeTruthy();
   });
 
+  it('re-enables editing when viewOnly changes back to false', () => {
+    initWith(ach, FormMode.Edit);
+    const measureInput: HTMLInputElement =
+      fixture.nativeElement.querySelector('[data-testid="measure-mapping-measure-input"]');
+
+    fixture.componentRef.setInput('viewOnly', true);
+    fixture.detectChanges();
+    expect(measureInput.readOnly).toBeTrue();
+
+    fixture.componentRef.setInput('viewOnly', false);
+    fixture.detectChanges();
+    expect(measureInput.readOnly).toBeFalse();
+  });
+
   it('still emits validity when the definitions fetch fails, so a valid form can be saved', () => {
     measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(throwError(() => new Error('down')));
 
