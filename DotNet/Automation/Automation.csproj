@@ -8,12 +8,12 @@
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <ThetisEngineProjectPath Condition="'$(ThetisEngineProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Engine\Thetis.Generation.Engine.csproj</ThetisEngineProjectPath>
     <ThetisAbstractionsProjectPath Condition="'$(ThetisAbstractionsProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Abstractions\Thetis.Generation.Abstractions.csproj</ThetisAbstractionsProjectPath>
-    <!-- Default: sibling ../thetis project refs. NuGet fallback only when UseThetisProjectReference=false. -->
+    <!-- Sibling ../thetis project refs. NuGet packages are planned, not published yet. -->
     <UseThetisProjectReference Condition="'$(UseThetisProjectReference)' == ''">true</UseThetisProjectReference>
   </PropertyGroup>
 
   <Target Name="EnsureThetisSibling" BeforeTargets="ResolveProjectReferences;CollectPackageReferences" Condition="'$(UseThetisProjectReference)' == 'true'">
-    <Error Text="Thetis sibling project is required at $(ThetisEngineProjectPath). Clone ../thetis or set UseThetisProjectReference=false to use NuGet." Condition="!Exists('$(ThetisEngineProjectPath)')" />
+    <Error Text="Thetis sibling project is required at $(ThetisEngineProjectPath). Clone ../thetis next to link-cloud." Condition="!Exists('$(ThetisEngineProjectPath)')" />
   </Target>
 
   <ItemGroup>

@@ -107,16 +107,15 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                 validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
             }
         }
-        _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, record.headers());
     }
 
     /**
-        * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
+     * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
      * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
-        * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
+     * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
      */
     private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
         if (!preQualificationConfig.isWritePreQualOperationOutcome()) {

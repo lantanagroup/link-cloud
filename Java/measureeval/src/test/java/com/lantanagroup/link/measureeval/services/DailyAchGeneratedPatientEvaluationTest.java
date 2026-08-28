@@ -8,6 +8,7 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.StringType;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -23,11 +24,11 @@ class DailyAchGeneratedPatientEvaluationTest {
         while (repoRoot != null && !Files.exists(repoRoot.resolve("DotNet/Automation/measures/NHSNAcuteCareHospitalDailyInitialPopulation.json"))) {
             repoRoot = repoRoot.getParent();
         }
-        Assertions.assertNotNull(repoRoot, "Could not locate repo root from " + Path.of("").toAbsolutePath());
+        Assumptions.assumeTrue(repoRoot != null, "Skipping: could not locate repo root from " + Path.of("").toAbsolutePath());
 
         var measurePath = repoRoot.resolve("DotNet/Automation/measures/NHSNAcuteCareHospitalDailyInitialPopulation.json");
         var dataDir = repoRoot.resolve("artifacts/daily-ach-eval");
-        Assertions.assertTrue(Files.exists(dataDir), "Expected FHIR fixtures in " + dataDir);
+        Assumptions.assumeTrue(Files.exists(dataDir), "Skipping: local FHIR fixtures not present at " + dataDir);
 
         var measurePackage = parser.parseResource(Bundle.class, Files.readString(measurePath));
         var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);

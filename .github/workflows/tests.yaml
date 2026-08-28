@@ -70,6 +70,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Thetis is a private sibling repo (project reference, no NuGet package yet).
+      # Dockerfiles COPY --from=thetis; compose additional_contexts maps that to ../thetis.
+      - name: Checkout thetis sibling
+        uses: actions/checkout@v4
+        with:
+          repository: lantanagroup/thetis
+          path: _thetis
+          ref: main
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Expose thetis as ../thetis
+        run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -283,6 +296,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # Thetis is a private sibling repo (project reference, no NuGet package yet).
+      - name: Checkout thetis sibling
+        uses: actions/checkout@v4
+        with:
+          repository: lantanagroup/thetis
+          path: _thetis
+          ref: main
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Expose thetis as ../thetis
+        run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

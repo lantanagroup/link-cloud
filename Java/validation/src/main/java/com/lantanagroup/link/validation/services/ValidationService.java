@@ -4,7 +4,6 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
-import ca.uhn.fhir.validation.SingleValidationMessage;
 import ca.uhn.fhir.validation.ValidationResult;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
@@ -30,12 +29,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 @Service
-@Lazy(false)
+@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ValidationService {
     private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
     private final FhirValidator fhirValidator;
-    private final LinkConfig linkConfig;
-    private final ExecutorService bundleValidationExecutor;
     private final ValidationResultIgnoreService validationResultIgnoreService;
 
     public ValidationService(
@@ -100,89 +97,6 @@ public class ValidationService {
             logger.error("Validation failed", ex);
             throw ex;
         }
-    }
-
-    // Chunk the bundle and run up to bundleValidationParallelism chunks at once.
-    // Entries inside a chunk are sequential so HAPI never queues the whole NDJSON (HAPI-2246).
-    private List<Result> validateBundle(Bundle bundle) {
-        List<Bundle.BundleEntryComponent> entries = bundle.getEntry();
-        int entryCount = entries.size();
-        if (entryCount == 0) {
-            return toResults(fhirValidator.validateWithResult(bundle));
-        }
-
-        int batchSize = Math.max(1, linkConfig.getBundleValidationBatchSize());
-        if (entryCount <= batchSize) {
-            return validateSlice(entries, 0, entryCount);
-        }
-
-        int parallelism = Math.max(1, linkConfig.getBundleValidationParallelism());
-        int chunkCount = (entryCount + batchSize - 1) / batchSize;
-        logger.info("Validating Bundle with {} entries in {} chunks of {} on {} threads",
-                entryCount, chunkCount, batchSize, parallelism);
-
-        List<Callable<List<Result>>> tasks = new ArrayList<>(chunkCount);
-        for (int start = 0; start < entryCount; start += batchSize) {
-            int chunkStart = start;
-            int chunkEnd = Math.min(start + batchSize, entryCount);
-            tasks.add(() -> validateSlice(entries, chunkStart, chunkEnd));
-        }
-
-        List<Result> results = new ArrayList<>();
-        try {
-            for (Future<List<Result>> future : bundleValidationExecutor.invokeAll(tasks)) {
-                results.addAll(future.get());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Bundle validation interrupted", e);
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            if (cause instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new RuntimeException("Bundle validation failed", cause);
-        }
-        return results;
-    }
-
-    private List<Result> validateSlice(List<Bundle.BundleEntryComponent> entries, int start, int end) {
-        List<Result> results = new ArrayList<>();
-        for (int i = start; i < end; i++) {
-            IBaseResource resource = entries.get(i).getResource();
-            if (resource == null) {
-                continue;
-            }
-            ValidationResult validationResult = fhirValidator.validateWithResult(resource);
-            String prefix = "Bundle.entry[" + i + "].resource.ofType(" + resource.fhirType() + ")";
-            for (SingleValidationMessage message : validationResult.getMessages()) {
-                Result result = Result.fromMessage(message);
-                result.setExpression(prefixEntryLocation(result.getExpression(), prefix));
-                results.add(result);
-            }
-        }
-        return results;
-    }
-
-    private static List<Result> toResults(ValidationResult validationResult) {
-        return validationResult.getMessages().stream()
-                .map(Result::fromMessage)
-                .toList();
-    }
-
-    // Same path rewrite HAPI uses in FhirValidator.buildValidationMessages.
-    static String prefixEntryLocation(String locationString, String bundleEntryPathPrefix) {
-        String location = locationString == null ? "" : locationString;
-        String currentPath;
-        int dotIndex = location.indexOf('.');
-        if (dotIndex >= 0) {
-            currentPath = location.substring(dotIndex);
-        } else if (bundleEntryPathPrefix.isBlank() || location.isBlank()) {
-            currentPath = location;
-        } else {
-            currentPath = "." + location;
-        }
-        return bundleEntryPathPrefix + currentPath;
     }
 
     // Text emitted by RemoteTermServiceValidation for an inactive code (see isInactiveIssue).

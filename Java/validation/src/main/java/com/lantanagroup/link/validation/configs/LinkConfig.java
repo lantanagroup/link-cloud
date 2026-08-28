@@ -43,19 +43,6 @@ public class LinkConfig {
     private List<String> whiteListValueSetRegex = new ArrayList<>();
 
     /**
-     * How many bundle chunks validate at once. Memory is bounded by this times one
-     * in-flight HAPI validation (entries inside a chunk run sequentially).
-     */
-    @Getter @Setter
-    private int bundleValidationParallelism = 4;
-
-    /**
-     * Entries per chunk. Each chunk is one pool task; HAPI never sees the full bundle.
-     */
-    @Getter @Setter
-    private int bundleValidationBatchSize = 32;
-
-    /**
      * Configured validation-result rules whose matches should be dropped before categorization,
      * persistence, and downstream validity calculations.
      */
