@@ -35,9 +35,11 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM;
             var frequency = searchDto.Frequency;
 
+            // Substring match: the Admin UI filters as the admin types, so every partial value has
+            // to narrow the list rather than answer empty until the full value matches.
             var (records, metadata) = await _repository.SearchAsync(
-                m => (measure == null || m.Measure == measure)
-                    && (dqm == null || m.DQM == dqm)
+                m => (measure == null || m.Measure.Contains(measure))
+                    && (dqm == null || m.DQM.Contains(dqm))
                     && (!frequency.HasValue || m.Frequency == frequency.Value),
                 searchDto.SortBy, searchDto.SortOrder,
                 searchDto.PageSize, searchDto.PageNumber, cancellationToken);
