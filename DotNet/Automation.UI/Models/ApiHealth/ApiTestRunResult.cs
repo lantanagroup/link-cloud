@@ -54,6 +54,6 @@ public sealed class ApiTestRunResult
     /// <summary>Trace ID from the response headers for correlating with Grafana/distributed tracing.</summary>
     public string? TraceId { get; set; }
 
-    /// <summary>Response body (for both success and failure diagnostics).</summary>
+    /// <summary>Truncated response body (for both success and failure diagnostics).</summary>
     public string? ResponseBody { get; set; }
 }

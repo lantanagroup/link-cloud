@@ -206,7 +206,7 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             result.Passed = responseCodeMatchesExpected;
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {(int)response.StatusCode})."
-                : responseBody;
+                : (responseBody.Length > 500 ? responseBody[..500] : responseBody);
             result.TraceId = ExtractTraceId(response);
 
 if (validateAuthErrorMessage && responseCodeMatchesExpected && !LooksLikeAuthError(result.ResponseBody))

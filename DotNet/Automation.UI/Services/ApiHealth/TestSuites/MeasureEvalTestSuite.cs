@@ -223,7 +223,9 @@ public sealed class MeasureEvalTestSuite : ServiceTestSuiteBase
 
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : responseBody;
+                : responseBody.Length > 500
+                    ? responseBody[..500]
+                    : responseBody;
 
             if (!result.Passed)
             {

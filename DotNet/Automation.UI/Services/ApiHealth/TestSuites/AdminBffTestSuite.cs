@@ -248,7 +248,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             var body = response.RawBody;
             var capturedBody = string.IsNullOrWhiteSpace(body)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : body;
+                : (body.Length > 500 ? body[..500] : body);
             result.ResponseBody = capturedBody;
             if (!result.Passed)
                 result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
@@ -398,7 +398,9 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : responseBody;
+                : responseBody.Length > 500
+                    ? responseBody[..500]
+                    : responseBody;
 
             if (!result.Passed)
             {

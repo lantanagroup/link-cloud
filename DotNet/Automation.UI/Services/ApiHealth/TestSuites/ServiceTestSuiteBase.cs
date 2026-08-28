@@ -303,7 +303,8 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
 
     private static string BodyOrNote(string? value, string note)
     {
-        return string.IsNullOrWhiteSpace(value) ? note : value;
+        var body = Truncate(value);
+        return string.IsNullOrWhiteSpace(body) ? note : body;
     }
 
     private static string NoRequestBodyNote(string? requestMethod = null)
