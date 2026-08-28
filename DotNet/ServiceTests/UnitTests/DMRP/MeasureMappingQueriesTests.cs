@@ -149,9 +149,10 @@ namespace UnitTests.DMRP
 
             var queries = CreateQueries(context);
 
-            // SQLite translates Contains to the case-sensitive instr(), and a SQL Server
-            // deployment can carry a case-sensitive collation, so the query itself must
-            // lower-case both sides rather than lean on provider defaults.
+            // SQLite's LIKE happens to be ASCII-case-insensitive, so these pass here even
+            // without explicit lower-casing — they pin the contract. The case that motivates
+            // the explicit ToLower in the query is a case-sensitive SQL Server collation,
+            // which this harness cannot reproduce.
             var result = await queries.PagedSearchAsync(new SearchMeasureMappingDto
             {
                 Measure = measure,

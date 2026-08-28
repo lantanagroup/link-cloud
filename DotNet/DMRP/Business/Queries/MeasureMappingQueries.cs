@@ -31,8 +31,10 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
 
         public async Task<PagedMeasureMappingDto> PagedSearchAsync(SearchMeasureMappingDto searchDto, CancellationToken cancellationToken = default)
         {
-            var measure = string.IsNullOrWhiteSpace(searchDto.Measure) ? null : searchDto.Measure.ToLower();
-            var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM.ToLower();
+            // ToLowerInvariant: the parameter is lowered in C#, where the current culture could
+            // otherwise diverge from the SQL LOWER() applied to the column (e.g. Turkish dotless i).
+            var measure = string.IsNullOrWhiteSpace(searchDto.Measure) ? null : searchDto.Measure.ToLowerInvariant();
+            var dqm = string.IsNullOrWhiteSpace(searchDto.DQM) ? null : searchDto.DQM.ToLowerInvariant();
             var frequency = searchDto.Frequency;
 
             // Substring match: the Admin UI filters as the admin types, so every partial value has
