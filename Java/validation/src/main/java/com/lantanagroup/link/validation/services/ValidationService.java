@@ -15,7 +15,8 @@ import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import org.slf4j.Logger;
@@ -26,10 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 @Service
 @Lazy(false)
@@ -47,14 +45,11 @@ public class ValidationService {
             ValidationCacheService validationCacheService,
             ValidationResultIgnoreService validationResultIgnoreService,
             @Qualifier("bundleValidationExecutor") ExecutorService bundleValidationExecutor) throws IOException {
-        this.linkConfig = linkConfig;
-        this.bundleValidationExecutor = bundleValidationExecutor;
+        this.validationResultIgnoreService = validationResultIgnoreService;
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
                 new SnapshotGeneratingValidationSupport(fhirContext));
-
-        this.validationResultIgnoreService = validationResultIgnoreService;
 
         loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain, validationCacheService);
 
@@ -62,7 +57,8 @@ public class ValidationService {
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
-        logger.info("ValidationService initialized (packages and FhirValidator loaded)");
+        fhirValidator.setConcurrentBundleValidation(true);
+        fhirValidator.setExecutorService(bundleValidationExecutor);
     }
 
     // Package-private for unit testing of the terminology support chain composition.
@@ -95,9 +91,10 @@ public class ValidationService {
             if (resource instanceof Bundle bundle) {
                 logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
             }
-            List<Result> results = resource instanceof Bundle bundle
-                    ? validateBundle(bundle)
-                    : toResults(fhirValidator.validateWithResult(resource));
+            ValidationResult validationResult = fhirValidator.validateWithResult(resource);
+            List<Result> results = validationResult.getMessages().stream()
+                    .map(Result::fromMessage)
+                    .toList();
             return validationResultIgnoreService.filterIgnored(deduplicateInactiveResults(results));
         } catch (Exception ex) {
             logger.error("Validation failed", ex);

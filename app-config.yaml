@@ -605,13 +605,13 @@ services:
       required: false
       defaultValue: "link-cloud-dev"
     - key: "MockDmrpApi:AuthClientSecret"
-      description: "Client secret the mock's token endpoint accepts. There is no code default: a deployed environment that does not provision this refuses to issue tokens rather than fall back to a value published in the repository. Supply it as a Key Vault reference. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      description: "Client secret the mock's token endpoint accepts. There is no code default: a deployed environment that does not provision this refuses to issue tokens rather than fall back to a value published in the repository. Held as a literal rather than a Key Vault reference: the mock is never provisioned in a production store, so this authenticates nothing beyond the simulated DMRP surface and is not marked sensitive. Scripts/AzureAppConfig/validate_aac_secrets.py exempts it from the secret-shaped-key warning on the same grounds (NON_PRODUCTION_FIXTURE_SECRET_KEYS); value-based credential checks still apply to it."
       required: false
-      sensitive: true
+      sensitive: false
     - key: "MockDmrpApi:SigningKey"
-      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Held as a literal rather than a Key Vault reference and not marked sensitive: the mock is never provisioned in a production store, so a token signed with this key is accepted only by the simulated DMRP surface. Scripts/AzureAppConfig/validate_aac_secrets.py exempts it from the secret-shaped-key warning on the same grounds (NON_PRODUCTION_FIXTURE_SECRET_KEYS); value-based credential checks still apply to it."
       required: false
-      sensitive: true
+      sensitive: false
 
   MeasureEval:
     - key: "spring.data.mongodb.uri"

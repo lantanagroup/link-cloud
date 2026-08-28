@@ -974,7 +974,6 @@ services:
       # 75% of the container cgroup limit (mem_limit below, or the platform memory
       # limit in deployed environments). Do not set -Xmx here; it would cap production.
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
-      spring.main.lazy-initialization: "true"
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
