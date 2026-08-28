@@ -151,6 +151,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     // The MappingOutcomeEvaluated dead-letter handler republishes with the consumed key type.
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
 
+    // Required by the typed dead-letter and transient handlers on MappingOutcomeListener: both take an
+    // IKafkaProducerFactory<K, V> to republish onto the -Error and -Retry topics. Without it the listener
+    // cannot be constructed and the service fails at startup.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();

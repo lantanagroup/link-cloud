@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Domain.Models;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -38,8 +39,18 @@ public class MappingOutcomeListenerTests
     private readonly Mock<IReportEntryMappingOutcomeManager> _manager = new();
     private readonly MappingOutcomeListener _listener;
 
+    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, string>> _consumeHandler = new();
+    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, MappingOutcomeEvaluatedValue>> _deadLetterHandler = new();
+    private readonly Mock<ITransientExceptionHandler<MappingOutcomeListener, ResourceKey, MappingOutcomeEvaluatedValue>> _transientHandler = new();
+
     public MappingOutcomeListenerTests()
     {
+        // SetupProperty, not Mock.Of: the constructor assigns Topic, and a plain mock would discard the
+        // assignment and make the topic-wiring test pass vacuously.
+        _consumeHandler.SetupProperty(item => item.Topic);
+        _deadLetterHandler.SetupProperty(item => item.Topic);
+        _transientHandler.SetupProperty(item => item.Topic);
+
         var services = new ServiceCollection();
         services.AddSingleton(_manager.Object);
         var serviceProvider = services.BuildServiceProvider();
@@ -54,9 +65,29 @@ public class MappingOutcomeListenerTests
             Mock.Of<ILogger<MappingOutcomeListener>>(),
             Mock.Of<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>(),
             new ServiceInformation { ServiceConfigName = "Report" },
-            Mock.Of<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, string>>(),
+            _consumeHandler.Object,
+            _deadLetterHandler.Object,
+            _transientHandler.Object,
+            Mock.Of<IExceptionLogger<MappingOutcomeListener>>(),
             scopeFactory.Object);
     }
+
+    #region Error handling wiring
+
+    [Fact]
+    public void ConstructorWiresTheErrorAndRetryTopics()
+    {
+        // Both companion topics are declared in topics.txt and MappingOutcomeEvaluatedRetry is registered
+        // with Report's RetryScheduleService -- but a handler with no Topic cannot write to either.
+        // DeadLetterExceptionHandler.ProduceConsumeExceptionDeadLetter throws on an unset Topic and
+        // HandleConsumeException swallows that into a log line, so a poison record would be dropped in
+        // silence rather than landing on -Error.
+        Assert.Equal("MappingOutcomeEvaluated-Error", _consumeHandler.Object.Topic);
+        Assert.Equal("MappingOutcomeEvaluated-Error", _deadLetterHandler.Object.Topic);
+        Assert.Equal("MappingOutcomeEvaluated-Retry", _transientHandler.Object.Topic);
+    }
+
+    #endregion
 
     #region Source routing
 
@@ -331,6 +362,11 @@ public class MappingOutcomeListenerTests
         message.Message.Key.PatientId = patientId;
 
         // Nothing downstream can place an outcome without both halves of the key.
+        //
+        // This asserts the contract of ConsumeMessageAsync, which is what the test drives directly. The
+        // consume callback is what turns that throw into a dead letter plus a commit; it cannot be reached
+        // without the Kafka consumer machinery, so the wiring it depends on is asserted by
+        // ConstructorWiresTheErrorAndRetryTopics instead.
         await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(message));
     }
 
