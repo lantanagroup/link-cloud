@@ -163,7 +163,7 @@ public class EpicAuth : IAuth
         {
             256 => SecurityAlgorithms.EcdsaSha256,
             384 => SecurityAlgorithms.EcdsaSha384,
-            512 => SecurityAlgorithms.EcdsaSha512,
+            521 => SecurityAlgorithms.EcdsaSha512,
             _ => null
         };
         if (algorithm == null)
