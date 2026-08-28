@@ -4,50 +4,23 @@ using LantanaGroup.Link.Report.Domain.Enums;
 namespace UnitTests.Report;
 
 /// <summary>
-/// Covers the one indicator the API reports but storage does not hold: whether Normalization is never
-/// going to answer for this patient, as opposed to not having answered yet.
+/// Covers the one indicator the API reports but storage does not hold: whether the patient is in the
+/// report at all, which decides whether any code map result about them is worth showing.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class MappingIndicatorViewTests
 {
     [Fact]
-    public void NormalizationNeverReportedAndNoEncounterWasInTheOrg_IsExcluded()
+    public void NoEncounterBelongedToTheOrganization_IsExcluded()
     {
         var status = MappingIndicatorView.ResolveHsloc(
             stored: MappingIndicatorStatus.NotEvaluated,
-            locationOrgStatus: MappingIndicatorStatus.Unmapped,
-            normalizationEvaluatedAt: null);
+            locationOrgStatus: MappingIndicatorStatus.Unmapped);
 
-        // Acquisition strips every non-org encounter, so a patient with none left never reaches
-        // Normalization and no message is ever produced. Left as NotEvaluated the row would sit there
-        // forever looking like it was still in flight, with nothing to say why.
+        // The patient's encounters were all stripped, so the measure evaluates no qualifying encounter for
+        // them. Left as NotEvaluated the row would sit there forever looking like it was still in flight,
+        // with nothing to say why.
         Assert.Equal(MappingIndicatorStatus.Excluded, status);
-    }
-
-    [Fact]
-    public void NormalizationHasNotReportedButThePatientIsInTheOrg_StaysNotEvaluated()
-    {
-        var status = MappingIndicatorView.ResolveHsloc(
-            stored: MappingIndicatorStatus.NotEvaluated,
-            locationOrgStatus: MappingIndicatorStatus.Mapped,
-            normalizationEvaluatedAt: null);
-
-        // This patient's resources did survive the strip, so Normalization still owes an answer. Calling
-        // it Excluded would be a guess that goes stale the moment the message lands.
-        Assert.Equal(MappingIndicatorStatus.NotEvaluated, status);
-    }
-
-    [Fact]
-    public void NeitherSourceHasReported_StaysNotEvaluated()
-    {
-        var status = MappingIndicatorView.ResolveHsloc(
-            stored: MappingIndicatorStatus.NotEvaluated,
-            locationOrgStatus: MappingIndicatorStatus.NotEvaluated,
-            normalizationEvaluatedAt: null);
-
-        // Excluded is derived from what acquisition found. With acquisition silent there is nothing to
-        // derive it from, and the honest answer is that nothing is known yet.
-        Assert.Equal(MappingIndicatorStatus.NotEvaluated, status);
     }
 
     [Theory]
@@ -57,28 +30,66 @@ public class MappingIndicatorViewTests
     [InlineData(MappingIndicatorStatus.NothingToEvaluate)]
     [InlineData(MappingIndicatorStatus.NotApplicable)]
     [InlineData(MappingIndicatorStatus.Unknown)]
-    public void NormalizationReported_ItsAnswerStands(MappingIndicatorStatus stored)
+    public void ExcludedOutranksAnyResultNormalizationReported(MappingIndicatorStatus stored)
     {
-        var status = MappingIndicatorView.ResolveHsloc(
-            stored,
-            locationOrgStatus: MappingIndicatorStatus.Unmapped,
-            normalizationEvaluatedAt: DateTime.UtcNow);
+        var status = MappingIndicatorView.ResolveHsloc(stored, MappingIndicatorStatus.Unmapped);
 
-        // The acquisition side is only ever used to explain an ABSENT answer. Once Normalization has
-        // spoken, overriding it from another column would be inventing a result.
+        // Stripping a patient's encounters does not necessarily empty the correlation: the Location
+        // resources they referenced survive and are code mapped perfectly well, so Normalization can
+        // report a genuine Mapped for a patient who is not in the report. Surfacing it would describe a
+        // location the report never evaluates and read as a clean pass for an excluded patient.
+        Assert.Equal(MappingIndicatorStatus.Excluded, status);
+    }
+
+    [Theory]
+    [InlineData(MappingIndicatorStatus.Mapped)]
+    [InlineData(MappingIndicatorStatus.PartiallyMapped)]
+    [InlineData(MappingIndicatorStatus.NothingToEvaluate)]
+    [InlineData(MappingIndicatorStatus.NotApplicable)]
+    [InlineData(MappingIndicatorStatus.Unknown)]
+    public void PatientInTheOrganization_KeepsTheStoredResult(MappingIndicatorStatus stored)
+    {
+        var status = MappingIndicatorView.ResolveHsloc(stored, MappingIndicatorStatus.Mapped);
+
+        // The exclusion is the only override. For a patient the report does evaluate, the code map result
+        // is the answer and must not be rewritten from another column.
         Assert.Equal(stored, status);
     }
 
     [Fact]
-    public void NormalizationReportedNothingForAnExcludedLookingPatient_IsNotRewritten()
+    public void MembershipAssumedRatherThanVerified_IsStillInTheReport()
     {
         var status = MappingIndicatorView.ResolveHsloc(
-            stored: MappingIndicatorStatus.NotApplicable,
-            locationOrgStatus: MappingIndicatorStatus.Unmapped,
-            normalizationEvaluatedAt: DateTime.UtcNow);
+            stored: MappingIndicatorStatus.NothingToEvaluate,
+            locationOrgStatus: MappingIndicatorStatus.Assumed);
 
-        // The boundary between the two rules. Both conditions for Excluded look satisfied except the one
-        // that matters: Normalization did run, so NotApplicable is a real result and not an absence.
-        Assert.Equal(MappingIndicatorStatus.NotApplicable, status);
+        // Assumed means membership was never checked, not that it failed. Such a patient still ships in
+        // the submission, so their code map result is still worth reporting.
+        Assert.Equal(MappingIndicatorStatus.NothingToEvaluate, status);
+    }
+
+    [Fact]
+    public void AcquisitionHasNotReported_LeavesTheStoredValueAlone()
+    {
+        var status = MappingIndicatorView.ResolveHsloc(
+            stored: MappingIndicatorStatus.NotEvaluated,
+            locationOrgStatus: MappingIndicatorStatus.NotEvaluated);
+
+        // Excluded is derived from what acquisition found. With acquisition silent there is nothing to
+        // derive it from, and the honest answer is that nothing is known yet.
+        Assert.Equal(MappingIndicatorStatus.NotEvaluated, status);
+    }
+
+    [Fact]
+    public void OrgLocationMappingNotConfigured_DoesNotExcludeAnyone()
+    {
+        var status = MappingIndicatorView.ResolveHsloc(
+            stored: MappingIndicatorStatus.PartiallyMapped,
+            locationOrgStatus: MappingIndicatorStatus.NotApplicable);
+
+        // A facility that has not configured org-location resolution excludes nobody -- every patient is
+        // evaluated. Treating NotApplicable as an exclusion would blank the HSLOC column for every patient
+        // at that facility.
+        Assert.Equal(MappingIndicatorStatus.PartiallyMapped, status);
     }
 }

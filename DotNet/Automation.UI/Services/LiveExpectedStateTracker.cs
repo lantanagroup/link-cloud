@@ -6,9 +6,11 @@ namespace Automation.UI.Services;
 
 /// <summary>
 /// In-memory census / observability state for a live simulation window.
-/// Report inclusion is data/pattern-driven (pattern <c>ExpectedInReport</c> plus
-/// measure-oriented expectations) — never <c>CurrentlyAdmitted ∪ DischargedDuringWindow</c>.
-/// Automatic census uses <see cref="ScheduledInpatientPatternExtensions.GetCensusBehavior"/>.
+/// Report inclusion is Admit (auto or UI) AND the predictor flag
+/// (<c>ExpectedInReport</c> from cohort/pattern/measure eligibility). Adding a patient
+/// to the pool does not put them on the expected list. Discharge after Admit does not
+/// remove them. Automatic census uses
+/// <see cref="ScheduledInpatientPatternExtensions.GetCensusBehavior"/>.
 /// Auto-discharges fire at the window midpoint (windowStart + duration/2) so they complete before freeze.
 /// </summary>
 public sealed class LiveExpectedStateTracker
@@ -68,8 +70,6 @@ public sealed class LiveExpectedStateTracker
                 CensusState = LivePatientCensusState.NotAdmitted,
                 ExpectedInReport = expected
             };
-            if (expected)
-                _expectedInReport.Add(seed.PatientId);
         }
     }
 
@@ -181,8 +181,6 @@ public sealed class LiveExpectedStateTracker
                 CensusState = LivePatientCensusState.NotAdmitted,
                 ExpectedInReport = expected
             };
-            if (expected)
-                _expectedInReport.Add(id);
             _eventLog.Add(NewEvent(
                 id,
                 PatientEventType.Inject,
@@ -306,6 +304,8 @@ public sealed class LiveExpectedStateTracker
         _currentlyAdmitted.Add(id);
         _dischargedDuringWindow.Remove(id);
         UpdatePoolState(id, LivePatientCensusState.Admitted);
+        if (_pool.TryGetValue(id, out var admittedEntry) && admittedEntry.ExpectedInReport)
+            _expectedInReport.Add(id);
 
         var evt = NewEvent(id, PatientEventType.Admit, source, notes, timestampUtc);
         _eventLog.Add(evt);
@@ -355,7 +355,7 @@ public sealed class LiveExpectedStateTracker
 
         // No generated inpatient pattern means this is a scenario-loaded import
         // (or an unpatterned seed). Admit at window open so the run is hands-off.
-        // Report inclusion stays on ExpectedInReport / the generation manifest.
+        // Report inclusion is still Admit AND ExpectedInReport (see AdmitUnlocked).
         return true;
     }
 

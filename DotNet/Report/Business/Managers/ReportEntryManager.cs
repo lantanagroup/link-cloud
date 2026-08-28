@@ -152,12 +152,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 LocationOrgStatus = proj.MappingOutcome?.LocationOrgStatus ?? MappingIndicatorStatus.NotEvaluated,
                 EncounterMappingStatus = proj.MappingOutcome?.EncounterMappingStatus ?? MappingIndicatorStatus.NotEvaluated,
 
-                // Resolved rather than copied: a patient whose encounters were all stripped as non-org
-                // never reaches Normalization, so the stored NotEvaluated would never resolve on its own.
+                // Resolved rather than copied: a patient whose encounters all fell outside the
+                // organization is not in the report, so any code map result about them describes
+                // resources the report never evaluates.
                 HslocMappingStatus = MappingIndicatorView.ResolveHsloc(
                     proj.MappingOutcome?.HslocMappingStatus ?? MappingIndicatorStatus.NotEvaluated,
-                    proj.MappingOutcome?.LocationOrgStatus ?? MappingIndicatorStatus.NotEvaluated,
-                    proj.MappingOutcome?.NormalizationEvaluatedAt),
+                    proj.MappingOutcome?.LocationOrgStatus ?? MappingIndicatorStatus.NotEvaluated),
 
                 AcquisitionEvaluatedAt = proj.MappingOutcome?.AcquisitionEvaluatedAt,
                 NormalizationEvaluatedAt = proj.MappingOutcome?.NormalizationEvaluatedAt,

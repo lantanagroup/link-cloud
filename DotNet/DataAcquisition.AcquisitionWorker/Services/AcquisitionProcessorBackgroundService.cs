@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -256,25 +257,24 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
     private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
     {
+        TailCompletionResult? tailResult = null;
         try
         {
-            var tailResult = await logManager.TryCompleteTailAsync(logId, ct);
+            tailResult = await logManager.TryCompleteTailAsync(logId, ct);
             if (tailResult == null)
             {
                 return; // Group not yet complete.
             }
 
-            // Remove non-org encounters from the cache before the bundle reaches MeasureEval. The
-            // Encounter was cached by its own (ungated) primary log, so the NotReportable status on a
-            // dependent log doesn't keep it out of evaluation. Stripping here means an all-non-org patient
-            // has no qualifying encounter (non-reportable outcome), and a mixed patient keeps only org
-            // encounters. Runs before ProduceAsync so Normalization rehydrates the already-filtered cache.
-            var locationMappingService = scopeProvider.GetRequiredService<ILocationMappingService>();
-            
-            // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
-            // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
-            var locationOrgOutcome = await locationMappingService.StripNonOrgEncountersFromCacheAsync(
-                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
+            // Strips non-org encounters from the cache and then drops any cache key left empty, so
+            // ResourcesAcquired never points Normalization at an empty location. Runs before ProduceAsync
+            // so the cache the tail announces is already filtered.
+            //
+            // The strip's result is returned rather than discarded: how the patient resolved against the
+            // facility's organization is computed here and nowhere else, and it is what the report's
+            // Location Org and Encounter Mapping indicators record.
+            var tailFinalizer = scopeProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+            var locationOrgOutcome = await tailFinalizer.FinalizeAsync(tailResult, ct);
 
             var headers = new Headers
             {
@@ -343,6 +343,12 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     },
                     ct);
 
+            await logManager.MarkTailSentAsync(
+                tailResult.FacilityId,
+                tailResult.CorrelationId,
+                tailResult.QueryPhase,
+                ct);
+
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
                 tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
@@ -353,6 +359,25 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
+            if (tailResult != null)
+            {
+                try
+                {
+                    await logManager.RevertTailSentAsync(
+                        tailResult.FacilityId,
+                        tailResult.CorrelationId,
+                        tailResult.QueryPhase,
+                        CancellationToken.None);
+                }
+                catch (Exception revertEx)
+                {
+                    _logger.LogError(
+                        revertEx,
+                        "Failed to revert tail claim after inline tail failure for LogId {LogId}. Stale claim will be reclaimed after the lease.",
+                        logId);
+                }
+            }
+
             _logger.LogError(ex, "Failed to produce inline tail message for LogId {LogId}. Safety-net poller will recover.", logId);
         }
     }

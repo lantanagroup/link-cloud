@@ -108,9 +108,11 @@ public interface ILocationMappingService
     /// acquired-resource cache before the tail's ResourcesAcquired event is produced. The Encounter is
     /// fetched and cached by its own (ungated) primary log, so marking a dependent log NotReportable does
     /// not keep the non-org encounter out of MeasureEval; this strip does. A patient whose encounters are
-    /// all non-org ends up with no cached encounter — MeasureEval evaluates no qualifying encounter and
-    /// produces a non-reportable outcome — while a patient with a mix keeps only the org encounters.
-    /// No-op when org-location mapping is not active for the facility.
+    /// all non-org ends up with no cached encounter. The tail finalizer then omits that empty
+    /// Encounter key from ResourcesAcquired so Normalization is not pointed at an empty location.
+    /// MeasureEval evaluates no qualifying encounter and produces a non-reportable outcome.
+    /// A patient with a mix keeps only the org encounters. No-op when org-location mapping
+    /// is not active for the facility.
     /// <para>
     /// Also reports how the patient resolved, so the result can be recorded against the report it was
     /// acquired for. The outcome is scoped to this correlation's encounters rather than to every encounter

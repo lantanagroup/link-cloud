@@ -243,11 +243,10 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // Data Acquisition only lists a cache key when it acquired at least one
-                    // resource of that type. An empty read means the cache copy is not ready
-                    // (or used a blob type the reader could not see). Fail transiently so the
-                    // source keys are NOT deleted and MeasureEval does not evaluate an empty bundle.
-                    throw new TransientException(
+                    // DA only lists a key after it has written (and not stripped) resources there.
+                    // An empty listed key is a producer defect, not a not-ready race: retries cannot
+                    // create data that was never cached (org-map filter, Encounter strip, etc.).
+                    throw new DeadLetterException(
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
                         $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }
@@ -347,6 +346,17 @@ public class ResourcesAcquiredListener : BackgroundService
                 copiedKeys.Add(cacheKey);
             }
 
+            if (cacheKeys.Count == 0)
+            {
+                _logger.LogInformation(
+                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+            }
+
+            // Produced even when nothing was acquired: the configured code maps are declared up front, so
+            // this still reports them with zero counts, which is what separates "nothing reached the map"
+            // from "no map is configured".
             await ProduceMappingOutcomeEvaluatedMessage(
                 result.Message.Key.FacilityId,
                 result.Message.Key.PatientId,
@@ -354,6 +364,8 @@ public class ResourcesAcquiredListener : BackgroundService
                 result.Message.Value,
                 mappingOutcomes,
                 cancellationToken);
+
+
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
             await resourceCache.DeleteAsync(copiedKeys, cancellationToken);

@@ -322,6 +322,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
         services.AddTransient<IFhirApiService, FhirApiService>();
         services.AddTransient<ILocationMappingService, LocationMappingService>();
+        services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();

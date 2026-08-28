@@ -30,7 +30,7 @@ public class AcquisitionProcessorBackgroundServiceTests
 
     private readonly Mock<IProducer<ResourceKey, ResourcesAcquired>> _mockResourceAcquiredProducer = new();
     private readonly Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> _mockMappingOutcomeProducer = new();
-    private readonly Mock<ILocationMappingService> _mockLocationMappingService = new();
+    private readonly Mock<IResourcesAcquiredTailFinalizer> _mockTailFinalizer = new();
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager = new();
     private readonly AcquisitionProcessorBackgroundService _service;
     private readonly IServiceProvider _scopeProvider;
@@ -38,7 +38,7 @@ public class AcquisitionProcessorBackgroundServiceTests
     public AcquisitionProcessorBackgroundServiceTests()
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_mockLocationMappingService.Object);
+        services.AddSingleton(_mockTailFinalizer.Object);
         _scopeProvider = services.BuildServiceProvider();
 
         _service = new AcquisitionProcessorBackgroundService(
@@ -152,8 +152,8 @@ public class AcquisitionProcessorBackgroundServiceTests
         _mockResourceAcquiredProducer.Verify(
             p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        _mockLocationMappingService.Verify(
-            s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+        _mockTailFinalizer.Verify(
+            s => s.FinalizeAsync(It.IsAny<TailCompletionResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -194,9 +194,10 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         // Assert — the gate covers reporting only. Stripping stays unconditional: it is what guarantees no
         // non-org encounter reaches MeasureEval, and it must not become contingent on a reporting concern.
-        _mockLocationMappingService.Verify(
-            s => s.StripNonOrgEncountersFromCacheAsync(
-                FacilityId, CorrelationId, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+        _mockTailFinalizer.Verify(
+            s => s.FinalizeAsync(
+                It.Is<TailCompletionResult>(t => t.FacilityId == FacilityId && t.CorrelationId == CorrelationId),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -250,9 +251,13 @@ public class AcquisitionProcessorBackgroundServiceTests
         await InvokeTryProduceTailMessageAsync();
 
         // Assert — EncounterMapping.PatientId holds the bare id, so the prefix must be stripped or every
-        // lookup silently misses and the outcome reports zeros without erroring.
-        _mockLocationMappingService.Verify(
-            s => s.StripNonOrgEncountersFromCacheAsync(FacilityId, CorrelationId, "abc-123", It.IsAny<CancellationToken>()),
+        // lookup silently misses and the outcome reports zeros without erroring. That normalisation now
+        // happens inside the finalizer, so what the worker owes is the tail with the prefixed id intact;
+        // ResourcesAcquiredTailFinalizerTests covers the stripping itself.
+        _mockTailFinalizer.Verify(
+            s => s.FinalizeAsync(
+                It.Is<TailCompletionResult>(t => t.PatientId == "Patient/abc-123"),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -284,9 +289,8 @@ public class AcquisitionProcessorBackgroundServiceTests
     }
 
     private void SetupStrip(LocationOrgOutcome outcome) =>
-        _mockLocationMappingService
-            .Setup(s => s.StripNonOrgEncountersFromCacheAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _mockTailFinalizer
+            .Setup(s => s.FinalizeAsync(It.IsAny<TailCompletionResult>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(outcome);
 
     private void CaptureMappingOutcome(Action<Message<ResourceKey, MappingOutcomeEvaluatedValue>> capture) =>

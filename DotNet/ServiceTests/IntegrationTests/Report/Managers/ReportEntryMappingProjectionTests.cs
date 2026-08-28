@@ -94,11 +94,28 @@ public class ReportEntryMappingProjectionTests
 
         var entry = Assert.Single((await SearchAsync(scheduleId)).Records);
 
-        // Nothing of this patient survived the org-location strip, so Normalization never runs and the
-        // stored NotEvaluated would never resolve. Derived on read, so the write path keeps its rule that
-        // each producer touches only its own columns.
+        // No encounter belonged to the organization, so the patient is not in the report. Derived on read,
+        // so the write path keeps its rule that each producer touches only its own columns.
         Assert.Equal(MappingIndicatorStatus.Excluded, entry.HslocMappingStatus);
         Assert.Null(entry.NormalizationEvaluatedAt);
+    }
+
+    [Fact]
+    public async Task NonOrgPatientWhoseLocationsDidMap_IsStillExcluded()
+    {
+        var scheduleId = await SeedScheduleAsync();
+        await SeedEntryAsync(scheduleId, "non-org-mapped");
+        await SeedOutcomeAsync(scheduleId, "non-org-mapped",
+            MappingIndicatorStatus.Unmapped, MappingIndicatorStatus.Mapped, MappingIndicatorStatus.Mapped,
+            acquisitionAt: DateTime.UtcNow, normalizationAt: DateTime.UtcNow);
+
+        var entry = Assert.Single((await SearchAsync(scheduleId)).Records);
+
+        // The real case, not a contrived one. Stripping the patient's encounters leaves the Location
+        // resources they referenced in the cache, so Normalization code maps them and genuinely reports
+        // Mapped -- for a patient the report does not evaluate. Reporting that would read as a clean pass
+        // and describe a location no measure ever sees.
+        Assert.Equal(MappingIndicatorStatus.Excluded, entry.HslocMappingStatus);
     }
 
     [Fact]

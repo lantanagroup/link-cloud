@@ -24,26 +24,29 @@ public static class MappingIndicatorView
     /// Resolves the HSLOC indicator to report, given the stored value and the acquisition columns.
     /// </summary>
     /// <remarks>
-    /// Normalization reports nothing for a patient whose encounters all fell outside the reporting
-    /// organization: acquisition strips them, so no resource ever reaches it and no message is ever
-    /// produced. Stored, that is indistinguishable from a patient still in flight -- both are
-    /// <see cref="MappingIndicatorStatus.NotEvaluated"/> with a null timestamp -- and reporting it that way
-    /// leaves a row that never resolves and gives no reason why.
+    /// <para>
+    /// A patient whose encounters all fell outside the reporting organization contributes nothing to the
+    /// report: acquisition strips those encounters, and the measure evaluates no qualifying encounter for
+    /// them. The column asks whether this patient's locations mapped <em>for this report</em>, so for a
+    /// patient the report excludes there is no meaningful answer, and
+    /// <see cref="MappingIndicatorStatus.Excluded"/> is it.
+    /// </para>
+    /// <para>
+    /// That holds even when Normalization did report a result. Stripping the encounters does not
+    /// necessarily empty the correlation -- the Location resources they referenced can survive and be code
+    /// mapped perfectly well -- so Normalization can genuinely report <c>Mapped</c> for a patient who is
+    /// not in the report at all. Surfacing that would describe a location the report never evaluates and
+    /// read as a clean pass for an excluded patient.
+    /// </para>
     /// </remarks>
     public static MappingIndicatorStatus ResolveHsloc(
         MappingIndicatorStatus stored,
-        MappingIndicatorStatus locationOrgStatus,
-        DateTime? normalizationEvaluatedAt)
+        MappingIndicatorStatus locationOrgStatus)
     {
-        // Normalization did report; its answer stands whatever the acquisition side says.
-        if (normalizationEvaluatedAt is not null)
-        {
-            return stored;
-        }
-
-        // Acquisition found encounters and none of them belonged to the organization, which is the one
-        // outcome that leaves nothing behind to normalize. Anything else -- including acquisition not
-        // having reported yet -- is still genuinely pending.
+        // Unmapped here means acquisition found encounters and none belonged to the organization. The
+        // patient is out of the report, so no code map result about them is worth reporting -- whether
+        // Normalization answered or not. Any other value, including acquisition not having reported yet,
+        // leaves the stored result to speak for itself.
         return locationOrgStatus == MappingIndicatorStatus.Unmapped
             ? MappingIndicatorStatus.Excluded
             : stored;
