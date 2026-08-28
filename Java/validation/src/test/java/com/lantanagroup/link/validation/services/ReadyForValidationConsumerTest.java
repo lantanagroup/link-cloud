@@ -885,13 +885,15 @@ public class ReadyForValidationConsumerTest {
         when(shadowCompareEventTemplate.send(captor.capture()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
-        consumerWithShadowEnabled.process(buildRecord(null));
+        consumerWithShadowEnabled.process(buildRecord(null, true));
 
         ShadowCompareEvent event = captor.getValue().value();
         assertFalse(event.isRanNewEngine());
         assertEquals(1, event.getAuthoritativeResult().size());
         assertEquals(FACILITY_ID, captor.getValue().key());
         assertNull(event.getRequestId(), "legacy engine has no request id to share, unlike the rubric engine");
+        assertEquals(CORRELATION_ID, event.getCorrelationId(),
+                "correlationId read from the ReadyForValidation header must reach the shadow comparison event");
     }
 
     @Test
@@ -901,7 +903,7 @@ public class ReadyForValidationConsumerTest {
         stubBundleJsonEncoding();
         UUID rubricRequestId = UUID.randomUUID();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().requestId(rubricRequestId).build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
@@ -911,12 +913,14 @@ public class ReadyForValidationConsumerTest {
         when(shadowCompareEventTemplate.send(captor.capture()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
-        consumerWithBridgeAndShadowEnabled.process(buildRecord(null));
+        consumerWithBridgeAndShadowEnabled.process(buildRecord(null, true));
 
         ShadowCompareEvent event = captor.getValue().value();
         assertTrue(event.isRanNewEngine());
         assertEquals(rubricRequestId, event.getRequestId(),
                 "the rubric engine's own request id (already on its rubric_result row) should be forwarded as-is");
+        assertEquals(CORRELATION_ID, event.getCorrelationId(),
+                "correlationId read from the ReadyForValidation header must reach the shadow comparison event");
     }
 
     @Test

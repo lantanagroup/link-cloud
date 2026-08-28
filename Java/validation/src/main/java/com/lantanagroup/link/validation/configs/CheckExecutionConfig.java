@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Configuration for the dedicated thread pool that fans out rubric check execution
- * The checks of a single {@code $evaluate} call are submitted to this
+ * The checks of a single {@code $rubric-validate} call are submitted to this
  * pool and merged after all complete.
  *
  * <p>The pool is only used when {@code vaas.checks.parallel} is true, which is <b>not</b> the default.

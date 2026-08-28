@@ -70,7 +70,7 @@ class RubricVersionResolverTest {
     }
 
     @Test
-    @DisplayName("$evaluate (publishedOnly) rejects an explicit non-PUBLISHED version with a lifecycle conflict")
+    @DisplayName("$rubric-validate (publishedOnly) rejects an explicit non-PUBLISHED version with a lifecycle conflict")
     void evaluateRejectsNonPublishedExplicitVersion() {
         when(cacheService.getVersion("piqi.core", "1.2.0"))
                 .thenReturn(snapshot("1.2.0", RubricVersionStatus.DRAFT));

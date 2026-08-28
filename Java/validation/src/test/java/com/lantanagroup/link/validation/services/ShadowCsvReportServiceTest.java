@@ -106,17 +106,17 @@ class ShadowCsvReportServiceTest {
         List<String> header = rows.get(0);
         assertEquals("Correlation ID", header.get(1));
         assertEquals("Facility ID", header.get(2));
-        assertEquals("Is Matched", header.get(9));
-        assertEquals("Compared At", header.get(17));
+        assertEquals("Is Matched", header.get(8));
+        assertEquals("Compared At", header.get(16));
 
         assertEquals(3, rows.size());
         List<String> matchedRow = rows.get(1);
-        assertEquals("true", matchedRow.get(9));
-        assertEquals("", matchedRow.get(14));
+        assertEquals("true", matchedRow.get(8));
+        assertEquals("", matchedRow.get(13));
 
         List<String> mismatchedRow = rows.get(2);
-        assertEquals("false", mismatchedRow.get(9));
-        assertTrue(mismatchedRow.get(14).contains("WARNING"));
+        assertEquals("false", mismatchedRow.get(8));
+        assertTrue(mismatchedRow.get(13).contains("WARNING"));
     }
 
     @Test
@@ -128,8 +128,8 @@ class ShadowCsvReportServiceTest {
         service.generateDailyReport(LocalDate.parse("2026-08-21"), List.of(result));
 
         List<String> row = capturedDailyRows().get(1);
-        assertEquals(largeJson.length(), row.get(14).length());
-        assertEquals(largeJson, row.get(14));
+        assertEquals(largeJson.length(), row.get(13).length());
+        assertEquals(largeJson, row.get(13));
     }
 
     @Test
@@ -142,7 +142,7 @@ class ShadowCsvReportServiceTest {
         service.generateDailyReport(LocalDate.parse("2026-08-21"), List.of(result));
 
         List<String> row = capturedDailyRows().get(1);
-        assertEquals(trickyJson, row.get(14));
+        assertEquals(trickyJson, row.get(13));
     }
 
     @Test
@@ -157,20 +157,23 @@ class ShadowCsvReportServiceTest {
                         .message("legacy finding")
                         .build()))
                 .build();
+        ShadowCsvReportService service = service();
+        // Stubbed after service() -- whose lenient any() defaults are registered first -- so these more
+        // specific stubs are the last ones matching requestId and take precedence (Mockito resolves
+        // overlapping stubs on a mock by most-recently-registered, not most-specific).
         when(rubricResultQueryService.findByRequestId(requestId)).thenReturn(Optional.of(rubricResult));
         when(legacyShadowResultQueryService.findByRequestId(requestId)).thenReturn(Optional.of(legacyResult));
-        ShadowCsvReportService service = service();
 
         service.generateDailyReport(
                 LocalDate.parse("2026-08-21"), List.of(comparisonResult(true, null, requestId)));
 
         List<List<String>> rows = capturedDailyRows();
-        assertEquals("Rubric Findings", rows.get(0).get(7));
-        assertEquals("Legacy Findings", rows.get(0).get(8));
+        assertEquals("Rubric Findings", rows.get(0).get(6));
+        assertEquals("Legacy Findings", rows.get(0).get(7));
 
         List<String> row = rows.get(1);
-        assertTrue(row.get(7).contains("rubric finding"));
-        assertTrue(row.get(8).contains("legacy finding"));
+        assertTrue(row.get(6).contains("rubric finding"));
+        assertTrue(row.get(7).contains("legacy finding"));
     }
 
     @Test
@@ -181,8 +184,8 @@ class ShadowCsvReportServiceTest {
                 LocalDate.parse("2026-08-21"), List.of(comparisonResult(true, null, null)));
 
         List<String> row = capturedDailyRows().get(1);
+        assertEquals("", row.get(6));
         assertEquals("", row.get(7));
-        assertEquals("", row.get(8));
         verifyNoInteractions(rubricResultQueryService, legacyShadowResultQueryService);
     }
 

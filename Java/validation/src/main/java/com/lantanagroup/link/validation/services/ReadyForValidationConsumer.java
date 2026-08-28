@@ -318,7 +318,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
     }
 
     /**
-     * Evaluates the rubric engine in-process, same as the $evaluate REST endpoint, and maps its result
+     * Evaluates the rubric engine in-process, same as the $rubric-validate REST endpoint, and maps its result
      * back into the legacy {@link Result} shape so the rest of {@code process()} doesn't care which
      * engine ran.
      */

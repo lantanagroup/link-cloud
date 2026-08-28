@@ -219,15 +219,15 @@ public class ValidationController {
         }
     }
 
-    @Operation(summary = "Evaluate a rubric synchronously against a FHIR payload (v2)")
-    @PostMapping("/v2/rubrics/{rubricId}/$evaluate")
+    @Operation(summary = "Perform rubric validation synchronously against a FHIR payload (v2)")
+    @PostMapping("/v2/rubrics/{rubricId}/$rubric-validate")
     public ResponseEntity<ApiResponse<ValidationResultEnvelope>> evaluate(
             @PathVariable String rubricId,
             @RequestParam(name = "version", required = false) String version,
             @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
             @Valid @RequestBody EvaluateRequestDto request) {
         ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, version, request, true, correlationId);
-        return ResponseEntity.ok(ApiResponse.ok("Evaluation completed", result));
+        return ResponseEntity.ok(ApiResponse.ok("Rubric validation completed", result));
     }
 
     @Operation(summary = "Dry-run a rubric: no result is persisted, but the outcome is recorded on the version (v2)")

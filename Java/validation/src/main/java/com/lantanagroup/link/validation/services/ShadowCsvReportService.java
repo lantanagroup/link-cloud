@@ -35,7 +35,7 @@ public class ShadowCsvReportService {
 
     private static final String[] DAILY_HEADERS = {
             "Request ID", "Correlation ID", "Facility ID", "Patient ID", "Report ID", "Rubric ID",
-            "Ran New Engine", "Rubric Findings", "Legacy Findings", "Is Matched", "Added Count", "Missing Count",
+            "Rubric Findings", "Legacy Findings", "Is Matched", "Added Count", "Missing Count",
             "Severity Changed Count", "Matched Finding Count", "Added Findings", "Missing Findings",
             "Severity Changed", "Compared At"
     };
@@ -113,13 +113,12 @@ public class ShadowCsvReportService {
         LegacyShadowResultDto legacy = lookUp(legacyShadowResultQueryService::findByRequestId, result.getRequestId());
 
         return new String[]{
-                result.getId() == null ? "" : result.getRequestId().toString(),
+                result.getRequestId() == null ? "" : result.getRequestId().toString(),
                 nullToEmpty(result.getCorrelationId()),
                 nullToEmpty(result.getFacilityId()),
                 nullToEmpty(result.getPatientId()),
                 nullToEmpty(result.getReportId()),
                 nullToEmpty(result.getRubricId()),
-                Boolean.toString(result.isRanNewEngine()),
                 rubric == null ? "" : writeFindingsJson(rubric.getFindings(), "rubric", result.getReportId()),
                 legacy == null ? "" : writeFindingsJson(legacy.getFindings(), "legacy", result.getReportId()),
                 Boolean.toString(result.isMatched()),

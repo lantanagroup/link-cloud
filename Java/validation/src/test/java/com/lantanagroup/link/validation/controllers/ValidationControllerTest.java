@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Covers the {@code ApiResponse} envelope on the two v2 evaluation endpoints ({@code $evaluate},
+ * Covers the {@code ApiResponse} envelope on the two v2 rubric validation endpoints ({@code $rubric-validate},
  * {@code $dry-run}) and the {@link GlobalExceptionHandler} error paths that apply to them. The
  * legacy endpoints ({@code /$validate}, {@code /$categorize}, pre-qual) intentionally keep Spring's
  * default responses and are out of scope here.
@@ -66,11 +66,11 @@ class ValidationControllerTest {
     private RubricExecutionService rubricExecutionService;
 
     @Nested
-    @DisplayName("POST /v2/rubrics/{rubricId}/$evaluate")
+    @DisplayName("POST /v2/rubrics/{rubricId}/$rubric-validate")
     class Evaluate {
 
         @Test
-        @DisplayName("valid request -> 200, envelope wraps the Evaluation envelope under data")
+        @DisplayName("valid request -> 200, envelope wraps the rubric validation envelope under data")
         void evaluate_valid() throws Exception {
             UUID requestId = UUID.randomUUID();
             ValidationResultEnvelope envelope = ValidationResultEnvelope.builder()
@@ -82,11 +82,11 @@ class ValidationControllerTest {
             when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true), isNull()))
                     .thenReturn(envelope);
 
-            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$evaluate")
+            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$rubric-validate")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"payload\": {\"resourceType\": \"Patient\"}}"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.message").value("Evaluation completed"))
+                    .andExpect(jsonPath("$.message").value("Rubric validation completed"))
                     .andExpect(jsonPath("$.data.requestId").value(requestId.toString()))
                     .andExpect(jsonPath("$.data.rubricId").value("piqi.core"));
         }
@@ -94,7 +94,7 @@ class ValidationControllerTest {
         @Test
         @DisplayName("missing payload -> 400 envelope with errors[]")
         void evaluate_missingPayload() throws Exception {
-            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$evaluate")
+            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$rubric-validate")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(status().isBadRequest())
@@ -109,7 +109,7 @@ class ValidationControllerTest {
             when(rubricExecutionService.evaluate(eq("piqi.core"), isNull(), any(), eq(true), isNull()))
                     .thenThrow(new RuntimeException("boom"));
 
-            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$evaluate")
+            mockMvc.perform(post(BASE + "/v2/rubrics/piqi.core/$rubric-validate")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"payload\": {\"resourceType\": \"Patient\"}}"))
                     .andExpect(status().isInternalServerError())
