@@ -27,6 +27,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -132,6 +133,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -145,6 +147,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
 
+    // The MappingOutcomeEvaluated dead-letter handler republishes with the consumed key type.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
+
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
@@ -157,6 +162,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
+    builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
 
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     builder.Services.AddLinkBearerServiceAuthentication(options =>
@@ -237,6 +243,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
+    builder.Services.AddHostedService<MappingOutcomeListener>();
 
     builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();

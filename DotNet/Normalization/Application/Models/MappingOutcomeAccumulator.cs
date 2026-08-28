@@ -78,28 +78,44 @@ public sealed class MappingOutcomeAccumulator
     /// Projects every accumulated tally into the outcomes carried on the message.
     /// </summary>
     public IReadOnlyList<CodeMapOutcome> BuildAll() =>
-        _tallies.Select(kv =>
+        _tallies
+            .Select(entry => new CodeMapOutcome(
+                entry.Key.SourceSystem,
+                entry.Key.TargetSystem,
+                ResolveStatus(entry.Value),
+                entry.Value.MappedCount,
+                entry.Value.UnmappedCount,
+                entry.Value.FailureCount,
+                entry.Value.UnmappedCodes.ToList()))
+            .ToList();
+
+    /// <summary>
+    /// Projects one pair's accumulated counts into the status reported for it.
+    /// </summary>
+    private static MappingStatus ResolveStatus(Tally tally)
+    {
+        // Nothing was counted either way. Either the code maps ran and had nothing to act on, or every one
+        // of them failed -- and a processing fault must not be reported as a gap in the facility's
+        // configuration, nor hidden as a success.
+        if (tally.MappedCount == 0 && tally.UnmappedCount == 0)
         {
-            var (key, tally) = kv;
+            return tally.FailureCount > 0
+                ? MappingStatus.Unknown
+                : MappingStatus.NotApplicable;
+        }
 
-            var status = tally switch
-            {
-                { MappedCount: 0, UnmappedCount: 0, FailureCount: > 0 } => MappingStatus.Unknown,
-                { MappedCount: 0, UnmappedCount: 0 } => MappingStatus.NotApplicable,
-                { UnmappedCount: 0 } => MappingStatus.Mapped,
-                { MappedCount: 0 } => MappingStatus.Unmapped,
-                _ => MappingStatus.PartiallyMapped
-            };
+        if (tally.UnmappedCount == 0)
+        {
+            return MappingStatus.Mapped;
+        }
 
-            return new CodeMapOutcome(
-                key.SourceSystem,
-                key.TargetSystem,
-                status,
-                tally.MappedCount,
-                tally.UnmappedCount,
-                tally.FailureCount,
-                tally.UnmappedCodes.ToList());
-        }).ToList();
+        if (tally.MappedCount == 0)
+        {
+            return MappingStatus.Unmapped;
+        }
+
+        return MappingStatus.PartiallyMapped;
+    }
 
     private Tally GetOrCreate(string sourceSystem, string targetSystem)
     {
