@@ -60,7 +60,7 @@ describe('FacilityReportingPlansComponent', () => {
     expect(text).toContain('ACH');
     expect(text).toContain('AchMonthly');
     expect(text).toContain('March 2026');
-    expect(text).toContain('Withdrawn');
+    expect(text).toContain('Not reporting');
   });
 
   it('shows the empty state when the facility has no plans', () => {
