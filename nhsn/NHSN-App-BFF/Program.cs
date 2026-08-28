@@ -17,6 +17,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -63,6 +64,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;
     });
     builder.Services.Configure<NhsnJwtSettings>(builder.Configuration.GetRequiredSection(NhsnJwtSettings.SectionName));
+
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.AddLinkSdk();
 
     builder.Services.AddDbContext<NhsnAppDbContext>(options =>
     {
@@ -166,7 +171,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
+    builder.Services.AddTransient<IApi, FhirServerEndpoints>();
     builder.Services.AddTransient<IApi, LocalizationEndpoints>();
+    builder.Services.AddTransient<IApi, StaticAssetEndpoints>();
     builder.Services.AddTransient<IApi, OnboardingEndpoints>();
     builder.Services.AddTransient<IApi, ReferenceEndpoints>();
     builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();

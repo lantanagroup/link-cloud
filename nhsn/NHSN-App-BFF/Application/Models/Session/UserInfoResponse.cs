@@ -9,6 +9,7 @@ public class UserInfoResponse
     public bool IsOnboarded { get; set; }
     public bool HasFacility { get; set; }
     public string? FacilityId { get; set; }
+    public string? FacilityName { get; set; }
     public IReadOnlyCollection<string> Groups { get; set; } = [];
     public IReadOnlyCollection<string> AvailableNavigation { get; set; } = [];
     public string? AccessRequestUrl { get; set; }

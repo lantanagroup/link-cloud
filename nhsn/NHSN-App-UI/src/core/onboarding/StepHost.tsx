@@ -33,32 +33,49 @@ export function StepHost() {
 
   return (
     <div className="nhsn-link__onboarding">
-      <ol className="nhsn-link__steps">
-        {steps.map((entry, index) => {
-          const unlocked = isUnlocked(entry.id, draft, user);
-          const complete = entry.isComplete(draft) && unlocked && entry.id !== target.stepId;
-          return (
-            <li
-              key={entry.id}
-              className={[
-                'nhsn-link__step',
-                entry.id === target.stepId ? 'nhsn-link__step--current' : '',
-                complete ? 'nhsn-link__step--done' : ''
-              ]
-                .filter(Boolean)
-                .join(' ')}>
-              <button
-                type="button"
-                className="nhsn-link__step-button"
-                disabled={!unlocked}
-                onClick={() => goTo(entry.id)}>
-                <span className="nhsn-link__step-index">{index + 1}</span>
-                <span className="nhsn-link__step-label">{t(entry.labelKey)}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      <aside className="nhsn-link__step-nav">
+        <h1 className="nhsn-link__step-nav-title">{t('common:app.linkTitle')}</h1>
+        <p className="nhsn-link__step-nav-subtitle">{t('common:navigation.onboarding')}</p>
+
+        {(user.facilityName || user.facilityId) && (
+          <div className="nhsn-link__step-nav-facility">
+            {user.facilityName && (
+              <div className="nhsn-link__step-nav-facility-name">{user.facilityName}</div>
+            )}
+            {user.facilityId && (
+              <div className="nhsn-link__step-nav-facility-id">{user.facilityId}</div>
+            )}
+          </div>
+        )}
+
+        <ol className="nhsn-link__steps">
+          {steps.map((entry, index) => {
+            const unlocked = isUnlocked(entry.id, draft, user);
+            const complete = entry.isComplete(draft) && unlocked && entry.id !== target.stepId;
+            return (
+              <li
+                key={entry.id}
+                className={[
+                  'nhsn-link__step',
+                  unlocked ? 'nhsn-link__step--unlocked' : '',
+                  entry.id === target.stepId ? 'nhsn-link__step--current' : '',
+                  complete ? 'nhsn-link__step--done' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}>
+                <button
+                  type="button"
+                  className="nhsn-link__step-button"
+                  disabled={!unlocked}
+                  onClick={() => goTo(entry.id)}>
+                  <span className="nhsn-link__step-index">{index + 1}</span>
+                  <span className="nhsn-link__step-label">{t(entry.labelKey)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </aside>
 
       {/* No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict. */}
       <section className="nhsn-link__step-panel" aria-live="polite">

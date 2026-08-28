@@ -162,6 +162,29 @@ export function OnboardingProvider({
     }
   }, [target, baseUrl, loadState, draft.currentStepId, draft.currentView]);
 
+  const persistDraft = useCallback(
+    (toSave: FacilityDraft) => {
+      pendingSaves.current += 1;
+      setSaving(true);
+
+      saveChain.current = saveChain.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            await api.saveDraft(toSave);
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : String(cause));
+          } finally {
+            pendingSaves.current -= 1;
+            if (pendingSaves.current === 0) {
+              setSaving(false);
+            }
+          }
+        });
+    },
+    [api]
+  );
+
   // Persist at transitions. popstate cannot be cancelled, so a dirty-navigation
   // prompt cannot guard the back button the way beforeunload guards a reload —
   // saving on transition is what keeps a later reload agreeing with where back
@@ -176,44 +199,17 @@ export function OnboardingProvider({
       return;
     }
     persistedStep.current = key;
-
-    let cancelled = false;
-    pendingSaves.current += 1;
-    setSaving(true);
-
-    // Serialized so writes land in the order the user made them - the BFF's lock orders
-    // arrivals, not intentions, so two saves in flight could otherwise land out of order.
-    saveChain.current = saveChain.current
-      // A failed save must not stall every later one.
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          await api.saveDraft(draft);
-        } catch (cause) {
-          if (cancelled) {
-            return;
-          }
-          setError(cause instanceof Error ? cause.message : String(cause));
-        } finally {
-          pendingSaves.current -= 1;
-          if (pendingSaves.current === 0) {
-            setSaving(false);
-          }
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [draft, loadState, api, reloadDraft]);
+    persistDraft(draft);
+  }, [draft, loadState, persistDraft]);
 
   const goTo = useCallback(
     (stepId: StepId) => {
+      persistDraft(draft);
       setUrlTarget(undefined);
       dispatch({type: 'step/unlock', stepId});
       dispatch({type: 'step/goto', stepId});
     },
-    []
+    [draft, persistDraft]
   );
 
   const goNext = useCallback(() => {
@@ -233,8 +229,6 @@ export function OnboardingProvider({
     if (previous) {
       goTo(previous);
     }
-    // At step 1 we do nothing: the previous history entry is the NHSN App's
-    // own page and must not be trapped.
   }, [target, draft, user, goTo]);
 
   const openView = useCallback((view: StepView) => {

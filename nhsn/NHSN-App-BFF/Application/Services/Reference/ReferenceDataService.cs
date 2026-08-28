@@ -8,34 +8,58 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
 public sealed class ReferenceDataService : IReferenceDataService
 {
     private static readonly Lazy<IReadOnlyList<TimezoneResponse>> Timezones = new(BuildTimezones);
+    private static readonly (string Id, string FriendlyName)[] CuratedZones =
+    [
+        ("America/New_York", "Eastern Time"),
+        ("America/Detroit", "Eastern Time"),
+        ("America/Kentucky/Louisville", "Eastern Time"),
+        ("America/Kentucky/Monticello", "Eastern Time"),
+        ("America/Indiana/Indianapolis", "Eastern Time"),
+        ("America/Indiana/Vincennes", "Eastern Time"),
+        ("America/Indiana/Winamac", "Eastern Time"),
+        ("America/Indiana/Marengo", "Eastern Time"),
+        ("America/Indiana/Petersburg", "Eastern Time"),
+        ("America/Indiana/Vevay", "Eastern Time"),
+        ("America/Indiana/Tell_City", "Central Time"),
+        ("America/Indiana/Knox", "Central Time"),
+        ("America/Chicago", "Central Time"),
+        ("America/Menominee", "Central Time"),
+        ("America/North_Dakota/Center", "Central Time"),
+        ("America/North_Dakota/New_Salem", "Central Time"),
+        ("America/North_Dakota/Beulah", "Central Time"),
+        ("America/Denver", "Mountain Time"),
+        ("America/Boise", "Mountain Time"),
+        ("America/Phoenix", "Mountain Time (no DST)"),
+        ("America/Los_Angeles", "Pacific Time"),
+        ("America/Anchorage", "Alaska Time"),
+        ("America/Juneau", "Alaska Time"),
+        ("America/Sitka", "Alaska Time"),
+        ("America/Metlakatla", "Alaska Time"),
+        ("America/Yakutat", "Alaska Time"),
+        ("America/Nome", "Alaska Time"),
+        ("America/Adak", "Hawaii-Aleutian Time"),
+        ("Pacific/Honolulu", "Hawaii Time (no DST)"),
+        ("America/Puerto_Rico", "Atlantic Time (Puerto Rico / US Virgin Islands)"),
+        ("Pacific/Guam", "Chamorro Time (Guam)"),
+        ("Pacific/Saipan", "Chamorro Time (N. Mariana Islands)"),
+        ("Pacific/Pago_Pago", "Samoa Time (American Samoa)")
+    ];
 
     public IReadOnlyList<VendorProfile> GetVendorProfiles() => VendorProfileCatalog.All;
 
     public IReadOnlyList<TimezoneResponse> GetTimezones() => Timezones.Value;
 
-    // Builds the time zone list as IANA ids, sorted by offset, computed once.
-    //
-    // Explicitly converted rather than returned raw: TimeZoneInfo.GetSystemTimeZones() returns
-    // Windows ids on Windows and IANA ids on Linux, and Tenant stores IANA (America/Chicago), so a
-    // Windows id written through would only fail later, in a service that can't resolve it.
-    //
-    // The full list is returned rather than a curated US subset — which zones a facility may choose
-    // is presentation policy, and filtering here would silently exclude a territory nobody thought
-    // of at build time.
     private static IReadOnlyList<TimezoneResponse> BuildTimezones() =>
-        TimeZoneInfo.GetSystemTimeZones()
+        CuratedZones
             .Select(zone =>
             {
-                var id = TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var ianaId) ? ianaId : zone.Id;
+                var info = TimeZoneInfo.FindSystemTimeZoneById(zone.Id);
                 return new TimezoneResponse
                 {
-                    Id = id,
-                    DisplayName = zone.DisplayName,
-                    BaseUtcOffset = zone.BaseUtcOffset
+                    Id = zone.Id,
+                    DisplayName = $"{zone.Id} — {zone.FriendlyName}",
+                    BaseUtcOffset = info.BaseUtcOffset
                 };
             })
-            .DistinctBy(zone => zone.Id)
-            .OrderBy(zone => zone.BaseUtcOffset)
-            .ThenBy(zone => zone.Id, StringComparer.Ordinal)
             .ToArray();
 }

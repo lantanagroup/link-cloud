@@ -69,6 +69,12 @@ export class TestAuthApiClient implements ApiClient {
     this.inner.acknowledgeReport(id, a);
 
   getReportingPlan = () => this.inner.getReportingPlan();
+
+  getFhirServerInfo = () => this.inner.getFhirServerInfo();
+  updateFhirServerInfo: ApiClient['updateFhirServerInfo'] = request =>
+    this.inner.updateFhirServerInfo(request);
+  getJwksInstructionsUrl: ApiClient['getJwksInstructionsUrl'] = vendor =>
+    this.inner.getJwksInstructionsUrl(vendor);
 }
 
 /**
@@ -78,8 +84,10 @@ export class TestAuthApiClient implements ApiClient {
  * decision visible in one shell-only place.
  */
 let installed = false;
+let currentProfile: TestUserProfile | null = null;
 
 function installAuthHeaderInterceptor(profile: TestUserProfile): void {
+  currentProfile = profile;
   if (installed) {
     return;
   }
@@ -88,12 +96,12 @@ function installAuthHeaderInterceptor(profile: TestUserProfile): void {
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    if (!url.includes('/nhsn-app-bff/')) {
+    if (!url.includes('/nhsn-app-bff/') || !currentProfile) {
       return originalFetch(input, init);
     }
 
     const headers = new Headers(init?.headers);
-    headers.set('Authorization', `Bearer ${await createSignedJwt(profile)}`);
+    headers.set('Authorization', `Bearer ${await createSignedJwt(currentProfile)}`);
     return originalFetch(input, {...init, headers});
   };
 }

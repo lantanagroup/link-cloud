@@ -20,20 +20,76 @@
     "audienceTitle": "Intended Audience",
     "audienceBody": "The onboarding steps that follow should be completed by the site’s information technology team.",
     "workflowTitle": "Workflow",
-    "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time.",
-    "vendorNote": "Your facility is configured for {{vendor}}."
+    "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time."
   },
   "reportingPlan": {
     "title": "Facility Reporting Plan"
   },
   "facilityInfo": {
-    "title": "Facility Information"
+    "title": "Facility Information",
+    "intro": "Some general information related to your facility is needed prior to beginning the onboarding process.",
+    "fields": {
+      "timeZoneLabel": "Facility Time Zone",
+      "timeZoneTooltip": "The time zone setting is used to determine when NHSNLink schedules a new reporting period for your facility.",
+      "timeZonePlaceholder": "Select a time zone…",
+      "ehrVendorLabel": "EHR Vendor",
+      "ehrVendorPlaceholder": "Select a vendor…"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "loadError": "Unable to load facility information.",
+      "saveSuccess": "Facility information saved.",
+      "saveError": "Unable to save facility information."
+    }
   },
   "manualUpload": {
     "title": "Manual Upload"
   },
-  "fhir": {
-    "title": "FHIR Server Information"
+  "fhirServerInfo": {
+    "title": "FHIR Server Information",
+    "subtitlePrefix": "NHSNLink uses the",
+    "subtitleFhirLinkText": "FHIR",
+    "subtitleSuffix": "standard to communicate with your facility's EHR system. Please provide the technical information needed to securely connect your EHR FHIR APIs to NHSNLink.",
+    "authenticationSectionTitle": "Authentication",
+    "throttleSectionTitle": "Throttle Settings",
+    "fields": {
+      "baseUrlLabel": "FHIR Server Base URL",
+      "baseUrlTooltip": "The FHIR base URL used to access your facility's FHIR resources. Example: https://ehr.example.org/fhir/r4",
+      "baseUrlPlaceholder": "https://ehr.example.org/fhir/r4",
+      "jwksInstructions": "{{vendor}} facilities support JSON Web Key Set (JWKS) based authentication. This is enabled directly by your facility's EHR administrator from the {{vendor}} vendor portal — no credentials need to be entered here. Download the instructions below and provide them to your EHR administrator to enable JWKS for NHSNLink.",
+      "downloadPdfInstructions": "Download PDF Instructions",
+      "maxConcurrentRequestsLabel": "Max Concurrent Requests",
+      "maxConcurrentRequestsTooltip": "NHSNLink is capable of querying resources concurrently for reported patients. This setting throttles how many requests will run concurrently against the facility FHIR server.",
+      "maxRetriesLabel": "Max Retries",
+      "maxRetriesTooltip": "If NHSNLink experiences an issue while querying the facility FHIR server, it can retry the request. This setting determines the maximum number of retries NHSNLink can attempt for a given FHIR resource request. The value must be between 0 and 10.",
+      "minPullTimeLabel": "Min Acquisition Pull Time",
+      "minPullTimeTooltip": "Specifies the earliest time NHSNLink is allowed to start querying the facility FHIR server for patient resources.",
+      "maxPullTimeLabel": "Max Acquisition Pull Time",
+      "maxPullTimeTooltip": "Specifies the time NHSNLink stops querying the facility FHIR server for patient resources.",
+      "pullTimePlaceholder": "HH:MM",
+      "lagLabel": "Patient Resource Acquisition Lag Duration",
+      "lagTooltip": "A lag time can be applied for each patient being reported to ensure that data related to the visit has settled prior to acquiring it from the facility FHIR server, for example so lab results can be finalized and medication orders completed. Scheduled reports wait until each patient in the census is accounted for, even if the applied lag extends beyond the reporting period.",
+      "lagDaysLabel": "Days",
+      "lagHoursLabel": "Hours",
+      "lagMinutesLabel": "Minutes"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "invalidBaseUrl": "Enter a valid URL starting with http:// or https:// (e.g. https://ehr.example.org/fhir/r4).",
+      "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number of 1 or greater.",
+      "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
+      "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
+      "invalidLagDays": "Days must be a whole number of 0 or greater.",
+      "invalidLagHours": "Hours must be a whole number between 0 and 23.",
+      "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
+      "loadError": "Unable to load FHIR server information.",
+      "saveSuccess": "FHIR server information saved.",
+      "saveError": "Unable to save FHIR server information.",
+      "testSuccess": "Connection test succeeded.",
+      "testFailure": "Connection test failed.",
+      "testError": "Unable to test the connection.",
+      "connectionNotTested": "Test the connection before continuing."
+    }
   },
   "census": {
     "title": "Patients of Interest Configuration"
