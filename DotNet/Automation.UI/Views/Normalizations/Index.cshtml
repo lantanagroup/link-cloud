@@ -879,9 +879,16 @@
             || allOperations.find(o => !selectedOperationIds.has(o.id))?.id
             || '';
 
+        const formErrors = document.getElementById('seqFormErrors');
+
         if (!selectedOperationId) {
+            formErrors.textContent = 'All available operations are already included in this sequence.';
+            formErrors.style.display = '';
             return;
         }
+
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
 
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
