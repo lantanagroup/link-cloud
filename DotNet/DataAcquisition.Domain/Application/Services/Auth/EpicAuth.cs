@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -25,12 +26,14 @@ public class EpicAuth : IAuth
     private readonly ICacheService _cacheService;
     private readonly ISecretManager _secretManager;
     private readonly IOptions<DataSourceAuthSettings> _dataSourceAuthSettings;
+    private readonly ITenantApiService _tenantApiService;
     public EpicAuth(
         HttpClient httpClient,
         ILogger<EpicAuth> logger,
         ICacheService cacheService,
         ISecretManager secretManager,
-        IOptions<DataSourceAuthSettings> dataSourceAuthSettings
+        IOptions<DataSourceAuthSettings> dataSourceAuthSettings,
+        ITenantApiService tenantApiService
         )
     {
         _httpClient = httpClient;
@@ -38,6 +41,7 @@ public class EpicAuth : IAuth
         _cacheService = cacheService;
         _secretManager = secretManager;
         _dataSourceAuthSettings = dataSourceAuthSettings;
+        _tenantApiService = tenantApiService;
     }
 
     /// <summary>
@@ -53,7 +57,7 @@ public class EpicAuth : IAuth
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
 
-        var jwt = await GetJwt(facilityId, authSettings);
+        var jwt = await GetJwt(facilityId, authSettings, cancellationToken);
 
         try
         {
@@ -91,12 +95,12 @@ public class EpicAuth : IAuth
         return sanitizedInput;
     }
 
-    private async Task<string> GetJwt(string facilityId, AuthenticationConfigurationModel authSettings)
+    private async Task<string> GetJwt(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("A facilityId must be provided for Epic authentication.");
 
-        var resolvedPem = await ResolvePem(facilityId, authSettings);
+        var resolvedPem = await ResolvePem(facilityId, authSettings, cancellationToken);
 
         var signingCredentials =
             TryGetECDsaSigningCredentials(resolvedPem)
@@ -116,7 +120,7 @@ public class EpicAuth : IAuth
         return GetToken(clientId, audience, signingCredentials);
     }
 
-    private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings)
+    private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
     {
         var keySource = _dataSourceAuthSettings.Value.KeySource;
 
@@ -129,7 +133,12 @@ public class EpicAuth : IAuth
             return authSettings.Key;
         }
 
-        var pemName = $"{facilityId}{PemSuffix}";
+        var vendorSecretName = await _tenantApiService.GetVendorSigningKeySecretId(facilityId, cancellationToken);
+
+        var pemName = string.IsNullOrWhiteSpace(vendorSecretName)
+            ? $"{facilityId}{PemSuffix}"
+            : vendorSecretName;
+
         var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
