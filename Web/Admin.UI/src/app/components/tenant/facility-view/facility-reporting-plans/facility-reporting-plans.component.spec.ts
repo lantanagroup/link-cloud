@@ -60,7 +60,11 @@ describe('FacilityReportingPlansComponent', () => {
     expect(text).toContain('ACH');
     expect(text).toContain('AchMonthly');
     expect(text).toContain('March 2026');
-    expect(text).toContain('Not reporting');
+
+    // "No" would match too much as a substring, so assert on the rendered cells instead.
+    const reportingCells = Array.from(root.querySelectorAll('td.mat-column-isReporting'))
+      .map(cell => cell.textContent?.trim());
+    expect(reportingCells).toEqual(['No', 'Yes']);
   });
 
   it('shows the empty state when the facility has no plans', () => {
