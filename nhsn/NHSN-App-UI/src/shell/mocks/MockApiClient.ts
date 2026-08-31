@@ -18,7 +18,6 @@ import type * as C from '../../core/api/contracts';
  * for real facility data.
  */
 const DRAFT_KEY_PREFIX = 'nhsn-app-ui.mockDraft.';
-const FHIR_SERVER_INFO_KEY_PREFIX = 'nhsn-app-ui.mockFhirServerInfo.';
 const LATENCY_MS = 120;
 
 // Every section healthy - mock mode reads from localStorage, so nothing can be unavailable.
@@ -38,10 +37,6 @@ export class MockApiClient implements ApiClient {
 
   private get draftKey(): string {
     return `${DRAFT_KEY_PREFIX}${this.facilityId}`;
-  }
-
-  private get fhirServerInfoKey(): string {
-    return `${FHIR_SERVER_INFO_KEY_PREFIX}${this.facilityId}`;
   }
 
   // ------------------------------------------------------------ session
@@ -389,23 +384,25 @@ export class MockApiClient implements ApiClient {
 
   async getFhirServerInfo(): Promise<C.FhirServerInfoResponse> {
     await tick();
-    return this.loadFhirServerInfo();
-  }
+    const raw = window.localStorage.getItem(this.draftKey);
+    const fhir = (raw ? migrateDraft(JSON.parse(raw)) : createEmptyDraft()).fhir;
+    const [lagDays, lagHours, lagMinutes] = parseIso8601Duration(fhir.lagDuration);
 
-  async updateFhirServerInfo(request: C.UpdateFhirServerInfoRequest): Promise<C.FhirServerInfoResponse> {
-    await tick();
-    window.localStorage.setItem(this.fhirServerInfoKey, JSON.stringify(request));
-    return request;
+    return {
+      fhirServerBaseUrl: fhir.fhirServerBaseUrl,
+      maxConcurrentRequests: fhir.maxConcurrentRequests,
+      maxRetries: fhir.maxRetries,
+      minAcquisitionPullTime: fhir.minAcquisitionPullTime,
+      maxAcquisitionPullTime: fhir.maxAcquisitionPullTime,
+      lagDays,
+      lagHours,
+      lagMinutes
+    };
   }
 
   getJwksInstructionsUrl(vendor: string): string {
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
     return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
-  }
-
-  private loadFhirServerInfo(): C.FhirServerInfoResponse {
-    const raw = window.localStorage.getItem(this.fhirServerInfoKey);
-    return raw ? (JSON.parse(raw) as C.FhirServerInfoResponse) : {};
   }
 
   private buildReport(request: C.ReportRequest): C.ReportSummary {
@@ -445,4 +442,14 @@ function isValidHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Inverse of FhirStep's buildIso8601Duration: PxDTyHzM -> [days, hours, minutes].
+function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
+  const match = duration?.match(/^P(\d+)DT(\d+)H(\d+)M$/);
+  if (!match) {
+    return [undefined, undefined, undefined];
+  }
+
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
