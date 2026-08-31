@@ -50,6 +50,11 @@ public class FacilityLocationManager : IFacilityLocationManager
         _dbContext.FacilityLocations.Add(facilityLocation);
         await _dbContext.SaveChangesAsync();
 
+        await _dbContext.FacilityLocations
+            .Where(location => location.FacilityId == facilityId && location.PartOfId == facilityLocation.LocationId)
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(location => location.ParentFacilityLocationId, facilityLocation.Id));
+
         return ToModel(facilityLocation);
     }
 
