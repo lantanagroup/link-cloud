@@ -23,6 +23,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Moq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -1145,6 +1146,90 @@ public class FhirApiServiceTests
 
         Assert.NotNull(capturedSearchParams);
         Assert.Equal(100, capturedSearchParams.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_UsesConfiguredSearchPageSize()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        SearchParams? capturedSearchParams = null;
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<SearchFhirCommandRequest, CancellationToken>((request, _) => capturedSearchParams = request.searchParams)
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService(),
+            Options.Create(new FhirSearchSettings { PageSize = 50 })
+        );
+
+        await service.ExecuteSearch(
+            new DataAcquisitionLogModel
+            {
+                FacilityId = "fac-1",
+                CorrelationId = "corr-1",
+                ScheduledReport = new ScheduledReport(),
+                ReportableEvent = ReportableEvent.Adhoc
+            },
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.NotNull(capturedSearchParams);
+        Assert.Equal(50, capturedSearchParams.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_FallsBackToDefaultWhenConfiguredPageSizeIsInvalid()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        SearchParams? capturedSearchParams = null;
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<SearchFhirCommandRequest, CancellationToken>((request, _) => capturedSearchParams = request.searchParams)
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService(),
+            Options.Create(new FhirSearchSettings { PageSize = 0 })
+        );
+
+        await service.ExecuteSearch(
+            new DataAcquisitionLogModel
+            {
+                FacilityId = "fac-1",
+                CorrelationId = "corr-1",
+                ScheduledReport = new ScheduledReport(),
+                ReportableEvent = ReportableEvent.Adhoc
+            },
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.NotNull(capturedSearchParams);
+        Assert.Equal(FhirSearchSettings.DefaultPageSize, capturedSearchParams.Count);
     }
 
     [Fact]

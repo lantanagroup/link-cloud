@@ -22,6 +22,7 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using DateTime = System.DateTime;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -39,7 +40,6 @@ public interface IFhirApiService
 public class FhirApiService : IFhirApiService
 {
     private static readonly JsonSerializerOptions _options = LinkFhirSerializerOptions.ForFhirLenientSerialization;
-    private const int DefaultSearchPageSize = 100;
 
     private readonly IReferenceResourcesManager _referenceResourceManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
@@ -48,6 +48,7 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
     private readonly ILocationMappingService _locationMappingService;
+    private readonly int _searchPageSize;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -56,7 +57,8 @@ public class FhirApiService : IFhirApiService
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
-        ILocationMappingService locationMappingService)
+        ILocationMappingService locationMappingService,
+        IOptions<FhirSearchSettings>? fhirSearchSettings = null)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -65,6 +67,7 @@ public class FhirApiService : IFhirApiService
         _logger = logger;
         _resourceCache = resourceCache;
         _locationMappingService = locationMappingService;
+        _searchPageSize = fhirSearchSettings?.Value.ResolvePageSize() ?? FhirSearchSettings.DefaultPageSize;
     }
 
     #region Interface Implementation
@@ -440,7 +443,7 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private static void ApplySearchPageSize(SearchParams searchParams, FhirQueryModel fhirQuery)
+    private void ApplySearchPageSize(SearchParams searchParams, FhirQueryModel fhirQuery)
     {
         if (searchParams.Count is > 0)
             return;
@@ -449,7 +452,9 @@ public class FhirApiService : IFhirApiService
                 parameter.StartsWith("_count=", StringComparison.OrdinalIgnoreCase)))
             return;
 
-        var pageSize = fhirQuery.Paged is > 0 ? fhirQuery.Paged.Value : DefaultSearchPageSize;
+        // Query-plan Paged, when set, is a per-query override. Otherwise use app config
+        // (FhirSearch:PageSize), which defaults to 100.
+        var pageSize = fhirQuery.Paged is > 0 ? fhirQuery.Paged.Value : _searchPageSize;
         searchParams.Count = pageSize;
     }
 
