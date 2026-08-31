@@ -182,6 +182,28 @@ public class ReportEntryMappingProjectionTests
     }
 
     [Fact]
+    public async Task Detail_NormalizationReportedFirst_IsTheMirrorOfTheCaseAbove()
+    {
+        var scheduleId = await SeedScheduleAsync();
+        await SeedEntryAsync(scheduleId, "normalization-first");
+        await SeedOutcomeAsync(scheduleId, "normalization-first",
+            MappingIndicatorStatus.NotEvaluated, MappingIndicatorStatus.NotEvaluated,
+            MappingIndicatorStatus.PartiallyMapped,
+            acquisitionAt: null, normalizationAt: DateTime.UtcNow,
+            normalizationDetails: NormalizationJson());
+
+        var detail = await DetailAsync(scheduleId, "normalization-first");
+
+        // The two sources are independent messages on separate topics with no ordering between them, so
+        // Normalization landing first is an ordinary state rather than a curiosity. Each section is keyed
+        // off its own timestamp, and this is the case that proves the two branches are genuinely
+        // independent -- reading one source's blob must not depend on the other having answered.
+        Assert.NotNull(detail!.Normalization);
+        Assert.Equal("PHARMACY", Assert.Single(Assert.Single(detail.Normalization!.CodeMaps).UnmappedCodes));
+        Assert.Null(detail.Acquisition);
+    }
+
+    [Fact]
     public async Task Detail_NoOutcomeRow_Returns200WithNotEvaluated_NotNull()
     {
         var scheduleId = await SeedScheduleAsync();
