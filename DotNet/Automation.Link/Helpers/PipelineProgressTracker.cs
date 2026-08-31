@@ -36,6 +36,16 @@ public class PipelineProgressTracker
     /// </summary>
     public string? StalledStage => _stalledStage;
 
+    /// <summary>
+    /// Clears stall state when another signal (FHIR paging logs) shows work
+    /// is still happening even if patient/resource counters have not moved.
+    /// </summary>
+    public void NoteActivity()
+    {
+        _lastProgressChange = DateTime.UtcNow;
+        _stalledStage = null;
+    }
+
     public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, PipelineDataReader reader, bool expectsDataAcquisition = true)
     {
         _output = output;

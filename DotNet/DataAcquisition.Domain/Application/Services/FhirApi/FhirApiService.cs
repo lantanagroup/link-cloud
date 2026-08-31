@@ -242,6 +242,11 @@ public class FhirApiService : IFhirApiService
         var isReferenceLog = fhirQuery.IsReference.GetValueOrDefault();
         var resourceIds = new List<string>();
         ApplySearchPageSize(searchParams, fhirQuery);
+        var pageNumber = 0;
+        _logger.LogInformation(
+            "Log {LogId} retrieving paged results: starting {ResourceType} search",
+            log.Id,
+            resourceType);
         try
         {
             await foreach (var bundle in _searchFhirCommand.ExecuteAsync(
@@ -329,6 +334,17 @@ public class FhirApiService : IFhirApiService
                 await UpdateResourceMappingsAsync(log, resources, cancellationToken);
 
                 await AddResourcesToCacheAsync(log, resources, cancellationToken);
+
+                pageNumber++;
+                var hasNextPage = bundle.Link?.Exists(link => link.Relation == "next") == true;
+                _logger.LogInformation(
+                    "Log {LogId} retrieving paged results: {ResourceType} page {PageNumber} ({PageResourceCount} resources this page, {CumulativeCount} total so far, {PagingStatus})",
+                    log.Id,
+                    resourceType,
+                    pageNumber,
+                    resources.Count,
+                    resourceIds.Count,
+                    hasNextPage ? "fetching next page" : "last page");
             }
 
             return resourceIds;

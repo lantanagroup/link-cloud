@@ -2,8 +2,8 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Tracks Data Acquisition activity across poll cycles so a long-running
-/// acquisition (one large patient, thousands of resources) is treated as
-/// progress instead of a stall or a hard timeout.
+/// acquisition (one large patient, thousands of resources, multi-page FHIR
+/// searches) is treated as progress instead of a stall or a hard timeout.
 /// </summary>
 public sealed class AcquisitionActivityTracker
 {
@@ -19,6 +19,12 @@ public sealed class AcquisitionActivityTracker
     public DateTime LastProgressUtc { get; private set; }
     public int LastResourcesAcquired { get; private set; }
     public bool InFlight { get; private set; }
+
+    /// <summary>
+    /// Records progress from a signal other than the DA report summary,
+    /// such as FHIR paging INFO logs scraped from Loki.
+    /// </summary>
+    public void MarkProgress(DateTime utcNow) => LastProgressUtc = utcNow;
 
     public readonly record struct Observation(
         bool ShouldLogStatus,

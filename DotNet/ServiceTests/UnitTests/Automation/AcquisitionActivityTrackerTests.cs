@@ -82,6 +82,20 @@ public class AcquisitionActivityTrackerTests
     }
 
     [Fact]
+    public void MarkProgress_from_paging_logs_is_recent_progress()
+    {
+        var tracker = new AcquisitionActivityTracker();
+        var t0 = DateTime.UtcNow;
+        tracker.Observe(12, 10, 1, 1, 0, 0, 7751, t0);
+
+        var t1 = t0.AddMinutes(3);
+        tracker.MarkProgress(t1);
+
+        tracker.HasRecentProgress(TimeSpan.FromMinutes(2), t1).Should().BeTrue();
+        tracker.HasRecentProgress(TimeSpan.FromMinutes(2), t1.AddMinutes(3)).Should().BeFalse();
+    }
+
+    [Fact]
     public void TryExtendDeadline_caps_total_wait()
     {
         var start = new DateTime(2026, 8, 31, 14, 15, 0, DateTimeKind.Utc);

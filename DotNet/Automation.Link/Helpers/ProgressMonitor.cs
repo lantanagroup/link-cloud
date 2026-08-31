@@ -28,8 +28,9 @@ public class ProgressMonitor
     private string? _lastMeasureEvalActivity;
     private string? _lastValidationActivity;
     private string? _lastNormalizationActivity;
+    private string? _lastDataAcquisitionActivity;
 
-    /// <summary>Most recent time DA logs completed or acquired additional resources.</summary>
+    /// <summary>Most recent time DA logs completed, acquired additional resources, or paged FHIR results.</summary>
     public DateTime LastAcquisitionProgressUtc => _acquisitionActivity.LastProgressUtc;
 
     /// <summary>Latest <c>TotalResourcesAcquired</c> from the DA report summary.</summary>
@@ -102,6 +103,18 @@ public class ProgressMonitor
         {
             _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
             _lastMeasureEvalActivity = measureEvalActivity;
+        }
+
+        var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (!string.IsNullOrWhiteSpace(dataAcquisitionActivity))
+        {
+            _acquisitionActivity.MarkProgress(DateTime.UtcNow);
+            _progressTracker?.NoteActivity();
+            if (!string.Equals(dataAcquisitionActivity, _lastDataAcquisitionActivity, StringComparison.Ordinal))
+            {
+                _output.WriteLine($"[DIAG][DataAcq] Active: {dataAcquisitionActivity}");
+                _lastDataAcquisitionActivity = dataAcquisitionActivity;
+            }
         }
 
         var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));

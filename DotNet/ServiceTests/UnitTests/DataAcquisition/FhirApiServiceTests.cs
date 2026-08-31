@@ -1043,6 +1043,68 @@ public class FhirApiServiceTests
     }
 
     [Fact]
+    public async Task ExecuteSearch_LogsPagingProgressForEachResultPage()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var logger = new Mock<ILogger<FhirApiService>>();
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            logger.Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService()
+        );
+
+        var page1 = new Bundle
+        {
+            Entry =
+            [
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-1" } },
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-2" } }
+            ]
+        };
+        page1.Link.Add(new Bundle.LinkComponent { Relation = "next", Url = "http://test/Observation?page=2" });
+        var page2 = new Bundle
+        {
+            Entry =
+            [
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-3" } }
+            ]
+        };
+
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetBundlesAsync(page1, page2));
+
+        var log = new DataAcquisitionLogModel
+        {
+            Id = 935585,
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            ScheduledReport = new ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+
+        var ids = await service.ExecuteSearch(
+            log,
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.Equal(3, ids.Count);
+        VerifyInformationLog(logger, "Log 935585 retrieving paged results: starting Observation search", Times.Once());
+        VerifyInformationLog(logger, "Log 935585 retrieving paged results: Observation page 1 (2 resources this page, 2 total so far, fetching next page)", Times.Once());
+        VerifyInformationLog(logger, "Log 935585 retrieving paged results: Observation page 2 (1 resources this page, 3 total so far, last page)", Times.Once());
+    }
+
+    [Fact]
     public async Task ExecuteSearch_AppliesDefaultSearchPageSize()
     {
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
@@ -1137,5 +1199,24 @@ public class FhirApiServiceTests
     {
         yield return bundle;
         await Task.CompletedTask;
+    }
+
+    private static async IAsyncEnumerable<Bundle> GetBundlesAsync(params Bundle[] bundles)
+    {
+        foreach (var bundle in bundles)
+            yield return bundle;
+        await Task.CompletedTask;
+    }
+
+    private static void VerifyInformationLog(Mock<ILogger<FhirApiService>> logger, string contains, Times times)
+    {
+        logger.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains(contains)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            times);
     }
 }

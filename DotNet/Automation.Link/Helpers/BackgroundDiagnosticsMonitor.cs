@@ -45,7 +45,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     public int AcquisitionResourcesAcquired => _monitor.State.AcquisitionResourcesAcquired;
 
     /// <summary>
-    /// True when DA completed a log or acquired more resources within <paramref name="window"/>.
+    /// True when DA completed a log, acquired more resources, or paged FHIR results within <paramref name="window"/>.
     /// Used as a poll-loop keep-alive so large acquisitions are not treated as timeouts.
     /// </summary>
     public bool HasRecentAcquisitionProgress(TimeSpan window)
