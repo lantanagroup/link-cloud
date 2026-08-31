@@ -129,6 +129,11 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (model.Entries.Count == 0)
             return BadRequest("At least one operation entry is required.");
 
+        if (model.Entries.GroupBy(e => e.OperationId).Any(g => g.Count() > 1))
+        {
+            return BadRequest("A sequence cannot contain the same operation more than once.");
+        }
+
         var existing = await store.GetSequenceByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
             return StatusCode(StatusCodes.Status403Forbidden, "System sequences cannot be modified.");
