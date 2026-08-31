@@ -184,18 +184,7 @@ public class EpicAuth : IAuth
         {
             return null;
         }
-        string? algorithm = rsa.KeySize switch
-        {
-            2048 => SecurityAlgorithms.RsaSha256,
-            3072 => SecurityAlgorithms.RsaSha384,
-            4096 => SecurityAlgorithms.RsaSha512,
-            _ => null
-        };
-        if (algorithm == null)
-        {
-            return null;
-        }
-        return new SigningCredentials(new RsaSecurityKey(rsa), algorithm);
+        return new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256);
     }
 
     private string GetToken(string clientId, string audience, SigningCredentials credentials)
