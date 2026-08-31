@@ -253,11 +253,65 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         return [location];
     }
 
-    private static List<OperationSequenceModel> CodeMapSequence(params (string Source, string Target)[] codes)
+    [Fact]
+    public async Task ProcessMessageAsync_CodeMapOperationFails_ReportsTheFailureWithoutStoppingNormalization()
+    {
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var normalizedProducer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var resourceCache = new Mock<IResourceCache>();
+        var listener = BuildListener(
+            LocationWithTypeCodes("ICU", "PHARMACY"),
+            FailingCodeMapSequence(),
+            outcomeProducer,
+            normalizedProducer,
+            resourceCache);
+
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        Capture(outcomeProducer, message => produced = message);
+
+        await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
+
+        // The pair is still reported, because the declaration pass registered it before the operation ran.
+        // Reporting it as unmapped would blame the facility's code map for what is a processing fault, and
+        // dropping it would leave the column looking as though nothing were configured.
+        var outcome = Assert.Single(produced!.Value.CodeMapOutcomes);
+        Assert.Equal(HslocSystem, outcome.TargetSystem);
+        Assert.Equal(1, outcome.FailureCount);
+        Assert.Equal(0, outcome.MappedCount);
+        Assert.Equal(0, outcome.UnmappedCount);
+        Assert.Equal(MappingStatus.Unknown, outcome.Status);
+
+        // A failed operation is a normalization result, not a normalization abort: the resource still ships
+        // and the correlation's cache keys are still released.
+        normalizedProducer.Verify(
+            item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        resourceCache.Verify(
+            item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
+    /// <summary>
+    /// A code map that is configured validly and fails when it runs. <c>single()</c> compiles -- the
+    /// operation's constructor rejects a path that does not -- and then raises at evaluation because the
+    /// fixture location carries more than one type coding.
+    /// </summary>
+    private static List<OperationSequenceModel> FailingCodeMapSequence() =>
+        CodeMapSequence("Location.type.coding.single()", ("ICU", "1027-4"));
+
+    private static List<OperationSequenceModel> CodeMapSequence(params (string Source, string Target)[] codes) =>
+        CodeMapSequence("Location.type.coding", codes);
+
+    private static List<OperationSequenceModel> CodeMapSequence(
+        string fhirPath,
+        params (string Source, string Target)[] codes)
     {
         var operation = new CodeMapOperation(
             "Location type to HSLOC",
-            "Location.type.coding",
+            fhirPath,
             [
                 new CodeSystemMap(LocalSystem, HslocSystem, codes.ToDictionary(
                     pair => pair.Source,

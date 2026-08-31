@@ -535,7 +535,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 "Mapping outcomes for {FacilityId}/{CorrelationId}: {Outcomes}",
                 facilityId.SanitizeForLog(),
                 correlationId.SanitizeForLog(),
-                string.Join(", ", outcomes.Select(o => $"{o.TargetSystem}={o.Status}")));
+                string.Join(", ", outcomes.Select(o => $"{o.TargetSystem}={o.Status}")).SanitizeForLog());
         }
 
         try

@@ -518,10 +518,6 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
 
-                    b.Property<long?>("MisfireOriginalFireTime")
-                        .HasColumnType("bigint")
-                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
-
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")
                         .HasColumnName("NEXT_FIRE_TIME");
@@ -927,11 +923,11 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
-                    b.Property<DateTimeOffset>("ReportEndDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportEndDate")
+                        .HasColumnType("datetime2");
 
-                    b.Property<DateTimeOffset>("ReportStartDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportStartDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()

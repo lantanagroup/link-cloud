@@ -181,15 +181,23 @@ public class MappingOutcomeListener : BackgroundService
         var reportEntryMappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
         var value = result.Message.Value;
-        var facilityId = result.Message.Key.FacilityId;
-        var patientId = result.Message.Key.PatientId.SplitReference();
+
+        // Read through the key rather than off it. A message whose key failed to deserialize arrives here
+        // with a null Key, and dereferencing it would raise a NullReferenceException that the listener's
+        // catch-all classifies as transient -- retrying a record that can never succeed. Malformed input
+        // belongs in the dead letter topic, which is what the guard below routes it to.
+        var key = result.Message.Key;
+        var facilityId = key?.FacilityId;
+        var patientId = key?.PatientId.SplitReference();
 
         if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(patientId) || value is null)
         {
             throw new DeadLetterException("Invalid MappingOutcomeEvaluated message");
         }
 
-        var scheduleIds = value.ScheduledReports
+        // Deserialization writes a null over the property initializer, so the collection is only
+        // non-null by convention.
+        var scheduleIds = (value.ScheduledReports ?? [])
             .Select(sr => sr.ReportTrackingId)
             .Where(id => Guid.TryParse(id, out _))
             .Select(Guid.Parse!)
