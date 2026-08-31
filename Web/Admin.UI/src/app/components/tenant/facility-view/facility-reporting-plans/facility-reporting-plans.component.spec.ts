@@ -41,7 +41,9 @@ describe('FacilityReportingPlansComponent', () => {
 
     fixture = TestBed.createComponent(FacilityReportingPlansComponent);
     component = fixture.componentInstance;
-    component.facilityId = '100';
+    // Through setInput (not direct assignment) so Angular tracks it: ngOnChanges must see a
+    // later facility switch as a non-first change.
+    fixture.componentRef.setInput('facilityId', '100');
   });
 
   it('loads the facility\'s reporting plans, newest period first', () => {
@@ -61,10 +63,39 @@ describe('FacilityReportingPlansComponent', () => {
     expect(text).toContain('AchMonthly');
     expect(text).toContain('March 2026');
 
-    // "No" would match too much as a substring, so assert on the rendered cells instead.
     const reportingCells = Array.from(root.querySelectorAll('td.mat-column-isReporting'))
       .map(cell => cell.textContent?.trim());
-    expect(reportingCells).toEqual(['No', 'Yes']);
+    expect(reportingCells).toEqual(['Not reporting', 'Yes']);
+  });
+
+  it('reloads plans when the facilityId input changes', () => {
+    fixture.detectChanges();
+    expect(reportingPlanService.getReportingPlansForFacility).toHaveBeenCalledWith('100');
+
+    const otherPlans: IFacilityReportingPlan[] = [{
+      id: 'rp-other', facilityId: '200', measureMappingId: 'mm-9',
+      reportingMonth: 5, reportingYear: 2026, isReporting: true,
+      measure: 'CDI', dqm: 'CdiMonthly', frequency: Frequency.Monthly,
+      createDate: '2026-04-25T00:00:00Z', modifyDate: null
+    }];
+    reportingPlanService.getReportingPlansForFacility.and.returnValue(of(otherPlans));
+
+    fixture.componentRef.setInput('facilityId', '200');
+    fixture.detectChanges();
+
+    expect(reportingPlanService.getReportingPlansForFacility).toHaveBeenCalledWith('200');
+    expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-other']);
+  });
+
+  it('clears active filters when the facility changes', () => {
+    fixture.detectChanges();
+    component.filterMeasure = 'ACH';
+    component.onFilterChange();
+
+    fixture.componentRef.setInput('facilityId', '200');
+    fixture.detectChanges();
+
+    expect(component.hasActiveFilters()).toBeFalse();
   });
 
   it('shows the empty state when the facility has no plans', () => {
@@ -211,6 +242,10 @@ describe('FacilityReportingPlansComponent', () => {
     expect(component.dataSource.data.length).toBe(2);
   });
 });
+
+
+
+
 
 
 

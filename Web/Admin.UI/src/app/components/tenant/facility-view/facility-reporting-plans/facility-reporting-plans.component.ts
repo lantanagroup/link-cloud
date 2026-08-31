@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, ViewChild } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -42,7 +42,7 @@ import { Frequency } from '../../../../interfaces/dmrp/measure-mapping.interface
   templateUrl: './facility-reporting-plans.component.html',
   styleUrls: ['./facility-reporting-plans.component.scss']
 })
-export class FacilityReportingPlansComponent implements OnInit {
+export class FacilityReportingPlansComponent implements OnInit, OnChanges {
   @Input() facilityId: string = '';
 
   displayedColumns = ['measure', 'dqm', 'frequency', 'period', 'isReporting', 'lastUpdated'];
@@ -96,12 +96,28 @@ export class FacilityReportingPlansComponent implements OnInit {
     this.loadReportingPlans();
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+    const facilityChange = changes['facilityId'];
+    if (facilityChange && !facilityChange.firstChange && this.facilityId) {
+      // A new facility means the old filters describe data that no longer exists.
+      this.resetFilterFields();
+      this.loadReportingPlans();
+    }
+  }
+
   loadReportingPlans(): void {
     this.loading = true;
     this.loadFailed = false;
 
+    // If the facility changes while a request is in flight, the late response must not
+    // overwrite the newer facility's rows.
+    const requestedFacilityId = this.facilityId;
+
     this.reportingPlanService.getReportingPlansForFacility(this.facilityId).subscribe({
       next: (plans) => {
+        if (requestedFacilityId !== this.facilityId) {
+          return;
+        }
         this.loading = false;
         this.allPlans = plans ?? [];
         this.periodOptions = this.buildPeriodOptions(this.allPlans);
@@ -109,6 +125,9 @@ export class FacilityReportingPlansComponent implements OnInit {
         this.applyView();
       },
       error: () => {
+        if (requestedFacilityId !== this.facilityId) {
+          return;
+        }
         this.loading = false;
         this.loadFailed = true;
         this.allPlans = [];
@@ -125,12 +144,16 @@ export class FacilityReportingPlansComponent implements OnInit {
   }
 
   clearFilters(): void {
+    this.resetFilterFields();
+    this.onFilterChange();
+  }
+
+  private resetFilterFields(): void {
     this.filterMeasure = '';
     this.filterDqm = '';
     this.filterPeriod = null;
     this.filterReporting = null;
     this.filterFrequency = null;
-    this.onFilterChange();
   }
 
   hasActiveFilters(): boolean {
