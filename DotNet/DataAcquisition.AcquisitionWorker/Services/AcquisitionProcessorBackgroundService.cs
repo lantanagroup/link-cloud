@@ -314,7 +314,15 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                             {
                                 Source = MappingOutcomeSource.Acquisition,
                                 ScheduledReports = tailResult.ResourcesAcquired.ScheduledReports,
-                                LocationOrgOutcome = locationOrgOutcome
+                                LocationOrgOutcome = locationOrgOutcome,
+
+                                // Names the pass this outcome describes. Report does not read it on the
+                                // acquisition path -- that write overwrites its own columns unconditionally,
+                                // so a redelivery is already idempotent -- but the contract declares the
+                                // field, and a message that identifies itself is what makes a duplicate or
+                                // an out-of-order delivery legible when reading the topic.
+                                CorrelationId = tailResult.CorrelationId,
+                                QueryType = tailResult.ResourcesAcquired.QueryType
                             }
                         },
                         ct);

@@ -49,6 +49,26 @@ public class AcquisitionProcessorBackgroundServiceTests
     }
 
     [Fact]
+    public async Task TryProduceTailMessage_MappingOutcomeNamesTheAcquisitionPassItDescribes()
+    {
+        SetupTail();
+        SetupStrip(NotApplicable());
+
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        CaptureMappingOutcome(message => produced = message);
+
+        await InvokeTryProduceTailMessageAsync();
+
+        // Report does not read these on the acquisition path -- that write overwrites its own columns
+        // unconditionally, so redelivery is already idempotent. The contract declares them, though, and a
+        // message that cannot say which pass it describes is unreadable on the topic and would silently
+        // become ambiguous if the merge model were ever extended to this source.
+        Assert.NotNull(produced);
+        Assert.Equal(CorrelationId, produced!.Value.CorrelationId);
+        Assert.Equal(nameof(QueryPhase.Initial), produced.Value.QueryType);
+    }
+
+    [Fact]
     public async Task TryProduceTailMessage_ProducesMappingOutcomeCarryingTheLocationOrgResult()
     {
         // Arrange
