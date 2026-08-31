@@ -3,7 +3,10 @@ using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LinqKit;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DMRP.Business.Queries
 {
@@ -16,8 +19,63 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
         /// state. The same query serves callers asking about the current month (clock-derived
         /// arguments) and callers asking about a specific reporting period.
         /// </summary>
+        /// <param name="facilityId">
+        /// The reporting facility as the Tenant service knows it (the NHSN Org Id). A facility with no
+        /// plans, and one that does not exist, both return an empty list - absence of enrollment is an
+        /// answer, so the caller decides whether the facility itself is missing.
+        /// </param>
+        /// <param name="reportingMonth">Exact reporting month, 1-12. Null returns every month.</param>
+        /// <param name="reportingYear">Exact reporting year. Null returns every year.</param>
+        /// <param name="isReporting">
+        /// True returns only the measures the facility is enrolled in, false only those it has
+        /// withdrawn from. Null returns both: a withdrawal is recorded as false rather than deleted,
+        /// so an unfiltered read is the facility's whole history.
+        /// </param>
+        /// <param name="periodRange">
+        /// An inclusive window of reporting periods, for callers asking "what is coming up" rather
+        /// than about one exact month. Combining it with <paramref name="reportingMonth"/> or
+        /// <paramref name="reportingYear"/> narrows to the intersection; callers that treat the two
+        /// as mutually exclusive refuse the combination before they get here.
+        /// </param>
+        /// <param name="cancellationToken">Cancels the read.</param>
+        /// <returns>
+        /// The matching plans, each resolved through its measure mapping so the measure, dQM and
+        /// frequency are populated. A plan whose mapping could not be resolved is still returned, with
+        /// those three left null.
+        /// </returns>
         Task<List<FacilityReportingPlanModel>> GetForFacilityAsync(string facilityId, int? reportingMonth = null,
-            int? reportingYear = null, bool? isReporting = null, CancellationToken cancellationToken = default);
+            int? reportingYear = null, bool? isReporting = null, ReportingPeriodRange? periodRange = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// A facility's reporting plan as the facility itself reads it: one entry per reporting
+        /// period, carrying the measures enrolled in that period.
+        /// </summary>
+        /// <remarks>
+        /// The same rows <see cref="GetForFacilityAsync"/> returns, grouped. The stored grain is one
+        /// row per measure per period because that is what the reporting workflow needs; a facility
+        /// reads its obligations as a calendar, so the regrouping happens here rather than in each
+        /// client.
+        /// </remarks>
+        /// <param name="facilityId">The reporting facility, as the Tenant service knows it.</param>
+        /// <param name="periodRange">
+        /// An inclusive window of reporting periods. Null returns every period the facility has a plan
+        /// for, past ones included.
+        /// </param>
+        /// <param name="isReporting">
+        /// Passed through to the underlying read. Facility-facing callers pass true so a withdrawn
+        /// measure does not read as a current obligation.
+        /// </param>
+        /// <param name="pageSize">Periods per page.</param>
+        /// <param name="pageNumber">One-based page number.</param>
+        /// <param name="cancellationToken">Cancels the read.</param>
+        /// <returns>
+        /// A page of periods in chronological order, oldest first, with the paging metadata counting
+        /// periods rather than plan rows. A facility with no plans is an empty page.
+        /// </returns>
+        Task<PagedFacilityReportingPlanPeriodDto> GetPeriodsForFacilityAsync(string facilityId,
+            ReportingPeriodRange? periodRange = null, bool? isReporting = null, int pageSize = 10,
+            int pageNumber = 1, CancellationToken cancellationToken = default);
 
         Task<PagedFacilityReportingPlanDto> PagedSearchAsync(string? facilityId = null, string? measureMappingId = null,
             int? reportingMonth = null, int? reportingYear = null, bool? isReporting = null, string sortBy = "Id",
@@ -46,12 +104,11 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
 
         public async Task<List<FacilityReportingPlanModel>> GetForFacilityAsync(string facilityId,
             int? reportingMonth = null, int? reportingYear = null, bool? isReporting = null,
-            CancellationToken cancellationToken = default)
+            ReportingPeriodRange? periodRange = null, CancellationToken cancellationToken = default)
         {
-            var entities = await _repository.FindAsync(p => p.FacilityId == facilityId
-                && (reportingMonth == null || p.ReportingMonth == reportingMonth)
-                && (reportingYear == null || p.ReportingYear == reportingYear)
-                && (isReporting == null || p.IsReporting == isReporting), cancellationToken);
+            var entities = await _repository.FindAsync(
+                MatchesFacilityPlan(facilityId, reportingMonth, reportingYear, isReporting, periodRange),
+                cancellationToken);
 
             // The facility view labels rows by measure rather than mapping id, so resolve the
             // mappings and hang them on the navigation before mapping - the same two-query stitch
@@ -69,6 +126,44 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             }
 
             return entities.Select(ToModel).ToList();
+        }
+
+        public async Task<PagedFacilityReportingPlanPeriodDto> GetPeriodsForFacilityAsync(string facilityId,
+            ReportingPeriodRange? periodRange = null, bool? isReporting = null, int pageSize = 10,
+            int pageNumber = 1, CancellationToken cancellationToken = default)
+        {
+            var plans = await GetForFacilityAsync(facilityId, isReporting: isReporting,
+                periodRange: periodRange, cancellationToken: cancellationToken);
+
+            // Grouped and paged in memory rather than in SQL. Grouping needs every row in the window
+            // before it can count periods at all, and the window is what keeps that set small - one
+            // row per measure per period, for at most a couple of years. Paging here is about giving
+            // the caller the same envelope every other list operation returns, not about how much is
+            // read.
+            var periods = plans
+                .GroupBy(plan => (plan.ReportingYear, plan.ReportingMonth))
+                .OrderBy(period => period.Key.ReportingYear)
+                .ThenBy(period => period.Key.ReportingMonth)
+                .Select(period => new FacilityReportingPlanPeriodModel
+                {
+                    ReportingYear = period.Key.ReportingYear,
+                    ReportingMonth = period.Key.ReportingMonth,
+
+                    // Ordered by measure, then by mapping id to break the tie two mappings of the
+                    // same measure would otherwise leave to the database's row order. Without it the
+                    // same period can render in a different order on a later call.
+                    Measures = period
+                        .OrderBy(plan => plan.Measure, StringComparer.Ordinal)
+                        .ThenBy(plan => plan.MeasureMappingId, StringComparer.Ordinal)
+                        .Select(ToMeasureModel)
+                        .ToList()
+                })
+                .ToList();
+
+            var page = periods.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
+
+            return new PagedFacilityReportingPlanPeriodDto(page,
+                new PaginationMetadata(pageSize, pageNumber, periods.Count));
         }
 
         public async Task<PagedFacilityReportingPlanDto> PagedSearchAsync(string? facilityId = null,
@@ -91,7 +186,83 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             };
         }
 
+        /// <summary>
+        /// The filter behind the per-facility read: the facility, plus whichever of the optional
+        /// narrowings the caller supplied. Each one is skipped when its argument is null, so the
+        /// unfiltered call returns the facility's whole history.
+        /// </summary>
+        /// <remarks>
+        /// Composed rather than written as one expression: a filter the caller left out contributes
+        /// nothing at all, instead of a <c>value == null ||</c> guard that has to be read past here
+        /// and evaluated in the database there. Same idiom the Report managers use.
+        /// <para>
+        /// The window is three clauses that read as one sentence: the period falls inside the span of
+        /// years, and where it lands on the first or the last year of that span, it is not before the
+        /// opening month or after the closing one. Splitting the year test from the month test is what
+        /// makes it legible - "October 2026 through March 2027" is not a month range, because March
+        /// is inside the window in one year and behind it in the other.
+        /// </para>
+        /// <para>
+        /// Comparisons are on the year and month columns rather than arithmetic over them
+        /// (<c>ReportingYear * 12 + ReportingMonth</c>). The arithmetic form is shorter and answers
+        /// correctly, but no index can serve it, so it scans - and
+        /// <c>IX_FacilityReportingPlans_Facility_Period</c> exists for exactly this read.
+        /// </para>
+        /// </remarks>
+        private static Expression<Func<FacilityReportingPlan, bool>> MatchesFacilityPlan(string facilityId,
+            int? reportingMonth, int? reportingYear, bool? isReporting, ReportingPeriodRange? window)
+        {
+            Expression<Func<FacilityReportingPlan, bool>> predicate = plan => plan.FacilityId == facilityId;
+
+            if (reportingMonth.HasValue)
+            {
+                predicate = predicate.And(plan => plan.ReportingMonth == reportingMonth.Value);
+            }
+
+            if (reportingYear.HasValue)
+            {
+                predicate = predicate.And(plan => plan.ReportingYear == reportingYear.Value);
+            }
+
+            if (isReporting.HasValue)
+            {
+                predicate = predicate.And(plan => plan.IsReporting == isReporting.Value);
+            }
+
+            if (window.HasValue)
+            {
+                // Each bound reaches the expression as a plain local rather than as a walk through
+                // window.Value.From.Year, which is a longer chain for the provider to fold away.
+                var firstYear = window.Value.From.Year;
+                var firstMonth = window.Value.From.Month;
+                var lastYear = window.Value.To.Year;
+                var lastMonth = window.Value.To.Month;
+
+                // Inside the span of years...
+                predicate = predicate.And(plan => plan.ReportingYear >= firstYear && plan.ReportingYear <= lastYear);
+
+                // ...and within the opening and closing months of that span.
+                predicate = predicate.And(plan => plan.ReportingYear != firstYear || plan.ReportingMonth >= firstMonth);
+                predicate = predicate.And(plan => plan.ReportingYear != lastYear || plan.ReportingMonth <= lastMonth);
+            }
+
+            return predicate;
+        }
+
         private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) =>
             FacilityReportingPlanMapper.ToModel(entity);
+
+        /// <summary>
+        /// Narrows a plan row to what it contributes to a period: the measure, without the facility
+        /// and period it is already filed under.
+        /// </summary>
+        private static FacilityReportingPlanMeasureModel ToMeasureModel(FacilityReportingPlanModel plan) => new()
+        {
+            MeasureMappingId = plan.MeasureMappingId,
+            Measure = plan.Measure,
+            DQM = plan.DQM,
+            Frequency = plan.Frequency,
+            IsReporting = plan.IsReporting
+        };
     }
 }
