@@ -23,12 +23,20 @@
       "jwtKeyIdPlaceholder": "Certificate thumbprint / key id",
       "jwtPrivateKeyPem": "JWT Private Key PEM",
       "jwtPrivateKeyPlaceholder": "-----BEGIN PRIVATE KEY-----"
-    }
+    },
+    "modeTitle": "Harness Mode",
+    "modeLabel": "Backend",
+    "modeMock": "Mock (offline)",
+    "modeBff": "NHSN-App-BFF (:8079)",
+    "modeMockHint": "In-memory fixtures. No backing services required.",
+    "modeBffHint": "Signs a real JWT from the active test user and calls the BFF."
   },
   "navigation": {
     "title": "Navigation",
     "facility": "Facility",
     "home": "Home",
+    "facilityInformation": "Facility Information",
+    "fhirServerInformation": "FHIR Server Information",
     "onboarding": "Onboarding",
     "configuration": "Configuration"
   },
@@ -40,7 +48,13 @@
     "submitRequest": "Submit a request",
     "completeOnboarding": "Complete Onboarding",
     "saveAndActivate": "Save and activate test profile",
-    "cancelEdit": "Cancel edit"
+    "cancelEdit": "Cancel edit",
+    "continue": "Continue",
+    "back": "Back",
+    "returnToHome": "Return to Home",
+    "reload": "Reload",
+    "download": "Download",
+    "testConnection": "Test Connection"
   },
   "commonBoolean": {
     "yes": "Yes",
@@ -78,5 +92,12 @@
     "missingAccessDescription": "Your NHSN App identity does not include the FACADMIN role required for this experience.",
     "missingFacilityTitle": "You must select a facility before proceeding.",
     "missingFacilityDescription": "Your user context did not include a facility. Please return to the NHSN App and choose a facility before continuing."
+  },
+  "status": {
+    "saving": "Saving…",
+    "loading": "Loading…"
+  },
+  "errors": {
+    "unexpected": "Something went wrong. Please try again."
   }
 }

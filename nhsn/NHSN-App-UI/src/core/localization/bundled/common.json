@@ -1,0 +1,75 @@
+{
+  "app": {
+    "title": "NHSN App UI Shell",
+    "linkTitle": "NHSNLink"
+  },
+  "navigation": {
+    "title": "Navigation",
+    "facility": "Facility",
+    "home": "Home",
+    "facilityInformation": "Facility Information",
+    "fhirServerInformation": "FHIR Server Information",
+    "onboarding": "Onboarding",
+    "configuration": "Configuration"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "remove": "Remove",
+    "submitRequest": "Submit a request",
+    "completeOnboarding": "Complete Onboarding",
+    "saveAndActivate": "Save and activate test profile",
+    "cancelEdit": "Cancel edit",
+    "continue": "Continue",
+    "back": "Back",
+    "returnToHome": "Return to Home",
+    "reload": "Reload",
+    "download": "Download",
+    "testConnection": "Test Connection"
+  },
+  "commonBoolean": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "state": {
+    "loadingUserContext": "Loading NHSNLink user context...",
+    "noUserContext": "No user context was returned.",
+    "selectOrCreateProfile": "Select or create a test profile",
+    "loadUserContextError": "Unable to load user context."
+  },
+  "home": {
+    "userContextTitle": "User context",
+    "facilityLabel": "Facility:",
+    "groupsLabel": "Groups:",
+    "accessStateLabel": "Access state:",
+    "facilityAdminLabel": "Facility admin:",
+    "onboardingLabel": "Onboarding:",
+    "notAssigned": "Not assigned",
+    "noGroupsProvided": "No groups provided",
+    "onboardingComplete": "Complete",
+    "onboardingInProgress": "In progress",
+    "frameworkStatusTitle": "Framework status",
+    "maintenanceModeDescription": "This framework foundation is in maintenance mode. As the facility configuration evolves, this area can surface the specific onboarding artifacts or settings that need to be reviewed or updated.",
+    "onboardingModeDescription": "This framework foundation is in onboarding mode. Future work will guide the user through initial facility onboarding, source-system coordination, and role-appropriate setup tasks.",
+    "availableNavigationTitle": "Available navigation from the BFF"
+  },
+  "notifications": {
+    "close": "Close notification",
+    "onboardingCompleted": "Completed onboarding for facility {{facilityId}}.",
+    "onboardingFailed": "Unable to complete onboarding."
+  },
+  "auth": {
+    "missingAccessTitle": "You do not currently have access to NHSNLink configuration.",
+    "missingAccessDescription": "Your NHSN App identity does not include the FACADMIN role required for this experience.",
+    "missingFacilityTitle": "You must select a facility before proceeding.",
+    "missingFacilityDescription": "Your user context did not include a facility. Please return to the NHSN App and choose a facility before continuing."
+  },
+  "status": {
+    "saving": "Saving…",
+    "loading": "Loading…"
+  },
+  "errors": {
+    "unexpected": "Something went wrong. Please try again."
+  }
+}

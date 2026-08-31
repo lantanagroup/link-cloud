@@ -4,7 +4,9 @@ const common = require('./webpack.common');
 
 module.exports = {
   ...common,
-  entry: './src/app-shell/main.tsx',
+  // The only entry permitted to reach shell/. Global styles are left
+  // unscoped here — the shell owns its page, unlike the embed build.
+  entry: './src/app/main.tsx',
   output: {
     ...common.output,
     filename: '[name].[contenthash].js',
@@ -14,7 +16,7 @@ module.exports = {
   devServer: {
     historyApiFallback: true,
     static: {
-      directory: path.resolve(__dirname, 'dist/app-shell')
+      directory: path.resolve(__dirname, 'dist')
     },
     proxy: [
       {
@@ -24,9 +26,12 @@ module.exports = {
       }
     ]
   },
+  // Spread common's plugins — assigning a fresh array would silently drop
+  // the DefinePlugin that keeps `process.env` out of the browser.
   plugins: [
+    ...common.plugins,
     new HtmlWebpackPlugin({
-      template: './src/app-shell/index.html',
+      template: './src/app/index.html',
       filename: 'index.html'
     })
   ]

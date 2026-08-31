@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -10,9 +10,9 @@ public class UserInfoEndpoints : IApi
             .WithTags("NHSN App BFF")
             .WithOpenApi();
 
-        group.MapGet("/userinfo", async (HttpContext context, IUserInfoService userInfoService, CancellationToken cancellationToken) =>
+        group.MapGet("/userinfo", async (IUserInfoService userInfoService, CancellationToken cancellationToken) =>
             {
-                var response = await userInfoService.GetUserInfoAsync(context.User, context.Request, cancellationToken);
+                var response = await userInfoService.GetUserInfoAsync(cancellationToken);
                 return Results.Ok(response);
             })
             .RequireAuthorization("AuthenticatedUser")

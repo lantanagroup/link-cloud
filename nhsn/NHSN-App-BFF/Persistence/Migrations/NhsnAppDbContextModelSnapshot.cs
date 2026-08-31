@@ -22,19 +22,94 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.NhsnFacility", b =>
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.Acknowledgement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Accepted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AcceptedByExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("AcceptedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContextId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<bool>("IsOnboarded")
-                        .HasColumnType("bit");
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("StatementKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityId", "Kind", "AcceptedOn");
+
+                    b.ToTable("Acknowledgements", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.NhsnFacility", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrentStepId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("LastModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OnboardingStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Vendor")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.HasKey("Id");
 
@@ -67,14 +142,6 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("FacilityId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("GroupsRaw")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<DateTime?>("LastAccessedOn")
                         .HasColumnType("datetime2");
 
@@ -98,6 +165,43 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.OnboardingDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DraftJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UnlockedStepsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("UpdatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .IsUnique();
+
+                    b.ToTable("OnboardingDrafts", (string)null);
                 });
 #pragma warning restore 612, 618
         }

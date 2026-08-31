@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -39,6 +39,8 @@ public sealed class LocalizationEndpoints : IApi
 
     private static IResult HandleOkResult(HttpContext context, LocalizationResourceResult result)
     {
+        context.Response.Headers.CacheControl = "no-cache";
+
         if (!string.IsNullOrWhiteSpace(result.ETag))
         {
             var expectedETag = $"\"{result.ETag}\"";

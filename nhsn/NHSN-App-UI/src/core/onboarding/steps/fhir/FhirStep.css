@@ -1,0 +1,310 @@
+.fhir-server-info {
+  --fhir-blue: var(--kendo-color-primary, #0057b7);
+  --fhir-blue-dark: var(--kendo-color-primary-hover, #032659);
+  --fhir-green: var(--kendo-color-success, #1e5f25);
+  --fhir-red: var(--kendo-color-error, #cc1b22);
+  --fhir-gray-50: var(--kendo-color-surface, #f7f9fc);
+  --fhir-gray-100: var(--kendo-color-base-hover, #f2f4f7);
+  --fhir-gray-200: var(--kendo-color-border, #d0d7de);
+  --fhir-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
+  --fhir-gray-800: var(--kendo-color-app-text, #1f2328);
+  --fhir-radius: 10px;
+
+  color: var(--fhir-gray-800);
+  font-size: 15px;
+}
+
+.fhir-server-info .card {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--fhir-gray-200);
+  border-radius: 10px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.fhir-server-info .page-header {
+  padding: 0;
+  border-bottom: none !important;
+  display: block;
+}
+
+.fhir-server-info .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.fhir-server-info .page-header-buttons {
+  display: none;
+}
+
+.fhir-server-info .subtitle {
+  color: var(--fhir-gray-600);
+  margin: 0 0 22px;
+  font-size: 14px;
+}
+
+.fhir-server-info .subtitle a {
+  color: var(--fhir-blue);
+}
+
+.fhir-server-info .section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fhir-gray-600);
+  margin: 26px 0 10px;
+  font-weight: 600;
+}
+
+.fhir-server-info .form-group {
+  margin-bottom: 18px;
+}
+
+.fhir-server-info .form-group > label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--fhir-gray-800);
+}
+
+.fhir-server-info .info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--fhir-gray-200);
+  color: var(--fhir-gray-600);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+
+.fhir-server-info .info-icon:hover,
+.fhir-server-info .info-icon:focus-visible {
+  background: var(--fhir-blue);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  outline: none;
+}
+
+.fhir-server-info .info-icon .tooltip-bubble {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fhir-gray-800);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+}
+
+.fhir-server-info .info-icon .tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--fhir-gray-800);
+}
+
+.fhir-server-info .info-icon:hover .tooltip-bubble,
+.fhir-server-info .info-icon:focus-visible .tooltip-bubble {
+  display: block;
+}
+
+.fhir-server-info .instructions-box {
+  background: var(--fhir-gray-50);
+  border: 1px solid var(--fhir-gray-200);
+  border-radius: var(--fhir-radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.fhir-server-info .instructions-box p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fhir-gray-600);
+}
+
+.fhir-server-info .download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 14px;
+  border: 1px solid var(--fhir-gray-200);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--fhir-blue-dark);
+  font-weight: 600;
+  font-size: 13.5px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.fhir-server-info .download-link:hover {
+  border-color: var(--fhir-blue);
+  background: var(--fhir-gray-50);
+}
+
+.fhir-server-info .triplet {
+  display: flex;
+  gap: 12px;
+}
+
+.fhir-server-info .triplet .k-form-field {
+  flex: 1;
+}
+
+.fhir-server-info .nhsn-link__step-actions {
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 0;
+  border-top: none;
+  flex-wrap: wrap;
+}
+
+.fhir-server-info .fhir-test-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.fhir-server-info .result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fhir-server-info .result-icon-success {
+  background: var(--fhir-green);
+}
+
+.fhir-server-info .result-icon-failed {
+  background: var(--fhir-red);
+}
+
+.fhir-server-info .k-form-field {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.fhir-server-info .k-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--fhir-gray-800);
+}
+
+.fhir-server-info .k-label svg {
+  display: none;
+}
+
+.fhir-server-info .k-input,
+.fhir-server-info .k-numerictextbox {
+  width: 100%;
+  border-radius: 10px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.fhir-server-info .k-input::placeholder {
+  color: var(--fhir-gray-600);
+  opacity: 1;
+}
+
+.fhir-server-info .k-input:focus-within {
+  outline: 2px solid var(--fhir-blue);
+  outline-offset: 1px;
+}
+
+.fhir-server-info .k-input.k-invalid,
+.fhir-server-info .k-numerictextbox.k-invalid {
+  border-color: var(--fhir-red);
+}
+
+.fhir-server-info .k-input.k-invalid:focus-within,
+.fhir-server-info .k-numerictextbox.k-invalid:focus-within {
+  outline-color: var(--fhir-red);
+}
+
+.fhir-server-info .k-form-error {
+  color: var(--fhir-red);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border-radius: 50%;
+  background: var(--fhir-gray-200);
+  color: var(--fhir-gray-600);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: help;
+  anchor-name: --fhir-hint-badge;
+}
+
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label:hover::after,
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label:focus-within::after {
+  background: var(--fhir-blue);
+  color: var(--kendo-color-on-inverse, #ffffff);
+}
+
+@supports (position-anchor: --fhir-hint-badge) {
+  .fhir-server-info .k-form-hint {
+    position-anchor: --fhir-hint-badge;
+    left: anchor(center);
+    bottom: calc(anchor(top) + 9px);
+    transform: translateX(-50%);
+  }
+
+  .fhir-server-info .k-form-hint::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+.fhir-server-info .k-label:hover ~ .k-form-hint,
+.fhir-server-info .k-label:focus-within ~ .k-form-hint {
+  display: block;
+}
