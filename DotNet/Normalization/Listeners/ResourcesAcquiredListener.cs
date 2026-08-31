@@ -213,10 +213,12 @@ public class ResourcesAcquiredListener : BackgroundService
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
+        var cacheKeys = result.Message.Value.CacheKeys ?? [];
+        var copiedKeys = new List<string>(cacheKeys.Count);
 
         using (var scope = _scopeFactory.CreateScope())
         {
-            foreach (var cacheKey in result.Message.Value.CacheKeys)
+            foreach (var cacheKey in cacheKeys)
             {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
@@ -229,6 +231,15 @@ public class ResourcesAcquiredListener : BackgroundService
                 }, cancellationToken: cancellationToken);
 
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
+                if (resources.Count == 0)
+                {
+                    // DA only lists a key after it has written (and not stripped) resources there.
+                    // An empty listed key is a producer defect, not a not-ready race: retries cannot
+                    // create data that was never cached (org-map filter, Encounter strip, etc.).
+                    throw new DeadLetterException(
+                        $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
+                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                }
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -316,11 +327,20 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
 
                 await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+                copiedKeys.Add(cacheKey);
+            }
+
+            if (cacheKeys.Count == 0)
+            {
+                _logger.LogInformation(
+                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
-            await resourceCache.DeleteAsync(result.Message.Value.CacheKeys, cancellationToken);
+            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
         }
     }
 
