@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+﻿import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 
@@ -101,6 +101,20 @@ describe('FacilityReportingPlansComponent', () => {
       expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
     });
 
+    it('filters by reporting cadence', () => {
+      component.filterFrequency = Frequency.Monthly;
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-1']);
+
+      component.filterFrequency = Frequency.Daily;
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
+    });
+
+    it('offers the cadences present in the data, in canonical order', () => {
+      expect(component.frequencyOptions).toEqual([Frequency.Daily, Frequency.Monthly]);
+    });
+
     it('offers the distinct periods newest first', () => {
       expect(component.periodOptions.map(o => o.label)).toEqual(['April 2026', 'March 2026']);
     });
@@ -119,6 +133,7 @@ describe('FacilityReportingPlansComponent', () => {
     it('clearFilters restores the full list', () => {
       component.filterText = 'ach';
       component.filterReporting = false;
+      component.filterFrequency = Frequency.Daily;
       component.onFilterChange();
 
       component.clearFilters();
@@ -176,3 +191,5 @@ describe('FacilityReportingPlansComponent', () => {
     expect(component.dataSource.data.length).toBe(2);
   });
 });
+
+

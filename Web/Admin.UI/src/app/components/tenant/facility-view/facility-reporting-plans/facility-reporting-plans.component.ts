@@ -13,6 +13,7 @@ import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 
 import { ReportingPlanService } from '../../../../services/gateway/dmrp/reporting-plan.service';
 import { IFacilityReportingPlan } from '../../../../interfaces/dmrp/facility-reporting-plan.interface';
+import { Frequency } from '../../../../interfaces/dmrp/measure-mapping.interface';
 
 /**
  * Read-only view of what DMRP said the facility is enrolled to report, one row per measure per
@@ -51,10 +52,21 @@ export class FacilityReportingPlansComponent implements OnInit {
   allPlans: IFacilityReportingPlan[] = [];
   /** Distinct periods present in the data, newest first, for the period filter. */
   periodOptions: { key: string; label: string }[] = [];
+  /**
+   * Distinct cadences present in the data, in canonical order. Derived from the rows rather
+   * than MEASURE_MAPPING_FREQUENCIES so historical values a mapping no longer allows (Adhoc,
+   * Discharge) remain filterable.
+   */
+  frequencyOptions: Frequency[] = [];
 
   filterText = '';
   filterPeriod: string | null = null;
   filterReporting: boolean | null = null;
+  filterFrequency: Frequency | null = null;
+
+  private static readonly frequencyOrder: readonly Frequency[] = [
+    Frequency.Daily, Frequency.Weekly, Frequency.Monthly, Frequency.Adhoc, Frequency.Discharge
+  ];
 
   readonly pageSizeOptions = [10, 25, 50];
 
@@ -92,6 +104,7 @@ export class FacilityReportingPlansComponent implements OnInit {
         this.loading = false;
         this.allPlans = plans ?? [];
         this.periodOptions = this.buildPeriodOptions(this.allPlans);
+        this.frequencyOptions = FacilityReportingPlansComponent.buildFrequencyOptions(this.allPlans);
         this.applyView();
       },
       error: () => {
@@ -99,6 +112,7 @@ export class FacilityReportingPlansComponent implements OnInit {
         this.loadFailed = true;
         this.allPlans = [];
         this.periodOptions = [];
+        this.frequencyOptions = [];
         this.dataSource.data = [];
       }
     });
@@ -113,11 +127,13 @@ export class FacilityReportingPlansComponent implements OnInit {
     this.filterText = '';
     this.filterPeriod = null;
     this.filterReporting = null;
+    this.filterFrequency = null;
     this.onFilterChange();
   }
 
   hasActiveFilters(): boolean {
-    return this.filterText.trim() !== '' || this.filterPeriod !== null || this.filterReporting !== null;
+    return this.filterText.trim() !== '' || this.filterPeriod !== null
+      || this.filterReporting !== null || this.filterFrequency !== null;
   }
 
   onSortChange(sort: Sort): void {
@@ -153,7 +169,18 @@ export class FacilityReportingPlansComponent implements OnInit {
     const reportingMatches = this.filterReporting === null
       || plan.isReporting === this.filterReporting;
 
-    return textMatches && periodMatches && reportingMatches;
+    const frequencyMatches = this.filterFrequency === null
+      || plan.frequency === this.filterFrequency;
+
+    return textMatches && periodMatches && reportingMatches && frequencyMatches;
+  }
+
+  private static buildFrequencyOptions(plans: IFacilityReportingPlan[]): Frequency[] {
+    const present = new Set(plans.map(p => p.frequency).filter((f): f is Frequency => f !== null));
+    const ordered = FacilityReportingPlansComponent.frequencyOrder.filter(f => present.has(f));
+    // Anything outside the canonical order (a future enum value) still gets an option.
+    const unknown = [...present].filter(f => !FacilityReportingPlansComponent.frequencyOrder.includes(f));
+    return [...ordered, ...unknown];
   }
 
   private buildPeriodOptions(plans: IFacilityReportingPlan[]): { key: string; label: string }[] {

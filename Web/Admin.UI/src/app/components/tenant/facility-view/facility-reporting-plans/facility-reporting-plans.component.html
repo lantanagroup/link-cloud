@@ -34,6 +34,14 @@
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting Cadence</mat-label>
+          <mat-select [(ngModel)]="filterFrequency" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            <mat-option *ngFor="let freq of frequencyOptions" [value]="freq">{{ freq }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
           <mat-label>Reporting</mat-label>
           <mat-select [(ngModel)]="filterReporting" (selectionChange)="onFilterChange()">
             <mat-option [value]="null">All</mat-option>
