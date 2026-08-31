@@ -34,9 +34,9 @@ public sealed class LivePatientSeed
     public ScheduledInpatientPattern? Pattern { get; init; }
 
     /// <summary>
-    /// Data/pattern report-inclusion baseline. When null, the tracker falls back to
-    /// <see cref="ScheduledInpatientPatternExtensions.GetCensusBehavior"/> for
-    /// <c>ExpectedInReport</c>. Census Admit/Discharge must not change this.
+    /// Predictor: would this patient be included if they are admitted. When null, the
+    /// tracker falls back to <see cref="ScheduledInpatientPatternExtensions.GetCensusBehavior"/>.
+    /// Census does not rewrite this flag; realized report inclusion is Admit AND this value.
     /// </summary>
     public bool? ExpectedInReport { get; init; }
 }
