@@ -936,6 +936,160 @@ public class FhirApiServiceTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task ExecuteSearch_CachesEntireBundlePageInOneWrite()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var resourceCache = new Mock<IResourceCache>();
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            resourceCache.Object,
+            CreateLocationMappingService()
+        );
+
+        var bundle = new Bundle
+        {
+            Entry =
+            [
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-1" } },
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-2" } },
+                new Bundle.EntryComponent { Resource = new Observation { Id = "obs-3" } }
+            ]
+        };
+
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetBundleAsync(bundle));
+
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            ScheduledReport = new ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+        var fhirQuery = new FhirQueryModel
+        {
+            IsReference = false,
+            ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+        };
+
+        var ids = await service.ExecuteSearch(
+            log,
+            fhirQuery,
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.Equal(3, ids.Count);
+        resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
+            "corr-1:Observation",
+            It.Is<List<DomainResource>>(resources =>
+                resources.Count == 3
+                && resources.Select(resource => resource.Id).SequenceEqual(new[] { "obs-1", "obs-2", "obs-3" })),
+            ResourceType.Observation,
+            It.IsAny<CancellationToken>()), Times.Once);
+        resourceCache.Verify(x => x.UpdateCorrelationCacheAsync(
+            It.IsAny<string>(),
+            It.IsAny<List<DomainResource>>(),
+            It.IsAny<ResourceType>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_AppliesDefaultSearchPageSize()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        SearchParams? capturedSearchParams = null;
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<SearchFhirCommandRequest, CancellationToken>((request, _) => capturedSearchParams = request.searchParams)
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService()
+        );
+
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            ScheduledReport = new ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+
+        await service.ExecuteSearch(
+            log,
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.NotNull(capturedSearchParams);
+        Assert.Equal(100, capturedSearchParams.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_DoesNotOverrideExplicitCount()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        SearchParams? capturedSearchParams = null;
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<SearchFhirCommandRequest, CancellationToken>((request, _) => capturedSearchParams = request.searchParams)
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService()
+        );
+
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            ScheduledReport = new ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+
+        await service.ExecuteSearch(
+            log,
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1", "_count=25"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.NotNull(capturedSearchParams);
+        Assert.True(
+            capturedSearchParams.Count == 25
+            || capturedSearchParams.Parameters.Any(parameter =>
+                string.Equals(parameter.Item1, "_count", StringComparison.OrdinalIgnoreCase)
+                && parameter.Item2 == "25"));
+        Assert.NotEqual(100, capturedSearchParams.Count);
+    }
+
     private static async IAsyncEnumerable<Bundle> GetBundleAsync(Bundle bundle)
     {
         yield return bundle;

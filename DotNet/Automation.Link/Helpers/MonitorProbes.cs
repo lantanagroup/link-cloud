@@ -102,6 +102,11 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
             HasCriticalFailure = critical,
             StalledStage = _progressMonitor.StalledStage,
             StallDuration = _progressMonitor.StallDuration,
+            LastProgressUtc = _progressMonitor.LastAcquisitionProgressUtc == default
+                ? null
+                : _progressMonitor.LastAcquisitionProgressUtc,
+            AcquisitionResourcesAcquired = _progressMonitor.LastResourcesAcquired,
+            AcquisitionInFlight = _progressMonitor.IsAcquisitionInFlight,
             Issues = issues
         };
     }

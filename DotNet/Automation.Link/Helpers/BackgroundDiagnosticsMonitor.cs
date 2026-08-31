@@ -40,6 +40,21 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     public IReadOnlyCollection<string> CompletedMilestones => _monitor.State.CompletedMilestones;
 
     /// <summary>
+    /// Latest Data Acquisition resource count observed by the progress probe.
+    /// </summary>
+    public int AcquisitionResourcesAcquired => _monitor.State.AcquisitionResourcesAcquired;
+
+    /// <summary>
+    /// True when DA completed a log or acquired more resources within <paramref name="window"/>.
+    /// Used as a poll-loop keep-alive so large acquisitions are not treated as timeouts.
+    /// </summary>
+    public bool HasRecentAcquisitionProgress(TimeSpan window)
+    {
+        var last = _monitor.State.LastProgressUtc;
+        return last != default && DateTime.UtcNow - last <= window;
+    }
+
+    /// <summary>
     /// Returns true if the named milestone has been reached.
     /// Milestone names match <see cref="MilestoneValidationOrchestrator.Milestone"/> enum values as strings.
     /// </summary>

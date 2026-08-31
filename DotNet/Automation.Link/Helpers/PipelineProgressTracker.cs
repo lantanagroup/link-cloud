@@ -18,6 +18,7 @@ public class PipelineProgressTracker
 
     // Stall detection
     private int _lastCompletedUnits = -1;
+    private int _lastResourcesAcquired = -1;
     private DateTime _lastProgressChange = DateTime.UtcNow;
     private string? _stalledStage;
 
@@ -79,7 +80,7 @@ public class PipelineProgressTracker
             else
             {
                 stageDetails.Add("report=pending");
-                PrintIfChanged(completedUnits, stageDetails);
+                PrintIfChanged(completedUnits, stageDetails, resourcesAcquired: 0);
                 return;
             }
 
@@ -116,10 +117,12 @@ public class PipelineProgressTracker
             stageDetails.Add($"valid={patientsValidated}/{_expectedPatientCount}");
             stageDetails.Add($"submit={patientsSubmitted}/{_expectedPatientCount}");
 
+            var resourcesAcquired = 0;
             if (_expectsDataAcquisition)
             {
                 var acqSummary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
                 var patientsAcquired = acqSummary?.TotalCompletedPatients ?? 0;
+                resourcesAcquired = acqSummary?.TotalResourcesAcquired ?? 0;
 
                 patientsAcquired = Math.Min(patientsAcquired, _expectedPatientCount);
                 completedUnits += patientsAcquired;
@@ -127,7 +130,7 @@ public class PipelineProgressTracker
                 stageDetails.Insert(1, $"acq={patientsAcquired}/{_expectedPatientCount}");
             }
 
-            PrintIfChanged(completedUnits, stageDetails);
+            PrintIfChanged(completedUnits, stageDetails, resourcesAcquired);
         }
         catch (Exception ex)
         {
@@ -135,12 +138,16 @@ public class PipelineProgressTracker
         }
     }
 
-    private void PrintIfChanged(int completedUnits, List<string> stageDetails)
+    private void PrintIfChanged(int completedUnits, List<string> stageDetails, int resourcesAcquired)
     {
-        // Stall detection
-        if (completedUnits != _lastCompletedUnits)
+        // Stall detection: patient-level units or DA still writing resources
+        // (one large patient can sit at acq=0/1 for a long time while Observation pages).
+        var activityChanged = completedUnits != _lastCompletedUnits
+            || resourcesAcquired != _lastResourcesAcquired;
+        if (activityChanged)
         {
             _lastCompletedUnits = completedUnits;
+            _lastResourcesAcquired = resourcesAcquired;
             _lastProgressChange = DateTime.UtcNow;
             _stalledStage = null;
         }
