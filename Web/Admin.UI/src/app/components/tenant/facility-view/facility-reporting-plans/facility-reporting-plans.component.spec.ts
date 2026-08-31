@@ -97,6 +97,17 @@ describe('FacilityReportingPlansComponent', () => {
       expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
     });
 
+    it('trims whitespace around filter text before matching', () => {
+      component.filterMeasure = '  ach  ';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-1']);
+
+      component.filterMeasure = '';
+      component.filterDqm = ' hobdaily ';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
+    });
+
     it('filters by reporting period', () => {
       component.filterPeriod = '2026-3';
       component.onFilterChange();
@@ -200,6 +211,8 @@ describe('FacilityReportingPlansComponent', () => {
     expect(component.dataSource.data.length).toBe(2);
   });
 });
+
+
 
 
 
