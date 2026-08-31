@@ -6,7 +6,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -87,10 +86,7 @@ public class ReadFhirCommand : IReadFhirCommand
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
-            var httpClientWithHandler = new HttpClient(headerCapturingHandler)
-            {
-                Timeout = FhirSearchLimits.HttpClientTimeout
-            };
+            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
             var fhirClient = new FhirClient(request.baseUrl.Trim('/'), httpClientWithHandler, new FhirClientSettings
             {

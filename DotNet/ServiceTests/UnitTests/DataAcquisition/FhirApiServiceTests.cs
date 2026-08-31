@@ -1017,7 +1017,7 @@ public class FhirApiServiceTests
             CreateLocationMappingService()
         );
 
-        var encounterIds = string.Join(',', Enumerable.Range(1, 45).Select(i => $"enc-{i}"));
+        var encounterIds = string.Join(',', Enumerable.Range(1, 150).Select(i => $"enc-{i}"));
         var log = new DataAcquisitionLogModel
         {
             FacilityId = "fac-1",
@@ -1039,7 +1039,7 @@ public class FhirApiServiceTests
 
         searchFhirCommand.Verify(
             x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(3));
+            Times.Exactly(2));
     }
 
     [Fact]

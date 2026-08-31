@@ -36,7 +36,7 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
 
         Int32.TryParse(parameter.Paged, out int configuredPageSize);
         var pageSize = configuredPageSize > 0
-            ? Math.Min(configuredPageSize, FhirSearchLimits.MaxIdsPerParameter)
+            ? configuredPageSize
             : FhirSearchLimits.MaxIdsPerParameter;
 
         if (resourceIds.Count > pageSize)

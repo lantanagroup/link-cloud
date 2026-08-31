@@ -133,7 +133,7 @@ namespace UnitTests.DataAcquisition.Factories
                 CorrelationId = "CorrId",
                 FacilityId = "FacId"
             };
-            var resourceIds = Enumerable.Range(1, 45).Select(i => $"enc-{i}").ToList();
+            var resourceIds = Enumerable.Range(1, 150).Select(i => $"enc-{i}").ToList();
 
             _dataAcquisitionLogQueriesMock
                 .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
@@ -143,14 +143,13 @@ namespace UnitTests.DataAcquisition.Factories
 
             Assert.NotNull(result);
             Assert.True(result.paged);
-            Assert.Equal(3, result.values!.Count);
-            Assert.Equal(20, result.values[0].Count());
-            Assert.Equal(20, result.values[1].Count());
-            Assert.Equal(5, result.values[2].Count());
+            Assert.Equal(2, result.values!.Count);
+            Assert.Equal(100, result.values[0].Count());
+            Assert.Equal(50, result.values[1].Count());
         }
 
         [Fact]
-        public async Task Build_WhenPagedExceedsFhirCap_ChunksAtCap()
+        public async Task Build_WhenPagedIs100AndIdsFitInOneQuery_DoesNotPage()
         {
             var parameter = new ResourceIdsParameter
             {
@@ -172,10 +171,8 @@ namespace UnitTests.DataAcquisition.Factories
             var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
 
             Assert.NotNull(result);
-            Assert.True(result.paged);
-            Assert.Equal(4, result.values!.Count);
-            Assert.Equal(20, result.values[0].Count());
-            Assert.Equal(8, result.values[3].Count());
+            Assert.False(result.paged);
+            Assert.Equal(68, result.value!.Split(',').Length);
         }
 
         [Fact]

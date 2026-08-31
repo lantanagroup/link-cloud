@@ -1,13 +1,14 @@
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
 /// <summary>
-/// Caps comma-separated FHIR search tokens (encounter, _id, etc.). A single
-/// GET with dozens of long IDs can hang a FHIR server for minutes with no error.
+/// Caps how many <em>filter</em> IDs (encounter, _id, …) go on one FHIR search.
+/// This is not result paging: 68 encounter IDs means "ServiceRequests for these
+/// 68 encounters," and each encounter may return many resources. Result pages
+/// are controlled separately with <c>_count</c>.
 /// </summary>
 public static class FhirSearchLimits
 {
-    public const int MaxIdsPerParameter = 20;
-    public static readonly TimeSpan HttpClientTimeout = TimeSpan.FromMinutes(2);
+    public const int MaxIdsPerParameter = 100;
 
     /// <summary>
     /// If one query parameter value has more than <paramref name="maxIds"/>
