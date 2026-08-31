@@ -1,10 +1,102 @@
 {
+  "steps": {
+    "welcome": "Bienvenida",
+    "reportingPlan": "Plan de reportes del centro",
+    "facilityInfo": "Información del centro",
+    "manualUpload": "Carga manual",
+    "fhir": "Información del servidor FHIR",
+    "census": "Configuración de pacientes de interés",
+    "locationOrg": "Identificación de la organización",
+    "hsloc": "Identificación de ubicación (HSLOC)",
+    "encounter": "Mapeo de encuentros",
+    "report": "Generar informe de prueba",
+    "reportResults": "Resultados del informe",
+    "mrnIntake": "Recepción de identificador MRN",
+    "complete": "Inscripción completa"
+  },
   "page": {
     "title": "Incorporación",
     "intro": "Hola mundo..."
   },
+  "reportingPlan": {
+    "title": "Plan de Informes del Centro",
+    "subtitle": "Esta es una vista previa a seis meses de las medidas de NHSN que su centro tiene programado informar. Revise el cronograma antes de completar la inscripción.",
+    "columns": {
+      "month": "Mes del Informe",
+      "year": "Año del Informe",
+      "measures": "Medidas de NHSN"
+    },
+    "scheduleUnavailable": "No se pudo recuperar el cronograma del plan de informes. La inscripción no se puede completar hasta que esté disponible."
+  },
   "messages": {
     "completeSuccess": "Incorporación completada para el centro {{facilityId}}.",
-    "completeError": "No se pudo completar la incorporación."
+    "completeError": "No se pudo completar la incorporación.",
+    "stepNotImplemented": "Este paso aún no está implementado.",
+    "stepUnavailable": "Ese paso no está disponible.",
+    "draftConflict": "Este centro se actualizó en otra ventana. Recargue para ver la versión más reciente.",
+    "notConnected": "Aún no conectado a datos en vivo. Los valores mostrados son simulados."
+  },
+  "facilityInfo": {
+    "title": "Información del centro",
+    "intro": "Se necesita información general sobre su centro antes de comenzar el proceso de incorporación.",
+    "fields": {
+      "timeZoneLabel": "Zona horaria del centro",
+      "timeZoneTooltip": "La configuración de zona horaria se utiliza para determinar cuándo NHSNLink programa un nuevo período de reporte para su centro.",
+      "timeZonePlaceholder": "Seleccione una zona horaria…",
+      "ehrVendorLabel": "Proveedor de EHR",
+      "ehrVendorPlaceholder": "Seleccione un proveedor…"
+    },
+    "messages": {
+      "incomplete": "Complete todos los campos antes de continuar.",
+      "loadError": "No se pudo cargar la información del centro.",
+      "saveSuccess": "Información del centro guardada.",
+      "saveError": "No se pudo guardar la información del centro."
+    }
+  },
+  "fhirServerInfo": {
+    "title": "Información del servidor FHIR",
+    "subtitlePrefix": "NHSNLink utiliza el estándar",
+    "subtitleFhirLinkText": "FHIR",
+    "subtitleSuffix": "para comunicarse con el sistema EHR de su centro. Proporcione la información técnica necesaria para conectar de forma segura las API FHIR de su EHR a NHSNLink.",
+    "authenticationSectionTitle": "Autenticación",
+    "throttleSectionTitle": "Configuración de limitación",
+    "fields": {
+      "baseUrlLabel": "URL base del servidor FHIR",
+      "baseUrlTooltip": "La URL base de FHIR utilizada para acceder a los recursos FHIR de su centro. Ejemplo: https://ehr.example.org/fhir/r4",
+      "baseUrlPlaceholder": "https://ehr.example.org/fhir/r4",
+      "jwksInstructions": "Los centros con {{vendor}} admiten autenticación basada en JSON Web Key Set (JWKS). Esto lo habilita directamente el administrador de EHR de su centro desde el portal de proveedor de {{vendor}}; no es necesario ingresar credenciales aquí. Descargue las instrucciones a continuación y entréguelas a su administrador de EHR para habilitar JWKS para NHSNLink.",
+      "downloadPdfInstructions": "Descargar instrucciones en PDF",
+      "maxConcurrentRequestsLabel": "Máximo de solicitudes simultáneas",
+      "maxConcurrentRequestsTooltip": "NHSNLink puede consultar recursos de forma simultánea para los pacientes reportados. Esta configuración limita cuántas solicitudes se ejecutarán simultáneamente contra el servidor FHIR del centro.",
+      "maxRetriesLabel": "Máximo de reintentos",
+      "maxRetriesTooltip": "Si NHSNLink experimenta un problema al consultar el servidor FHIR del centro, puede reintentar la solicitud. Esta configuración determina el número máximo de reintentos que NHSNLink puede intentar para una solicitud de recurso FHIR dada. El valor debe estar entre 0 y 10.",
+      "minPullTimeLabel": "Hora mínima de extracción de adquisición",
+      "minPullTimeTooltip": "Especifica la hora más temprana en que NHSNLink puede comenzar a consultar el servidor FHIR del centro para obtener recursos de pacientes.",
+      "maxPullTimeLabel": "Hora máxima de extracción de adquisición",
+      "maxPullTimeTooltip": "Especifica la hora en que NHSNLink deja de consultar el servidor FHIR del centro para obtener recursos de pacientes.",
+      "pullTimePlaceholder": "HH:MM",
+      "lagLabel": "Duración del retraso de adquisición de recursos del paciente",
+      "lagTooltip": "Se puede aplicar un tiempo de retraso para cada paciente reportado a fin de garantizar que los datos relacionados con la visita se hayan consolidado antes de adquirirlos del servidor FHIR del centro, por ejemplo, para que los resultados de laboratorio puedan finalizarse y las órdenes de medicamentos completarse. Los informes programados esperan hasta que se contabilice cada paciente en el censo, incluso si el retraso aplicado se extiende más allá del período de informe.",
+      "lagDaysLabel": "Días",
+      "lagHoursLabel": "Horas",
+      "lagMinutesLabel": "Minutos"
+    },
+    "messages": {
+      "incomplete": "Complete todos los campos antes de continuar.",
+      "invalidBaseUrl": "Ingrese una URL válida que comience con http:// o https:// (p. ej., https://ehr.example.org/fhir/r4).",
+      "invalidMaxConcurrentRequests": "El máximo de solicitudes simultáneas debe ser un número entero de 1 o más.",
+      "invalidMaxRetries": "El máximo de reintentos debe ser un número entero entre 0 y 10.",
+      "invalidPullTime": "Ingrese una hora válida de 24 horas en formato HH:MM.",
+      "invalidLagDays": "Los días deben ser un número entero de 0 o más.",
+      "invalidLagHours": "Las horas deben ser un número entero entre 0 y 23.",
+      "invalidLagMinutes": "Los minutos deben ser un número entero entre 0 y 59.",
+      "loadError": "No se pudo cargar la información del servidor FHIR.",
+      "saveSuccess": "Información del servidor FHIR guardada.",
+      "saveError": "No se pudo guardar la información del servidor FHIR.",
+      "testSuccess": "La prueba de conexión fue exitosa.",
+      "testFailure": "La prueba de conexión falló.",
+      "testError": "No se pudo probar la conexión.",
+      "connectionNotTested": "Pruebe la conexión antes de continuar."
+    }
   }
 }

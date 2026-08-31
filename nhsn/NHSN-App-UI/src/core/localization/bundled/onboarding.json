@@ -1,0 +1,171 @@
+{
+  "steps": {
+    "welcome": "Welcome",
+    "reportingPlan": "Facility Reporting Plan",
+    "facilityInfo": "Facility Information",
+    "manualUpload": "Manual Upload",
+    "fhir": "FHIR Server Information",
+    "census": "Patients of Interest Configuration",
+    "locationOrg": "Organization Identification",
+    "hsloc": "Location Identification (HSLOC)",
+    "encounter": "Encounter Mapping",
+    "report": "Generate Test Report",
+    "reportResults": "Report Results",
+    "mrnIntake": "MRN Identifier Intake",
+    "complete": "Enrollment Complete"
+  },
+  "welcome": {
+    "title": "Welcome to DQM Onboarding",
+    "intro": "The National Healthcare Safety Network (NHSN) uses <nhsnlink>NHSNLink</nhsnlink>, an open-source Fast Healthcare Interoperability Resources (<fhir>FHIR®</fhir>) application, to enable reporting of digital quality measures (dQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of dQMs to NHSN.",
+    "audienceTitle": "Intended Audience",
+    "audienceBody": "The onboarding steps that follow should be completed by the site’s information technology team.",
+    "workflowTitle": "Workflow",
+    "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time."
+  },
+  "reportingPlan": {
+    "title": "Facility Reporting Plan",
+    "subtitle": "This is a six-month look-ahead of the NHSN measures your facility is scheduled to report against. Review the schedule before completing enrollment.",
+    "columns": {
+      "month": "Report Month",
+      "year": "Report Year",
+      "measures": "NHSN Measures"
+    },
+    "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available."
+  },
+  "facilityInfo": {
+    "title": "Facility Information",
+    "intro": "Some general information related to your facility is needed prior to beginning the onboarding process.",
+    "fields": {
+      "timeZoneLabel": "Facility Time Zone",
+      "timeZoneTooltip": "The time zone setting is used to determine when NHSNLink schedules a new reporting period for your facility.",
+      "timeZonePlaceholder": "Select a time zone…",
+      "ehrVendorLabel": "EHR Vendor",
+      "ehrVendorPlaceholder": "Select a vendor…"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "loadError": "Unable to load facility information.",
+      "saveSuccess": "Facility information saved.",
+      "saveError": "Unable to save facility information."
+    },
+    "intro": "Tell us your facility's timezone and EHR vendor. These drive how the rest of onboarding is configured.",
+    "vendorLabel": "EHR Vendor",
+    "vendorPlaceholder": "Select a vendor",
+    "timeZoneLabel": "Time Zone",
+    "timeZonePlaceholder": "Select a time zone"
+  },
+  "manualUpload": {
+    "title": "Manual Upload Option",
+    "intro": "If you are not able to complete the onboarding form online, download the form, complete it with your facility's technical team, and upload it here. You can upload a partially completed form and return later to finish the process.",
+    "downloadTemplate": "Download Import Sheet & Instructions",
+    "downloadHint": "Downloads the .xlsx import sheet.",
+    "uploadFile": "Upload Completed Import Sheet",
+    "reading": "Reading file...",
+    "imported": "Imported {{imported}} of {{total}} field(s) from {{fileName}}.",
+    "readError": "Could not read that file — make sure it is the .xlsx import sheet downloaded from this page.",
+    "uploadRejected": "The file could not be imported. Please check the file and try again.",
+    "errors": {
+      "invalidFormat": "The file is not a valid import sheet.",
+      "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
+      "invalidUrl": "Enter a valid, fully-qualified URL.",
+      "invalidNumber": "Enter a whole number of zero or greater.",
+      "invalidLocationMethod": "Enter a valid organization identification method."
+    }
+  },
+  "fhirServerInfo": {
+    "title": "FHIR Server Information",
+    "subtitlePrefix": "NHSNLink uses the",
+    "subtitleFhirLinkText": "FHIR",
+    "subtitleSuffix": "standard to communicate with your facility's EHR system. Please provide the technical information needed to securely connect your EHR FHIR APIs to NHSNLink.",
+    "authenticationSectionTitle": "Authentication",
+    "throttleSectionTitle": "Throttle Settings",
+    "fields": {
+      "baseUrlLabel": "FHIR Server Base URL",
+      "baseUrlTooltip": "The FHIR base URL used to access your facility's FHIR resources. Example: https://ehr.example.org/fhir/r4",
+      "baseUrlPlaceholder": "https://ehr.example.org/fhir/r4",
+      "jwksInstructions": "{{vendor}} facilities support JSON Web Key Set (JWKS) based authentication. This is enabled directly by your facility's EHR administrator from the {{vendor}} vendor portal — no credentials need to be entered here. Download the instructions below and provide them to your EHR administrator to enable JWKS for NHSNLink.",
+      "downloadPdfInstructions": "Download PDF Instructions",
+      "maxConcurrentRequestsLabel": "Max Concurrent Requests",
+      "maxConcurrentRequestsTooltip": "NHSNLink is capable of querying resources concurrently for reported patients. This setting throttles how many requests will run concurrently against the facility FHIR server.",
+      "maxRetriesLabel": "Max Retries",
+      "maxRetriesTooltip": "If NHSNLink experiences an issue while querying the facility FHIR server, it can retry the request. This setting determines the maximum number of retries NHSNLink can attempt for a given FHIR resource request. The value must be between 0 and 10.",
+      "minPullTimeLabel": "Min Acquisition Pull Time",
+      "minPullTimeTooltip": "Specifies the earliest time NHSNLink is allowed to start querying the facility FHIR server for patient resources.",
+      "maxPullTimeLabel": "Max Acquisition Pull Time",
+      "maxPullTimeTooltip": "Specifies the time NHSNLink stops querying the facility FHIR server for patient resources.",
+      "pullTimePlaceholder": "HH:MM",
+      "lagLabel": "Patient Resource Acquisition Lag Duration",
+      "lagTooltip": "A lag time can be applied for each patient being reported to ensure that data related to the visit has settled prior to acquiring it from the facility FHIR server, for example so lab results can be finalized and medication orders completed. Scheduled reports wait until each patient in the census is accounted for, even if the applied lag extends beyond the reporting period.",
+      "lagDaysLabel": "Days",
+      "lagHoursLabel": "Hours",
+      "lagMinutesLabel": "Minutes"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "invalidBaseUrl": "Enter a valid URL starting with http:// or https:// (e.g. https://ehr.example.org/fhir/r4).",
+      "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number of 1 or greater.",
+      "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
+      "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
+      "invalidLagDays": "Days must be a whole number of 0 or greater.",
+      "invalidLagHours": "Hours must be a whole number between 0 and 23.",
+      "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
+      "loadError": "Unable to load FHIR server information.",
+      "saveSuccess": "FHIR server information saved.",
+      "saveError": "Unable to save FHIR server information.",
+      "testSuccess": "Connection test succeeded.",
+      "testFailure": "Connection test failed.",
+      "testError": "Unable to test the connection.",
+      "connectionNotTested": "Test the connection before continuing."
+    }
+  },
+  "census": {
+    "title": "Patients of Interest Configuration"
+  },
+  "locationOrg": {
+    "title": "Organization Identification"
+  },
+  "hsloc": {
+    "title": "Location Identification (HSLOC)"
+  },
+  "encounter": {
+    "title": "Encounter Mapping"
+  },
+  "report": {
+    "title": "Generate Test Report"
+  },
+  "reportResults": {
+    "title": "Report Results"
+  },
+  "mrnIntake": {
+    "title": "MRN Identifier Intake"
+  },
+  "complete": {
+    "title": "Enrollment Complete",
+    "subtitle": "This facility's onboarding has been completed and saved.",
+    "summary": {
+      "facilityId": "Facility ID",
+      "vendor": "EHR Vendor",
+      "timeZone": "Time Zone",
+      "fhirBaseUrl": "FHIR Base URL",
+      "connectionTest": "Connection Test",
+      "censusMethod": "Census Method",
+      "reportsGenerated": "Reports Generated",
+      "completedReportId": "Completed From Report Id"
+    },
+    "connectionTested": "Passed",
+    "connectionNotTested": "Not tested",
+    "notAvailable": "—"
+  },
+  "page": {
+    "title": "Onboarding",
+    "intro": "Hello world..."
+  },
+  "messages": {
+    "completeSuccess": "Completed onboarding for facility {{facilityId}}.",
+    "completeError": "Unable to complete onboarding.",
+    "stepNotImplemented": "This step is not implemented yet.",
+    "stepUnavailable": "That step is not available.",
+    "draftConflict": "This facility was updated in another window. Reload to see the latest version.",
+    "notConnected": "Not yet connected to live data. The values shown are simulated."
+  }
+}

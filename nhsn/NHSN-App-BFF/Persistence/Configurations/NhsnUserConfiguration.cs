@@ -15,8 +15,6 @@ public class NhsnUserConfiguration : IEntityTypeConfiguration<NhsnUser>
         builder.Property(x => x.ExternalUserId).HasMaxLength(128).IsRequired();
         builder.Property(x => x.Email).HasMaxLength(256).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(256).IsRequired();
-        builder.Property(x => x.GroupsRaw).HasMaxLength(256);
-        builder.Property(x => x.FacilityId).HasMaxLength(64);
         builder.Property(x => x.CreatedBy).HasMaxLength(256);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(256);
     }

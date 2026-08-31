@@ -2,15 +2,24 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Acknowledgements;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.PatientsOfInterest;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Errors;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.DependencyInjection;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence.Seed;
 using LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,6 +28,8 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 using Serilog.Enrichers.Span;
 
@@ -34,9 +45,11 @@ app.Run();
 static void RegisterServices(WebApplicationBuilder builder)
 {
     builder.AddExternalConfiguration(NhsnAppConstants.ServiceName);
+    ValidateConfiguration(builder);
 
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     var serviceInformation = builder.SetupServiceInformation(NhsnAppConstants.ServiceName, assemblyVersion);
+    ServiceActivitySource.Initialize(serviceInformation);
 
     builder.Services.AddProblemDetailsService(options =>
     {
@@ -51,6 +64,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;
     });
     builder.Services.Configure<NhsnJwtSettings>(builder.Configuration.GetRequiredSection(NhsnJwtSettings.SectionName));
+
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.AddLinkSdk();
 
     builder.Services.AddDbContext<NhsnAppDbContext>(options =>
     {
@@ -126,14 +143,44 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddAuthorizationBuilder()
         .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 
+    builder.Services.AddLinkGateways(builder.Configuration);
+    builder.Services.AddExceptionHandler<FacilityWriteLockExceptionHandler>();
+    builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
+
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = NhsnAppConstants.ServiceName;
+        options.ServiceVersion = ServiceActivitySource.Instance.Version;
+    });
+
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddMemoryCache();
+    builder.Services.AddScoped<INhsnUserContext, NhsnUserContext>();
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
+    builder.Services.AddScoped<IOnboardingDraftStore, OnboardingDraftStore>();
+    builder.Services.AddScoped<IOnboardingReadService, OnboardingReadService>();
+    builder.Services.AddScoped<IOnboardingWriteService, OnboardingWriteService>();
+    builder.Services.AddScoped<IAcknowledgementService, AcknowledgementService>();
+    builder.Services.AddSingleton<IReferenceDataService, ReferenceDataService>();
+    builder.Services.AddScoped<IPatientsOfInterestService, PatientsOfInterestService>();
+    builder.Services.Configure<OnboardingReadSettings>(builder.Configuration.GetSection(OnboardingReadSettings.SectionName));
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
     builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));
+    builder.Services.AddScoped<IManualUploadTemplateService, ManualUploadTemplateService>();
+    builder.Services.AddScoped<IDocumentProvider, DocumentProvider>();
+    builder.Services.Configure<DocumentSettings>(builder.Configuration.GetSection(DocumentSettings.SectionName));
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
+    builder.Services.AddTransient<IApi, FhirServerEndpoints>();
     builder.Services.AddTransient<IApi, LocalizationEndpoints>();
+    builder.Services.AddTransient<IApi, StaticAssetEndpoints>();
+    builder.Services.AddTransient<IApi, OnboardingEndpoints>();
+    builder.Services.AddTransient<IApi, ReferenceEndpoints>();
+    builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();
+    builder.Services.AddTransient<IApi, DocumentsEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -146,12 +193,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Description = "JWT Authorization header using the Bearer scheme.",
+            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' followed by your token.",
             Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Scheme = JwtBearerDefaults.AuthenticationScheme
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header
         });
 
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -172,7 +217,21 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.DocumentFilter<HealthChecksFilter>();
     });
 
-    builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.PropertyNamingPolicy = null);
+    // camelCase on every route, both directions. Stated explicitly rather than left to the
+    // framework default so a new endpoint cannot pick the other convention by accident.
+    // Browsers cache nhsn-link.js independently of BFF releases, so once a bundle ships a casing
+    // change breaks every cached copy until it refreshes - which is why this is settled now, while
+    // nothing is deployed.
+    builder.Services.Configure<JsonOptions>(opt =>
+    {
+        opt.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+
+        // Enums travel as their names, not their ordinals. A numeric status is opaque to the UI and
+        // silently reinterprets every stored value if a member is ever inserted. Names are left
+        // PascalCase to match the unions the UI already declares - AccessState, EhrVendor,
+        // OnboardingStatus are all "Allowed" / "Epic" / "NotStarted".
+        opt.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
@@ -341,4 +400,40 @@ static SecurityKey CreateIssuerSigningKey(X509Certificate2 certificate)
     }
 
     throw new InvalidOperationException("NhsnJwt:PublicCertificatePem must contain an RSA or ECDSA public key.");
+}
+
+// Fails the process at startup when configuration is missing or unsafe for the target environment.
+//
+// Validate the ServiceRegistry strings directly. Never resolve a Link client or read a *ApiUrl
+// property to do this: TenantServiceApiUrl's getter dereferences ServiceRegistry.TenantService,
+// declared null!, so that throws NullReferenceException from inside the check itself.
+static void ValidateConfiguration(WebApplicationBuilder builder)
+{
+    // Docker is exempt alongside Development: the compose stack deliberately runs with
+    // AllowAllOrigins and no JWT audience.
+    if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Docker"))
+    {
+        return;
+    }
+
+    var errors = new List<string>();
+    var serviceRegistry = builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName);
+
+    // Tenant is a nested object, not a flat key like the other services' *ServiceUrl names.
+    if (string.IsNullOrWhiteSpace(serviceRegistry["TenantService:TenantServiceUrl"]))
+    {
+        errors.Add("ServiceRegistry:TenantService:TenantServiceUrl must be configured.");
+    }
+
+    // Only services this build actually calls are validated, so a deployment isn't blocked on
+    // configuration for a phase that hasn't shipped.
+    if (string.IsNullOrWhiteSpace(serviceRegistry["DataAcquisitionServiceUrl"]))
+    {
+        errors.Add("ServiceRegistry:DataAcquisitionServiceUrl must be configured.");
+    }
+
+    if (errors.Count > 0)
+    {
+        throw new InvalidOperationException("Invalid configuration:" + Environment.NewLine + " - " + string.Join(Environment.NewLine + " - ", errors));
+    }
 }

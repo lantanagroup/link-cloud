@@ -23,12 +23,20 @@
       "jwtKeyIdPlaceholder": "Huella digital del certificado / id de clave",
       "jwtPrivateKeyPem": "Clave privada JWT PEM",
       "jwtPrivateKeyPlaceholder": "-----BEGIN PRIVATE KEY-----"
-    }
+    },
+    "modeTitle": "Modo del entorno de pruebas",
+    "modeLabel": "Backend",
+    "modeMock": "Simulado (sin conexión)",
+    "modeBff": "NHSN-App-BFF (:8079)",
+    "modeMockHint": "Datos de prueba en memoria. No requiere servicios de backend.",
+    "modeBffHint": "Firma un JWT real del usuario de prueba activo y llama al BFF."
   },
   "navigation": {
     "title": "Navegación",
     "facility": "Centro",
     "home": "Inicio",
+    "facilityInformation": "Información del centro",
+    "fhirServerInformation": "Información del servidor FHIR",
     "onboarding": "Incorporación",
     "configuration": "Configuración"
   },
@@ -39,8 +47,13 @@
     "remove": "Eliminar",
     "submitRequest": "Enviar una solicitud",
     "completeOnboarding": "Completar incorporación",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "reload": "Recargar",
+    "download": "Descargar",
     "saveAndActivate": "Guardar y activar perfil de prueba",
-    "cancelEdit": "Cancelar edición"
+    "cancelEdit": "Cancelar edición",
+    "testConnection": "Probar conexión"
   },
   "commonBoolean": {
     "yes": "Sí",
@@ -78,5 +91,12 @@
     "missingAccessDescription": "Tu identidad de NHSN App no incluye el rol FACADMIN requerido para esta experiencia.",
     "missingFacilityTitle": "Debes seleccionar un centro antes de continuar.",
     "missingFacilityDescription": "Tu contexto de usuario no incluía un centro. Vuelve a NHSN App y selecciona un centro antes de continuar."
+  },
+  "status": {
+    "saving": "Guardando…",
+    "loading": "Cargando…"
+  },
+  "errors": {
+    "unexpected": "Algo salió mal. Inténtelo de nuevo."
   }
 }

@@ -30,11 +30,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\DotNet\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Localization\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="StaticAssets\**\*.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="Documents\**\*.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>

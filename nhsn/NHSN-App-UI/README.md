@@ -1,298 +1,138 @@
 # NHSN-App-UI
 
-## Overview
+The facility-facing NHSNLink onboarding UI. One codebase, two build outputs:
 
-`NHSN-App-UI` is the React-based foundation for the NHSN App integration framework described by the `nhsn-app-web-component-poc` ADR.
+1. **`dist/embed/nhsn-link.js`** — the web component the CDC NHSN App loads.
+2. **A standalone shell** — a local harness for developing and testing it.
 
-This project intentionally produces **two different outputs**:
+Architecture: [`documentation/NHSNLink-UI-Architecture.md`](../documentation/NHSNLink-UI-Architecture.md).
+Backend: [`documentation/NHSN-App-BFF-Architecture-and-Plan.md`](../documentation/NHSN-App-BFF-Architecture-and-Plan.md).
 
-1. a **standalone shell application** for lower/test environments
-2. a **separate embeddable webpack bundle** for NHSN App integration
+---
 
-The shell exists to generate signed lower-environment JWTs, while the embeddable bundle exists to be loaded by the NHSN App.
+## Running it locally
 
-## Key architectural rule
+### Prerequisite, once
 
-The standalone app/framework shell must **not** be included in the webpack bundle intended for the NHSN App.
-
-That means:
-
-- shell-only code lives under `src/app-shell`
-- reusable component code lives under `src/components`
-- the webpack embed build only packages the reusable NHSNLink component layer and its adapter
-
-## Main reusable component
-
-The main integration entry point is:
-
-- `src/components/NHSNLink.tsx`
-
-This is the same component used by:
-
-- the standalone lower-environment shell
-- the embeddable NHSN App integration package
-
-### Public component contract
-
-The component supports a configurable routing base via:
-
-- `baseUrl`
-- `apiBaseUrl`
-
-Examples:
-
-```tsx
-<NHSNLink baseUrl="/" apiBaseUrl="/api" />
-<NHSNLink baseUrl="/nhsnlink" apiBaseUrl="https://some-host/api" />
-```
-
-The standalone app host uses `/` while the embedded NHSN App scenario is expected to use `/nhsnlink`.
-
-`apiBaseUrl` controls which backend API root the component targets for endpoints like `/userinfo`. This is especially important for NHSN App integration where the UI may need to call an externally routed BFF path.
-
-## How the UI initializes
-
-The UI does **not** take a JWT prop.
-
-Instead, `NHSNLink` initializes by calling the BFF using `apiBaseUrl`:
-
-- `GET /api/nhsn-app-bff/userinfo`
-
-The BFF resolves who the user is, whether their JWT includes `FACADMIN`, whether a facility claim is present, and whether the facility is in onboarding or maintenance mode.
-
-The `/userinfo` response also drives:
-
-- whether the user has the required `FACADMIN` role
-- whether a facility context is present
-- whether onboarding is required
-- the navigation options that should be available
-
-## Shell signed-JWT model
-
-The standalone shell is designed for lower-environment testing.
-
-### First launch
-If there are no saved test profiles, the shell asks the tester to create a lower-environment JWT test profile.
-
-It captures:
-
-- email
-- name
-- group(s)
-- facilityId
-- issuer
-- key id (`kid`)
-- private key PEM
-
-### Saved profile library
-The shell stores a library of previously used test profiles in browser local storage so the tester can easily switch among JWT contexts.
-
-The shell tracks:
-
-- multiple saved test profiles
-- the currently active test profile
-- last-used timestamps
-
-### Request behavior
-When the shell makes a request to the BFF, it signs a real bearer JWT using the configured issuer, key id, and private key PEM and sends it through the normal `Authorization: Bearer ...` header.
-
-This mimics the production request shape as closely as possible while still allowing lower-environment negative testing by changing the issuer, key id, or private key in the harness.
-
-## Top-navigation behavior
-
-`NHSNLink` uses the `/userinfo` response to determine whether to render:
-
-- no-access messaging when `FACADMIN` is missing
-- missing-facility messaging when no facility claim is present
-- onboarding navigation
-- maintenance/configuration navigation
-
-This is the initial framework/foundation behavior. It is intentionally light-weight but establishes the long-term UI shape.
-
-### Navigation component
-
-The navigation rail is implemented as its own component:
-
-- `src/components/NavigationRail.tsx`
-
-The rail currently shows:
-
-- app title
-- available navigation options
-- the current end-user identity at the bottom of the rail
-
-### Current routes
-
-The UI currently supports component-controlled routes relative to `baseUrl`:
-
-- `/` ? Home
-- `/onboard` ? Onboarding
-- `/configuration` ? Configuration
-
-Under an embedded base of `/nhsnlink`, those resolve as:
-
-- `/nhsnlink`
-- `/nhsnlink/onboard`
-- `/nhsnlink/configuration`
-
-## Project structure
-
-### `src/components`
-Reusable UI components intended for the embeddable package.
-
-Important file:
-- `src/components/NHSNLink.tsx`
-
-Other key components:
-- `src/components/NavigationRail.tsx`
-- `src/components/OnboardingScreen.tsx`
-- `src/components/notifications/NotificationProvider.tsx`
-
-### `src/services`
-Client-side service layer.
-
-Important file:
-- `src/services/user-info-service.ts`
-
-### `src/web-component`
-Adapter layer for web-component registration and NHSN App hosting.
-
-Important file:
-- `src/web-component/register.ts`
-
-The custom element supports a `baseurl` attribute so the embedded host can control the routing base path.
-
-### `src/app-shell`
-Standalone lower-environment shell.
-
-Important files:
-- `src/app-shell/App.tsx`
-- `src/app-shell/main.tsx`
-
-### `src/shared`
-Shared models and local storage helpers.
-
-## Build outputs
-
-### Standalone shell build
-Command:
-
-- `npm run build:app`
-
-Output:
-
-- `dist/...`
-
-This output is what the Dockerfile publishes for lower/test environments.
-
-### Embeddable webpack build
-Command:
-
-- `npm run build:embed`
-
-Output:
-
-- `dist/embed/nhsn-link.js`
-
-This is the artifact intended for NHSN App integration.
-
-## Local development
-
-### Start the standalone shell
+`package.json` depends on `file:packages/nhsn-react-core-2.4.1.tgz`, which is gitignored and not in the repo. Place the tarball at `packages/nhsn-react-core-2.4.1.tgz` before installing — nothing builds without it.
 
 ```bash
 npm install
-npm start
+npm start          # http://localhost:4300
 ```
 
-This starts the lower-environment shell on port `4300` and proxies `/api` requests to the BFF on `http://localhost:8079`.
+### Two modes, chosen in the UI
 
-In the standalone shell, the app host renders:
+The harness sidebar has a **Harness Mode** selector.
 
-```tsx
-<NHSNLink baseUrl="/" apiBaseUrl="/api" />
-```
+| Mode | Needs | Use it for |
+|---|---|---|
+| **Mock (offline)** — default | Nothing | Step development. No BFF, no Docker, no database. |
+| **NHSN-App-BFF (:8079)** | The BFF running | Real JWT validation, real endpoints. |
 
-### Build both outputs
+**Mock mode is fully offline.** `MockApiClient` serves the whole `ApiClient` port from in-memory fixtures and persists the draft to `localStorage`, and en-US strings are bundled into the artifact, so nothing is fetched. This is the mode to develop steps in — the BFF's onboarding endpoints do not exist yet.
 
-```bash
-npm run build
-```
+Everything a fixture invents is marked `simulated: true` and uses obviously synthetic values, so a screenshot can never be mistaken for real facility data.
 
-### Harness JWT signing mode
+### BFF mode
 
-For signed JWT mode:
+Start the BFF (see [`documentation/SERVICES.md`](../documentation/SERVICES.md)), then switch the selector. `/api` proxies to `http://localhost:8079`.
 
-- configure a test profile with the JWT issuer that matches `NhsnJwt:Issuer` in the BFF config
-- configure the `kid` that matches the key id/thumbprint expected by the BFF signing certificate
-- provide the matching PKCS#8 private key PEM used to sign the token
-- configure the matching public certificate PEM in `NHSN-App-BFF` development/docker appsettings
+BFF mode signs a real ES256 JWT in the browser from the active test profile, so it exercises the same validation path as production. Create a profile in the sidebar with:
 
-The shell runtime server also supports these environment variables for default harness JWT signing settings:
+- email, name, groups (`FACADMIN`), facilityId
+- issuer matching `NhsnJwt:Issuer` in the BFF config
+- `kid` matching the BFF's signing certificate
+- the matching PKCS#8 private key PEM
+
+Change any of them to test the negative paths. Defaults can come from the shell runtime server via `/shell-config.js`:
 
 - `NHSN_APP_UI_DEFAULT_JWT_ISSUER`
 - `NHSN_APP_UI_DEFAULT_JWT_KEY_ID`
 - `NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM`
 
-These are exposed to the lower-environment shell through `/shell-config.js` so testers can avoid pasting the key information repeatedly. Saved test profiles may still override any of these values for negative testing.
+---
 
-## Docker usage
+## Commands
 
-The Dockerfile builds and publishes the **standalone shell only**.
+```bash
+npm start              # standalone shell on :4300
+npm run build          # both outputs
+npm run build:embed    # dist/embed/nhsn-link.js only
 
-That container is intended for lower-environment deployment where testers need to:
+npm run verify         # typecheck + lint + tests — run before pushing
+npm run typecheck
+npm run lint
+npm test               # unit + component tests
+npm run test:watch
+npm run test:boundary  # builds the embed bundle and inspects it (~20s)
+```
 
-- save multiple signed-JWT test profiles
-- switch among them
-- re-run the same shared `NHSNLink` component against the BFF
+---
 
-The Docker image is not the delivery mechanism for the embeddable webpack artifact.
+## The rule that shapes the structure
 
-When launched through `docker compose`, the shell is exposed on port `8090` so it does not conflict with the webpack development server port used locally.
+**Shell code must never reach the embed bundle.** That artifact runs inside the CDC NHSN App with their user's session, and the shell handles private keys — if it leaks, we ship a token-forging harness into their application.
 
-Inside Docker, the standalone shell runtime server proxies `/api` requests to the BFF using the `BFF_BASE_URL` environment variable. By default in compose this is set to `http://nhsn-app-bff:8079/api` so browser calls like `/api/nhsn-app-bff/userinfo` reach the BFF with the expected `/api/...` route prefix.
+```
+src/
+  core/      embed-safe. The only thing embed/register.tsx may reach.
+  shell/     standalone only. Never imported by core.
+  embed/     -> core
+  app/       -> shell + core
+```
 
-The Docker-hosted shell also renders with a base URL of `/`, while the custom element wrapper defaults to `/nhsnlink` for embedded usage.
+Three layers enforce it:
 
-## Notifications
+1. `no-restricted-imports` in `eslint.config.js` — fast feedback.
+2. A webpack alias that fails the embed build if `shell/` appears on its graph.
+3. **`tests/bundle-boundary.test.ts`** — inspects the built artifact for shell markers. This is the one that actually holds: a lint rule can be disabled inline and a re-export can carry code across without tripping it.
 
-The UI includes a reusable notification provider:
+Run `npm run test:boundary` in CI on every change to `src/`.
 
-- `src/components/notifications/NotificationProvider.tsx`
+---
 
-Behavior:
+## Layout
 
-- notifications appear in the bottom-right corner
-- multiple notifications stack vertically
-- success/info notifications auto-dismiss after 5 seconds
-- error notifications remain visible until explicitly dismissed
-- all notifications can be manually closed
+| Path | Holds |
+|---|---|
+| `core/onboarding/` | The step machine — `types`, `reducer`, `flow`, `gating`, `navigation`, provider, `StepHost` |
+| `core/onboarding/steps/` | Thirteen step directories, in flow order |
+| `core/fields/` | Design-system adapter — the **only** place `@nhsn/nhsn-react-core` components are imported |
+| `core/api/` | `ApiClient` port, `BffApiClient`, `http.ts`, contracts |
+| `core/localization/bundled/` | en-US fallback shipped in the artifact |
+| `shell/auth/` | `jose` signing, private keys, `TestUserProfile` |
+| `shell/mocks/` | `MockApiClient` |
+| `shell/facilities/` | The harness — **throwaway**, deleted once the BFF resolves facility from the token |
 
-This notification system is used for real-time persisted updates such as system administrator role/status changes.
+### Element contract
 
-## System administrator behavior
+```html
+<script src="https://<env-host>/nhsn-link.js"></script>
+<nhsn-link baseurl="/nhsnlink" apibaseurl="/api" locale="en-US"></nhsn-link>
+```
 
-System administrators have a separate route and screen:
+`apibaseurl` is the only knob for backend location: the component appends `/nhsn-app-bff/…` to it. If the gateway mounts us elsewhere, the attribute changes and no code does.
 
-- `/admin/users`
+The component **never sets an `Authorization` header** — the NHSN gateway injects the JWT in transit. It also never sends a facility: the BFF resolves it from the `facility` claim, and the onboarding routes carry no facility segment.
 
-This screen allows them to:
+---
 
-- view users
-- change user roles
-- enable/disable users
+## Working on a step
 
-Safeguards currently in place:
+**→ `documentation/NHSNLink-UI-Step-Implementation-Guide.md`** — hand that to your coding agent along with the user story. It is distributed offline, since `documentation/` is gitignored.
 
-- a system administrator cannot change their own role
-- a system administrator cannot disable their own account
+The short version: each step is a separate story, and the machine around them is done — don't rebuild it.
 
-The UI prevents those actions and the BFF also enforces them server-side.
+Already wired: draft access and patching (`useOnboarding()`), navigation (`onNext`/`onBack`), gating and URL sync, draft persistence with ETag concurrency, and every control through `core/fields`.
 
-## Disabled-user behavior
+To implement one:
 
-If `/userinfo` indicates that the current user is disabled, the UI blocks normal usage and shows:
+1. Replace the stub in `core/onboarding/steps/<step>/`.
+2. Replace its `COMPLETION_PENDING_STORY` placeholder in `flow.ts` with a real `isComplete`. Grep that symbol for what's outstanding.
+3. Add fields to the step's slice in `onboarding/types.ts`.
+4. Add i18n keys to the BFF's `Localization/en-US/` **and** `core/localization/bundled/`.
 
-- `Your account does not have access to NHSNLink. Submit a request to restore access`
+Three things never go in the draft: **secrets** (sFTP credentials are write-only; the draft holds `hasCredentials` only), **MRN intake** (normalized server-side, mirrored for rendering), and **reference data** (fetched per session).
 
-If the BFF provides an `AccessRequestUrl`, the UI renders it as a direct link.
+Vendor branching is field-level and driven by the `VendorProfile` the BFF serves — never `vendor === 'Epic'` in a component.
