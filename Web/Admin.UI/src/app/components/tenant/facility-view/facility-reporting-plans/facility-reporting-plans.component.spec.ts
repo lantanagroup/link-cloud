@@ -79,12 +79,20 @@ describe('FacilityReportingPlansComponent', () => {
   describe('filtering', () => {
     beforeEach(() => fixture.detectChanges());
 
-    it('filters by measure or dQM text, case-insensitively', () => {
-      component.filterText = 'ach';
+    it('filters by measure text, case-insensitively', () => {
+      component.filterMeasure = 'ach';
       component.onFilterChange();
       expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-1']);
+    });
 
-      component.filterText = 'HOBD';
+    it('filters by dQM text independently of measure', () => {
+      component.filterDqm = 'HOBD';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
+
+      // A dQM term must not match against the measure column.
+      component.filterDqm = 'HOB';
+      component.filterMeasure = '';
       component.onFilterChange();
       expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
     });
@@ -120,7 +128,7 @@ describe('FacilityReportingPlansComponent', () => {
     });
 
     it('shows a no-match state distinct from the empty state when filters exclude everything', () => {
-      component.filterText = 'ACH';
+      component.filterMeasure = 'ACH';
       component.filterReporting = false;
       component.onFilterChange();
       fixture.detectChanges();
@@ -131,7 +139,8 @@ describe('FacilityReportingPlansComponent', () => {
     });
 
     it('clearFilters restores the full list', () => {
-      component.filterText = 'ach';
+      component.filterMeasure = 'ach';
+      component.filterDqm = 'x';
       component.filterReporting = false;
       component.filterFrequency = Frequency.Daily;
       component.onFilterChange();
@@ -165,7 +174,7 @@ describe('FacilityReportingPlansComponent', () => {
     it('resets to the first page when a filter changes', () => {
       component.dataSource.paginator!.pageIndex = 1;
 
-      component.filterText = 'Measure1';
+      component.filterMeasure = 'Measure1';
       component.onFilterChange();
 
       expect(component.dataSource.paginator!.pageIndex).toBe(0);
@@ -191,5 +200,7 @@ describe('FacilityReportingPlansComponent', () => {
     expect(component.dataSource.data.length).toBe(2);
   });
 });
+
+
 
 

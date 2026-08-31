@@ -16,11 +16,21 @@
     @if (allPlans.length > 0) {
       <div class="filter-bar">
         <mat-form-field appearance="outline" class="compact-filter">
-          <mat-label>Search</mat-label>
-          <input matInput [(ngModel)]="filterText" (ngModelChange)="onFilterChange()"
-                 placeholder="Measure or dQM..." data-testid="reporting-plans-filter-text">
-          <button *ngIf="filterText" matSuffix mat-icon-button aria-label="Clear search"
-                  (click)="filterText=''; onFilterChange()">
+          <mat-label>Measure</mat-label>
+          <input matInput [(ngModel)]="filterMeasure" (ngModelChange)="onFilterChange()"
+                 placeholder="Search measure..." data-testid="reporting-plans-filter-measure">
+          <button *ngIf="filterMeasure" matSuffix mat-icon-button aria-label="Clear measure filter"
+                  (click)="filterMeasure=''; onFilterChange()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>dQM</mat-label>
+          <input matInput [(ngModel)]="filterDqm" (ngModelChange)="onFilterChange()"
+                 placeholder="Search dQM..." data-testid="reporting-plans-filter-dqm">
+          <button *ngIf="filterDqm" matSuffix mat-icon-button aria-label="Clear dqm filter"
+                  (click)="filterDqm=''; onFilterChange()">
             <mat-icon>close</mat-icon>
           </button>
         </mat-form-field>

@@ -59,7 +59,8 @@ export class FacilityReportingPlansComponent implements OnInit {
    */
   frequencyOptions: Frequency[] = [];
 
-  filterText = '';
+  filterMeasure = '';
+  filterDqm = '';
   filterPeriod: string | null = null;
   filterReporting: boolean | null = null;
   filterFrequency: Frequency | null = null;
@@ -124,7 +125,8 @@ export class FacilityReportingPlansComponent implements OnInit {
   }
 
   clearFilters(): void {
-    this.filterText = '';
+    this.filterMeasure = '';
+    this.filterDqm = '';
     this.filterPeriod = null;
     this.filterReporting = null;
     this.filterFrequency = null;
@@ -132,8 +134,9 @@ export class FacilityReportingPlansComponent implements OnInit {
   }
 
   hasActiveFilters(): boolean {
-    return this.filterText.trim() !== '' || this.filterPeriod !== null
-      || this.filterReporting !== null || this.filterFrequency !== null;
+    return this.filterMeasure.trim() !== '' || this.filterDqm.trim() !== ''
+      || this.filterPeriod !== null || this.filterReporting !== null
+      || this.filterFrequency !== null;
   }
 
   onSortChange(sort: Sort): void {
@@ -158,10 +161,13 @@ export class FacilityReportingPlansComponent implements OnInit {
   }
 
   private matchesFilters(plan: IFacilityReportingPlan): boolean {
-    const text = this.filterText.trim().toLowerCase();
-    const textMatches = text === ''
-      || (plan.measure ?? '').toLowerCase().includes(text)
-      || (plan.dqm ?? '').toLowerCase().includes(text);
+    const measureText = this.filterMeasure.trim().toLowerCase();
+    const measureMatches = measureText === ''
+      || (plan.measure ?? '').toLowerCase().includes(measureText);
+
+    const dqmText = this.filterDqm.trim().toLowerCase();
+    const dqmMatches = dqmText === ''
+      || (plan.dqm ?? '').toLowerCase().includes(dqmText);
 
     const periodMatches = this.filterPeriod === null
       || FacilityReportingPlansComponent.periodKey(plan) === this.filterPeriod;
@@ -172,7 +178,7 @@ export class FacilityReportingPlansComponent implements OnInit {
     const frequencyMatches = this.filterFrequency === null
       || plan.frequency === this.filterFrequency;
 
-    return textMatches && periodMatches && reportingMatches && frequencyMatches;
+    return measureMatches && dqmMatches && periodMatches && reportingMatches && frequencyMatches;
   }
 
   private static buildFrequencyOptions(plans: IFacilityReportingPlan[]): Frequency[] {
