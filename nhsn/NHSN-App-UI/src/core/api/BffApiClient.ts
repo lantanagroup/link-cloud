@@ -32,7 +32,6 @@ import type {
   SftpCredentials,
   SftpFile,
   Timezone,
-  UpdateFhirServerInfoRequest,
   UserInfoResponse,
   VendorProfile
 } from './contracts';
@@ -285,11 +284,6 @@ export class BffApiClient implements ApiClient {
 
   async getFhirServerInfo(): Promise<FhirServerInfoResponse> {
     const {data} = await this.http.get<FhirServerInfoResponse>('/facilities/fhir-server-info');
-    return data;
-  }
-
-  async updateFhirServerInfo(request: UpdateFhirServerInfoRequest): Promise<FhirServerInfoResponse> {
-    const {data} = await this.http.put<FhirServerInfoResponse>('/facilities/fhir-server-info', request);
     return data;
   }
 

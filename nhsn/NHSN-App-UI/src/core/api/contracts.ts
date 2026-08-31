@@ -79,17 +79,6 @@ export interface FhirServerInfoResponse {
   lagMinutes?: number;
 }
 
-export interface UpdateFhirServerInfoRequest {
-  fhirServerBaseUrl: string;
-  maxConcurrentRequests: number;
-  maxRetries: number;
-  minAcquisitionPullTime: string;
-  maxAcquisitionPullTime: string;
-  lagDays: number;
-  lagHours: number;
-  lagMinutes: number;
-}
-
 // ---------------------------------------------------------------- reference data
 
 export type LocationMethod =

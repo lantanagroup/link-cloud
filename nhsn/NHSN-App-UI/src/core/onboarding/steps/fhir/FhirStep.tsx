@@ -18,7 +18,7 @@ import './FhirStep.css';
 export function FhirStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
-  const {notifySuccess, notifyError} = useNotifications();
+  const {notifyError} = useNotifications();
   const {patch, saving, vendorProfile} = useOnboarding();
 
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,15 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
   const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(null);
+
+  const [readyToAdvance, setReadyToAdvance] = useState(false);
+
+  useEffect(() => {
+    if (readyToAdvance) {
+      setReadyToAdvance(false);
+      onNext();
+    }
+  }, [readyToAdvance, onNext]);
 
   useEffect(() => {
     let mounted = true;
@@ -144,7 +153,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
     }
   }
 
-  async function handleNext() {
+  function handleNext() {
     const trimmedBaseUrl = baseUrl.trim();
     const errors = validateFhir({
       fhirServerBaseUrl: baseUrl,
@@ -178,33 +187,16 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
     setValidationError(null);
 
-    try {
-      const updated = await api.updateFhirServerInfo({
-        fhirServerBaseUrl: trimmedBaseUrl,
-        maxConcurrentRequests: maxConcurrentRequests!,
-        maxRetries: maxRetries!,
-        minAcquisitionPullTime: minPullTime,
-        maxAcquisitionPullTime: maxPullTime,
-        lagDays: lagDays!,
-        lagHours: lagHours!,
-        lagMinutes: lagMinutes!
-      });
-
-      patch('fhir', {
-        fhirServerBaseUrl: updated.fhirServerBaseUrl,
-        maxConcurrentRequests: updated.maxConcurrentRequests,
-        maxRetries: updated.maxRetries,
-        minAcquisitionPullTime: updated.minAcquisitionPullTime,
-        maxAcquisitionPullTime: updated.maxAcquisitionPullTime,
-        lagDuration: buildIso8601Duration(updated.lagDays, updated.lagHours, updated.lagMinutes),
-        connectionTested: testedBaseUrl === trimmedBaseUrl
-      });
-
-      notifySuccess(t('onboarding:fhirServerInfo.messages.saveSuccess'));
-      onNext();
-    } catch (cause) {
-      notifyError(cause instanceof Error ? cause.message : t('onboarding:fhirServerInfo.messages.saveError'));
-    }
+    patch('fhir', {
+      fhirServerBaseUrl: trimmedBaseUrl,
+      maxConcurrentRequests: maxConcurrentRequests!,
+      maxRetries: maxRetries!,
+      minAcquisitionPullTime: minPullTime,
+      maxAcquisitionPullTime: maxPullTime,
+      lagDuration: buildIso8601Duration(lagDays, lagHours, lagMinutes),
+      connectionTested: testedBaseUrl === trimmedBaseUrl
+    });
+    setReadyToAdvance(true);
   }
 
   if (loading) {

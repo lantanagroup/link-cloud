@@ -119,15 +119,8 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         };
     }
 
-    public async Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default)
+    public async Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default)
     {
-        if (!_userContext.IsFacilityAdmin)
-        {
-            throw new InvalidOperationException("FACADMIN is required to update FHIR server information.");
-        }
-
-        var facilityId = _userContext.RequireFacilityId();
-
         if (!Uri.TryCreate(request.FhirServerBaseUrl, UriKind.Absolute, out var parsedBaseUrl) ||
             (parsedBaseUrl.Scheme != Uri.UriSchemeHttp && parsedBaseUrl.Scheme != Uri.UriSchemeHttps))
         {
@@ -161,8 +154,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
         var minPullTime = ParsePullTime(request.MinAcquisitionPullTime, "MinAcquisitionPullTime");
         var maxPullTime = ParsePullTime(request.MaxAcquisitionPullTime, "MaxAcquisitionPullTime");
-
-        await using var writeLock = await _writeLock.AcquireAsync(facilityId, cancellationToken);
 
         var facilityResponse = await _facilityServiceClient.GetAsync(facilityId, cancellationToken);
         if (facilityResponse.StatusCode == 404)
@@ -229,8 +220,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
             throw new InvalidOperationException($"Unable to save acquisition lag configuration in Query Dispatch. Query Dispatch returned HTTP {dispatchUpsertResponse.StatusCode}.");
         }
 
-        await writeLock.CommitAsync(cancellationToken);
-
         return new FhirServerInfoResponse
         {
             FhirServerBaseUrl = request.FhirServerBaseUrl,
@@ -279,7 +268,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
             .FirstOrDefault(schedule => string.Equals(schedule.Event, LagDispatchEvent, StringComparison.OrdinalIgnoreCase))
             ?.Duration;
 
-    private static (int Days, int Hours, int Minutes) ParseLagDuration(string? duration)
+    internal static (int Days, int Hours, int Minutes) ParseLagDuration(string? duration)
     {
         if (string.IsNullOrWhiteSpace(duration))
         {

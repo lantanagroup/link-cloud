@@ -22,7 +22,7 @@ public interface IFacilityAdministrationService
     Task<FhirServerInfoResponse?> GetFhirServerInfoAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Writes the facility's FHIR server configuration. FACADMIN only.</summary>
-    Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default);
+    Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The stage-1, URL-only reachability probe (C8) — proves the FHIR server responds, not that

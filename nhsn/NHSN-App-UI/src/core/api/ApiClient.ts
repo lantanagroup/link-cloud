@@ -32,7 +32,6 @@ import type {
   SftpFile,
   Timezone,
   SectionSource,
-  UpdateFhirServerInfoRequest,
   UserInfoResponse,
   VendorProfile
 } from './contracts';
@@ -118,6 +117,5 @@ export interface ApiClient {
   getReportingPlan(): Promise<ReportingPlan>;
 
   getFhirServerInfo(): Promise<FhirServerInfoResponse>;
-  updateFhirServerInfo(request: UpdateFhirServerInfoRequest): Promise<FhirServerInfoResponse>;
   getJwksInstructionsUrl(vendor: string): string;
 }

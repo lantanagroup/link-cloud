@@ -1,7 +1,9 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
@@ -35,6 +37,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IFacilityGateway _facilityGateway;
     private readonly ICensusConfigurationGateway _censusGateway;
     private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
+    private readonly IFacilityAdministrationService _facilityAdministrationService;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -46,6 +49,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IFacilityGateway facilityGateway,
         ICensusConfigurationGateway censusGateway,
         ISftpConfigurationGateway sftpConfigurationGateway,
+        IFacilityAdministrationService facilityAdministrationService,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -56,6 +60,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _facilityGateway = facilityGateway;
         _censusGateway = censusGateway;
         _sftpConfigurationGateway = sftpConfigurationGateway;
+        _facilityAdministrationService = facilityAdministrationService;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -224,6 +229,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 break;
 
             case "fhir":
+                await WriteFhirSectionAsync(facility.FacilityId, draft.Fhir, cancellationToken);
+                break;
+
             case "location-org":
                 _logger.LogWarning(
                     "Step {StepId} for facility {FacilityId}: configuration not written. Data Acquisition writes are unavailable until the SDK exposes an update operation.",
@@ -239,6 +247,37 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
             default:
                 // Workflow-only step, or one whose data is written through its own endpoint.
                 break;
+        }
+    }
+
+    private async Task WriteFhirSectionAsync(string facilityId, FhirSection fhir, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(fhir.FhirServerBaseUrl) ||
+            fhir.MaxConcurrentRequests is null ||
+            fhir.MaxRetries is null ||
+            string.IsNullOrWhiteSpace(fhir.MinAcquisitionPullTime) ||
+            string.IsNullOrWhiteSpace(fhir.MaxAcquisitionPullTime))
+        {
+            return;
+        }
+
+        var (lagDays, lagHours, lagMinutes) = FacilityAdministrationService.ParseLagDuration(fhir.LagDuration);
+
+        var result = await _facilityAdministrationService.UpdateFhirServerInfoAsync(facilityId, new UpdateFhirServerInfoRequest
+        {
+            FhirServerBaseUrl = fhir.FhirServerBaseUrl,
+            MaxConcurrentRequests = fhir.MaxConcurrentRequests.Value,
+            MaxRetries = fhir.MaxRetries.Value,
+            MinAcquisitionPullTime = fhir.MinAcquisitionPullTime,
+            MaxAcquisitionPullTime = fhir.MaxAcquisitionPullTime,
+            LagDays = lagDays,
+            LagHours = lagHours,
+            LagMinutes = lagMinutes
+        }, cancellationToken);
+
+        if (result is null)
+        {
+            _logger.LogWarning("Step fhir for facility {FacilityId}: Tenant has no facility record; FHIR configuration not written.", facilityId);
         }
     }
 
