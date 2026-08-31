@@ -1000,6 +1000,49 @@ public class FhirApiServiceTests
     }
 
     [Fact]
+    public async Task ExecuteSearch_SplitsOversizedEncounterParameterIntoMultipleFhirCalls()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService()
+        );
+
+        var encounterIds = string.Join(',', Enumerable.Range(1, 45).Select(i => $"enc-{i}"));
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            ScheduledReport = new ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+
+        await service.ExecuteSearch(
+            log,
+            new FhirQueryModel
+            {
+                IsReference = false,
+                QueryParameters = ["patient=Patient-1", $"encounter={encounterIds}"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.ServiceRequest);
+
+        searchFhirCommand.Verify(
+            x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+    }
+
+    [Fact]
     public async Task ExecuteSearch_AppliesDefaultSearchPageSize()
     {
         var searchFhirCommand = new Mock<ISearchFhirCommand>();

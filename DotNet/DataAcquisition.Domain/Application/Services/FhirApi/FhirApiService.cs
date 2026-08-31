@@ -215,8 +215,16 @@ public class FhirApiService : IFhirApiService
         }
         else
         {
-            var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
-            return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
+            var parameterBatches = FhirSearchLimits.SplitOversizedIdParameters(fhirQuery.QueryParameters);
+            foreach (var batch in parameterBatches)
+            {
+                var searchParams = BuildSearchParams(batch);
+                var ids = await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
+                if (ids != null)
+                    resourceIds.AddRange(ids);
+            }
+
+            return resourceIds;
         }
     }
     #endregion

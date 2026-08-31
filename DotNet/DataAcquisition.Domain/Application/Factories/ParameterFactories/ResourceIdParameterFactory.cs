@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using Microsoft.Extensions.Logging;
 
@@ -33,9 +34,12 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
             return null;
         }
 
-        Int32.TryParse(parameter.Paged, out int pageSize);
+        Int32.TryParse(parameter.Paged, out int configuredPageSize);
+        var pageSize = configuredPageSize > 0
+            ? Math.Min(configuredPageSize, FhirSearchLimits.MaxIdsPerParameter)
+            : FhirSearchLimits.MaxIdsPerParameter;
 
-        if (!string.IsNullOrWhiteSpace(parameter.Paged) && pageSize > 0 && resourceIds.Count > pageSize)
+        if (resourceIds.Count > pageSize)
         {
             var pagedEntries = resourceIds.Chunk(pageSize).ToList();
             return new ParameterFactoryResult(parameter.Name, null, true, pagedEntries);
