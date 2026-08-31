@@ -587,6 +587,14 @@ public static class FacilitySetupHelper
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Daily");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
+        try
+        {
+            await dataAcqClient.DeleteFhirListConfigurationAsync(facilityId);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: FHIR list config delete failed for '{facilityId}': {ex.Message}");
+        }
         await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
         await facilityClient.DeleteAsync(facilityId);
         output.WriteLine("Facility cleanup complete.");

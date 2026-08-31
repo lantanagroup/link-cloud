@@ -217,6 +217,24 @@ public class ResourcesAcquiredListener : BackgroundService
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
+        using var scope = _scopeFactory.CreateScope();
+        var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+        if (abortRegistry != null)
+        {
+            var reportId = result.Message.Value.ScheduledReports
+                .Select(sr => sr.ReportTrackingId)
+                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+            if (await abortRegistry.IsAbortedAsync(result.Message.Key.FacilityId, reportId, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Skipping ResourcesAcquired for aborted pipeline FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+                await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
+                return;
+            }
+        }
+
         using var duration = _metrics.MeasureNormalizationDuration(
         [
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
@@ -227,10 +245,8 @@ public class ResourcesAcquiredListener : BackgroundService
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
-        using (var scope = _scopeFactory.CreateScope())
+        foreach (var cacheKey in cacheKeys)
         {
-            foreach (var cacheKey in cacheKeys)
-            {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
@@ -345,10 +361,9 @@ public class ResourcesAcquiredListener : BackgroundService
                     correlationId.SanitizeForLog());
             }
 
-            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+        await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
-            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
-        }
+        await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
     }
 
     private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)
