@@ -76,6 +76,87 @@ describe('FacilityReportingPlansComponent', () => {
     expect(empty).not.toBeNull();
   });
 
+  describe('filtering', () => {
+    beforeEach(() => fixture.detectChanges());
+
+    it('filters by measure or dQM text, case-insensitively', () => {
+      component.filterText = 'ach';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-1']);
+
+      component.filterText = 'HOBD';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
+    });
+
+    it('filters by reporting period', () => {
+      component.filterPeriod = '2026-3';
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-1']);
+    });
+
+    it('filters by reporting state', () => {
+      component.filterReporting = false;
+      component.onFilterChange();
+      expect(component.dataSource.data.map(p => p.id)).toEqual(['rp-2']);
+    });
+
+    it('offers the distinct periods newest first', () => {
+      expect(component.periodOptions.map(o => o.label)).toEqual(['April 2026', 'March 2026']);
+    });
+
+    it('shows a no-match state distinct from the empty state when filters exclude everything', () => {
+      component.filterText = 'ACH';
+      component.filterReporting = false;
+      component.onFilterChange();
+      fixture.detectChanges();
+
+      expect(component.dataSource.data.length).toBe(0);
+      expect(fixture.nativeElement.querySelector('[data-testid="reporting-plans-no-match"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="reporting-plans-empty"]')).toBeNull();
+    });
+
+    it('clearFilters restores the full list', () => {
+      component.filterText = 'ach';
+      component.filterReporting = false;
+      component.onFilterChange();
+
+      component.clearFilters();
+
+      expect(component.hasActiveFilters()).toBeFalse();
+      expect(component.dataSource.data.length).toBe(2);
+    });
+  });
+
+  describe('pagination', () => {
+    const manyPlans: IFacilityReportingPlan[] = Array.from({ length: 15 }, (_, i) => ({
+      id: `rp-${i}`, facilityId: '100', measureMappingId: `mm-${i}`,
+      reportingMonth: (i % 12) + 1, reportingYear: 2026, isReporting: true,
+      measure: `Measure${i}`, dqm: `Dqm${i}`, frequency: Frequency.Monthly,
+      createDate: '2026-01-01T00:00:00Z', modifyDate: null
+    }));
+
+    beforeEach(() => {
+      reportingPlanService.getReportingPlansForFacility.and.returnValue(of(manyPlans));
+      fixture.detectChanges();
+    });
+
+    it('pages the table at 10 rows by default', () => {
+      expect(component.dataSource.paginator).toBeTruthy();
+      const rows = fixture.nativeElement.querySelectorAll('tr.mat-mdc-row:not(.mat-mdc-no-data-row)');
+      expect(rows.length).toBe(10);
+    });
+
+    it('resets to the first page when a filter changes', () => {
+      component.dataSource.paginator!.pageIndex = 1;
+
+      component.filterText = 'Measure1';
+      component.onFilterChange();
+
+      expect(component.dataSource.paginator!.pageIndex).toBe(0);
+    });
+  });
+
   it('surfaces a failed load with a message and recovers on retry', () => {
     reportingPlanService.getReportingPlansForFacility.and.returnValue(throwError(() => new Error('down')));
 

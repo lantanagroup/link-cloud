@@ -4,6 +4,51 @@
   padding-top: 1em;
 }
 
+// Same filter-bar treatment as the measure-mappings dashboard, so the DMRP screens read alike.
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: rgba(0, 0, 0, 0.025);
+  border-radius: 6px;
+  margin: 0 0 8px;
+}
+
+.compact-filter {
+  flex: 1 1 160px;
+  max-width: 220px;
+  font-size: 14px;
+
+  .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: rgba(0, 0, 0, 0.18) !important;
+  }
+
+  &:hover .mdc-notched-outline__leading,
+  &:hover .mdc-notched-outline__notch,
+  &:hover .mdc-notched-outline__trailing {
+    border-color: rgba(0, 0, 0, 0.35) !important;
+  }
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+mat-paginator {
+  background-color: transparent;
+}
+
 .section-state {
   display: flex;
   flex-direction: column;

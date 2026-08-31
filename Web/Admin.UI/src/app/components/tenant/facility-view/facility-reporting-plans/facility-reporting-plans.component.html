@@ -13,6 +13,43 @@
       </button>
     </div>
   } @else {
+    @if (allPlans.length > 0) {
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Search</mat-label>
+          <input matInput [(ngModel)]="filterText" (ngModelChange)="onFilterChange()"
+                 placeholder="Measure or dQM..." data-testid="reporting-plans-filter-text">
+          <button *ngIf="filterText" matSuffix mat-icon-button aria-label="Clear search"
+                  (click)="filterText=''; onFilterChange()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting Period</mat-label>
+          <mat-select [(ngModel)]="filterPeriod" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All periods</mat-option>
+            <mat-option *ngFor="let period of periodOptions" [value]="period.key">{{ period.label }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting</mat-label>
+          <mat-select [(ngModel)]="filterReporting" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            <mat-option [value]="true">Reporting</mat-option>
+            <mat-option [value]="false">Not reporting</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="filter-actions">
+          <button mat-stroked-button (click)="clearFilters()" *ngIf="hasActiveFilters()">
+            <mat-icon>filter_list_off</mat-icon> Clear Filters
+          </button>
+        </div>
+      </div>
+    }
+
     <div class="table-container no-border">
       <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)"
              style="width: 100%; background-color: transparent">
@@ -73,17 +110,29 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.withdrawn-row]="!row.isReporting"></tr>
 
-        <!-- Empty state -->
+        <!-- Empty state: nothing recorded at all vs. filters excluding every row -->
         <tr class="mat-row" *matNoDataRow>
           <td class="mat-cell" [attr.colspan]="displayedColumns.length">
-            <div class="no-data-message" data-testid="reporting-plans-empty">
-              <mat-icon>event_busy</mat-icon>
-              No reporting plans have been recorded for this facility.
-            </div>
+            @if (allPlans.length === 0) {
+              <div class="no-data-message" data-testid="reporting-plans-empty">
+                <mat-icon>event_busy</mat-icon>
+                No reporting plans have been recorded for this facility.
+              </div>
+            } @else {
+              <div class="no-data-message" data-testid="reporting-plans-no-match">
+                <mat-icon>filter_list_off</mat-icon>
+                No reporting plans match the current filters.
+              </div>
+            }
           </td>
         </tr>
 
       </table>
     </div>
+
+    @if (allPlans.length > 0) {
+      <mat-paginator [pageSizeOptions]="pageSizeOptions" [pageSize]="10" showFirstLastButtons
+                     aria-label="Select page of reporting plans"></mat-paginator>
+    }
   }
 </div>
