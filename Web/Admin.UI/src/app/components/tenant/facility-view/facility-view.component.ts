@@ -38,6 +38,8 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 import {MatTabsModule} from '@angular/material/tabs';
 import {LocationsListComponent} from './locations-list/locations-list.component';
 import {EncountersListComponent} from './encounters-list/encounters-list.component';
+import {FacilityReportingPlansComponent} from './facility-reporting-plans/facility-reporting-plans.component';
+import {AppConfigService} from '../../../services/app-config.service';
 
 @Component({
   selector: 'app-facility-view',
@@ -62,7 +64,8 @@ import {EncountersListComponent} from './encounters-list/encounters-list.compone
     MatTooltipModule,
     MatTabsModule,
     LocationsListComponent,
-    EncountersListComponent
+    EncountersListComponent,
+    FacilityReportingPlansComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
@@ -118,7 +121,16 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
     private reportService: ReportService,
     private aggregationService: AggregationService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar) {
+    private snackBar: MatSnackBar,
+    private appConfigService: AppConfigService) {
+  }
+
+  /**
+   * DMRP feature flag, mirroring the nav bar's gating: the Reporting Plans tab only exists while
+   * the module is on, because its api/dmrp routes do not exist when it is off.
+   */
+  get dmrpEnabled(): boolean {
+    return this.appConfigService.config?.dmrpEnabled ?? false;
   }
 
   ngOnInit(): void {
