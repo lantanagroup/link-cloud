@@ -29,7 +29,8 @@ namespace LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
 /// different system from the one guarding <see cref="DmrpController"/>: these endpoints
 /// belong to Link, the contract endpoints impersonate a third party and take that third
 /// party's token. The token endpoint below issues the latter, which is why it lives here but
-/// hands out something the contract endpoints accept.
+/// hands out something the contract endpoints accept -- and why it is the one endpoint here
+/// that opts out of the class-level policy.
 /// </para>
 /// </remarks>
 [ApiController]
@@ -323,10 +324,21 @@ public class MockController : ControllerBase
     /// system's authorization server.
     /// </summary>
     /// <remarks>
-    /// Reaching this endpoint needs a Link token; what it hands back is a third-party one.
-    /// The two are unrelated, which is the point -- a caller exercises the same
-    /// acquire-then-use sequence it will perform against the real service.
+    /// The one operation here that opts out of Link's authentication. It stands in for the
+    /// reporting system's authorization server, and a real one's token endpoint is not reached
+    /// by first authenticating to some unrelated system -- the client credentials are what get
+    /// a caller in. Requiring a Link token as well would make a consumer hold two credentials
+    /// to exercise a sequence that needs one, and would not resemble the flow it will perform
+    /// against the real service.
+    /// <para>
+    /// Opening it gives up nothing it was protecting. <see cref="IAuthTokenService.Issue"/>
+    /// still refuses anything but the configured client id and secret, and the secret is
+    /// provisioned per environment with no default. What this hands back reaches
+    /// <see cref="DmrpController"/> only -- never the surface above, which keeps the
+    /// class-level policy.
+    /// </para>
     /// </remarks>
+    [AllowAnonymous]
     [HttpPost("oauth2/token")]
     [ProducesResponseType(typeof(MockTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MockTokenErrorResponse), StatusCodes.Status400BadRequest)]
