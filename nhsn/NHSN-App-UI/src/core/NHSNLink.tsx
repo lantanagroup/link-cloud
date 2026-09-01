@@ -41,6 +41,8 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
   const [route, setRoute] = useState<RouteName>('home');
   const normalizedBaseUrl = useMemo(() => normalizeBaseUrl(baseUrl), [baseUrl]);
 
+  useHintTooltips();
+
   useEffect(() => {
     const syncRoute = () => setRoute(resolveRoute(window.location.pathname, normalizedBaseUrl));
     syncRoute();
@@ -230,6 +232,55 @@ function resolveRoute(pathname: string, baseUrl: string): RouteName {
     return 'configuration';
   }
   return 'home';
+}
+
+const FIELD_HINT_OPEN_CLASS = 'k-form-field--hint-open';
+const INFO_ICON_OPEN_CLASS = 'info-icon--open';
+const OPEN_SELECTOR = `.${FIELD_HINT_OPEN_CLASS}, .${INFO_ICON_OPEN_CLASS}`;
+
+function closeAllHintsExcept(keep: Element | null) {
+  document.querySelectorAll(OPEN_SELECTOR).forEach(el => {
+    if (el !== keep) {
+      el.classList.remove(FIELD_HINT_OPEN_CLASS, INFO_ICON_OPEN_CLASS);
+    }
+  });
+}
+
+function useHintTooltips() {
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      const target = event.target as Element | null;
+      if (!target) {
+        return;
+      }
+
+      const label = target.closest('.k-label');
+      const field = label?.closest('.k-form-field') ?? null;
+      const fieldTrigger = field?.querySelector('.k-form-hint') ? field : null;
+      const infoIconTrigger = target.closest('.info-icon');
+
+      const trigger = fieldTrigger ?? infoIconTrigger;
+      if (!trigger) {
+        if (!target.closest('.k-form-hint, .tooltip-bubble')) {
+          closeAllHintsExcept(null);
+        }
+        return;
+      }
+
+      if (fieldTrigger) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      const openClass = fieldTrigger ? FIELD_HINT_OPEN_CLASS : INFO_ICON_OPEN_CLASS;
+      const isOpen = trigger.classList.contains(openClass);
+      closeAllHintsExcept(isOpen ? null : trigger);
+      trigger.classList.toggle(openClass, !isOpen);
+    }
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, []);
 }
 
 function buildPath(route: RouteName, baseUrl: string): string {
