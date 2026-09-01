@@ -25,7 +25,7 @@ public class FacilityLocationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FacilityLocationModel>> Get(string facilityId, string locationId)
+    public async Task<ActionResult<FacilityLocationModel>> Get(string facilityId, string locationId, CancellationToken cancellationToken)
     {
         facilityId = SanitizeIdentifier(facilityId);
         locationId = SanitizeIdentifier(locationId);
@@ -37,10 +37,14 @@ public class FacilityLocationsController : ControllerBase
 
         try
         {
-            var facilityLocation = await _facilityLocationManager.Get(facilityId, locationId);
+            var facilityLocation = await _facilityLocationManager.Get(facilityId, locationId, cancellationToken);
             return facilityLocation == null
                 ? Problem(detail: "The requested facility location does not exist.", statusCode: StatusCodes.Status404NotFound)
                 : Ok(facilityLocation);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -54,7 +58,10 @@ public class FacilityLocationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FacilityLocationModel>> Post(string facilityId, FacilityLocationPostModel model)
+    public async Task<ActionResult<FacilityLocationModel>> Post(
+        string facilityId,
+        FacilityLocationPostModel model,
+        CancellationToken cancellationToken)
     {
         facilityId = SanitizeIdentifier(facilityId);
         var sanitizedModel = Sanitize(model);
@@ -66,7 +73,7 @@ public class FacilityLocationsController : ControllerBase
 
         try
         {
-            var facilityLocation = await _facilityLocationManager.Create(facilityId, sanitizedModel);
+            var facilityLocation = await _facilityLocationManager.Create(facilityId, sanitizedModel, cancellationToken);
             return CreatedAtAction(
                 nameof(Get),
                 new { facilityId = facilityLocation.FacilityId, locationId = facilityLocation.LocationId },
@@ -75,6 +82,10 @@ public class FacilityLocationsController : ControllerBase
         catch (InvalidOperationException exception)
         {
             return Problem(detail: exception.Message, statusCode: StatusCodes.Status409Conflict);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

@@ -6,8 +6,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers;
 
 public interface IFacilityLocationManager
 {
-    Task<FacilityLocationModel?> Get(string facilityId, string locationId);
-    Task<FacilityLocationModel> Create(string facilityId, FacilityLocationPostModel model);
+    Task<FacilityLocationModel?> Get(string facilityId, string locationId, CancellationToken cancellationToken = default);
+    Task<FacilityLocationModel> Create(string facilityId, FacilityLocationPostModel model, CancellationToken cancellationToken = default);
 }
 
 public class FacilityLocationManager : IFacilityLocationManager
@@ -19,23 +19,28 @@ public class FacilityLocationManager : IFacilityLocationManager
         _dbContext = dbContext;
     }
 
-    public async Task<FacilityLocationModel?> Get(string facilityId, string locationId)
+    public async Task<FacilityLocationModel?> Get(string facilityId, string locationId, CancellationToken cancellationToken = default)
     {
         var facilityLocation = await _dbContext.FacilityLocations.SingleOrDefaultAsync(location =>
-            location.FacilityId == facilityId && location.LocationId == locationId);
+            location.FacilityId == facilityId && location.LocationId == locationId,
+            cancellationToken);
 
         return facilityLocation == null ? null : ToModel(facilityLocation);
     }
 
-    public async Task<FacilityLocationModel> Create(string facilityId, FacilityLocationPostModel model)
+    public async Task<FacilityLocationModel> Create(
+        string facilityId,
+        FacilityLocationPostModel model,
+        CancellationToken cancellationToken = default)
     {
         if (await _dbContext.FacilityLocations.AnyAsync(location =>
-                location.FacilityId == facilityId && location.LocationId == model.LocationId))
+                location.FacilityId == facilityId && location.LocationId == model.LocationId,
+                cancellationToken))
         {
             throw new InvalidOperationException("A facility location with the supplied location identifier already exists.");
         }
 
-        var parentFacilityLocationId = await ResolveParentFacilityLocationId(facilityId, model.PartOfId);
+        var parentFacilityLocationId = await ResolveParentFacilityLocationId(facilityId, model.PartOfId, cancellationToken);
         var facilityLocation = new FacilityLocation
         {
             FacilityId = facilityId,
@@ -48,17 +53,20 @@ public class FacilityLocationManager : IFacilityLocationManager
         };
 
         _dbContext.FacilityLocations.Add(facilityLocation);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         await _dbContext.FacilityLocations
             .Where(location => location.FacilityId == facilityId && location.PartOfId == facilityLocation.LocationId)
             .ExecuteUpdateAsync(updates => updates
-                .SetProperty(location => location.ParentFacilityLocationId, facilityLocation.Id));
+                .SetProperty(location => location.ParentFacilityLocationId, facilityLocation.Id), cancellationToken);
 
         return ToModel(facilityLocation);
     }
 
-    private async Task<string?> ResolveParentFacilityLocationId(string facilityId, string? partOfId)
+    private async Task<string?> ResolveParentFacilityLocationId(
+        string facilityId,
+        string? partOfId,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(partOfId))
         {
@@ -68,7 +76,7 @@ public class FacilityLocationManager : IFacilityLocationManager
         return await _dbContext.FacilityLocations
             .Where(location => location.FacilityId == facilityId && location.LocationId == partOfId)
             .Select(location => location.Id)
-            .SingleOrDefaultAsync();
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     private static FacilityLocationModel ToModel(FacilityLocation facilityLocation) => new()
