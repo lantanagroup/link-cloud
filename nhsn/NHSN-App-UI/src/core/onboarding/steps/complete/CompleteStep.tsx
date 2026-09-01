@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {DraftEnvelope} from '../../../api/ApiClient';
-import {Button, NHSNLoadingIndicator, PageHeader, StepActions} from '../../../fields';
+import {Button, MessageContainer, NHSNLoadingIndicator, PageHeader, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {migrateDraft} from '../../types';
@@ -82,9 +82,9 @@ export function CompleteStep(_props: StepProps) {
       <p className="nhsn-link__subtitle">{t('onboarding:complete.subtitle')}</p>
 
       {error && (
-        <p className="nhsn-link__state nhsn-link__state--error" role="alert">
-          {error}
-        </p>
+        <MessageContainer type="error" showIcon>
+          <span role="alert">{error}</span>
+        </MessageContainer>
       )}
 
       <ul className="nhsn-link__summary-list">

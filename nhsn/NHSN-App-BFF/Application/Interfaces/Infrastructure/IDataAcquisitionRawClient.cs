@@ -3,12 +3,12 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 
 /// <summary>
-/// Data Acquisition operations LinkSdk's IDataAcquisitionServiceClient doesn't wrap yet: the
-/// connectionValidation reachability probe, and a clean-replace update for the FHIR query
-/// configuration. Extending the SDK for these is scheduled for Onboarding Phase 2 (per
-/// 02-bff-architecture.md); until then this calls Data Acquisition directly from the BFF, the same
-/// way DotNet/Shared's TenantApiService already calls Tenant directly rather than through a
-/// generated client.
+/// Data Acquisition operations that don't fit LinkSdk's IDataAcquisitionServiceClient shape: the
+/// connectionValidation reachability probe returns a bespoke result rather than a LinkApiResponse,
+/// and the clean-replace update declares its own local payload type. The implementation
+/// (DataAcquisitionRawClient) still builds on LinkSdk's LinkApiClientBase for both calls, the same
+/// base class the generated clients use, rather than hand-rolling requests against a plain
+/// HttpClient.
 /// </summary>
 public interface IDataAcquisitionRawClient
 {

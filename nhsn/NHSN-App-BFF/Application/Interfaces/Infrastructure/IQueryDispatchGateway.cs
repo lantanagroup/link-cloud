@@ -5,4 +5,6 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 public interface IQueryDispatchGateway
 {
     Task<string?> GetLagDurationAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    Task SetLagDurationAsync(string facilityId, string lagDuration, CancellationToken cancellationToken = default);
 }

@@ -67,7 +67,7 @@ body {
 .shell__card {
   background: rgba(255, 255, 255, 0.08);
   padding: 1rem;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-bottom: 1rem;
   min-width: 0;
   overflow: hidden;
@@ -98,7 +98,7 @@ body {
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.28);
   padding: 0.65rem 0.75rem;
-  border-radius: 10px;
+  border-radius: 8px;
   text-align: center;
   line-height: 1.3;
   cursor: pointer;
@@ -160,7 +160,7 @@ body {
 .shell__row input,
 .shell__row textarea {
   padding: 0.5rem;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   box-sizing: border-box;
   width: 100%;

@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
@@ -24,5 +25,16 @@ internal sealed class QueryDispatchGateway : IQueryDispatchGateway
         var config = LinkResponseHandler.Optional(response, ServiceName, nameof(GetLagDurationAsync));
 
         return config?.DispatchSchedules.FirstOrDefault(x => x.Event == DischargeEvent)?.Duration;
+    }
+
+    public async Task SetLagDurationAsync(string facilityId, string lagDuration, CancellationToken cancellationToken = default)
+    {
+        var response = await _queryDispatchClient.UpsertQueryDispatchConfigurationAsync(facilityId, new QueryDispatchConfigurationApiModel
+        {
+            FacilityId = facilityId,
+            DispatchSchedules = [new DispatchScheduleApiModel { Event = DischargeEvent, Duration = lagDuration }]
+        }, cancellationToken);
+
+        LinkResponseHandler.EnsureSuccess(response, ServiceName, nameof(SetLagDurationAsync));
     }
 }

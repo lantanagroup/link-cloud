@@ -11,4 +11,17 @@ public interface IFhirConfigurationGateway
 {
     // Reads the facility's FHIR configuration, or null when none exists yet.
     Task<FhirSection?> GetAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    Task SaveAsync(FhirConfigurationSave request, CancellationToken cancellationToken = default);
+}
+
+public sealed record FhirConfigurationSave
+{
+    public required string FacilityId { get; init; }
+    public required string FhirServerBaseUrl { get; init; }
+    public required int MaxConcurrentRequests { get; init; }
+    public required int MaxRetries { get; init; }
+    public required TimeSpan MinAcquisitionPullTime { get; init; }
+    public required TimeSpan MaxAcquisitionPullTime { get; init; }
+    public string? TimeZone { get; init; }
 }

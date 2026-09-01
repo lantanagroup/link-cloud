@@ -30,10 +30,10 @@ export function WelcomeStep({onNext}: StepProps) {
         />
       </p>
 
-      <h2 className="nhsn-link__section-heading">{t('onboarding:welcome.audienceTitle')}</h2>
+      <h2>{t('onboarding:welcome.audienceTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.audienceBody')}</p>
 
-      <h2 className="nhsn-link__section-heading">{t('onboarding:welcome.workflowTitle')}</h2>
+      <h2>{t('onboarding:welcome.workflowTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.workflowBody')}</p>
 
       <StepActions>
