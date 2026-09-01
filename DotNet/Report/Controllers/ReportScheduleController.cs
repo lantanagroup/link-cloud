@@ -340,6 +340,9 @@ namespace LantanaGroup.Link.Report.Controllers
             if (pageNumber < 1)
                 pageNumber = 1;
 
+            facilityId = facilityId is null ? null : HtmlInputSanitizer.Sanitize(facilityId);
+            sortBy = sortBy is null ? null : HtmlInputSanitizer.Sanitize(sortBy);
+
             var result = await _reportScheduledManager.GetReportSummaries(
                 facilityId,
                 status,
