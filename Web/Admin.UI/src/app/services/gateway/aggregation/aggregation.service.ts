@@ -38,5 +38,12 @@ export class AggregationService {
     );
   }
 
+  abortReport(reportScheduleId: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.appConfigService.config?.baseApiUrl}/aggregate/reports/${encodeURIComponent(reportScheduleId)}/abort`,
+      null
+    );
+  }
+
 
 }

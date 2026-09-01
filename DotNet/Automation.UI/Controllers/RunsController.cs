@@ -16,6 +16,7 @@ public class RunsController(
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
+    LeftoverRunCleanupService leftoverRunCleanup,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -151,6 +152,34 @@ public class RunsController(
         }
 
         await runManager.StartAsync(request, cancellationToken);
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CleanLeftovers(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await leftoverRunCleanup.RunOnceAsync(cancellationToken, maxFacilitiesOverride: 200);
+            if (result.QuiesceCandidateCount == 0 && result.TeardownCandidateCount == 0)
+            {
+                TempData["LeftoverCleanup"] = "No leftover Automation facilities were found.";
+            }
+            else
+            {
+                var message = $"Stopped hot work for {result.QuiescedFacilityIds.Count} of {result.QuiesceCandidateCount} leftover facilit{(result.QuiesceCandidateCount == 1 ? "y" : "ies")}. Torn down {result.TornDownFacilityIds.Count} past the 14-day tail.";
+                if (result.FailedFacilityIds.Count > 0)
+                    message += $" Failed: {string.Join(", ", result.FailedFacilityIds)}.";
+                TempData["LeftoverCleanup"] = message;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Manual leftover facility cleanup failed.");
+            TempData["LeftoverCleanupError"] = $"Leftover facility cleanup failed: {ex.Message}";
+        }
+
         return RedirectToAction(nameof(Index));
     }
 

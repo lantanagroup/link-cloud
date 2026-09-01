@@ -38,6 +38,7 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<LeftoverRunCleanupOptions>(builder.Configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
 builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
 var lokiUrl = builder.Configuration["Loki:Url"];
@@ -317,6 +318,10 @@ builder.Services.AddControllersWithViews()
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+builder.Services.AddSingleton<LeftoverRunCleanupService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 builder.Services.AddSingleton<PatientReplacementManager>();

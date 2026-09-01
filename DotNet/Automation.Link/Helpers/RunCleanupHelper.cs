@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -44,72 +46,101 @@ public static class RunCleanupHelper
     }
 
     /// <summary>
-    /// Cleanup workflow for user-initiated cancellation.
-    /// Order is: cancel DA work, soft-delete DA/report artifacts, then remove facility-level config,
-    /// then expunge FHIR data.
+    /// Stops work that is still moving: abort Kafka consumers, cancel DA retries,
+    /// disable census jobs, deactivate the report schedule. Leaves facility configs
+    /// and cancelled logs in place for debug until teardown.
+    /// </summary>
+    public static async Task AbortAndQuiesceFacilityAsync(
+        IPipelineAbortRegistry? abortRegistry,
+        IDataAcquisitionServiceClient dataAcqClient,
+        ICensusServiceClient censusClient,
+        IReportServiceClient reportClient,
+        IAutomationOutput output,
+        string facilityId,
+        string? reportId,
+        TimeSpan abortTtl,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return;
+
+        if (abortRegistry != null)
+        {
+            try
+            {
+                await abortRegistry.AbortAsync(facilityId, reportId, abortTtl, cancellationToken);
+                output.WriteLine($"Marked pipeline aborted for '{facilityId}'.");
+            }
+            catch (Exception ex)
+            {
+                output.WriteLine($"Warning: pipeline abort flag failed for '{facilityId}': {ex.Message}");
+            }
+        }
+
+        try
+        {
+            var cancelResult = await dataAcqClient.CancelAcquisitionLogsByFilterAsync(
+                new { FacilityId = facilityId },
+                minAgeHours: 0,
+                cancellationToken);
+            output.WriteLine($"Cancelled leftover DA work for '{facilityId}' (cancelled={cancelResult?.Body?.Cancelled ?? 0}).");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: DA cancel failed for '{facilityId}': {ex.Message}");
+        }
+
+        try
+        {
+            await censusClient.DisableFacilityJobsAsync(facilityId, cancellationToken);
+            output.WriteLine($"Disabled census jobs for '{facilityId}'.");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: census disable failed for '{facilityId}': {ex.Message}");
+        }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(reportId))
+                await reportClient.SoftDeleteScheduleAsync(reportId, cancellationToken);
+            await reportClient.SetReportsDeletedStatusForFacilityAsync(facilityId, deleted: true, cancellationToken);
+            output.WriteLine($"Deactivated report schedules for '{facilityId}'.");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: report schedule deactivate failed for '{facilityId}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Cancellation: abort and quiesce immediately, expunge FHIR so the server
+    /// does not keep mega-patient volume, but leave facility configs for the 14-day tail.
     /// </summary>
     public static async Task CleanupCancelledRunAsync(
-        IFacilityServiceClient facilityClient,
-        INormalizationServiceClient normalizationClient,
         IDataAcquisitionServiceClient dataAcqClient,
-        IQueryDispatchServiceClient queryDispatchClient,
+        ICensusServiceClient censusClient,
         IReportServiceClient reportClient,
+        IPipelineAbortRegistry? abortRegistry,
         FhirDataLoader fhirDataLoader,
         IAutomationOutput output,
         string? facilityId,
         string? reportId,
+        TimeSpan abortTtl,
         CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(facilityId))
         {
-            try
-            {
-                var cancelResult = await dataAcqClient.CancelAcquisitionLogsByFilterAsync(
-                    new { FacilityId = facilityId },
-                    minAgeHours: 0,
-                    cancellationToken);
-
-                output.WriteLine($"Requested DA cancellation for facility '{facilityId}' (cancelled={cancelResult?.Body?.Cancelled ?? 0}).");
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"Warning: DA cancel-by-filter failed for facility '{facilityId}': {ex.Message}");
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(facilityId))
-        {
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(reportId))
-                    await reportClient.SoftDeleteScheduleAsync(reportId);
-
-                await dataAcqClient.SoftDeleteLogsByFacilityAsync(facilityId);
-                await queryDispatchClient.DeleteQueryDispatchConfigurationAsync(facilityId);
-                output.WriteLine($"Soft-deleted DA logs and report artifacts for facility '{facilityId}'.");
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"Warning: soft-delete run data failed (facility={facilityId}, report={reportId}): {ex.Message}");
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(facilityId))
-        {
-            try
-            {
-                await FacilitySetupHelper.CleanupFacilityAsync(
-                    facilityClient,
-                    normalizationClient,
-                    dataAcqClient,
-                    queryDispatchClient,
-                    output,
-                    facilityId);
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"Warning: facility cleanup failed for '{facilityId}': {ex.Message}");
-            }
+            await AbortAndQuiesceFacilityAsync(
+                abortRegistry,
+                dataAcqClient,
+                censusClient,
+                reportClient,
+                output,
+                facilityId,
+                reportId,
+                abortTtl,
+                cancellationToken);
         }
 
         try
@@ -120,5 +151,136 @@ public static class RunCleanupHelper
         {
             output.WriteLine($"Warning: FHIR expunge failed during cancel cleanup: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Tears down a leftover Automation facility without expunging the whole FHIR server.
+    /// Used by the leftover sweeper so old GUID facilities stop driving DA census reads.
+    /// </summary>
+    public static async Task CleanupLeftoverFacilityAsync(
+        IFacilityServiceClient facilityClient,
+        INormalizationServiceClient normalizationClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
+        ICensusServiceClient censusClient,
+        IReportServiceClient reportClient,
+        IPipelineAbortRegistry? abortRegistry,
+        IAutomationOutput output,
+        string facilityId,
+        TimeSpan abortTtl,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return;
+
+        await AbortAndQuiesceFacilityAsync(
+            abortRegistry,
+            dataAcqClient,
+            censusClient,
+            reportClient,
+            output,
+            facilityId,
+            reportId: null,
+            abortTtl,
+            cancellationToken);
+
+        try
+        {
+            await dataAcqClient.SoftDeleteLogsByFacilityAsync(facilityId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: leftover DA log soft-delete failed for '{facilityId}': {ex.Message}");
+        }
+
+        try
+        {
+            await censusClient.DeleteCensusConfigAsync(facilityId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: leftover census config delete failed for '{facilityId}': {ex.Message}");
+        }
+
+        try
+        {
+            await FacilitySetupHelper.CleanupFacilityAsync(
+                facilityClient,
+                normalizationClient,
+                dataAcqClient,
+                queryDispatchClient,
+                output,
+                facilityId);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: leftover facility teardown failed for '{facilityId}': {ex.Message}");
+        }
+    }
+
+    public static bool IsAutomationFacilityId(string? facilityId) =>
+        Guid.TryParse(facilityId, out _);
+
+    /// <summary>
+    /// GUID facilities whose run is terminal past <paramref name="grace"/>, plus GUID
+    /// facilities with no matching run. These still have configs; only hot work is stopped.
+    /// </summary>
+    public static IReadOnlyList<string> SelectQuiesceAutomationFacilities(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan grace)
+        => SelectAutomationFacilities(facilities, runs, now, grace);
+
+    /// <summary>
+    /// GUID facilities whose run has been terminal longer than <paramref name="retention"/>,
+    /// plus GUID orphans with no run record.
+    /// </summary>
+    public static IReadOnlyList<string> SelectTeardownAutomationFacilities(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention)
+        => SelectAutomationFacilities(facilities, runs, now, retention);
+
+    public static IReadOnlyList<string> SelectLeftoverAutomationFacilities(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention)
+        => SelectTeardownAutomationFacilities(facilities, runs, now, retention);
+
+    private static IReadOnlyList<string> SelectAutomationFacilities(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan minAge)
+    {
+        var protectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var run in runs)
+        {
+            if (!run.Status.IsTerminal())
+            {
+                Protect(protectedIds, run);
+                continue;
+            }
+
+            var finished = run.FinishedAt ?? run.StartedAt ?? run.CreatedAt;
+            if (now - finished < minAge)
+                Protect(protectedIds, run);
+        }
+
+        return facilities.Keys
+            .Where(IsAutomationFacilityId)
+            .Where(id => !protectedIds.Contains(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void Protect(HashSet<string> protectedIds, AutomationRunSummary run)
+    {
+        protectedIds.Add(run.RunId.ToString());
+        if (!string.IsNullOrWhiteSpace(run.FacilityId))
+            protectedIds.Add(run.FacilityId);
     }
 }
