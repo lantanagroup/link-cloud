@@ -186,6 +186,27 @@ public sealed class DmrpTestSuite : ServiceTestSuiteBase
                 : await RunStepAsync<List<FacilityReportingPlanModel>>(StepNames.PlansForFacilityGet200, 200, () =>
                     _client.GetFacilityReportingPlansForFacilityAsync(facilityId, cancellationToken: ct), ct));
 
+            results.Add(facilityId is null
+                ? SkipStepAsync(StepNames.PlanPeriodsGet200, FacilityMissing)
+                : await RunStepAsync<PagedConfigModel<FacilityReportingPlanPeriodModel>>(
+                    StepNames.PlanPeriodsGet200, 200, () =>
+                        _client.GetFacilityReportingPlanPeriodsAsync(facilityId, cancellationToken: ct), ct));
+
+            results.Add(facilityId is null
+                ? SkipStepAsync(StepNames.PlanPeriodsGet200LookAhead, FacilityMissing)
+                : await RunStepAsync<PagedConfigModel<FacilityReportingPlanPeriodModel>>(
+                    StepNames.PlanPeriodsGet200LookAhead, 200, () =>
+                        _client.GetFacilityReportingPlanPeriodsAsync(facilityId, monthsAhead: 6, cancellationToken: ct), ct));
+
+            // Refresh is deliberately not exercised. It calls DMRP, so it would make this suite's
+            // result depend on a third party being reachable and would write to the facility's plan
+            // as a side effect of a health check.
+            results.Add(facilityId is null
+                ? SkipStepAsync(StepNames.PlanPeriodsGet400MonthsAhead, FacilityMissing)
+                : await RunStepAsync<PagedConfigModel<FacilityReportingPlanPeriodModel>>(
+                    StepNames.PlanPeriodsGet400MonthsAhead, 400, () =>
+                        _client.GetFacilityReportingPlanPeriodsAsync(facilityId, monthsAhead: 0, cancellationToken: ct), ct));
+
             // === DELETE, in the order the foreign key forces ===
 
             // The mapping cannot go while a plan still points at it. Answering 404 here would tell the

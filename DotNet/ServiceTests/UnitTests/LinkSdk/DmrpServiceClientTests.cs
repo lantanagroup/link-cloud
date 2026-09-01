@@ -94,6 +94,64 @@ public class DmrpServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_ReadsThePeriodsOperation()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/dmrp/reporting-plans/facilities/100/periods", request.Path);
+        Assert.Contains("monthsAhead=6", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_AsksForARefreshOnlyWhenTold()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        // A refresh makes the service call DMRP, so the parameter is sent only when it was asked
+        // for - refresh=false and no refresh at all should not be distinguishable to the service.
+        Assert.DoesNotContain("refresh", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_SendsRefreshWhenAskedFor()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6, refresh: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("refresh=true", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlansForFacilityAsync_CarriesTheLookAheadAndRefresh()
+    {
+        using var server = new OneShotServer("[]");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlansForFacilityAsync("100", monthsAhead: 6, refresh: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("/api/dmrp/reporting-plans/facilities/100", request.Path);
+        Assert.Contains("monthsAhead=6", request.Query);
+        Assert.Contains("refresh=true", request.Query);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SearchMeasureMappingsAsync_ReportsNotFoundRatherThanThrowing()
     {
         using var server = new OneShotServer("{}", statusCode: 404);
