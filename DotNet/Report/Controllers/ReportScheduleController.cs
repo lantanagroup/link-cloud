@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="active"></param>
         /// <param name="blocking">
         /// When set to <c>true</c>, returns only report schedules with a status of <c>New</c> or <c>EndOfPeriod</c>
-        /// — the statuses that indicate a report is actively in progress and would block a facility soft-delete.
+        /// ï¿½ the statuses that indicate a report is actively in progress and would block a facility soft-delete.
         /// Defaults to <c>false</c>.
         /// </param>
         /// <param name="includeDeleted">
@@ -246,7 +246,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="reportStartDate">Optional report start date filter (inclusive)</param>
         /// <param name="reportEndDate">Optional report end date filter (inclusive)</param>
-        /// <param name="status">Optional status filter — supports multiple values (e.g. status=New&amp;status=Submitted)</param>
+        /// <param name="status">Optional status filter ï¿½ supports multiple values (e.g. status=New&amp;status=Submitted)</param>
         /// <param name="endOfReportPeriodJobHasRun">Optional end of report period job flag filter</param>
         /// <param name="includeDeleted">Optional include deleted filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ReportStartDate")</param>
@@ -320,6 +320,52 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 throw;
             }
+        }
+
+        [HttpGet("summaries")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportSummaryApiModel>))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummaries(
+            string? facilityId = null,
+            ReportStatus? status = null,
+            string? sortBy = null,
+            SortOrder? sortOrder = null,
+            int pageSize = 10,
+            int pageNumber = 1,
+            CancellationToken cancellationToken = default)
+        {
+            if (pageSize < 1 || pageSize > 100)
+                pageSize = 10;
+
+            if (pageNumber < 1)
+                pageNumber = 1;
+
+            var result = await _reportScheduledManager.GetReportSummaries(
+                facilityId,
+                status,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
+                cancellationToken);
+
+            Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
+            return Ok(result);
+        }
+
+        [HttpGet("{reportScheduleId}/summary")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportSummaryApiModel))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ReportSummaryApiModel>> GetReportSummary(
+            string reportScheduleId,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _reportScheduledManager.GetReportSummary(
+                reportScheduleId,
+                cancellationToken);
+
+            return result == null ? NotFound() : Ok(result);
         }
     }
 }
