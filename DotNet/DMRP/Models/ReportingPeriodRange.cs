@@ -49,5 +49,18 @@ namespace LantanaGroup.Link.DMRP.Models
 
             return new ReportingPeriodRange(anchor, anchor.AddMonths(monthsAhead - 1));
         }
+
+        /// <summary>
+        /// Every period in the window, oldest first. Used to answer for months the facility has no
+        /// reporting plan on record for, which a read of stored rows cannot produce.
+        /// </summary>
+        public IEnumerable<ReportingPeriod> Periods()
+        {
+            for (var period = From; period.Year < To.Year || (period.Year == To.Year && period.Month <= To.Month);
+                 period = period.AddMonths(1))
+            {
+                yield return period;
+            }
+        }
     }
 }

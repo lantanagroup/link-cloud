@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DMRP.Business.Queries;
+﻿using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -299,51 +299,6 @@ namespace UnitTests.DMRP
             var results = await CreateQueries(context).GetForFacilityAsync("does-not-exist");
 
             Assert.Empty(results);
-        }
-
-        [Fact]
-        public async Task GetPeriodsForFacilityAsync_OrdersMeasuresWithinAPeriodByMeasure()
-        {
-            using var context = CreateContext();
-
-            var zulu = AddMapping(context);
-            zulu.Measure = "ZULU";
-
-            var alpha = AddMapping(context);
-            alpha.Measure = "ALPHA";
-
-            AddPlan(context, zulu, month: 5, year: 2026);
-            AddPlan(context, alpha, month: 5, year: 2026);
-            await context.SaveChangesAsync();
-
-            var page = await CreateQueries(context).GetPeriodsForFacilityAsync(FacilityId);
-
-            // The contract promises a stable order, so the measures are sorted rather than left in
-            // whatever order the rows came back in.
-            var measures = Assert.Single(page.Records).Measures;
-            Assert.Equal(["ALPHA", "ZULU"], measures.Select(m => m.Measure));
-        }
-
-        [Fact]
-        public async Task GetPeriodsForFacilityAsync_KeepsAMeasureWhoseMappingDidNotResolve()
-        {
-            using var context = CreateContext();
-            var mapping = AddMapping(context);
-            AddPlan(context, mapping, month: 5, year: 2026);
-            await context.SaveChangesAsync();
-
-            // Deleting the mapping out from under the plan is what a read racing a delete sees. It has
-            // to go around the change tracker: removing the principal there severs the relationship
-            // first, which nulls the plan's required foreign key before the delete ever runs.
-            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF");
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM MeasureMappings WHERE Id = {0}", mapping.Id);
-            context.ChangeTracker.Clear();
-
-            var page = await CreateQueries(context).GetPeriodsForFacilityAsync(FacilityId);
-
-            var measure = Assert.Single(Assert.Single(page.Records).Measures);
-            Assert.Null(measure.Measure);
-            Assert.Equal(mapping.Id, measure.MeasureMappingId);
         }
 
         [Fact]

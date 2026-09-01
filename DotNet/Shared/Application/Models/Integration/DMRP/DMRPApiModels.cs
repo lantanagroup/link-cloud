@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using System.ComponentModel.DataAnnotations;
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 
@@ -68,10 +69,37 @@ public class FacilityReportingPlanPeriodModel
     public int ReportingMonth { get; set; }
 
     /// <summary>
-    /// The measures enrolled in this period. Never empty: a period exists in the response because at
-    /// least one plan row put it there.
+    /// The measures enrolled in this period.
     /// </summary>
     public List<FacilityReportingPlanMeasureModel> Measures { get; set; } = [];
+
+    /// <summary>
+    /// What Link will actually run for this period: the dQMs grouped by the cadence they report on.
+    /// Derived from <see cref="Measures"/> by the same rule that builds the facility's stored
+    /// schedule, so the look-ahead cannot promise a report the scheduler will not create.
+    /// </summary>
+    /// <remarks>
+    /// Narrower than <see cref="Measures"/> on purpose. A measure with no dQM mapped, or one whose
+    /// cadence Link has no timer for (Discharge, Adhoc), is listed as an enrollment but produces no
+    /// scheduled report - which is the difference the facility needs to see.
+    /// </remarks>
+    public TenantScheduledReportConfig Schedule { get; set; } = new()
+    {
+        Daily = [],
+        Weekly = [],
+        Monthly = []
+    };
+
+    /// <summary>
+    /// True when this period has no reporting plan on record and was derived from the facility's
+    /// current enrollment instead.
+    /// </summary>
+    /// <remarks>
+    /// A projection assumes the current enrollment continues. DMRP records enrollment per period, so
+    /// once a period's own rows exist they are reported as they are and this is false - recorded
+    /// always wins over projected.
+    /// </remarks>
+    public bool IsProjected { get; set; }
 }
 
 /// <summary>
