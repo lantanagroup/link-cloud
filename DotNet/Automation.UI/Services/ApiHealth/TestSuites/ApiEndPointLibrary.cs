@@ -233,6 +233,10 @@ public static class ApiEndPointLibrary
     {
         [ReportSteps.InfoGet200] = new EndpointMeta("Returns Report service information.", "GET /api/Report/info"),
         [ReportSteps.RootHealthGet200] = new EndpointMeta("Returns Report service health status.", "GET /health"),
+        [ReportSteps.ReportSummaries200] = new EndpointMeta("Returns an empty page of report summaries for an unknown facility.", "GET /api/schedules/summaries"),
+        [ReportSteps.ReportSummaries200HasData] = new EndpointMeta("Returns report summaries for the seeded facility.", "GET /api/schedules/summaries"),
+        [ReportSteps.ReportSummaryGet200HasData] = new EndpointMeta("Returns the summary for the seeded report schedule.", "GET /api/schedules/{reportScheduleId}/summary"),
+        [ReportSteps.ReportSummaryGet404] = new EndpointMeta("Returns not-found for an unknown report-schedule summary.", "GET /api/schedules/{reportScheduleId}/summary"),
         [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
@@ -500,6 +504,10 @@ public static class ApiEndPointLibrary
         public const string GetByFacility200Empty = "Get By Facility → 200 (empty)";
         public const string GetByFacility200HasData = "Get By Facility → 200 (has data)";
         public const string Search200 = "Search → 200";
+        public const string ReportSummaries200 = "Report Summaries GET → 200";
+        public const string ReportSummaries200HasData = "Report Summaries GET → 200 (has data)";
+        public const string ReportSummaryGet200HasData = "Report Summary GET → 200 (has data)";
+        public const string ReportSummaryGet404 = "Report Summary GET → 404";
         public const string SoftDelete400BadGuid = "SoftDelete → 400 (bad guid)";
         public const string SoftDelete404 = "SoftDelete → 404";
         public const string SoftDelete204 = "SoftDelete → 204";
