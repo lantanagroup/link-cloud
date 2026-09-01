@@ -17,6 +17,11 @@ public class FacilityReportingPlanModel
     public string? MeasureMappingId { get; set; }
 
     /// <summary>
+    /// The NHSN component the enrollment belongs to - MSC or PS. Both are reported monthly.
+    /// </summary>
+    public string? Component { get; set; }
+
+    /// <summary>
     /// Month of the reporting period, 1-12.
     /// </summary>
     public int ReportingMonth { get; set; }
@@ -62,6 +67,11 @@ public class FacilityReportingPlanModel
 public class FacilityReportingPlanPeriodModel
 {
     public int ReportingYear { get; set; }
+
+    /// <summary>
+    /// The NHSN component the enrollment belongs to - MSC or PS. Both are reported monthly.
+    /// </summary>
+    public string? Component { get; set; }
 
     /// <summary>
     /// Month of the reporting period, 1-12.
