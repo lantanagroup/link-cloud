@@ -101,26 +101,25 @@ namespace LantanaGroup.Link.DMRP.Api
 
         private async Task<DmrpTokenResponse> FetchAsync(DmrpApiSettings api, CancellationToken cancellationToken)
         {
-            var form = new List<KeyValuePair<string, string>>
+            // JSON rather than the form encoding RFC 6749 describes for this grant. The token
+            // endpoint this stands in front of takes a JSON body, and a client that posts a form
+            // to it is answered 415 - so the wire format follows the service rather than the
+            // specification.
+            var request = new DmrpTokenRequest
             {
-                new("grant_type", "client_credentials"),
-                new("client_id", api.ClientId!),
-                new("client_secret", api.ClientSecret!)
+                GrantType = "client_credentials",
+                ClientId = api.ClientId!,
+                ClientSecret = api.ClientSecret!,
+                Scope = string.IsNullOrWhiteSpace(api.Scope) ? null : api.Scope
             };
 
-            if (!string.IsNullOrWhiteSpace(api.Scope))
-            {
-                form.Add(new KeyValuePair<string, string>("scope", api.Scope));
-            }
-
             using var client = _httpClientFactory.CreateClient(DmrpApiClient.HttpClientName);
-            using var content = new FormUrlEncodedContent(form);
 
             HttpResponseMessage response;
 
             try
             {
-                response = await client.PostAsync(api.TokenUrl, content, cancellationToken);
+                response = await client.PostAsJsonAsync(api.TokenUrl, request, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
