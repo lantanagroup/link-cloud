@@ -33,14 +33,14 @@ info:
     A reporting plan lists the NHSN modules a facility is enrolled to report.
     There are two, and they differ in both subject and cadence:
 
-    | Operation      | Component | Subject          | Cadence |
-    |----------------|-----------|------------------|---------|
-    | `/msc`         | MSC       | Medicine reports | Monthly |
-    | `/ps/annual/mrp`   | PS        | Patient safety   | Annual  |
+    | Operation         | Component | Subject          | Cadence |
+    |-------------------|-----------|------------------|---------|
+    | `/msc`            | MSC       | Medicine reports | Monthly |
+    | `/ps/annual/mrp`  | PS        | Patient safety   | Monthly |
 
-    Both accept the same query parameters. `month` has no meaning for the
-    annual plan, whose entries carry no month, so it is accepted and ignored
-    there rather than narrowing the result to nothing.
+    Both are reported monthly and both accept the same query parameters, which
+    narrow the result the same way. The `annual` in the patient-safety path is
+    part of that operation's name and says nothing about its cadence.
 
     ## Only nhsnorgid is required
 
@@ -113,14 +113,13 @@ paths:
     get:
       tags: [Reporting Plans]
       operationId: GetPatientSafetyAnnualReportingPlan
-      summary: Get a facility's annual patient-safety reporting plan.
+      summary: Get a facility's patient-safety reporting plan.
       description: |
         Returns the patient-safety modules the facility is enrolled to report,
-        narrowed by whichever of `name` and `year` are supplied.
+        narrowed by whichever of `name`, `year` and `month` are supplied.
 
-        This plan is annual. `month` is accepted for symmetry with the monthly
-        plan but does not narrow the result, and the response omits
-        `reportingMonth`.
+        Reported monthly, exactly like the medicine plan. The `annual` in this
+        operation's path is part of its name, not a statement about its cadence.
       security:
         - dmrpBearer: []
       parameters:
@@ -177,7 +176,7 @@ components:
       required: false
       description: |
         The month of the reporting period, `1` to `12`. Omit to return every
-        month. Has no effect on the annual plan.
+        month.
       schema: { type: string, maxLength: 2 }
       example: '2'
 
@@ -249,8 +248,7 @@ components:
           nullable: true
           description: |
             The month the result was narrowed to, echoed from the request. Null
-            when no month was supplied, and always null on the annual plan.
-            NUMERIC here, a string inside `plans`.
+            when no month was supplied. NUMERIC here, a string inside `plans`.
           example: 2
         modifyDate:
           type: string
@@ -296,7 +294,6 @@ components:
           nullable: true
           description: |
             The entry's own reporting month, as a STRING. Numeric at the root.
-            Absent for an annual component, whose entries carry no month.
           example: '2'
         year:
           type: string
