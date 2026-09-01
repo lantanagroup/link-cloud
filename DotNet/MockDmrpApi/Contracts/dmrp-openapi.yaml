@@ -212,11 +212,12 @@ components:
       type: object
       required: [plans]
       description: |
-        NOTE THE TYPES. `month` and `year` are NUMERIC here and STRINGS inside
-        `plans`. That is how the real API behaves, and this stand-in reproduces
-        it deliberately rather than tidying it up -- a consumer that codes
-        against a cleaned-up shape here would break on first contact with the
-        real endpoint, which is the one failure this service exists to prevent.
+        `month` and `year` are numeric both here and inside `plans`, which is
+        what the real API returns. `nhsnorgid` inside `plans` is still a string
+        while `orgid` at the root is a number -- that asymmetry is real and is
+        reproduced deliberately rather than tidied up, because a consumer that
+        codes against a cleaned-up shape breaks on first contact with the real
+        endpoint, which is the one failure this service exists to prevent.
       properties:
         psDMRptPlanID:
           type: integer
@@ -290,16 +291,17 @@ components:
           description: The facility, as a STRING here. Numeric at the root as `orgid`.
           example: '100'
         month:
-          type: string
+          type: integer
+          format: int32
           nullable: true
-          description: |
-            The entry's own reporting month, as a STRING. Numeric at the root.
-          example: '2'
+          description: The entry's own reporting month.
+          example: 2
         year:
-          type: string
+          type: integer
+          format: int32
           nullable: true
-          description: The entry's own reporting year, as a STRING. Numeric at the root.
-          example: '2020'
+          description: The entry's own reporting year.
+          example: 2020
         reporting:
           type: string
           nullable: true

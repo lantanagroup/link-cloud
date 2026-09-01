@@ -77,8 +77,8 @@ public static class EntryMapper
                 {
                     Name = e.Measure,
                     Nhsnorgid = nhsnOrgId,
-                    Month = e.ReportingMonth.ToString(CultureInfo.InvariantCulture),
-                    Year = e.ReportingYear.ToString(CultureInfo.InvariantCulture),
+                    Month = e.ReportingMonth,
+                    Year = e.ReportingYear,
                     Reporting = e.IsReporting,
                     RptSeq = 0
                 })
