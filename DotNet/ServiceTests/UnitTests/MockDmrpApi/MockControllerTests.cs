@@ -117,7 +117,7 @@ public class MockControllerTests : IAsyncLifetime
     private ReportingPlanEntryEntity Seed(
         string facilityId = "F1",
         string measure = "HOB",
-        int? month = 5,
+        int month = 5,
         int year = 2026,
         string isReporting = "Y",
         string component = ReportingComponents.Msc)
@@ -138,6 +138,8 @@ public class MockControllerTests : IAsyncLifetime
         return entry;
     }
 
+    // month is nullable here so a test can send a body with no reportingMonth at all, which is
+    // what exercises the [Required] rule rather than the range one.
     private static object MonthlyBody(
         string facilityId = "F1", string measure = "HOB", int? month = 5, int year = 2026, string isReporting = "Y") =>
         new
@@ -286,7 +288,7 @@ public class MockControllerTests : IAsyncLifetime
     {
         // Seeding and inspection span both plans, so this must not be component-scoped.
         Seed(measure: "HOB");
-        Seed(measure: "HAI", month: null, component: ReportingComponents.Ps);
+        Seed(measure: "HAI", component: ReportingComponents.Ps);
 
         var response = await _client.GetAsync("/api/mock-dmrp/facilities/F1/entries");
 
@@ -311,7 +313,7 @@ public class MockControllerTests : IAsyncLifetime
     public async Task Search_FiltersByComponent()
     {
         Seed(measure: "HOB");
-        Seed(measure: "HAI", month: null, component: ReportingComponents.Ps);
+        Seed(measure: "HAI", component: ReportingComponents.Ps);
 
         var response = await _client.GetAsync("/api/mock-dmrp/entries/search?component=PS");
 
@@ -379,20 +381,21 @@ public class MockControllerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_AnnualEntry_OmitsTheMonth()
+    public async Task Create_PatientSafetyEntry_CarriesItsMonth()
     {
         var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             component = "PS",
             measure = "HAI",
+            reportingMonth = 5,
             reportingYear = 2026,
             isReporting = "Y"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await response.Content.ReadFromJsonAsync<MockEntryModel>();
-        created!.ReportingMonth.Should().BeNull();
+        created!.ReportingMonth.Should().Be(5);
         created.Component.Should().Be("PS");
     }
 
@@ -578,32 +581,31 @@ public class MockControllerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_MonthlyEntryWithNoMonth_Returns400ExplainingTheCadence()
+    public async Task Create_EntryWithNoMonth_Returns400()
     {
-        // The rule is conditional on the component, so it cannot be a data annotation. The
-        // message has to name the cadence or the caller has no way to know what was wrong.
+        // Every component is reported monthly, so an entry with no month has no period to be
+        // reported against and is refused before it reaches the database.
         var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", MonthlyBody(month: null));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("monthly");
         _repository.Entries.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Create_AnnualEntryWithAMonth_Returns400ExplainingTheCadence()
+    public async Task Create_PatientSafetyEntryWithNoMonth_Returns400()
     {
+        // Both components need a month, so the patient-safety plan is refused for the same
+        // reason and by the same rule as the medicine one.
         var response = await _client.PostAsJsonAsync("/api/mock-dmrp/entries", new
         {
             facilityId = "F1",
             component = "PS",
             measure = "HAI",
-            reportingMonth = 5,
             reportingYear = 2026,
             isReporting = "Y"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("annually");
         _repository.Entries.Should().BeEmpty();
     }
 

@@ -29,7 +29,7 @@ public class ReportingPlanPersistenceTests
 
     /// <summary>A monthly (MSC) entry.</summary>
     private static ReportingPlanEntryEntity Entry(
-        string facilityId = "F1", string measure = "HOB", int? month = 5, int year = 2026) =>
+        string facilityId = "F1", string measure = "HOB", int month = 5, int year = 2026) =>
         new()
         {
             FacilityId = facilityId,
@@ -41,14 +41,14 @@ public class ReportingPlanPersistenceTests
         };
 
     /// <summary>An annual (PS) entry, which carries no month.</summary>
-    private static ReportingPlanEntryEntity AnnualEntry(
-        string facilityId = "F1", string measure = "HAI", int year = 2026) =>
+    private static ReportingPlanEntryEntity PatientSafetyEntry(
+        string facilityId = "F1", string measure = "HAI", int month = 5, int year = 2026) =>
         new()
         {
             FacilityId = facilityId,
             Component = ReportingComponents.Ps,
             Measure = measure,
-            ReportingMonth = null,
+            ReportingMonth = month,
             ReportingYear = year,
             IsReporting = "Y"
         };
@@ -99,18 +99,11 @@ public class ReportingPlanPersistenceTests
     }
 
     [Fact]
-    public void TheUniqueIndexIsNotFiltered()
+    public void TheUniqueIndexSpansTheComponentAndThePeriod()
     {
-        // EF's default for a unique index over a nullable column is a filtered index --
-        // "WHERE [ReportingMonth] IS NOT NULL" -- which drops every annual row out of the
-        // index and silently permits duplicate patient-safety entries. The mapping
-        // suppresses that filter with HasFilter(null); this is what holds it there.
-        //
-        // Asserted against the model rather than by attempting a duplicate insert, because
-        // whether the database then rejects it is provider-specific: SQL Server treats NULL
-        // as a single value in a unique index and refuses the second row, while SQLite --
-        // what this fixture runs on -- follows the standard, where NULLs are distinct.
-        // The filter is the part that is ours to get wrong, so the filter is what is pinned.
+        // Two components can be enrolled in the same measure for the same period, and one
+        // component in the same measure across months. Both stay distinct only because the
+        // key includes the component and the month.
         using var scope = _fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
 
@@ -119,23 +112,19 @@ public class ReportingPlanPersistenceTests
             .GetIndexes()
             .Single(i => i.IsUnique);
 
-        index.GetFilter().Should().BeNull("a filtered index would exclude every annual entry");
         index.Properties.Select(p => p.Name).Should().Contain(
             [nameof(ReportingPlanEntryEntity.Component), nameof(ReportingPlanEntryEntity.ReportingMonth)]);
     }
 
     [Fact]
-    public async Task TheServiceRejectsADuplicateAnnualEntryDespiteTheNullMonth()
+    public async Task TheServiceRejectsADuplicatePatientSafetyEntry()
     {
-        // The pre-check compares ReportingMonth to a null parameter. In SQL that comparison
-        // is never true on its own, so this only works because EF compensates -- rewriting
-        // it to "(ReportingMonth = @p) OR (ReportingMonth IS NULL AND @p IS NULL)". The
-        // in-memory fake gets there for free, since null == null in LINQ-to-objects, so a
-        // real provider is the only place that compensation is actually proven.
+        // Run against a real provider rather than the in-memory fake: the pre-check is a
+        // query, and whether it matches an existing row is the provider's answer to give.
         await _fixture.ResetAsync();
-        await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(PatientSafetyEntry(), CancellationToken.None));
 
-        var act = async () => await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+        var act = async () => await WithServiceAsync(s => s.CreateAsync(PatientSafetyEntry(), CancellationToken.None));
 
         await act.Should().ThrowAsync<DuplicateReportingPlanEntryException>();
 
@@ -168,7 +157,7 @@ public class ReportingPlanPersistenceTests
         await _fixture.ResetAsync();
 
         await WithServiceAsync(s => s.CreateAsync(Entry(measure: "SHARED"), CancellationToken.None));
-        await WithServiceAsync(s => s.CreateAsync(AnnualEntry(measure: "SHARED"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(PatientSafetyEntry(measure: "SHARED"), CancellationToken.None));
 
         using var scope = _fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
@@ -177,19 +166,18 @@ public class ReportingPlanPersistenceTests
     }
 
     [Fact]
-    public async Task ANullReportingMonthRoundTripsThroughTheDatabase()
+    public async Task APatientSafetyEntryRoundTripsThroughTheDatabaseWithItsMonth()
     {
-        // The column has to actually be nullable. If a migration ever made it NOT NULL,
-        // every annual write would fail at the database rather than at a validator.
+        // Patient safety is stored exactly like medicine: same columns, same required month.
         await _fixture.ResetAsync();
 
-        var created = await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+        var created = await WithServiceAsync(s => s.CreateAsync(PatientSafetyEntry(), CancellationToken.None));
 
         using var scope = _fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
         var stored = await context.ReportingPlanEntries.SingleAsync(e => e.Id == created.Id);
 
-        stored.ReportingMonth.Should().BeNull();
+        stored.ReportingMonth.Should().Be(created.ReportingMonth);
         stored.Component.Should().Be(ReportingComponents.Ps);
     }
 

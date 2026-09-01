@@ -177,15 +177,12 @@ public class ReportingPlanService : IReportingPlanService
     }
 
     /// <summary>
-    /// Rejects an entry whose reporting period does not match its component's cadence.
+    /// Rejects an entry whose reporting period cannot be reported against.
     /// </summary>
     /// <remarks>
-    /// This cannot be a column constraint or a range annotation, because whether a month is
-    /// required depends on the component. It has to be enforced, not merely documented: a
-    /// patient-safety entry saved with a stray month satisfies the unique index perfectly
-    /// well, but the annual query does not filter on month, so the row would be returned for
-    /// every month -- or, with the month wrong on a monthly entry, returned for none. Both
-    /// failures are silent.
+    /// Both components are reported monthly, so every entry carries a month. An entry stored
+    /// with the wrong month is returned for no month at all, which is a silent failure: the
+    /// row is there, the unique index is satisfied, and the plan simply comes back short.
     /// </remarks>
     /// <summary>
     /// Trims a value that takes part in the natural key.
@@ -254,20 +251,6 @@ public class ReportingPlanService : IReportingPlanService
         // "msc" invisible to /msc -- a difference no local run against SQL Server's
         // default case-insensitive collation would ever reveal.
         entry.Component = ReportingComponents.Normalize(entry.Component);
-
-        var monthRequired = ReportingComponents.RequiresReportingMonth(entry.Component);
-
-        if (monthRequired && entry.ReportingMonth is null)
-        {
-            throw new InvalidReportingPlanEntryException(
-                $"Component '{entry.Component}' is reported monthly, so reportingMonth is required.");
-        }
-
-        if (!monthRequired && entry.ReportingMonth is not null)
-        {
-            throw new InvalidReportingPlanEntryException(
-                $"Component '{entry.Component}' is reported annually, so reportingMonth must be omitted.");
-        }
 
         if (entry.ReportingMonth is < 1 or > 12)
         {
