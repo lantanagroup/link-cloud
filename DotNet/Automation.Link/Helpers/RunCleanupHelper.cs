@@ -250,6 +250,82 @@ public static class RunCleanupHelper
         TimeSpan retention)
         => SelectTeardownAutomationFacilities(facilities, runs, now, retention);
 
+    /// <summary>
+    /// GUID facilities whose Automation run is still non-terminal but older than
+    /// <paramref name="retention"/>. Daily teardown aborts these as leftover ongoing jobs.
+    /// </summary>
+    public static IReadOnlyList<string> SelectStaleActiveAutomationFacilities(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention)
+    {
+        var stale = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var run in runs)
+        {
+            if (run.Status.IsTerminal())
+                continue;
+
+            if (now - RunTimestamp(run) < retention)
+                continue;
+
+            if (IsAutomationFacilityId(run.FacilityId))
+                stale.Add(run.FacilityId!);
+            var runId = run.RunId.ToString();
+            if (IsAutomationFacilityId(runId))
+                stale.Add(runId);
+        }
+
+        return facilities.Keys
+            .Where(IsAutomationFacilityId)
+            .Where(stale.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static IReadOnlyList<AutomationRunSummary> SelectHistoryPurgeRuns(
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention)
+        => runs.Where(run => now - RunTimestamp(run) >= retention).ToList();
+
+    public static IReadOnlyList<AutomationRunSummary> SelectRunsFinishedInRange(
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset fromInclusiveUtc,
+        DateTimeOffset toExclusiveUtc)
+        => runs
+            .Where(run => run.Status.IsTerminal())
+            .Where(run =>
+            {
+                var stamp = RunTimestamp(run);
+                return stamp >= fromInclusiveUtc && stamp < toExclusiveUtc;
+            })
+            .ToList();
+
+    public static IReadOnlyList<string> SelectAutomationFacilitiesForRuns(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var run in runs)
+        {
+            if (IsAutomationFacilityId(run.FacilityId))
+                ids.Add(run.FacilityId!);
+            var runId = run.RunId.ToString();
+            if (IsAutomationFacilityId(runId))
+                ids.Add(runId);
+        }
+
+        return facilities.Keys
+            .Where(IsAutomationFacilityId)
+            .Where(ids.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static DateTimeOffset RunTimestamp(AutomationRunSummary run)
+        => run.FinishedAt ?? run.StartedAt ?? run.CreatedAt;
+
     private static IReadOnlyList<string> SelectAutomationFacilities(
         IReadOnlyDictionary<string, string> facilities,
         IReadOnlyList<AutomationRunSummary> runs,

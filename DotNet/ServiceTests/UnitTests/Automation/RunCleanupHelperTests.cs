@@ -89,6 +89,59 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
+    public void Stale_active_guid_run_is_selected_after_retention()
+    {
+        var runId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var stale = Run(runId, facilityId, AutomationRunStatus.Running, finishedAt: null);
+        stale.CreatedAt = now.AddDays(-15);
+        stale.StartedAt = now.AddDays(-15);
+        var runs = new[] { stale };
+
+        RunCleanupHelper.SelectStaleActiveAutomationFacilities(
+            Facilities(facilityId),
+            runs,
+            now,
+            TeardownRetention).Should().Equal(facilityId);
+    }
+
+    [Fact]
+    public void History_purge_selects_terminal_runs_past_retention()
+    {
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var oldId = Guid.NewGuid();
+        var recentId = Guid.NewGuid();
+        var runs = new[]
+        {
+            Run(oldId, oldId.ToString(), AutomationRunStatus.Succeeded, finishedAt: now.AddDays(-15)),
+            Run(recentId, recentId.ToString(), AutomationRunStatus.Failed, finishedAt: now.AddDays(-1))
+        };
+
+        RunCleanupHelper.SelectHistoryPurgeRuns(runs, now, TeardownRetention)
+            .Select(r => r.RunId)
+            .Should().Equal(oldId);
+    }
+
+    [Fact]
+    public void Custom_range_selects_terminal_runs_in_utc_window()
+    {
+        var from = DateTimeOffset.Parse("2026-08-01T00:00:00Z");
+        var to = DateTimeOffset.Parse("2026-08-15T00:00:00Z");
+        var inRange = Guid.NewGuid();
+        var outOfRange = Guid.NewGuid();
+        var runs = new[]
+        {
+            Run(inRange, inRange.ToString(), AutomationRunStatus.Cancelled, finishedAt: DateTimeOffset.Parse("2026-08-10T12:00:00Z")),
+            Run(outOfRange, outOfRange.ToString(), AutomationRunStatus.Succeeded, finishedAt: DateTimeOffset.Parse("2026-08-20T12:00:00Z"))
+        };
+
+        RunCleanupHelper.SelectRunsFinishedInRange(runs, from, to)
+            .Select(r => r.RunId)
+            .Should().Equal(inRange);
+    }
+
+    [Fact]
     public void IsAutomationFacilityId_accepts_guids_only()
     {
         RunCleanupHelper.IsAutomationFacilityId(Guid.NewGuid().ToString()).Should().BeTrue();

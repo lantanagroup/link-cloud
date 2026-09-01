@@ -1,0 +1,206 @@
+@model Automation.UI.Models.CleanupPageViewModel
+@{
+    ViewData["Title"] = "Cleanup";
+    var s = Model.Settings;
+}
+
+<div class="container mt-4">
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1"><i class="bi bi-recycle me-2"></i>Admin Cleanup</h2>
+        <p class="text-muted mb-0">
+            Abort leftover Automation pipeline work, tear down GUID facilities after retention, and purge old scenario-run history.
+            Named production facilities are never selected. Heavy teardown runs off-hours (default 10:00 UTC).
+        </p>
+    </div>
+
+    @if (TempData["Cleanup"] is string cleanup && !string.IsNullOrWhiteSpace(cleanup))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="bi bi-recycle me-1"></i> @cleanup
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["CleanupError"] is string cleanupError && !string.IsNullOrWhiteSpace(cleanupError))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> @cleanupError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-sliders me-2"></i>Schedule and retention</div>
+                <div class="card-body">
+                    <form asp-action="SaveSettings" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="Enabled" name="Enabled" value="true" @(s.Enabled ? "checked" : null) />
+                            <label class="form-check-label" for="Enabled">Cleanup enabled</label>
+                        </div>
+
+                        <h6 class="fw-semibold">Daytime quiesce (cheap)</h6>
+                        <p class="small text-muted">Stops leftover DA retries and census jobs so they do not hammer the stack. Does not delete facility configs.</p>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="QuiesceEnabled" name="QuiesceEnabled" value="true" @(s.QuiesceEnabled ? "checked" : null) />
+                            <label class="form-check-label" for="QuiesceEnabled">Quiesce leftover GUID work during the day</label>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small" for="QuiesceIntervalMinutes">Interval (minutes)</label>
+                                <input class="form-control" type="number" min="1" max="1440" id="QuiesceIntervalMinutes" name="QuiesceIntervalMinutes" value="@((int)s.QuiesceInterval.TotalMinutes)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="QuiesceGraceMinutes">Grace (minutes)</label>
+                                <input class="form-control" type="number" min="0" max="1440" id="QuiesceGraceMinutes" name="QuiesceGraceMinutes" value="@((int)s.QuiesceGrace.TotalMinutes)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="MaxFacilitiesPerPass">Max facilities / pass</label>
+                                <input class="form-control" type="number" min="1" max="500" id="MaxFacilitiesPerPass" name="MaxFacilitiesPerPass" value="@s.MaxFacilitiesPerPass" />
+                            </div>
+                        </div>
+
+                        <h6 class="fw-semibold">Off-hours teardown</h6>
+                        <p class="small text-muted">Daily job removes leftover GUID facility configs older than retention, including stale in-progress Automation jobs. Default 10:00 UTC (before US hospital prime hours).</p>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="DailyTeardownEnabled" name="DailyTeardownEnabled" value="true" @(s.DailyTeardownEnabled ? "checked" : null) />
+                            <label class="form-check-label" for="DailyTeardownEnabled">Daily leftover teardown</label>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small" for="DailyTeardownTimeUtc">Time (UTC)</label>
+                                <input class="form-control" type="time" id="DailyTeardownTimeUtc" name="DailyTeardownTimeUtc" value="@s.DailyTeardownTimeUtc.ToString("HH:mm")" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="TeardownRetentionDays">Retention (days)</label>
+                                <input class="form-control" type="number" min="1" max="365" id="TeardownRetentionDays" name="TeardownRetentionDays" value="@((int)s.TeardownRetention.TotalDays)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="AbortTtlDays">Abort flag TTL (days)</label>
+                                <input class="form-control" type="number" min="1" max="365" id="AbortTtlDays" name="AbortTtlDays" value="@((int)s.AbortTtl.TotalDays)" />
+                            </div>
+                        </div>
+
+                        <h6 class="fw-semibold">Weekly history purge</h6>
+                        <p class="small text-muted">Deletes Automation.UI run snapshots, logs, and payloads older than retention after tearing down leftover facilities.</p>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="WeeklyHistoryPurgeEnabled" name="WeeklyHistoryPurgeEnabled" value="true" @(s.WeeklyHistoryPurgeEnabled ? "checked" : null) />
+                            <label class="form-check-label" for="WeeklyHistoryPurgeEnabled">Weekly scenario-run history purge</label>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small" for="WeeklyHistoryPurgeDay">Day (UTC)</label>
+                                <select class="form-select" id="WeeklyHistoryPurgeDay" name="WeeklyHistoryPurgeDay">
+                                    @foreach (DayOfWeek day in Enum.GetValues<DayOfWeek>())
+                                    {
+                                        if (day == s.WeeklyHistoryPurgeDay)
+                                        {
+                                            <option value="@day" selected>@day</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@day">@day</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="WeeklyHistoryPurgeTimeUtc">Time (UTC)</label>
+                                <input class="form-control" type="time" id="WeeklyHistoryPurgeTimeUtc" name="WeeklyHistoryPurgeTimeUtc" value="@s.WeeklyHistoryPurgeTimeUtc.ToString("HH:mm")" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small" for="CatchUpWindowHours">Catch-up window (hours)</label>
+                                <input class="form-control" type="number" min="1" max="12" id="CatchUpWindowHours" name="CatchUpWindowHours" value="@((int)s.CatchUpWindow.TotalHours)" />
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-au-action">Save settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
+                <div class="card-body">
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-5">Now (UTC)</dt>
+                        <dd class="col-sm-7">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
+                        <dt class="col-sm-5">Next daily teardown</dt>
+                        <dd class="col-sm-7">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                        <dt class="col-sm-5">Next weekly purge</dt>
+                        <dd class="col-sm-7">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                        <dt class="col-sm-5">Last daily</dt>
+                        <dd class="col-sm-7">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                        <dt class="col-sm-5">Last weekly</dt>
+                        <dd class="col-sm-7">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                        <dt class="col-sm-5">Last quiesce</dt>
+                        <dd class="col-sm-7">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
+                    {
+                        <p class="small text-muted mb-1 mt-3">@s.LastDailyTeardownResult</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.LastWeeklyPurgeResult))
+                    {
+                        <p class="small text-muted mb-0">@s.LastWeeklyPurgeResult</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.LastQuiesceResult))
+                    {
+                        <p class="small text-muted mb-0">Last quiesce: @Model.LastQuiesceResult</p>
+                    }
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-play-circle me-2"></i>Run now</div>
+                <div class="card-body">
+                    <form asp-action="RunQuiesce" method="post" class="mb-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-secondary w-100">Quiesce leftover hot work now</button>
+                    </form>
+                    <form asp-action="RunTeardown" method="post" class="mb-2"
+                          onsubmit="return confirm('Tear down leftover GUID facilities older than retention, including stale in-progress Automation jobs? Named production facilities are not touched.');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-secondary w-100">Run daily leftover teardown now</button>
+                    </form>
+                    <form asp-action="RunHistoryPurge" method="post"
+                          onsubmit="return confirm('Tear down leftover GUID facilities and delete Automation run history older than retention? This cannot be undone.');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger w-100">Run weekly history purge now</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-calendar-range me-2"></i>Custom range</div>
+                <div class="card-body">
+                    <p class="small text-muted">Cleans terminal Automation runs whose finish time falls in this UTC date range. Named production facilities are never selected.</p>
+                    <form asp-action="RunCustomRange" method="post"
+                          onsubmit="return confirm('Run cleanup for the selected UTC date range?');">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-2">
+                            <label class="form-label small" for="FromDate">From (UTC)</label>
+                            <input class="form-control" type="date" id="FromDate" name="FromDate" value="@Model.FromDate.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small" for="ToDate">To (UTC, inclusive)</label>
+                            <input class="form-control" type="date" id="ToDate" name="ToDate" value="@Model.ToDate.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="TeardownFacilities" name="TeardownFacilities" value="true" checked />
+                            <label class="form-check-label" for="TeardownFacilities">Tear down leftover GUID facilities</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="PurgeHistory" name="PurgeHistory" value="true" />
+                            <label class="form-check-label" for="PurgeHistory">Purge matching run history</label>
+                        </div>
+                        <button type="submit" class="btn btn-au-action w-100">Run custom range</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

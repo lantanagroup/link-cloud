@@ -235,6 +235,7 @@ builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatie
 builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
+builder.Services.AddSingleton<ICleanupSettingsStore, MongoCleanupSettingsStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
