@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
@@ -344,6 +345,36 @@ public class DmrpControllerTests : IAsyncLifetime
         plan.Year.Should().Be(2026);
         plan.Month.Should().BeNull("no month was asked for, so none is echoed back");
         plan.Plans.Select(m => m.Name).Should().BeEquivalentTo("HAI", "SSI");
+    }
+
+    [Fact]
+    public async Task ThePlanSerialisesThePeriodAsNumbersAndTheFacilityAsAStringInsidePlans()
+    {
+        // The JSON types are part of the contract, and a typed read would hide them - the
+        // generated DTO would happily parse either shape. So this asserts the wire format.
+        //
+        // month and year are numbers in both places. The facility is not: numeric at the
+        // root, a string inside plans. That asymmetry is the real API's and is reproduced
+        // rather than tidied up, because a consumer that codes against a cleaned-up shape
+        // breaks on first contact with the real endpoint.
+        Seed(facilityId: "100", measure: "HOB", month: 5, year: 2026);
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=100&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+
+        root.GetProperty("orgid").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
+
+        var item = root.GetProperty("plans")[0];
+
+        item.GetProperty("nhsnorgid").ValueKind.Should().Be(JsonValueKind.String);
+        item.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        item.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
     }
 
     [Fact]
