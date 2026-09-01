@@ -37,9 +37,9 @@ public interface IReportingPlanService
     /// conveys "not enrolled".
     /// </para>
     /// <para>
-    /// Annual components carry no reporting month, so the caller passes null for
-    /// <paramref name="reportingMonth"/> there. Matching on a month would exclude every row
-    /// it is supposed to return.
+    /// Every component is reported monthly, so a stored entry always carries a month. A null
+    /// <paramref name="reportingMonth"/> means "do not narrow by month" rather than "this
+    /// component has none", and returns the facility's plan across every period.
     /// </para>
     /// </remarks>
     Task<IReadOnlyList<ReportingPlanEntryEntity>> GetReportingPlanAsync(
@@ -54,7 +54,7 @@ public interface IReportingPlanService
     /// Creates an entry.
     /// </summary>
     /// <exception cref="InvalidReportingPlanEntryException">
-    /// The component is unknown, or the reporting month does not match the component's cadence.
+    /// The component is unknown, or the reporting month is outside 1-12.
     /// </exception>
     /// <exception cref="DuplicateReportingPlanEntryException">
     /// An entry already exists for the same facility, component, measure and period.
@@ -66,7 +66,7 @@ public interface IReportingPlanService
     /// identifier -- this never creates one.
     /// </summary>
     /// <exception cref="InvalidReportingPlanEntryException">
-    /// The component is unknown, or the reporting month does not match the component's cadence.
+    /// The component is unknown, or the reporting month is outside 1-12.
     /// </exception>
     /// <exception cref="DuplicateReportingPlanEntryException">
     /// The update would collide with another entry's facility, component, measure and period.
