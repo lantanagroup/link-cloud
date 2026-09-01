@@ -149,6 +149,87 @@ public class BundleConfigurationGenerationTests
 
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [systemDefault]);
         proposal.Reuse.Should().ContainSingle(r => r.Recommendation == "Reuse" && r.Id == systemDefault.Id);
+        proposal.Notes.Should().Contain(n => n.Contains("before cleanup", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_type_only_map_when_upload_has_identifiers_but_no_those_types()
+    {
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://epic.example/locations", Value = "UNIT-1" }]
+        };
+        var typeOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Epic HSLOC map",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.type.coding.where(system = 'https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html').exists()"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [typeOnly]);
+        proposal.Conditions.Should().ContainSingle(c =>
+            c.FhirPath == "Location.identifier.where(system = 'http://epic.example/locations').exists()");
+        var reuse = proposal.Reuse.Should().ContainSingle(r => r.Id == typeOnly.Id).Subject;
+        reuse.Recommendation.Should().Be("Extend");
+        reuse.Reason.Should().Contain("before cleanup");
+    }
+
+    [Fact]
+    public void Orm_builder_reuses_type_only_map_when_those_type_codes_are_already_on_the_upload()
+    {
+        var hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1027-2" }]
+        };
+        var typeOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "HSLOC map",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}' and code = '1027-2').exists()"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [typeOnly]);
+        proposal.Reuse.Should().ContainSingle(r => r.Recommendation == "Reuse" && r.Id == typeOnly.Id);
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
+    {
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = "UNIT-9" }]
+        };
+        var hospitalOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hospital campus only",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = 'http://a' and value = 'HOSP').exists()"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [hospitalOnly]);
+        proposal.Reuse.Should().NotContain(r => r.Recommendation == "Reuse" && r.Id == hospitalOnly.Id);
     }
 
     [Fact]
@@ -236,6 +317,7 @@ public class BundleConfigurationGenerationTests
         proposal.Operations.Single(o => o.OperationType == "CopyLocationAliasToTypeIteratively").SplitOnComma.Should().BeTrue();
         proposal.Notes.Should().Contain(n => n.Contains("will not rewrite Encounter.status", StringComparison.OrdinalIgnoreCase));
         proposal.Notes.Should().Contain(n => n.Contains("will not be copied over existing Location.type", StringComparison.OrdinalIgnoreCase));
+        proposal.Notes.Should().Contain(n => n.Contains("Org resource maps must match", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

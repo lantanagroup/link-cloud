@@ -523,9 +523,10 @@ internal sealed class RunExecutor
                 normalizationEvidenceReportId = reportId;
                 scheduledRunFrequency = scheduledWorkflowState.Frequency;
                 MergeLiveManifestPatients(generationManifest, patientIds, scenarioConfig);
-                expectedSubmittedPatientIds = generationManifest != null
-                    ? generationManifest.ExpectedSubmittedPatientIds()
-                    : _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
+                // Live scheduled reports are census-driven. Expected ABS / inclusion is
+                // patients who were admitted AND the predictor says they qualify — not
+                // everyone appended to the generation manifest (pool-only Generate).
+                expectedSubmittedPatientIds = _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
                 expectedReportEntryPatientIds = expectedSubmittedPatientIds.ToList();
                 lock (state.Sync)
                     state.LiveExpectedPopulation = expectedSubmittedPatientIds;
@@ -821,7 +822,7 @@ internal sealed class RunExecutor
                     if (diagnostics.InclusionPassed == false)
                     {
                         throw new InvalidOperationException(
-                            "Live data/pattern report inclusion does not match the final report. " +
+                            "Live report inclusion does not match the final report. " +
                             $"Missing: [{string.Join(", ", diagnostics.MissingFromReport)}]. " +
                             $"Unexpected: [{string.Join(", ", diagnostics.UnexpectedInReport)}].");
                     }
@@ -1366,9 +1367,7 @@ internal sealed class RunExecutor
         await _liveInjector.NotifyWindowClosingAsync(state.RunId, windowEnd, cancellationToken);
         await _liveInjector.FreezeAsync(state.RunId, cancellationToken);
 
-        var expected = generationManifest != null
-            ? generationManifest.ExpectedSubmittedPatientIds()
-            : _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
+        var expected = _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
         lock (state.Sync)
         {
             state.LiveExpectedPopulation = expected;
@@ -1377,7 +1376,7 @@ internal sealed class RunExecutor
 
         await callbacks.BroadcastStatus();
         output.WriteLine(
-            $"Live window closed. Report inclusion expected={expected.Count} (data/pattern, not census). Finalizing report.");
+            $"Live window closed. Report inclusion expected={expected.Count} (admitted and predictor-qualifying). Finalizing report.");
 
         return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
     }

@@ -967,5 +967,139 @@ public class DataAcquisitionLogManagerTests
             .ToListAsync();
         Assert.Empty(orphanNotes);
     }
+
+    [Fact]
+    public async Task TryCompleteTailAsync_WhenGroupComplete_ClaimsWithoutSettingTailSent()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailClaimFac_{tag}";
+        var correlationId = $"TailClaimCorr_{tag}";
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(dbContext, facilityId, correlationId);
+
+        var manager = CreateManager(scope);
+        var result = await manager.TryCompleteTailAsync(logs[0].Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(facilityId, result.FacilityId);
+        Assert.Equal(correlationId, result.CorrelationId);
+
+        await dbContext.Entry(logs[0]).ReloadAsync();
+        await dbContext.Entry(logs[1]).ReloadAsync();
+        Assert.False(logs[0].TailSent);
+        Assert.False(logs[1].TailSent);
+        Assert.NotNull(logs[0].TailClaimedAt);
+        Assert.NotNull(logs[1].TailClaimedAt);
+    }
+
+    [Fact]
+    public async Task TryCompleteTailAsync_WhenClaimIsFresh_ReturnsNull()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailClaimFac_{tag}";
+        var correlationId = $"TailClaimCorr_{tag}";
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(dbContext, facilityId, correlationId, DateTime.UtcNow);
+
+        var manager = CreateManager(scope);
+        var result = await manager.TryCompleteTailAsync(logs[0].Id);
+
+        Assert.Null(result);
+
+        await dbContext.Entry(logs[0]).ReloadAsync();
+        Assert.False(logs[0].TailSent);
+    }
+
+    [Fact]
+    public async Task TryCompleteTailAsync_WhenClaimIsStale_Reclaims()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailClaimFac_{tag}";
+        var correlationId = $"TailClaimCorr_{tag}";
+        var staleClaim = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease).AddMinutes(-1);
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(dbContext, facilityId, correlationId, staleClaim);
+
+        var manager = CreateManager(scope);
+        var result = await manager.TryCompleteTailAsync(logs[0].Id);
+
+        Assert.NotNull(result);
+
+        await dbContext.Entry(logs[0]).ReloadAsync();
+        Assert.False(logs[0].TailSent);
+        Assert.NotNull(logs[0].TailClaimedAt);
+        Assert.True(logs[0].TailClaimedAt > staleClaim);
+    }
+
+    [Fact]
+    public async Task MarkTailSentAsync_SetsTailSentAfterClaim()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailClaimFac_{tag}";
+        var correlationId = $"TailClaimCorr_{tag}";
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(dbContext, facilityId, correlationId);
+
+        var manager = CreateManager(scope);
+        var result = await manager.TryCompleteTailAsync(logs[0].Id);
+        Assert.NotNull(result);
+
+        await manager.MarkTailSentAsync(facilityId, correlationId, QueryPhase.Initial);
+
+        await dbContext.Entry(logs[0]).ReloadAsync();
+        await dbContext.Entry(logs[1]).ReloadAsync();
+        Assert.True(logs[0].TailSent);
+        Assert.True(logs[1].TailSent);
+    }
+
+    private static async Task<List<DataAcquisitionLog>> SeedCompleteTailGroupAsync(
+        DataAcquisitionDbContext dbContext,
+        string facilityId,
+        string correlationId,
+        DateTime? tailClaimedAt = null)
+    {
+        var now = DateTime.UtcNow;
+        var logs = new List<DataAcquisitionLog>
+        {
+            new()
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                QueryPhase = QueryPhase.Initial,
+                Status = RequestStatus.Completed,
+                TailSent = false,
+                TailClaimedAt = tailClaimedAt,
+                SiblingCount = 2,
+                PatientId = "Patient/1",
+                CreateDate = now.AddMinutes(-5),
+                ModifyDate = now.AddMinutes(-2)
+            },
+            new()
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                QueryPhase = QueryPhase.Initial,
+                Status = RequestStatus.Completed,
+                TailSent = false,
+                TailClaimedAt = tailClaimedAt,
+                SiblingCount = 2,
+                PatientId = "Patient/1",
+                CreateDate = now.AddMinutes(-5),
+                ModifyDate = now.AddMinutes(-2)
+            }
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(logs);
+        await dbContext.SaveChangesAsync();
+        return logs;
+    }
 }
 

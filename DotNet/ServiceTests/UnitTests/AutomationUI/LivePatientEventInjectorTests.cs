@@ -146,10 +146,17 @@ public class LivePatientEventInjectorTests
         provisioner.UploadCalls.Should().Be(1);
         provisioner.ReferenceCalls.Should().Be(1);
 
-        injector.GetState(runId).ExpectedPopulation.Should().Equal("gen-appended", "upload-appended");
-        injector.GetState(runId).Admitted.Should().BeEmpty();
+        var state = injector.GetState(runId);
+        state.ExpectedPopulation.Should().BeEmpty();
+        state.Admitted.Should().BeEmpty();
+        state.Pool.Should().Contain(p => p.PatientId == "gen-appended" && p.ExpectedInReport);
+        state.Pool.Should().Contain(p => p.PatientId == "upload-appended" && p.ExpectedInReport);
+        state.Pool.Should().Contain(p => p.PatientId == "ref-appended" && !p.ExpectedInReport);
         injector.GetEvents(runId).Where(e => e.EventType == PatientEventType.Inject)
             .Select(e => e.PatientId).Should().Equal("gen-appended", "upload-appended", "ref-appended");
+
+        await injector.AdmitAsync(runId, "gen-appended", LiveEventSources.UI);
+        injector.GetState(runId).ExpectedPopulation.Should().Equal("gen-appended");
     }
 
     [Fact]

@@ -731,13 +731,13 @@ services:
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
-      # DMRP system feature switch. Must match DMRP:Enabled on the services, which this stack leaves
-      # off in the tenant service's appsettings.Docker.json. To exercise DMRP locally, set this to
-      # "true" and DMRP:Enabled to true in DotNet/Tenant/appsettings.Docker.json, then rebuild the
-      # tenant image - appsettings is baked into it, so recreating the container on its own keeps the
-      # value the image was built with. Change both, or the facility form quietly creates facilities
-      # that report nothing.
-      LINK_DMRP_ENABLED: "false"
+      # DMRP system feature switch, on by default in this stack to match DMRP:Enabled in the tenant
+      # service's appsettings.Docker.json. Override with LINK_DMRP_ENABLED in the shell or .env. The
+      # two must stay in step: a change to the tenant side needs a tenant image rebuild - appsettings
+      # is baked into it, so recreating the container on its own keeps the value the image was built
+      # with. UI on while the services are off makes the facility form quietly create facilities
+      # that report nothing; the other way round fails loudly.
+      LINK_DMRP_ENABLED: ${LINK_DMRP_ENABLED:-true}
     networks:
       - link-nw
     depends_on:
@@ -1009,6 +1009,9 @@ services:
     container_name: link-validation
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # 75% of the container cgroup limit (mem_limit below, or the platform memory
+      # limit in deployed environments). Do not set -Xmx here; it would cap production.
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
@@ -1019,6 +1022,7 @@ services:
       pre-qualification.write-expressions-in-operation-outcome: ${VALIDATION_WRITE_OO_EXPRESSIONS:-true}
     ports:
       - "8075:8075"
+    mem_limit: 3g
     build:
       context: Java/
       dockerfile: validation/Dockerfile
@@ -1035,7 +1039,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
-      start_period: 15s
+      start_period: 45s
       interval: 5s
       retries: 10
 

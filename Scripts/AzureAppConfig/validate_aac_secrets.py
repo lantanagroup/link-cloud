@@ -22,8 +22,11 @@ Three classes of finding:
          review rather than failing the build. Keys listed in
          PASSWORDLESS_CONNECTION_STRING_KEYS are exempt: they use a
          comma-delimited Redis connection string with the password supplied
-         separately from Key Vault. Those keys are still checked for credential
-         shapes. Use --strict to make warnings fatal.
+         separately from Key Vault. Keys listed in
+         NON_PRODUCTION_FIXTURE_SECRET_KEYS are exempt for a different reason:
+         they are fixture credentials for the mock DMRP surface, which is never
+         provisioned in a production store. Both sets are still checked for
+         credential shapes. Use --strict to make warnings fatal.
 
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
@@ -87,6 +90,23 @@ PASSWORDLESS_CONNECTION_STRING_KEYS = (
     "resourcecache:redis:connectionstring",
 )
 
+# Fixture credentials for the mock DMRP surface. These are real secrets in the sense
+# that the deployed mock checks them, but they authenticate nothing outside it: the
+# upstream DMRP is simulated, and app-config.yaml requires the mock be provisioned
+# "never in a production store" (MockDmrpApi:Enabled absent means every route answers
+# 503). Rotating them costs a config push and grants an attacker a token the mock
+# itself accepts -- no real system trusts it.
+#
+# Exempt from the secret-shaped-key warning only. Every value-based check still runs,
+# so a genuine credential pasted over one of these values is still an ERROR.
+#
+# Matched on the exact key rather than a "mockdmrpapi:" prefix so that a future
+# MockDmrpApi key holding something real is not silently exempted too.
+NON_PRODUCTION_FIXTURE_SECRET_KEYS = (
+    "mockdmrpapi:authclientsecret",
+    "mockdmrpapi:signingkey",
+)
+
 # Value shapes that are credentials no matter which key holds them.
 CREDENTIAL_VALUE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     (r"AccountKey\s*=\s*[A-Za-z0-9+/]{20,}={0,2}", "Azure Storage account key"),
@@ -136,6 +156,11 @@ def is_secret_shaped_key(key: str) -> bool:
 def is_passwordless_connection_string_key(key: str) -> bool:
     """Check if the connection string gets its password from a separate key."""
     return key.strip().lower() in PASSWORDLESS_CONNECTION_STRING_KEYS
+
+
+def is_non_production_fixture_key(key: str) -> bool:
+    """Check if the key holds a fixture credential for a non-production mock."""
+    return key.strip().lower() in NON_PRODUCTION_FIXTURE_SECRET_KEYS
 
 
 def is_non_secret_scalar(value: str) -> bool:
@@ -206,7 +231,8 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
     # Secret-shaped key holding a literal. Not always a credential, so warn.
     if (is_secret_shaped_key(key) and value.strip() and not is_kv_ref
             and not is_non_secret_scalar(value)
-            and not is_passwordless_connection_string_key(key)):
+            and not is_passwordless_connection_string_key(key)
+            and not is_non_production_fixture_key(key)):
         preview = value if len(value) <= 60 else value[:57] + "..."
         findings.append(Finding(
             "WARN", entry_location(path, index, key, label),

@@ -659,6 +659,9 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTime?>("TailClaimedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("TailSent")
                         .HasColumnType("bit");
 
@@ -703,6 +706,11 @@ namespace DataAcquisition.Domain.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
                         .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
+
+                    b.HasIndex("FacilityId", "CorrelationId")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_CorrelationId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "CorrelationId"), new[] { "QueryPhase", "Status", "ReportTrackingId" });
 
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");

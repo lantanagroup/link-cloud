@@ -335,6 +335,17 @@ public static class NormalizationProposalBuilder
                 "Location identifiers will not be copied over existing Location.type codes. Overwriting type[0].coding.code can remove HSLOC (or other) codes the measure uses for initial population.");
         }
 
+        var rewritesLocationType = proposal.Operations.Any(o =>
+            string.Equals(o.OperationType, "CopyLocation", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(o.OperationType, "CopyLocationAliasToTypeIteratively", StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(o.OperationType, "CodeMap", StringComparison.OrdinalIgnoreCase)
+                && o.ResourceTypes.Contains("Location", StringComparer.OrdinalIgnoreCase)));
+        if (rewritesLocationType)
+        {
+            proposal.Notes.Add(
+                "Copy Location, alias copy, and Location CodeMap change type after acquisition. Org resource maps must match identifiers or type codes already on the raw Location; they will not see codes these operations add.");
+        }
+
         if (refineExisting == null)
             return;
 

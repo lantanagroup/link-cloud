@@ -13,7 +13,7 @@ export interface AppConfig {
    *
    * When it is on, a facility's scheduled reports are derived from its DMRP reporting plans and the
    * API refuses a facility that supplies its own, so the form hides the report pickers and submits
-   * an empty schedule.
+   * an empty schedule. It also gates the DMRP screens (measure mappings) via DmrpGuard and the nav bar.
    *
    * This must never be on here while it is off in the services: the form would then send an empty
    * schedule that Tenant accepts, quietly creating a facility that reports nothing. The other way
