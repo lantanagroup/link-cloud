@@ -36,7 +36,7 @@ info:
     | Operation      | Component | Subject          | Cadence |
     |----------------|-----------|------------------|---------|
     | `/msc`         | MSC       | Medicine reports | Monthly |
-    | `/ps/annual`   | PS        | Patient safety   | Annual  |
+    | `/ps/annual/mrp`   | PS        | Patient safety   | Annual  |
 
     Both accept the same query parameters. `month` has no meaning for the
     annual plan, whose entries carry no month, so it is accepted and ignored
@@ -109,7 +109,7 @@ paths:
         '503':
           $ref: '#/components/responses/Unavailable'
 
-  /ps/annual:
+  /ps/annual/mrp:
     get:
       tags: [Reporting Plans]
       operationId: GetPatientSafetyAnnualReportingPlan

@@ -318,12 +318,12 @@ public class DmrpControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    // ------------------------------------------------------------ /ps/annual
+    // ------------------------------------------------------------ /ps/annual/mrp
 
     [Fact]
     public async Task GetAnnualPlan_WithoutAToken_Returns401()
     {
-        var response = await _client.GetAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await _client.GetAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -335,7 +335,7 @@ public class DmrpControllerTests : IAsyncLifetime
         SeedAnnual(measure: "SSI");
         SeedAnnual(measure: "OLD", year: 2025);
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -354,7 +354,7 @@ public class DmrpControllerTests : IAsyncLifetime
         Seed(measure: "HOB");
         Seed(measure: "HTCDI", month: 6);
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
         plan!.Plans.Should().ContainSingle();
@@ -367,7 +367,7 @@ public class DmrpControllerTests : IAsyncLifetime
         SeedAnnual(measure: "HAI");
         SeedAnnual(measure: "SSI", isReporting: "N");
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
         plan!.Plans.Should().ContainSingle();
@@ -377,7 +377,7 @@ public class DmrpControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetAnnualPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
     {
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=Nobody&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=Nobody&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -392,7 +392,7 @@ public class DmrpControllerTests : IAsyncLifetime
         SeedAnnual(measure: "HAI");
         Seed(measure: "HOB");
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026&month=5");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026&month=5");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -415,7 +415,7 @@ public class DmrpControllerTests : IAsyncLifetime
         foreach (var url in new[]
                  {
                      "/msc?nhsnorgid=F1&year=2026&month=5",
-                     "/ps/annual?nhsnorgid=F1&year=2026"
+                     "/ps/annual/mrp?nhsnorgid=F1&year=2026"
                  })
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -434,7 +434,7 @@ public class DmrpControllerTests : IAsyncLifetime
 
         var monthly = await (await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5"))
             .Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        var annual = await (await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026"))
+        var annual = await (await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026"))
             .Content.ReadFromJsonAsync<ReportingPlanResponse>();
 
         monthly!.Plans.Should().BeEmpty();

@@ -51,7 +51,7 @@ public class EntryMapperTests
     [Fact]
     public void ToReportingPlan_ForAnAnnualPlan_OmitsTheReportingMonth()
     {
-        // /ps/annual has no month to report. Emitting a zero or a stale value would tell a
+        // /ps/annual/mrp has no month to report. Emitting a zero or a stale value would tell a
         // consumer the plan covers one particular month, which is the opposite of the truth.
         var plan = EntryMapper.ToReportingPlan(
             "F1", null, 2026,
