@@ -91,16 +91,16 @@ Both come from the real API, and this stand-in reproduces them exactly. Normalis
 would let a consumer write code that works here and fails on first contact with the real
 endpoint — which is the one failure this service exists to prevent.
 
-**The same values appear twice, with different types.**
+**The facility appears twice, with a different type each time.**
 
 | | Root object | Inside `plans` |
 |---|---|---|
 | Facility | `orgid`, **number** | `nhsnorgid`, **string** |
-| Year | `year`, **number** | `year`, **string** |
-| Month | `month`, **number** | `month`, **string** |
+| Year | `year`, **number** | `year`, **number** |
+| Month | `month`, **number** | `month`, **number** |
 
-The generated C# reflects it: `int? Month` on `ReportingPlanResponse`, `string Month` on
-`ReportingPlanItem`.
+The generated C# reflects it: `int? Orgid` on `ReportingPlanResponse`, `string Nhsnorgid` on
+`ReportingPlanItem`. The period is numeric in both places.
 
 **The timestamps are not RFC 3339.** `modifyDate` and `createDate` are `2023-09-09 11:12:12.59`
 — a space separator, two fractional digits, no timezone. They are typed as plain strings in the
