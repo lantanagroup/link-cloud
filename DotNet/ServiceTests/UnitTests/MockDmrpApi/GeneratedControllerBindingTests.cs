@@ -137,7 +137,7 @@ public class GeneratedControllerBindingTests
         (await client.GetAsync("/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await client.GetAsync("/annotated/ps/annual?nhsnorgid=100&name=HAI&year=2020&month=2"))
+        (await client.GetAsync("/annotated/ps/annual/mrp?nhsnorgid=100&name=HAI&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -158,7 +158,7 @@ public class GeneratedControllerBindingTests
 
     [Theory]
     [InlineData("/annotated/msc?name=HOB&year=2020&month=2")]
-    [InlineData("/annotated/ps/annual?name=HAI&year=2020&month=2")]
+    [InlineData("/annotated/ps/annual/mrp?name=HAI&year=2020&month=2")]
     public async Task WithApiController_OmittingTheRequiredParameterIsRejected(string url)
     {
         // [BindRequired] lives on the base's nhsnorgid parameter and is never restated by the

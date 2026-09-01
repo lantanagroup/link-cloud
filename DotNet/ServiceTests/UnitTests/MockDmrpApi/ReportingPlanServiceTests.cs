@@ -441,7 +441,7 @@ public class ReportingPlanServiceTests
     [Fact]
     public async Task CreateAsync_ForAnAnnualComponentWithAMonth_Throws()
     {
-        // The mirror failure: /ps/annual does not filter on month, so a stray month makes
+        // The mirror failure: /ps/annual/mrp does not filter on month, so a stray month makes
         // the row appear in the annual plan while looking like a monthly entry in storage.
         var entry = AnnualEntry();
         entry.ReportingMonth = 5;
