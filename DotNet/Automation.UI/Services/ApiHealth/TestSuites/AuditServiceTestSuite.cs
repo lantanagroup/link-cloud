@@ -121,9 +121,7 @@ public sealed class AuditServiceTestSuite : ServiceTestSuiteBase
 
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : responseBody.Length > 500
-                    ? responseBody[..500]
-                    : responseBody;
+                : responseBody;
 
             if (!result.Passed)
             {
