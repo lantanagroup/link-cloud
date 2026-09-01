@@ -54,7 +54,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// </para>
         /// </remarks>
         /// <param name="searchDto">
-        /// Optional filters and paging. measure and dQM match exactly; frequency is one of Discharge,
+        /// Optional filters and paging. measure and dQM match as case-insensitive substrings, so the
+        /// Admin UI can search as the admin types; frequency is one of Discharge,
         /// Daily, Weekly, Monthly or Adhoc. pageSize is 1 to 100 and pageNumber 1 or greater; a value
         /// outside either range is quietly replaced with the default rather than refused.
         /// </param>
