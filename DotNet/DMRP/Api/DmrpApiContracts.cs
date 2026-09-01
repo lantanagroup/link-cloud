@@ -52,6 +52,29 @@ namespace LantanaGroup.Link.DMRP.Api
         public string? Reporting { get; set; }
     }
 
+    /// <summary>The client-credentials grant, as the DMRP token endpoint expects it.</summary>
+    /// <remarks>
+    /// The property names are the OAuth 2.0 ones - <c>grant_type</c>, <c>client_id</c> - carried in
+    /// a JSON body rather than the form encoding the specification describes, because that is what
+    /// the endpoint accepts.
+    /// </remarks>
+    public sealed class DmrpTokenRequest
+    {
+        [JsonPropertyName("grant_type")]
+        public string GrantType { get; set; } = string.Empty;
+
+        [JsonPropertyName("client_id")]
+        public string ClientId { get; set; } = string.Empty;
+
+        [JsonPropertyName("client_secret")]
+        public string ClientSecret { get; set; } = string.Empty;
+
+        /// <summary>Omitted from the body entirely when unset, rather than sent as null.</summary>
+        [JsonPropertyName("scope")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Scope { get; set; }
+    }
+
     /// <summary>The token endpoint's response to a client-credentials grant.</summary>
     public sealed class DmrpTokenResponse
     {
