@@ -26,6 +26,18 @@ public class FacilityReportingPlan : BaseEntityExtended
     public MeasureMapping? MeasureMapping { get; set; }
 
     /// <summary>
+    /// The NHSN component the enrollment belongs to - MSC or PS. Both are reported monthly; the
+    /// component says which of DMRP's two operations the enrollment came from, not how often it is
+    /// reported.
+    /// </summary>
+    /// <remarks>
+    /// Recorded rather than inferred from the measure. DMRP returns the two components from separate
+    /// operations, so which one an enrollment came from is a fact about the read, and a measure that
+    /// later moves component would otherwise silently reinterpret every row already stored for it.
+    /// </remarks>
+    public string Component { get; set; } = ReportingComponents.Msc;
+
+    /// <summary>
     /// Month of the reporting period, 1-12.
     /// </summary>
     public int ReportingMonth { get; set; }

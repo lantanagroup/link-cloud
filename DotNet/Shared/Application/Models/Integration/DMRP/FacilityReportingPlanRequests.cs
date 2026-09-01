@@ -20,6 +20,11 @@ public class FacilityReportingPlanRequest
     [DataMember]
     public string? MeasureMappingId { get; set; }
 
+    /// <summary>
+    /// The NHSN component - MSC or PS. Defaults to MSC when omitted.
+    /// </summary>
+    public string? Component { get; set; }
+
     [Range(ReportingPeriodLimits.MinimumReportingMonth, ReportingPeriodLimits.MaximumReportingMonth)]
     [DataMember]
     public int ReportingMonth { get; set; }

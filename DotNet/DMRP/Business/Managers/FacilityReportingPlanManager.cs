@@ -187,6 +187,12 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 throw new ReportingPlanValidationException("MeasureMappingId is required.");
             }
 
+            if (!ReportingComponents.IsKnown(plan.Component))
+            {
+                throw new ReportingPlanValidationException(
+                    $"Component must be one of: {string.Join(", ", ReportingComponents.All)}.");
+            }
+
             if (plan.ReportingMonth is < 1 or > 12)
             {
                 throw new ReportingPlanValidationException("ReportingMonth must be between 1 and 12.");

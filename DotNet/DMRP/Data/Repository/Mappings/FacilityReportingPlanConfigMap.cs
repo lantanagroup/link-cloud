@@ -20,6 +20,12 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
         /// </summary>
         internal const int MeasureMappingIdMaxLength = 450;
 
+        /// <summary>
+        /// Long enough for the component codes DMRP publishes (MSC, PS) with room to spare, short
+        /// enough to stay indexable.
+        /// </summary>
+        public const int ComponentMaxLength = 20;
+
         public void Configure(EntityTypeBuilder<FacilityReportingPlan> builder)
         {
             builder.ToTable("FacilityReportingPlans");
@@ -33,6 +39,10 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
             builder.Property(p => p.MeasureMappingId)
                 .IsRequired()
                 .HasMaxLength(MeasureMappingIdMaxLength);
+
+            builder.Property(p => p.Component)
+                .IsRequired()
+                .HasMaxLength(ComponentMaxLength);
 
             builder.Property(p => p.ReportingMonth).IsRequired();
             builder.Property(p => p.ReportingYear).IsRequired();

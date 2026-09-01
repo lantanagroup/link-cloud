@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             Id = entity.Id,
             FacilityId = entity.FacilityId,
             MeasureMappingId = entity.MeasureMappingId,
+            Component = entity.Component,
             ReportingMonth = entity.ReportingMonth,
             ReportingYear = entity.ReportingYear,
             IsReporting = entity.IsReporting,
@@ -39,6 +40,12 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
         {
             FacilityId = request.FacilityId?.Sanitize() ?? string.Empty,
             MeasureMappingId = request.MeasureMappingId?.Sanitize() ?? string.Empty,
+
+            // Defaulted rather than required: every enrollment recorded before components existed
+            // came from the medicine operation, and a caller that does not know about components
+            // still means MSC.
+            Component = ReportingComponents.Normalize(
+                string.IsNullOrWhiteSpace(request.Component) ? ReportingComponents.Msc : request.Component.Sanitize()),
             ReportingMonth = request.ReportingMonth,
             ReportingYear = request.ReportingYear,
             IsReporting = request.IsReporting
