@@ -403,6 +403,39 @@ global:
     defaultValue: "false"
     consumers: ["Tenant"]
 
+  # How the DMRP module reaches the DMRP API itself. Nothing here is required: an environment
+  # with DMRP:Enabled on still serves the api/dmrp routes and reads the reporting plans it has
+  # already recorded, and only a caller that actually asks the API for a plan needs these. Left
+  # unset, that call refuses with a message naming this section rather than failing somewhere
+  # further in. In the lower environments all four point at the mock (MockDmrpApi), whose token
+  # endpoint is POST /api/mock-dmrp/oauth2/token.
+  - key: "DMRP:Api:BaseUrl"
+    description: "Base URL of the DMRP API. The reporting-plan operations sit at its root, so this is the host and any path prefix in front of /msc and /ps/annual/mrp - not a URL including either of them."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenUrl"
+    description: "Full URL of the token endpoint the client-credentials grant is posted to. Separate from DMRP:Api:BaseUrl because the authorization server need not live under the API's root, and against the mock it does not."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientId"
+    description: "Client id presented to the DMRP API's token endpoint."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientSecret"
+    description: "Client secret presented to the DMRP API's token endpoint. Provision as a Key Vault reference; there is no code default, so an environment that has not provisioned it cannot obtain a token and says so."
+    required: false
+    sensitive: true
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:Scope"
+    description: "Optional scope requested with the client-credentials grant. Omitted from the token request when unset, which is what the mock expects; a real authorization server may require one."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenExpiryMarginSeconds"
+    description: "How long before a token's stated expiry it stops being reused, in seconds (default 60). A token that expires in flight fails the call it was fetched for; renewing slightly early costs one extra token request per lifetime and removes that class of failure."
+    required: false
+    defaultValue: "60"
+    consumers: ["Tenant"]
+
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"

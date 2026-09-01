@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
@@ -73,6 +74,13 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // lands, an implementation that refreshes those rows from the API replaces this one and
             // nothing downstream changes.
             builder.Services.AddScoped<IReportingPlanSource, DbBackedReportingPlanSource>();
+
+            // Registered whether or not DMRP:Api is filled in. An environment with no API to talk to
+            // simply never calls it, and the client says so plainly if something does; refusing to
+            // register would instead surface as a resolve failure somewhere unrelated.
+            builder.Services.AddHttpClient(DmrpApiClient.HttpClientName);
+            builder.Services.AddSingleton<IDmrpApiTokenProvider, DmrpApiTokenProvider>();
+            builder.Services.AddScoped<IDmrpApiClient, DmrpApiClient>();
 
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.
