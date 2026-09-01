@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import {Button, NHSNLoadingIndicator, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
@@ -44,6 +44,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
   const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(null);
+  const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [readyToAdvance, setReadyToAdvance] = useState(false);
 
@@ -53,6 +54,15 @@ export function FhirStep({onNext, onBack}: StepProps) {
       onNext();
     }
   }, [readyToAdvance, onNext]);
+
+  useEffect(() => {
+    if (testing || testResult) {
+      const container = cardScrollRef.current;
+      if (container) {
+        container.scrollTo({top: container.scrollHeight, behavior: 'smooth'});
+      }
+    }
+  }, [testing, testResult]);
 
   useEffect(() => {
     let mounted = true;
@@ -209,149 +219,154 @@ export function FhirStep({onNext, onBack}: StepProps) {
   return (
     <div className="fhir-server-info">
       <div className="card">
-        <PageHeader title={t('onboarding:fhirServerInfo.title')} />
-        <p className="subtitle">
-          {t('onboarding:fhirServerInfo.subtitlePrefix')}{' '}
-          <a href="https://hl7.org/fhir/R4/summary.html" target="_blank" rel="noreferrer">
-            {t('onboarding:fhirServerInfo.subtitleFhirLinkText')}
-          </a>{' '}
-          {t('onboarding:fhirServerInfo.subtitleSuffix')}
-        </p>
+        <div className="card-scroll" ref={cardScrollRef}>
+          <PageHeader title={t('onboarding:fhirServerInfo.title')} />
+          <p className="subtitle">
+            {t('onboarding:fhirServerInfo.subtitlePrefix')}{' '}
+            <a href="https://hl7.org/fhir/R4/summary.html" target="_blank" rel="noreferrer">
+              {t('onboarding:fhirServerInfo.subtitleFhirLinkText')}
+            </a>{' '}
+            {t('onboarding:fhirServerInfo.subtitleSuffix')}
+          </p>
 
-        <TextField
-          id="fhirBaseUrl"
-          type="url"
-          label={t('onboarding:fhirServerInfo.fields.baseUrlLabel')}
-          hint={t('onboarding:fhirServerInfo.fields.baseUrlTooltip')}
-          placeholder={t('onboarding:fhirServerInfo.fields.baseUrlPlaceholder')}
-          required
-          value={baseUrl}
-          error={baseUrlError ?? undefined}
-          onChange={handleBaseUrlChange}
-          onBlur={handleBaseUrlBlur} />
-
-        {jwksInstructionsKey && (
-          <>
-            <div className="section-title">{t('onboarding:fhirServerInfo.authenticationSectionTitle')}</div>
-            <div className="instructions-box">
-              <p>{t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}</p>
-              <a
-                className="download-link"
-                href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
-                target="_blank"
-                rel="noreferrer">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v12" />
-                  <path d="M7 10l5 5 5-5" />
-                  <path d="M5 21h14" />
-                </svg>
-                {t('onboarding:fhirServerInfo.fields.downloadPdfInstructions')}
-              </a>
-            </div>
-          </>
-        )}
-
-        <div className="section-title">{t('onboarding:fhirServerInfo.throttleSectionTitle')}</div>
-        <div className="triplet">
-          <NumberField
-            id="maxConcurrentRequests"
-            label={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsLabel')}
-            hint={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsTooltip')}
-            required
-            step={1}
-            value={maxConcurrentRequests}
-            error={maxConcurrentRequestsError ?? undefined}
-            onChange={setMaxConcurrentRequests}
-            onBlur={() => validateField('maxConcurrentRequests', setMaxConcurrentRequestsError)} />
-          <NumberField
-            id="maxRetries"
-            label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
-            hint={t('onboarding:fhirServerInfo.fields.maxRetriesTooltip')}
-            required
-            step={1}
-            value={maxRetries}
-            error={maxRetriesError ?? undefined}
-            onChange={setMaxRetries}
-            onBlur={() => validateField('maxRetries', setMaxRetriesError)} />
-        </div>
-
-        <div className="triplet">
           <TextField
-            id="minPullTime"
-            label={t('onboarding:fhirServerInfo.fields.minPullTimeLabel')}
-            hint={t('onboarding:fhirServerInfo.fields.minPullTimeTooltip')}
-            placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
-            maxLength={5}
+            id="fhirBaseUrl"
+            type="url"
+            label={t('onboarding:fhirServerInfo.fields.baseUrlLabel')}
+            hint={t('onboarding:fhirServerInfo.fields.baseUrlTooltip')}
+            placeholder={t('onboarding:fhirServerInfo.fields.baseUrlPlaceholder')}
             required
-            value={minPullTime}
-            error={minPullTimeError ?? undefined}
-            onChange={setMinPullTime}
-            onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime', setMinPullTimeError)} />
-          <TextField
-            id="maxPullTime"
-            label={t('onboarding:fhirServerInfo.fields.maxPullTimeLabel')}
-            hint={t('onboarding:fhirServerInfo.fields.maxPullTimeTooltip')}
-            placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
-            maxLength={5}
-            required
-            value={maxPullTime}
-            error={maxPullTimeError ?? undefined}
-            onChange={setMaxPullTime}
-            onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime', setMaxPullTimeError)} />
-        </div>
+            value={baseUrl}
+            error={baseUrlError ?? undefined}
+            onChange={handleBaseUrlChange}
+            onBlur={handleBaseUrlBlur} />
 
-        <div className="form-group">
-          <label>
-            {t('onboarding:fhirServerInfo.fields.lagLabel')}
-            <span className="info-icon" aria-label={t('onboarding:fhirServerInfo.fields.lagLabel')}>
-              ?<span className="tooltip-bubble" role="tooltip">{t('onboarding:fhirServerInfo.fields.lagTooltip')}</span>
-            </span>
-          </label>
+          {jwksInstructionsKey && (
+            <>
+              <div className="section-title">{t('onboarding:fhirServerInfo.authenticationSectionTitle')}</div>
+              <div className="instructions-box">
+                <p>{t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}</p>
+                <a
+                  className="download-link"
+                  href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
+                  download={`${vendorProfile.vendor}_JWKS_Instructions.pdf`}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3v12" />
+                    <path d="M7 10l5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  {t('onboarding:fhirServerInfo.fields.downloadPdfInstructions')}
+                </a>
+              </div>
+            </>
+          )}
+
+          <div className="section-title">{t('onboarding:fhirServerInfo.throttleSectionTitle')}</div>
           <div className="triplet">
             <NumberField
-              id="lagDays"
-              label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
+              id="maxConcurrentRequests"
+              label={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsLabel')}
+              hint={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsTooltip')}
               required
               step={1}
-              value={lagDays}
-              error={lagDaysError ?? undefined}
-              onChange={setLagDays}
-              onBlur={() => validateField('lagDays', setLagDaysError)} />
+              value={maxConcurrentRequests}
+              error={maxConcurrentRequestsError ?? undefined}
+              onChange={setMaxConcurrentRequests}
+              onBlur={() => validateField('maxConcurrentRequests', setMaxConcurrentRequestsError)} />
             <NumberField
-              id="lagHours"
-              label={t('onboarding:fhirServerInfo.fields.lagHoursLabel')}
+              id="maxRetries"
+              label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
+              hint={t('onboarding:fhirServerInfo.fields.maxRetriesTooltip')}
               required
               step={1}
-              value={lagHours}
-              error={lagHoursError ?? undefined}
-              onChange={setLagHours}
-              onBlur={() => validateField('lagHours', setLagHoursError)} />
-            <NumberField
-              id="lagMinutes"
-              label={t('onboarding:fhirServerInfo.fields.lagMinutesLabel')}
-              required
-              step={1}
-              value={lagMinutes}
-              error={lagMinutesError ?? undefined}
-              onChange={setLagMinutes}
-              onBlur={() => validateField('lagMinutes', setLagMinutesError)} />
+              value={maxRetries}
+              error={maxRetriesError ?? undefined}
+              onChange={setMaxRetries}
+              onBlur={() => validateField('maxRetries', setMaxRetriesError)} />
           </div>
+
+          <div className="triplet">
+            <TextField
+              id="minPullTime"
+              label={t('onboarding:fhirServerInfo.fields.minPullTimeLabel')}
+              hint={t('onboarding:fhirServerInfo.fields.minPullTimeTooltip')}
+              placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
+              maxLength={5}
+              required
+              value={minPullTime}
+              error={minPullTimeError ?? undefined}
+              onChange={setMinPullTime}
+              onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime', setMinPullTimeError)} />
+            <TextField
+              id="maxPullTime"
+              label={t('onboarding:fhirServerInfo.fields.maxPullTimeLabel')}
+              hint={t('onboarding:fhirServerInfo.fields.maxPullTimeTooltip')}
+              placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
+              maxLength={5}
+              required
+              value={maxPullTime}
+              error={maxPullTimeError ?? undefined}
+              onChange={setMaxPullTime}
+              onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime', setMaxPullTimeError)} />
+          </div>
+
+          <div className="form-group">
+            <label>
+              {t('onboarding:fhirServerInfo.fields.lagLabel')}
+              <span className="info-icon" aria-label={t('onboarding:fhirServerInfo.fields.lagLabel')}>
+                ?<span className="tooltip-bubble" role="tooltip">{t('onboarding:fhirServerInfo.fields.lagTooltip')}</span>
+              </span>
+            </label>
+            <div className="triplet">
+              <NumberField
+                id="lagDays"
+                label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
+                required
+                step={1}
+                value={lagDays}
+                error={lagDaysError ?? undefined}
+                onChange={setLagDays}
+                onBlur={() => validateField('lagDays', setLagDaysError)} />
+              <NumberField
+                id="lagHours"
+                label={t('onboarding:fhirServerInfo.fields.lagHoursLabel')}
+                required
+                step={1}
+                value={lagHours}
+                error={lagHoursError ?? undefined}
+                onChange={setLagHours}
+                onBlur={() => validateField('lagHours', setLagHoursError)} />
+              <NumberField
+                id="lagMinutes"
+                label={t('onboarding:fhirServerInfo.fields.lagMinutesLabel')}
+                required
+                step={1}
+                value={lagMinutes}
+                error={lagMinutesError ?? undefined}
+                onChange={setLagMinutes}
+                onBlur={() => validateField('lagMinutes', setLagMinutesError)} />
+            </div>
+          </div>
+
+          {validationError && (
+            <p className="nhsn-link__form-error" role="alert">
+              {validationError}
+            </p>
+          )}
+
+          {(testing || testResult) && (
+            <div className="fhir-test-result">
+              {testing ? (
+                <span className="result-spinner" />
+              ) : (
+                <span className={`result-icon ${testResult!.success ? 'result-icon-success' : 'result-icon-failed'}`}>
+                  {testResult!.success ? '✓' : '!'}
+                </span>
+              )}
+              <span>{testing ? t('onboarding:fhirServerInfo.messages.testing') : testResult!.message}</span>
+            </div>
+          )}
         </div>
-
-        {validationError && (
-          <p className="nhsn-link__form-error" role="alert">
-            {validationError}
-          </p>
-        )}
-
-        {testResult && (
-          <div className="fhir-test-result">
-            <span className={`result-icon ${testResult.success ? 'result-icon-success' : 'result-icon-failed'}`}>
-              {testResult.success ? '✓' : '!'}
-            </span>
-            <span>{testResult.message}</span>
-          </div>
-        )}
 
         <StepActions>
           <Button variant="secondary" onClick={onBack}>

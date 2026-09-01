@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Xml;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
@@ -7,42 +6,33 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
-using LantanaGroup.Link.Sdk.ApiClient;
-using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 
 public class FacilityAdministrationService : IFacilityAdministrationService
 {
-    private const string LagDispatchEvent = "Discharge";
-
     private readonly NhsnAppDbContext _dbContext;
     private readonly INhsnUserContext _userContext;
     private readonly IFacilityWriteLock _writeLock;
-    private readonly IFacilityServiceClient _facilityServiceClient;
-    private readonly IDataAcquisitionServiceClient _dataAcquisitionServiceClient;
-    private readonly IDataAcquisitionRawClient _dataAcquisitionRawClient;
-    private readonly IQueryDispatchServiceClient _queryDispatchServiceClient;
+    private readonly IFacilityGateway _facilityGateway;
+    private readonly IFhirConfigurationGateway _fhirConfigurationGateway;
+    private readonly IQueryDispatchGateway _queryDispatchGateway;
 
     public FacilityAdministrationService(
         NhsnAppDbContext dbContext,
         INhsnUserContext userContext,
         IFacilityWriteLock writeLock,
-        IFacilityServiceClient facilityServiceClient,
-        IDataAcquisitionServiceClient dataAcquisitionServiceClient,
-        IDataAcquisitionRawClient dataAcquisitionRawClient,
-        IQueryDispatchServiceClient queryDispatchServiceClient)
+        IFacilityGateway facilityGateway,
+        IFhirConfigurationGateway fhirConfigurationGateway,
+        IQueryDispatchGateway queryDispatchGateway)
     {
         _dbContext = dbContext;
         _userContext = userContext;
         _writeLock = writeLock;
-        _facilityServiceClient = facilityServiceClient;
-        _dataAcquisitionServiceClient = dataAcquisitionServiceClient;
-        _dataAcquisitionRawClient = dataAcquisitionRawClient;
-        _queryDispatchServiceClient = queryDispatchServiceClient;
+        _facilityGateway = facilityGateway;
+        _fhirConfigurationGateway = fhirConfigurationGateway;
+        _queryDispatchGateway = queryDispatchGateway;
     }
 
     public async Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default)
@@ -100,19 +90,22 @@ public class FacilityAdministrationService : IFacilityAdministrationService
     {
         var facilityId = _userContext.RequireFacilityId();
 
-        var fhirConfigResponse = await _dataAcquisitionServiceClient.GetFhirQueryConfigurationAsync(facilityId, cancellationToken);
-        var fhirConfig = ParseFhirQueryConfiguration(fhirConfigResponse);
+        var fhirConfig = await _fhirConfigurationGateway.GetAsync(facilityId, cancellationToken);
+        var lagDuration = await _queryDispatchGateway.GetLagDurationAsync(facilityId, cancellationToken);
+        var (lagDays, lagHours, lagMinutes) = ParseLagDuration(lagDuration);
 
-        var dispatchConfigResponse = await _queryDispatchServiceClient.GetConfigurationAsync(facilityId, cancellationToken);
-        var (lagDays, lagHours, lagMinutes) = ParseLagDuration(FindLagSchedule(dispatchConfigResponse.IsSuccessStatusCode ? dispatchConfigResponse.Body : null));
+        // fhirConfig's pull times arrive from Data Acquisition as a "date-span" wire value (e.g.
+        // "08:00:00"), not the two-digit HH:MM this response contracts for — reparse before formatting.
+        TimeSpan? minPullTime = TimeSpan.TryParse(fhirConfig?.MinAcquisitionPullTime, System.Globalization.CultureInfo.InvariantCulture, out var parsedMin) ? parsedMin : null;
+        TimeSpan? maxPullTime = TimeSpan.TryParse(fhirConfig?.MaxAcquisitionPullTime, System.Globalization.CultureInfo.InvariantCulture, out var parsedMax) ? parsedMax : null;
 
         return new FhirServerInfoResponse
         {
             FhirServerBaseUrl = fhirConfig?.FhirServerBaseUrl,
             MaxConcurrentRequests = fhirConfig?.MaxConcurrentRequests,
             MaxRetries = fhirConfig?.MaxRetries,
-            MinAcquisitionPullTime = FormatPullTime(fhirConfig?.MinAcquisitionPullTime),
-            MaxAcquisitionPullTime = FormatPullTime(fhirConfig?.MaxAcquisitionPullTime),
+            MinAcquisitionPullTime = FormatPullTime(minPullTime),
+            MaxAcquisitionPullTime = FormatPullTime(maxPullTime),
             LagDays = lagDays,
             LagHours = lagHours,
             LagMinutes = lagMinutes
@@ -155,70 +148,25 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         var minPullTime = ParsePullTime(request.MinAcquisitionPullTime, "MinAcquisitionPullTime");
         var maxPullTime = ParsePullTime(request.MaxAcquisitionPullTime, "MaxAcquisitionPullTime");
 
-        var facilityResponse = await _facilityServiceClient.GetAsync(facilityId, cancellationToken);
-        if (facilityResponse.StatusCode == 404)
+        var facility = await _facilityGateway.GetAsync(facilityId, cancellationToken);
+        if (facility is null)
         {
             return null;
         }
 
-        if (!facilityResponse.IsSuccessStatusCode || facilityResponse.Body is null)
-        {
-            throw new InvalidOperationException($"Unable to retrieve facility configuration from Tenant. Tenant returned HTTP {facilityResponse.StatusCode}.");
-        }
-
-        var timeZone = facilityResponse.Body.TimeZone;
-
-        var existingResponse = await _dataAcquisitionServiceClient.GetFhirQueryConfigurationAsync(facilityId, cancellationToken);
-        var existing = ParseFhirQueryConfiguration(existingResponse);
-        var existingId = existing?.Id;
-
-        if (existingId is null)
-        {
-            var createResponse = await _dataAcquisitionServiceClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
-            {
-                FacilityId = facilityId,
-                FhirServerBaseUrl = request.FhirServerBaseUrl,
-                MaxConcurrentRequests = request.MaxConcurrentRequests,
-                MaxRetries = request.MaxRetries,
-                MinAcquisitionPullTime = minPullTime,
-                MaxAcquisitionPullTime = maxPullTime,
-                TimeZone = timeZone
-            }, cancellationToken);
-
-            if (!createResponse.IsSuccessStatusCode)
-            {
-                throw new InvalidOperationException($"Unable to save FHIR query configuration in Data Acquisition. Data Acquisition returned HTTP {createResponse.StatusCode}.");
-            }
-        }
-        else
-        {
-            await _dataAcquisitionRawClient.UpdateFhirQueryConfigurationAsync(new UpdateFhirQueryConfigurationPayload
-            {
-                Id = existingId,
-                FacilityId = facilityId,
-                FhirServerBaseUrl = request.FhirServerBaseUrl,
-                MaxConcurrentRequests = request.MaxConcurrentRequests,
-                MaxRetries = request.MaxRetries,
-                MinAcquisitionPullTime = minPullTime,
-                MaxAcquisitionPullTime = maxPullTime,
-                TimeZone = timeZone
-            }, cancellationToken);
-        }
-
-        var lagDuration = BuildLagDuration(request.LagDays, request.LagHours, request.LagMinutes);
-        var dispatchUpsertResponse = await _queryDispatchServiceClient.UpsertQueryDispatchConfigurationAsync(facilityId, new QueryDispatchConfigurationApiModel
+        await _fhirConfigurationGateway.SaveAsync(new FhirConfigurationSave
         {
             FacilityId = facilityId,
-            DispatchSchedules =
-            [
-                new DispatchScheduleApiModel { Event = LagDispatchEvent, Duration = lagDuration }
-            ]
+            FhirServerBaseUrl = request.FhirServerBaseUrl,
+            MaxConcurrentRequests = request.MaxConcurrentRequests,
+            MaxRetries = request.MaxRetries,
+            MinAcquisitionPullTime = minPullTime,
+            MaxAcquisitionPullTime = maxPullTime,
+            TimeZone = facility.TimeZone
         }, cancellationToken);
 
-        if (!dispatchUpsertResponse.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"Unable to save acquisition lag configuration in Query Dispatch. Query Dispatch returned HTTP {dispatchUpsertResponse.StatusCode}.");
-        }
+        var lagDuration = BuildLagDuration(request.LagDays, request.LagHours, request.LagMinutes);
+        await _queryDispatchGateway.SetLagDurationAsync(facilityId, lagDuration, cancellationToken);
 
         return new FhirServerInfoResponse
         {
@@ -243,30 +191,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
         return Task.FromResult(new ConnectionResult { Success = true, MessageKey = "fhirServerInfo.messages.testSuccess" });
     }
-
-    private static readonly JsonSerializerOptions FhirQueryConfigurationJsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-    private static FhirQueryConfigurationDetail? ParseFhirQueryConfiguration(LinkApiResponse response)
-    {
-        if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(response.RawBody))
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<FhirQueryConfigurationDetail>(response.RawBody, FhirQueryConfigurationJsonOptions);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string? FindLagSchedule(QueryDispatchConfigurationApiModel? configuration) =>
-        configuration?.DispatchSchedules
-            .FirstOrDefault(schedule => string.Equals(schedule.Event, LagDispatchEvent, StringComparison.OrdinalIgnoreCase))
-            ?.Duration;
 
     internal static (int Days, int Hours, int Minutes) ParseLagDuration(string? duration)
     {

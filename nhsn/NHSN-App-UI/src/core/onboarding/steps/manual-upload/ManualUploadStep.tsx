@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, DownloadLinkButton, FileUploadField, PageHeader, StepActions} from '../../../fields';
+import {Button, DownloadLinkButton, FileUploadField, MessageContainer, PageHeader, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 
@@ -79,7 +79,11 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
           })}
         </p>
       )}
-      {error && <p className="nhsn-link__error-message">{error}</p>}
+      {error && (
+        <MessageContainer type="error" showIcon>
+          <span role="alert">{error}</span>
+        </MessageContainer>
+      )}
 
       <StepActions>
         <Button variant="secondary" onClick={onBack}>

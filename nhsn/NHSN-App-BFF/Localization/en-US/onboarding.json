@@ -24,11 +24,32 @@
   },
   "reportingPlan": {
     "title": "Facility Reporting Plan",
-    "subtitle": "This is a six-month look-ahead of the NHSN measures your facility is scheduled to report against. Review the schedule before completing enrollment.",
+    "subtitle": "Before you get started, here's a preview of the 6-month look-ahead of NHSN measures your facility will be scheduled to report against once enrollment is complete.",
     "columns": {
       "month": "Report Month",
       "year": "Report Year",
       "measures": "NHSN Measures"
+    },
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    },
+    "measures": {
+      "adultSepsis": "Adult Sepsis Bacteria & Fungemia",
+      "antimicrobialUseResistance": "Antimicrobial Use and Resistance (AU/AR)",
+      "cDifficile": "C. Difficile Infection",
+      "glycemicControl": "Glycemic Control",
+      "respiratoryPathogens": "Respiratory Pathogens Surveillance (RPS)"
     },
     "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available."
   },
@@ -71,14 +92,14 @@
     "title": "FHIR Server Information",
     "subtitlePrefix": "NHSNLink uses the",
     "subtitleFhirLinkText": "FHIR",
-    "subtitleSuffix": "standard to communicate with your facility's EHR system. Please provide the technical information needed to securely connect your EHR FHIR APIs to NHSNLink.",
+    "subtitleSuffix": "standard to connect with your facility's EHR system. Please provide the technical information needed to securely connect your EHR FHIR APIs to NHSNLink.",
     "authenticationSectionTitle": "Authentication",
     "throttleSectionTitle": "Throttle Settings",
     "fields": {
       "baseUrlLabel": "FHIR Server Base URL",
       "baseUrlTooltip": "The FHIR base URL used to access your facility's FHIR resources. Example: https://ehr.example.org/fhir/r4",
       "baseUrlPlaceholder": "https://ehr.example.org/fhir/r4",
-      "jwksInstructions": "{{vendor}} facilities support JSON Web Key Set (JWKS) based authentication. This is enabled directly by your facility's EHR administrator from the {{vendor}} vendor portal — no credentials need to be entered here. Download the instructions below and provide them to your EHR administrator to enable JWKS for NHSNLink.",
+      "jwksInstructions": "{{vendor}} facilities now support JSON Web Key Set (JWKS) based authentication. This is enabled directly by your facility's EHR administrator from the {{vendor}} vendor portal — no credentials need to be entered here. Download the instructions below and provide them to your EHR administrator to enable JWKS for NHSNLink.",
       "downloadPdfInstructions": "Download PDF Instructions",
       "maxConcurrentRequestsLabel": "Max Concurrent Requests",
       "maxConcurrentRequestsTooltip": "NHSNLink is capable of querying resources concurrently for reported patients. This setting throttles how many requests will run concurrently against the facility FHIR server.",
@@ -107,6 +128,7 @@
       "loadError": "Unable to load FHIR server information.",
       "saveSuccess": "FHIR server information saved.",
       "saveError": "Unable to save FHIR server information.",
+      "testing": "Testing connection…",
       "testSuccess": "Connection test succeeded.",
       "testFailure": "Connection test failed.",
       "testError": "Unable to test the connection.",
@@ -135,7 +157,21 @@
     "title": "MRN Identifier Intake"
   },
   "complete": {
-    "title": "Enrollment Complete"
+    "title": "Enrollment Complete",
+    "subtitle": "This facility's onboarding has been completed and saved.",
+    "summary": {
+      "facilityId": "Facility ID",
+      "vendor": "Vendor",
+      "timeZone": "Time Zone",
+      "fhirBaseUrl": "FHIR Base URL",
+      "connectionTest": "Connection Test",
+      "censusMethod": "Census Method",
+      "reportsGenerated": "Reports Generated",
+      "completedReportId": "Completed From Report Id"
+    },
+    "connectionTested": "Passed",
+    "connectionNotTested": "Not tested",
+    "notAvailable": "—"
   },
   "page": {
     "title": "Onboarding",
