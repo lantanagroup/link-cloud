@@ -22,7 +22,6 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
                 table: "MockDmrpEntries",
                 type: "int",
                 nullable: false,
-                defaultValue: 0,
                 oldClrType: typeof(int),
                 oldType: "int",
                 oldNullable: true);

@@ -177,14 +177,6 @@ public class ReportingPlanService : IReportingPlanService
     }
 
     /// <summary>
-    /// Rejects an entry whose reporting period cannot be reported against.
-    /// </summary>
-    /// <remarks>
-    /// Both components are reported monthly, so every entry carries a month. An entry stored
-    /// with the wrong month is returned for no month at all, which is a silent failure: the
-    /// row is there, the unique index is satisfied, and the plan simply comes back short.
-    /// </remarks>
-    /// <summary>
     /// Trims a value that takes part in the natural key.
     /// </summary>
     /// <remarks>
@@ -204,7 +196,7 @@ public class ReportingPlanService : IReportingPlanService
     /// Brings an entry's key fields to the form they are stored and compared in.
     /// </summary>
     /// <remarks>
-    /// Runs before both the cadence guard and the duplicate pre-check, so an entry is
+    /// Runs before both the component and period guard and the duplicate pre-check, so an entry is
     /// validated and compared as it will be persisted rather than as it arrived.
     /// </remarks>
     private static void Normalize(ReportingPlanEntryEntity entry)
@@ -237,6 +229,15 @@ public class ReportingPlanService : IReportingPlanService
         }
     }
 
+    /// <summary>
+    /// Rejects an entry whose component is unknown, or whose reporting period cannot be
+    /// reported against.
+    /// </summary>
+    /// <remarks>
+    /// Both components are reported monthly, so every entry carries a month. An entry stored
+    /// with a month outside 1-12 is returned for no month at all, which is a silent failure:
+    /// the row is there, the unique index is satisfied, and the plan simply comes back short.
+    /// </remarks>
     private static void GuardComponentAndPeriod(ReportingPlanEntryEntity entry)
     {
         if (!ReportingComponents.IsKnown(entry.Component))

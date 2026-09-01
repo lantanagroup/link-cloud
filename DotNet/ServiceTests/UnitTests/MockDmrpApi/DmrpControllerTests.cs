@@ -21,8 +21,9 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.MockDmrpApi;
 
 /// <summary>
-/// Drives the two contract endpoints over real HTTP, so the assertions cover routing, model
-/// binding, status codes and serialization -- not just the method bodies.
+/// Drives the two contract endpoints through the full MVC pipeline via <c>TestServer</c> --
+/// in-process, no sockets and no listening port -- so the assertions cover routing, model
+/// binding, status codes and serialization rather than just the method bodies.
 /// </summary>
 /// <remarks>
 /// Both endpoints are placeholders whose shape is expected to change when the published
@@ -380,8 +381,8 @@ public class DmrpControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetAnnualPlan_DoesNotServeMedicineEntries()
     {
-        // The annual query deliberately does not filter on month. Without the component
-        // in the predicate that omission would pull in every monthly entry for the year.
+        // This call supplies a year but no month, so nothing narrows the period. Without
+        // the component in the predicate that would pull in every medicine entry for the year.
         SeedPatientSafety(measure: "HAI");
         Seed(measure: "HOB");
         Seed(measure: "HTCDI", month: 6);

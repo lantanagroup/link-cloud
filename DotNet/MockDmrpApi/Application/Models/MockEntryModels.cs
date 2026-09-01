@@ -51,7 +51,7 @@ public class MockEntryModel
     public string FacilityId { get; set; } = string.Empty;
     public string Component { get; set; } = string.Empty;
     public string Measure { get; set; } = string.Empty;
-    public int? ReportingMonth { get; set; }
+    public int ReportingMonth { get; set; }
     public int ReportingYear { get; set; }
     public string IsReporting { get; set; } = string.Empty;
     public DateTimeOffset CreateDate { get; set; }
