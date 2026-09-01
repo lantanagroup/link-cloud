@@ -97,6 +97,8 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
             existing.FacilityId = facilityReportingPlan.FacilityId;
             existing.MeasureMappingId = facilityReportingPlan.MeasureMappingId;
+            existing.Measure = facilityReportingPlan.Measure;
+            existing.Component = facilityReportingPlan.Component;
             existing.ReportingMonth = facilityReportingPlan.ReportingMonth;
             existing.ReportingYear = facilityReportingPlan.ReportingYear;
             existing.IsReporting = facilityReportingPlan.IsReporting;
@@ -182,11 +184,6 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                     $"FacilityId must be {FacilityReportingPlanConfigMap.FacilityIdMaxLength} characters or fewer.");
             }
 
-            if (string.IsNullOrWhiteSpace(plan.MeasureMappingId))
-            {
-                throw new ReportingPlanValidationException("MeasureMappingId is required.");
-            }
-
             if (!ReportingComponents.IsKnown(plan.Component))
             {
                 throw new ReportingPlanValidationException(
@@ -204,12 +201,36 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                     $"ReportingYear must be between {MinimumReportingYear} and {MaximumReportingYear}.");
             }
 
-            var measureMappingExists = await _measureMappingRepository.AnyAsync(
-                m => m.Id == plan.MeasureMappingId, cancellationToken);
-
-            if (!measureMappingExists)
+            // The mapping is optional, but naming one that does not exist is still a mistake.
+            // When it is supplied and the caller left the measure blank, the mapping is where the
+            // measure name comes from - which is what keeps callers that only know about mappings
+            // working unchanged.
+            if (!string.IsNullOrWhiteSpace(plan.MeasureMappingId))
             {
-                throw new ReportingPlanValidationException($"Measure mapping with Id: {plan.MeasureMappingId} not found.");
+                var mapping = await _measureMappingRepository.FirstOrDefaultAsync(
+                    m => m.Id == plan.MeasureMappingId, cancellationToken);
+
+                if (mapping is null)
+                {
+                    throw new ReportingPlanValidationException($"Measure mapping with Id: {plan.MeasureMappingId} not found.");
+                }
+
+                if (string.IsNullOrWhiteSpace(plan.Measure))
+                {
+                    plan.Measure = mapping.Measure;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(plan.Measure))
+            {
+                throw new ReportingPlanValidationException(
+                    "Measure is required when no measure mapping is supplied to take it from.");
+            }
+
+            if (plan.Measure.Length > FacilityReportingPlanConfigMap.MeasureMaxLength)
+            {
+                throw new ReportingPlanValidationException(
+                    $"Measure must be {FacilityReportingPlanConfigMap.MeasureMaxLength} characters or fewer.");
             }
 
             var facilityExists = await _facilityExistence.ExistsAsync(plan.FacilityId, cancellationToken);
@@ -220,9 +241,16 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             }
         }
 
+        /// <summary>
+        /// Matches the unique index: an enrollment is the same one when the facility, component,
+        /// measure and period are the same. Keyed on the measure rather than the mapping, because
+        /// the mapping is optional and mapping one afterwards must not change what counts as a
+        /// duplicate.
+        /// </summary>
         private Task<bool> IsDuplicateAsync(FacilityReportingPlan plan, string? currentId, CancellationToken cancellationToken) =>
             _repository.AnyAsync(p => p.FacilityId == plan.FacilityId
-                && p.MeasureMappingId == plan.MeasureMappingId
+                && p.Component == plan.Component
+                && p.Measure == plan.Measure
                 && p.ReportingMonth == plan.ReportingMonth
                 && p.ReportingYear == plan.ReportingYear
                 && (currentId == null || p.Id != currentId), cancellationToken);
