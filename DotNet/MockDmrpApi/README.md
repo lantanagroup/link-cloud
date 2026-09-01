@@ -29,7 +29,7 @@ mistake most likely to waste someone's week.
 
 | | **Contract surface** | **Support surface** |
 |---|---|---|
-| Routes | `GET /msc`, `GET /ps/annual` | everything under `/api/mock-dmrp` |
+| Routes | `GET /msc`, `GET /ps/annual/mrp` | everything under `/api/mock-dmrp` |
 | Whose API is it? | The third party's | Ours |
 | In `Contracts/dmrp-openapi.yaml`? | Yes — it describes *only* these | No, deliberately |
 | Authentication | The third party's bearer token | **Link's standard scheme** |
@@ -49,7 +49,7 @@ The two contract endpoints differ in **subject and in cadence**:
 | Endpoint | Component | Subject | Cadence |
 |---|---|---|---|
 | `GET /msc` | `MSC` | Medicine reports | Monthly |
-| `GET /ps/annual` | `PS` | Patient safety | Annual |
+| `GET /ps/annual/mrp` | `PS` | Patient safety | Annual |
 
 That cadence difference reaches the schema: `ReportingMonth` is **nullable**, populated for
 MSC and null for PS. Whether it is required depends on the component, which no column
@@ -75,7 +75,7 @@ Two things about this are easy to get wrong:
   not a whole number — or a month outside 1–12 — is a `400` rather than a filter that quietly
   matches nothing. A typo must not read as "enrolled in nothing", which is the one conclusion
   this API exists to convey.
-- **`month` has no effect on `/ps/annual`.** Annual entries carry no month, so narrowing by one
+- **`month` has no effect on `/ps/annual/mrp`.** Annual entries carry no month, so narrowing by one
   would exclude every row the endpoint is supposed to return. It is accepted for symmetry and
   ignored, and the response omits `reportingMonth` regardless.
 
@@ -123,7 +123,7 @@ endpoints have to be supported as they are.
 This service hosts both under one base URL, because one stand-in is cheaper to run than two.
 That is a deviation, and it has a practical consequence: **a consumer cannot switch to the
 real thing by changing a single base URL.** It will need one per component, and the paths may
-well not be `/msc` and `/ps/annual` once each has its own host.
+well not be `/msc` and `/ps/annual/mrp` once each has its own host.
 
 Keeping the two operations distinct in the contract, rather than collapsing them into one
 parameterised endpoint, is what makes that switch a routing change rather than a rewrite.
@@ -288,7 +288,7 @@ Authenticated with the **third party's** bearer token, from `POST /api/mock-dmrp
 | Route | Purpose |
 |---|---|
 | `GET /msc?nhsnorgid=&name=&year=&month=` | Monthly medicine reporting plan (`MSC`) |
-| `GET /ps/annual?nhsnorgid=&name=&year=&month=` | Annual patient-safety reporting plan (`PS`) |
+| `GET /ps/annual/mrp?nhsnorgid=&name=&year=&month=` | Annual patient-safety reporting plan (`PS`) |
 
 Only `nhsnorgid` is required. `name`, `year` and `month` each narrow the result when supplied
 and are ignored when not, so a caller passing only `nhsnorgid` gets the facility's whole plan
@@ -379,7 +379,7 @@ it — `ReportingPlanService` rejects violations with a `400` naming the cadence
 
 It has to be enforced rather than merely documented, because both failure modes are silent:
 
-- A **PS entry saved with a month** satisfies the unique index perfectly well, and `/ps/annual`
+- A **PS entry saved with a month** satisfies the unique index perfectly well, and `/ps/annual/mrp`
   does not filter on month — so the row is returned for every request, looking correct.
 - An **MSC entry saved without one** matches no month, so `/msc` never returns it. The plan
   simply comes back short, with nothing to indicate a row was skipped.
@@ -472,7 +472,7 @@ TOKEN=$(curl -s -X POST $B/api/mock-dmrp/oauth2/token -H 'Content-Type: applicat
 
 # Query each plan -- each returns only its own component's measures
 curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100&year=2020&month=2" | jq
-curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?nhsnorgid=100&year=2020" | jq
+curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual/mrp?nhsnorgid=100&year=2020" | jq
 
 # Everything but nhsnorgid is optional -- this returns the whole medicine plan
 curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100" | jq
@@ -615,7 +615,7 @@ They are separate on purpose, mirroring the real topology.
 | | Guards | Scheme |
 |---|---|---|
 | **Link's** | the support surface at `/api/mock-dmrp` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
-| **The third party's** | `GET /msc`, `GET /ps/annual` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
+| **The third party's** | `GET /msc`, `GET /ps/annual/mrp` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
 
 `DmrpController` carries `[AllowAnonymous]` so Link's middleware never sees it, and checks the
 third-party token itself. That is not a hole: those endpoints impersonate an external service,
@@ -690,7 +690,7 @@ Everything below is invented. Getting a real request/response pair, or the publi
 matters more than anything else in this project — a consumer written against these guesses
 will work perfectly here and fail on first contact with the real endpoint.
 
-- **Path shapes** — `/msc` and `/ps/annual` are what LCG recorded, but the ADR describes the
+- **Path shapes** — `/msc` and `/ps/annual/mrp` are what LCG recorded, but the ADR describes the
   two components as *separately deployed APIs* rather than two paths on one. See §1.5.
 - **Component identifiers** — the strings `"MSC"` and `"PS"` are ours. Does the real API use
   these, longer names, or coded values?
