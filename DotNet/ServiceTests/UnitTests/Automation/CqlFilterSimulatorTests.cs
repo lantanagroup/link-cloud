@@ -88,6 +88,28 @@ public class CqlFilterSimulatorTests
     }
 
     [Fact]
+    public void AchMonthly_KeepsImagingAndProcedure_CommentedSocialHistorySurveyStillExcluded()
+    {
+        // SDE Observation Category is an or-chain: imaging | procedure, with
+        // social-history/survey commented out. A greedy .category-to-tilde span
+        // previously kept only procedure and dropped imaging (Run 1 +14).
+        var input = InputWith(
+            Obs("o-imaging", "imaging", "30746-2", EncStart.AddHours(1)),
+            Obs("o-procedure", "procedure", "30746-2", EncStart.AddHours(2)),
+            Obs("o-social", "social-history", "72166-2", EncStart.AddHours(3)),
+            Obs("o-survey", "survey", "44249-1", EncStart.AddHours(4)));
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
+
+        Assert.DoesNotContain("Observation/o-imaging", excluded);
+        Assert.DoesNotContain("Observation/o-procedure", excluded);
+        Assert.Contains("Observation/o-social", excluded);
+        Assert.Contains("Observation/o-survey", excluded);
+    }
+
+    [Fact]
     public void Ach_ExcludesObservationsOutsideEncounterPeriod()
     {
         var input = InputWith(
@@ -710,6 +732,116 @@ public class CqlFilterSimulatorTests
             InputWithDiagnosticReports(report));
 
         Assert.Contains("DiagnosticReport/DR-unknown", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_NoteCategoriesOverlappingIp_AreKept()
+    {
+        // SDE DiagnosticReport Note is Radiology | Pathology | Cardiology.
+        // The same greedy category span would keep only the last code.
+        var radiology = new CqlFilterSimulator.DiagnosticReportContext("DR-rad", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LP29684-5"]
+        };
+        var pathology = new CqlFilterSimulator.DiagnosticReportContext("DR-path", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LP7839-6"]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            InputWithDiagnosticReports(radiology, pathology));
+
+        Assert.DoesNotContain("DiagnosticReport/DR-rad", excluded);
+        Assert.DoesNotContain("DiagnosticReport/DR-path", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_OutsideIp_WithImportedEncounterList_IsExcluded()
+    {
+        // Run 2 mega-patient shape: report period is two months, one IMP
+        // encounter is IP, DiagnosticReports are acquired across the report
+        // period. Only those overlapping IP.period belong in ABS.
+        var ipStart = new DateTime(2026, 7, 9, 12, 23, 19, DateTimeKind.Utc);
+        var ipEnd = new DateTime(2026, 7, 25, 18, 59, 6, DateTimeKind.Utc);
+        var ipEncounter = new CqlFilterSimulator.EncounterContext(
+            "E-imp", ipStart, ipEnd, "IMP", "finished");
+        var outpatient = new CqlFilterSimulator.EncounterContext(
+            "E-amb",
+            new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 7, 2, 1, 0, 0, DateTimeKind.Utc),
+            "AMB",
+            "finished");
+
+        var inside = new CqlFilterSimulator.DiagnosticReportContext(
+            "DR-in", ipStart.AddDays(1), ipStart.AddDays(1));
+        var outside = new CqlFilterSimulator.DiagnosticReportContext(
+            "DR-out",
+            new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1",
+            ipEncounter.EncounterId,
+            ipEncounter.PeriodStart,
+            ipEncounter.PeriodEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        {
+            Encounters = [ipEncounter, outpatient],
+            DiagnosticReports = [inside, outside],
+            MeasurementPeriodStart = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            MeasurementPeriodEnd = new DateTime(2026, 8, 31, 23, 59, 59, DateTimeKind.Utc)
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
+
+        Assert.DoesNotContain("DiagnosticReport/DR-in", excluded);
+        Assert.Contains("DiagnosticReport/DR-out", excluded);
+    }
+
+    [Fact]
+    public void AchMonthly_DiagnosticReport_AmbClassIsNotIpWindow_EvenWhenValuesetMissing()
+    {
+        // Extra imported encounters (AMB/HH/etc.) must not widen the IP window
+        // used to filter DiagnosticReports.
+        var ipStart = new DateTime(2026, 7, 9, 12, 0, 0, DateTimeKind.Utc);
+        var ipEnd = new DateTime(2026, 7, 25, 18, 0, 0, DateTimeKind.Utc);
+        var ipEncounter = new CqlFilterSimulator.EncounterContext(
+            "E-imp", ipStart, ipEnd, "IMP", "finished");
+        var ambulatory = new CqlFilterSimulator.EncounterContext(
+            "E-amb",
+            new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 8, 10, 2, 0, 0, DateTimeKind.Utc),
+            "AMB",
+            "finished");
+
+        var duringAmbOnly = new CqlFilterSimulator.DiagnosticReportContext(
+            "DR-amb-only",
+            new DateTime(2026, 8, 10, 0, 30, 0, DateTimeKind.Utc),
+            new DateTime(2026, 8, 10, 0, 30, 0, DateTimeKind.Utc));
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1",
+            ipEncounter.EncounterId,
+            ipEncounter.PeriodStart,
+            ipEncounter.PeriodEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        {
+            Encounters = [ipEncounter, ambulatory],
+            DiagnosticReports = [duringAmbOnly],
+            MeasurementPeriodStart = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            MeasurementPeriodEnd = new DateTime(2026, 8, 31, 23, 59, 59, DateTimeKind.Utc)
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
+
+        Assert.Contains("DiagnosticReport/DR-amb-only", excluded);
     }
 
     // ---------- Location SDE: GetLocation(IP.location) vs [Location] ----------

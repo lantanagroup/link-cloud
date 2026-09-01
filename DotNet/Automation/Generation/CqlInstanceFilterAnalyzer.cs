@@ -28,6 +28,14 @@ internal static class CqlInstanceFilterAnalyzer
     private static readonly Regex IntentTildePattern = new(
         """intent\s*~\s*'([^']+)'""",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match each category tilde independently (`Category ~ "imaging"` or
+    // `categories ~ "encounter-diagnosis"`). A greedy
+    // `.category[\s\S]{0,160}~ "code"` span jumped from the first `.category`
+    // to the last tilde in an `or` chain, so ACH Monthly SDE Observation
+    // Category kept only `procedure` and dropped `imaging`.
+    private static readonly Regex CategoryTildePattern = new(
+        @"\bcategor(?:y|ies)\s*~\s*""([^""]+)""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Dictionary<string, string> ReturnFunctionToType = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -331,10 +339,7 @@ internal static class CqlInstanceFilterAnalyzer
         var categoryAnyOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var categoryNoneOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var notSpans = FindNotSpans(text);
-        foreach (Match match in Regex.Matches(
-                     text,
-                     @"\.category\b[\s\S]{0,160}~\s*""([^""]+)""",
-                     RegexOptions.IgnoreCase))
+        foreach (Match match in CategoryTildePattern.Matches(text))
         {
             var code = model.ResolveCode(match.Groups[1].Value);
             if (notSpans.Any(span => match.Index >= span.Start && match.Index <= span.End))

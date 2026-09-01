@@ -154,10 +154,20 @@ public static class CqlFilterSimulator
             return false;
         }
 
-        if (model.IpAllowsAnyClass || model.IpClassCodes.Count == 0)
+        if (model.IpClassCodes.Count > 0 && !model.IpAllowsAnyClass)
+            return model.IpClassCodes.Contains(enc.ClassCode);
+
+        // The measure bundle did not yield a class-code expansion (missing
+        // valueset, or only type/location IP paths). Treating every class as IP
+        // over-predicts DiagnosticReports on imported mega patients whose extra
+        // encounters sit in the report period but outside the IMP window.
+        // Empty class stays permissive for legacy contexts that omit class.
+        if (string.IsNullOrWhiteSpace(enc.ClassCode))
             return true;
 
-        return model.IpClassCodes.Contains(enc.ClassCode);
+        return EncounterIpClassification.ClassCodeQualifiesIp(
+            enc.ClassCode,
+            EncounterIpClassification.IpProfile.Ach);
     }
 
     private static bool StatusMatchesFhirEnum(string status, IReadOnlySet<string> allowed)
