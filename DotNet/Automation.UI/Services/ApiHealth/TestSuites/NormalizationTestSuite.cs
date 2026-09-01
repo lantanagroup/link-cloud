@@ -90,7 +90,11 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
         }
 
         var facilityId = $"ApiHealth-Norm-{Guid.NewGuid():N}";
+        var locationId = $"ApiHealth-Location-{Guid.NewGuid():N}";
+        var localCodeSystem = $"urn:api-health:{Guid.NewGuid():N}";
+        var localCode = $"ApiHealth-Code-{Guid.NewGuid():N}";
         var facilityCreated = false;
+        var facilityLocationCreated = false;
         var operationCreated = false;
 
         try
@@ -98,6 +102,196 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             // Prerequisite: create facility (infrastructure, not tracked)
             await CreateFacilityAsync(facilityId, ct);
             facilityCreated = true;
+
+            results.Add(await RunStepAsync(StepNames.FacilityLocationPost400EmptyLocationId, 400, async () =>
+                await _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel
+                {
+                    LocationId = " ",
+                    LocationName = "ApiHealth Invalid Facility Location"
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.FacilityLocationPost201, 201, async () =>
+            {
+                var response = await _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocationName = "ApiHealth Facility Location",
+                    LocationAlias = "api-health-location"
+                }, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    facilityLocationCreated = true;
+                }
+
+                return response;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.FacilityLocationPost409Duplicate, 409, async () =>
+                await _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocationName = "ApiHealth Duplicate Facility Location"
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.FacilityLocationGet200, 200, async () =>
+            {
+                var response = await _client.GetFacilityLocationAsync(facilityId, locationId, ct);
+                if (response.IsSuccessStatusCode && response.Body?.LocationId != locationId)
+                {
+                    throw new InvalidOperationException("The returned facility location did not match the created fixture.");
+                }
+
+                return response;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.FacilityLocationGet404, 404, async () =>
+                await _client.GetFacilityLocationAsync(facilityId, $"ApiHealth-Missing-{Guid.NewGuid():N}", ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingSearch200InitialEmpty, 200, async () =>
+            {
+                var response = await _client.SearchFacilityLocationLocalCodeMappingsAsync(
+                    new SearchFacilityLocationLocalCodeMappingsRequestApiModel
+                    {
+                        FacilityId = facilityId,
+                        PageSize = 10,
+                        PageNumber = 1
+                    },
+                    ct);
+                if (response.IsSuccessStatusCode && response.Body?.Records is { Count: > 0 })
+                {
+                    throw new InvalidOperationException("Expected no local-code mappings before the test fixture is created.");
+                }
+
+                return response;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingPost400EmptyLocationId, 400, async () =>
+                await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = " ",
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct), ct: ct));
+
+            string? mappingId = null;
+            results.Add(await RunStepAsync(StepNames.HslocMappingPost201, 201, async () =>
+            {
+                var response = await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct);
+                mappingId = response.Body?.Id;
+                return response;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingPost409Duplicate, 409, async () =>
+                await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingSearch200, 200, async () =>
+            {
+                var response = await _client.SearchFacilityLocationLocalCodeMappingsAsync(
+                    new SearchFacilityLocationLocalCodeMappingsRequestApiModel
+                    {
+                        FacilityId = facilityId,
+                        LocationId = locationId,
+                        LocalCodeSystem = localCodeSystem,
+                        LocalCode = localCode,
+                        PageSize = 10,
+                        PageNumber = 1
+                    },
+                    ct);
+                if (response.IsSuccessStatusCode && response.Body?.Records is not { Count: > 0 })
+                {
+                    throw new InvalidOperationException("Expected the created local-code mapping in the search response.");
+                }
+
+                return response;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingGet200, 200, async () =>
+            {
+                if (string.IsNullOrWhiteSpace(mappingId))
+                {
+                    throw new InvalidOperationException("Expected a mapping identifier after creating the fixture.");
+                }
+
+                return await _client.GetFacilityLocationLocalCodeMappingAsync(mappingId, ct);
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingPut202, 202, async () =>
+            {
+                if (string.IsNullOrWhiteSpace(mappingId))
+                {
+                    throw new InvalidOperationException("Expected a mapping identifier before updating the fixture.");
+                }
+
+                return await _client.UpdateFacilityLocationLocalCodeMappingAsync(mappingId, new UpdateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = $"{localCode}-updated"
+                }, ct);
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingDelete204, 204, async () =>
+            {
+                if (string.IsNullOrWhiteSpace(mappingId))
+                {
+                    throw new InvalidOperationException("Expected a mapping identifier before deleting the fixture.");
+                }
+
+                return await _client.DeleteFacilityLocationLocalCodeMappingAsync(mappingId, ct);
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingGet404, 404, async () =>
+            {
+                if (string.IsNullOrWhiteSpace(mappingId))
+                {
+                    throw new InvalidOperationException("Expected a mapping identifier after deleting the fixture.");
+                }
+
+                return await _client.GetFacilityLocationLocalCodeMappingAsync(mappingId, ct);
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingDeleteForFacility204, 204, async () =>
+            {
+                var createResponse = await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = $"{localCode}-facility-delete"
+                }, ct);
+                if (!createResponse.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException("Expected a local-code mapping fixture before deleting mappings for the facility.");
+                }
+
+                return await _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(facilityId, ct);
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.HslocMappingSearch200Empty, 200, async () =>
+            {
+                var response = await _client.SearchFacilityLocationLocalCodeMappingsAsync(
+                    new SearchFacilityLocationLocalCodeMappingsRequestApiModel
+                    {
+                        FacilityId = facilityId,
+                        PageSize = 10,
+                        PageNumber = 1
+                    },
+                    ct);
+                if (response.IsSuccessStatusCode && response.Body?.Records is { Count: > 0 })
+                {
+                    throw new InvalidOperationException("Local-code mappings remain after facility cleanup.");
+                }
+
+                return response;
+            }, ct: ct));
 
             // POST → 201
             results.Add(await RunStepAsync(StepNames.Post201, 201, async () =>
@@ -265,6 +459,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
         finally
         {
             if (operationCreated) await TryCleanupAsync(() => _client.DeleteFacilityOperationsAsync(facilityId, ct));
+            if (facilityLocationCreated) await TryCleanupAsync(() => _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 

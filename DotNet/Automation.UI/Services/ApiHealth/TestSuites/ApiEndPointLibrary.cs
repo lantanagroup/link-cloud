@@ -220,7 +220,23 @@ public static class ApiEndPointLibrary
     private static IReadOnlyDictionary<string, EndpointMeta> BuildNormalizationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [NormalizationSteps.InfoGet200] = new EndpointMeta("Returns Normalization service information.", "GET /api/Normalization/info"),
-        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health")
+        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health"),
+        [NormalizationSteps.FacilityLocationPost201] = new EndpointMeta("Creates a facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.FacilityLocationPost400EmptyLocationId] = new EndpointMeta("Rejects a facility location without an identifier.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.FacilityLocationPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.FacilityLocationGet200] = new EndpointMeta("Reads a facility location by its facility and location identifiers.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.FacilityLocationGet404] = new EndpointMeta("Returns not-found for an unknown facility location.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.HslocMappingSearch200] = new EndpointMeta("Searches facility-location local-code mappings.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.HslocMappingSearch200InitialEmpty] = new EndpointMeta("Returns an empty mapping page before fixture creation.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.HslocMappingSearch200Empty] = new EndpointMeta("Returns an empty mapping page after cleanup.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.HslocMappingPost201] = new EndpointMeta("Creates a facility-location local-code mapping.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.HslocMappingPost400EmptyLocationId] = new EndpointMeta("Rejects a mapping without a location identifier.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.HslocMappingPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility-location local-code mapping.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.HslocMappingGet200] = new EndpointMeta("Reads a facility-location local-code mapping by id.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.HslocMappingGet404] = new EndpointMeta("Returns not-found for an unknown mapping.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.HslocMappingPut202] = new EndpointMeta("Updates a facility-location local-code mapping.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.HslocMappingDelete204] = new EndpointMeta("Deletes a facility-location local-code mapping.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.HslocMappingDeleteForFacility204] = new EndpointMeta("Deletes all local-code mappings for a facility.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -467,6 +483,22 @@ public static class ApiEndPointLibrary
         public const string SequencesDelete204 = "SEQUENCES DELETE → 204";
         public const string SequencesDelete404 = "SEQUENCES DELETE → 404";
         public const string SequencesDelete400EmptyFacility = "SEQUENCES DELETE → 400 (empty facility)";
+        public const string FacilityLocationPost201 = "Facility Location POST → 201";
+        public const string FacilityLocationPost400EmptyLocationId = "Facility Location POST → 400 (empty locationId)";
+        public const string FacilityLocationPost409Duplicate = "Facility Location POST → 409 (duplicate)";
+        public const string FacilityLocationGet200 = "Facility Location GET → 200";
+        public const string FacilityLocationGet404 = "Facility Location GET → 404";
+        public const string HslocMappingSearch200 = "HSLOC Mapping Search GET → 200";
+        public const string HslocMappingSearch200InitialEmpty = "HSLOC Mapping Search GET → 200 (initially empty)";
+        public const string HslocMappingSearch200Empty = "HSLOC Mapping Search GET → 200 (empty)";
+        public const string HslocMappingPost201 = "HSLOC Mapping POST → 201";
+        public const string HslocMappingPost400EmptyLocationId = "HSLOC Mapping POST → 400 (empty locationId)";
+        public const string HslocMappingPost409Duplicate = "HSLOC Mapping POST → 409 (duplicate)";
+        public const string HslocMappingGet200 = "HSLOC Mapping GET → 200";
+        public const string HslocMappingGet404 = "HSLOC Mapping GET → 404";
+        public const string HslocMappingPut202 = "HSLOC Mapping PUT → 202";
+        public const string HslocMappingDelete204 = "HSLOC Mapping DELETE → 204";
+        public const string HslocMappingDeleteForFacility204 = "HSLOC Mapping Facility DELETE → 204";
     }
 
     public static class QueryDispatchSteps
