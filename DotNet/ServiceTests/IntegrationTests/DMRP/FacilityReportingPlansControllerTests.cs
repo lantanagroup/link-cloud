@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
@@ -46,6 +47,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var logger = sp.GetRequiredService<ILogger<FacilityReportingPlansController>>();
         var manager = sp.GetRequiredService<IFacilityReportingPlanManager>();
         var queries = sp.GetRequiredService<IFacilityReportingPlanQueries>();
+        var lookAhead = sp.GetRequiredService<IFacilityReportingPlanLookAhead>();
 
         _mappingRepository = sp.GetRequiredService<IEntityRepository<MeasureMapping>>();
         _planRepository = sp.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
@@ -54,7 +56,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         // these tests assert on depend on the day they run.
         _clock = new FakeTimeProvider(Now);
 
-        _controller = new FacilityReportingPlansController(logger, manager, queries, _clock)
+        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -370,9 +372,15 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
 
-        Assert.Equal(2, page.Records.Count);
+        // Every month in the window is answered for: October and March from their own plans, the four
+        // between them projected from October's enrollment. September and April are outside it.
+        Assert.Equal(6, page.Records.Count);
         Assert.Equal((2026, 10), (page.Records[0].ReportingYear, page.Records[0].ReportingMonth));
-        Assert.Equal((2027, 3), (page.Records[1].ReportingYear, page.Records[1].ReportingMonth));
+        Assert.Equal((2027, 3), (page.Records[5].ReportingYear, page.Records[5].ReportingMonth));
+
+        Assert.False(page.Records[0].IsProjected);
+        Assert.False(page.Records[5].IsProjected);
+        Assert.True(page.Records[1].IsProjected);
     }
 
     [Fact]

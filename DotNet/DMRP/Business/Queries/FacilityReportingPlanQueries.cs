@@ -47,36 +47,6 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             int? reportingYear = null, bool? isReporting = null, ReportingPeriodRange? periodRange = null,
             CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// A facility's reporting plan as the facility itself reads it: one entry per reporting
-        /// period, carrying the measures enrolled in that period.
-        /// </summary>
-        /// <remarks>
-        /// The same rows <see cref="GetForFacilityAsync"/> returns, grouped. The stored grain is one
-        /// row per measure per period because that is what the reporting workflow needs; a facility
-        /// reads its obligations as a calendar, so the regrouping happens here rather than in each
-        /// client.
-        /// </remarks>
-        /// <param name="facilityId">The reporting facility, as the Tenant service knows it.</param>
-        /// <param name="periodRange">
-        /// An inclusive window of reporting periods. Null returns every period the facility has a plan
-        /// for, past ones included.
-        /// </param>
-        /// <param name="isReporting">
-        /// Passed through to the underlying read. Facility-facing callers pass true so a withdrawn
-        /// measure does not read as a current obligation.
-        /// </param>
-        /// <param name="pageSize">Periods per page.</param>
-        /// <param name="pageNumber">One-based page number.</param>
-        /// <param name="cancellationToken">Cancels the read.</param>
-        /// <returns>
-        /// A page of periods in chronological order, oldest first, with the paging metadata counting
-        /// periods rather than plan rows. A facility with no plans is an empty page.
-        /// </returns>
-        Task<PagedFacilityReportingPlanPeriodDto> GetPeriodsForFacilityAsync(string facilityId,
-            ReportingPeriodRange? periodRange = null, bool? isReporting = null, int pageSize = 10,
-            int pageNumber = 1, CancellationToken cancellationToken = default);
-
         Task<PagedFacilityReportingPlanDto> PagedSearchAsync(string? facilityId = null, string? measureMappingId = null,
             int? reportingMonth = null, int? reportingYear = null, bool? isReporting = null, string sortBy = "Id",
             SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1,
@@ -126,44 +96,6 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             }
 
             return entities.Select(ToModel).ToList();
-        }
-
-        public async Task<PagedFacilityReportingPlanPeriodDto> GetPeriodsForFacilityAsync(string facilityId,
-            ReportingPeriodRange? periodRange = null, bool? isReporting = null, int pageSize = 10,
-            int pageNumber = 1, CancellationToken cancellationToken = default)
-        {
-            var plans = await GetForFacilityAsync(facilityId, isReporting: isReporting,
-                periodRange: periodRange, cancellationToken: cancellationToken);
-
-            // Grouped and paged in memory rather than in SQL. Grouping needs every row in the window
-            // before it can count periods at all, and the window is what keeps that set small - one
-            // row per measure per period, for at most a couple of years. Paging here is about giving
-            // the caller the same envelope every other list operation returns, not about how much is
-            // read.
-            var periods = plans
-                .GroupBy(plan => (plan.ReportingYear, plan.ReportingMonth))
-                .OrderBy(period => period.Key.ReportingYear)
-                .ThenBy(period => period.Key.ReportingMonth)
-                .Select(period => new FacilityReportingPlanPeriodModel
-                {
-                    ReportingYear = period.Key.ReportingYear,
-                    ReportingMonth = period.Key.ReportingMonth,
-
-                    // Ordered by measure, then by mapping id to break the tie two mappings of the
-                    // same measure would otherwise leave to the database's row order. Without it the
-                    // same period can render in a different order on a later call.
-                    Measures = period
-                        .OrderBy(plan => plan.Measure, StringComparer.Ordinal)
-                        .ThenBy(plan => plan.MeasureMappingId, StringComparer.Ordinal)
-                        .Select(ToMeasureModel)
-                        .ToList()
-                })
-                .ToList();
-
-            var page = periods.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
-
-            return new PagedFacilityReportingPlanPeriodDto(page,
-                new PaginationMetadata(pageSize, pageNumber, periods.Count));
         }
 
         public async Task<PagedFacilityReportingPlanDto> PagedSearchAsync(string? facilityId = null,
@@ -251,18 +183,5 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
 
         private static FacilityReportingPlanModel ToModel(FacilityReportingPlan entity) =>
             FacilityReportingPlanMapper.ToModel(entity);
-
-        /// <summary>
-        /// Narrows a plan row to what it contributes to a period: the measure, without the facility
-        /// and period it is already filed under.
-        /// </summary>
-        private static FacilityReportingPlanMeasureModel ToMeasureModel(FacilityReportingPlanModel plan) => new()
-        {
-            MeasureMappingId = plan.MeasureMappingId,
-            Measure = plan.Measure,
-            DQM = plan.DQM,
-            Frequency = plan.Frequency,
-            IsReporting = plan.IsReporting
-        };
     }
 }

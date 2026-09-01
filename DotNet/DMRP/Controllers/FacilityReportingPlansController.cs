@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Mapping;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
@@ -41,13 +42,15 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private readonly ILogger<FacilityReportingPlansController> _logger;
         private readonly IFacilityReportingPlanManager _manager;
         private readonly IFacilityReportingPlanQueries _queries;
+        private readonly IFacilityReportingPlanLookAhead _lookAhead;
         private readonly TimeProvider _timeProvider;
 
-        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, TimeProvider timeProvider)
+        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, TimeProvider timeProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _lookAhead = lookAhead ?? throw new ArgumentNullException(nameof(lookAhead));
             _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
 
@@ -266,7 +269,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
 
-            var result = await _queries.GetPeriodsForFacilityAsync(facilityId, LookAheadWindow(monthsAhead),
+            var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead), CurrentPeriod(),
                 isReporting ?? true, pageSize, pageNumber, cancellationToken);
 
             return Ok(result);
@@ -602,11 +605,19 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return null;
             }
 
-            // UTC rather than the facility's timezone: this module knows whether a facility exists,
-            // not where it is. See the remarks on GetFacilityReportingPlanPeriods.
+            return ReportingPeriodRange.LookAhead(CurrentPeriod(), monthsAhead.Value);
+        }
+
+        /// <summary>
+        /// The reporting period the service considers current, in UTC rather than the facility's
+        /// timezone: this module knows whether a facility exists, not where it is. See the remarks on
+        /// <see cref="GetFacilityReportingPlanPeriods"/>.
+        /// </summary>
+        private ReportingPeriod CurrentPeriod()
+        {
             var now = _timeProvider.GetUtcNow();
 
-            return ReportingPeriodRange.LookAhead(new ReportingPeriod(now.Year, now.Month), monthsAhead.Value);
+            return new ReportingPeriod(now.Year, now.Month);
         }
 
         private static string? ValidatePeriodFilters(int? month, int? year)
