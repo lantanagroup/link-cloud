@@ -28,10 +28,13 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
     public class FacilityReportingPlanQueries : IFacilityReportingPlanQueries
     {
         private readonly IEntityRepository<FacilityReportingPlan> _repository;
+        private readonly IEntityRepository<MeasureMapping> _measureMappings;
 
-        public FacilityReportingPlanQueries(IEntityRepository<FacilityReportingPlan> repository)
+        public FacilityReportingPlanQueries(IEntityRepository<FacilityReportingPlan> repository,
+            IEntityRepository<MeasureMapping> measureMappings)
         {
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _measureMappings = measureMappings ?? throw new ArgumentNullException(nameof(measureMappings));
         }
 
         public async Task<FacilityReportingPlanModel?> GetAsync(string id, CancellationToken cancellationToken = default)
@@ -49,6 +52,21 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
                 && (reportingMonth == null || p.ReportingMonth == reportingMonth)
                 && (reportingYear == null || p.ReportingYear == reportingYear)
                 && (isReporting == null || p.IsReporting == isReporting), cancellationToken);
+
+            // The facility view labels rows by measure rather than mapping id, so resolve the
+            // mappings and hang them on the navigation before mapping - the same two-query stitch
+            // DbBackedReportingPlanSource uses (the shared repository has no Include).
+            if (entities.Count > 0)
+            {
+                var mappingIds = entities.Select(p => p.MeasureMappingId).Distinct().ToList();
+                var mappings = await _measureMappings.FindAsync(m => mappingIds.Contains(m.Id), cancellationToken);
+                var mappingsById = mappings.ToDictionary(m => m.Id);
+
+                foreach (var plan in entities)
+                {
+                    plan.MeasureMapping = mappingsById.GetValueOrDefault(plan.MeasureMappingId);
+                }
+            }
 
             return entities.Select(ToModel).ToList();
         }
