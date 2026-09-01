@@ -109,14 +109,12 @@ public class DuplicateReportingPlanEntryException : Exception
 }
 
 /// <summary>
-/// Raised when an entry's component and reporting period disagree.
+/// Raised when an entry cannot be stored as a reporting plan entry.
 /// </summary>
 /// <remarks>
-/// The rule is conditional -- a monthly component must carry a month, an annual one must
-/// not -- so it cannot be expressed as a column constraint or a range annotation. Rejecting
-/// it here matters: a patient-safety entry saved with a stray month still satisfies the
-/// unique index, but would sit in a different index slot than the annual query looks in and
-/// so become invisible rather than wrong.
+/// Rejecting here rather than leaving it to the database matters, because the failures are
+/// silent ones: an entry stored against a period nothing queries is returned by no plan at
+/// all, and the plan simply comes back short with nothing to indicate a row was skipped.
 /// </remarks>
 public class InvalidReportingPlanEntryException : Exception
 {

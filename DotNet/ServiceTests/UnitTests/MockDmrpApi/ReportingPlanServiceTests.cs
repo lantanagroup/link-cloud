@@ -26,7 +26,7 @@ public class ReportingPlanServiceTests
     private static ReportingPlanEntryEntity Entry(
         string facilityId = "F1",
         string measure = "HOB",
-        int? month = 5,
+        int month = 5,
         int year = 2026,
         string isReporting = "Y",
         string component = ReportingComponents.Msc,
@@ -44,13 +44,14 @@ public class ReportingPlanServiceTests
         };
 
     /// <summary>An annual (PS) entry, which carries no reporting month.</summary>
-    private static ReportingPlanEntryEntity AnnualEntry(
+    private static ReportingPlanEntryEntity PatientSafetyEntry(
         string facilityId = "F1",
         string measure = "HAI",
+        int month = 5,
         int year = 2026,
         string isReporting = "Y",
         string? id = null) =>
-        Entry(facilityId, measure, month: null, year, isReporting, ReportingComponents.Ps, id);
+        Entry(facilityId, measure, month, year, isReporting, ReportingComponents.Ps, id);
 
     // -------------------------------------------------------- monthly plan (MSC)
 
@@ -117,15 +118,15 @@ public class ReportingPlanServiceTests
     // --------------------------------------------------------- annual plan (PS)
 
     [Fact]
-    public async Task GetReportingPlanAsync_Annual_ReturnsEveryMeasureForTheYearRegardlessOfMonth()
+    public async Task GetReportingPlanAsync_PatientSafety_NarrowsToTheFacilityYearAndComponent()
     {
-        // The annual predicate deliberately omits month. Seeding an MSC entry in the same
-        // year proves the omission does not widen the result to other components.
+        // Seeding an MSC entry in the same period proves the component still narrows the
+        // result, now that month is no longer what separates the two plans.
         _repository.Seed(
-            AnnualEntry(measure: "HAI"),
-            AnnualEntry(measure: "SSI"),
-            AnnualEntry(measure: "HAI", year: 2025),
-            AnnualEntry(facilityId: "F2", measure: "HAI"),
+            PatientSafetyEntry(measure: "HAI"),
+            PatientSafetyEntry(measure: "SSI"),
+            PatientSafetyEntry(measure: "HAI", year: 2025),
+            PatientSafetyEntry(facilityId: "F2", measure: "HAI"),
             Entry(measure: "HOB"));
 
         var plan = await _service.GetReportingPlanAsync(
@@ -133,15 +134,14 @@ public class ReportingPlanServiceTests
 
         plan.Should().HaveCount(2);
         plan.Select(e => e.Measure).Should().BeEquivalentTo("HAI", "SSI");
-        plan.Should().OnlyContain(e => e.ReportingMonth == null);
     }
 
     [Fact]
     public async Task GetReportingPlanAsync_Annual_ExcludesEntriesNotBeingReported()
     {
         _repository.Seed(
-            AnnualEntry(measure: "HAI"),
-            AnnualEntry(measure: "SSI", isReporting: "N"));
+            PatientSafetyEntry(measure: "HAI"),
+            PatientSafetyEntry(measure: "SSI", isReporting: "N"));
 
         var plan = await _service.GetReportingPlanAsync(
             ReportingComponents.Ps, "F1", null, null, 2026, CancellationToken.None);
@@ -153,7 +153,7 @@ public class ReportingPlanServiceTests
     [Fact]
     public async Task GetReportingPlanAsync_Annual_ForAFacilityWithNoEntries_ReturnsEmptyRatherThanFailing()
     {
-        _repository.Seed(AnnualEntry(facilityId: "F2"));
+        _repository.Seed(PatientSafetyEntry(facilityId: "F2"));
 
         var plan = await _service.GetReportingPlanAsync(
             ReportingComponents.Ps, "unknown-facility", null, null, 2026, CancellationToken.None);
@@ -189,7 +189,7 @@ public class ReportingPlanServiceTests
     [Fact]
     public async Task SearchAsync_FiltersByComponent()
     {
-        _repository.Seed(Entry(measure: "HOB"), AnnualEntry(measure: "HAI"));
+        _repository.Seed(Entry(measure: "HOB"), PatientSafetyEntry(measure: "HAI"));
 
         var (records, _) = await _service.SearchAsync(
             new ReportingPlanSearchCriteria { Component = ReportingComponents.Ps }, CancellationToken.None);
@@ -345,7 +345,7 @@ public class ReportingPlanServiceTests
     {
         // The support surface is for inspecting what was seeded, so it should show a
         // facility's entries whatever component they belong to.
-        _repository.Seed(Entry(measure: "HOB"), AnnualEntry(measure: "HAI"));
+        _repository.Seed(Entry(measure: "HOB"), PatientSafetyEntry(measure: "HAI"));
 
         var (records, _) = await _service.GetByFacilityAsync("F1", 10, 1, CancellationToken.None);
 
@@ -427,30 +427,15 @@ public class ReportingPlanServiceTests
     // ---------------------------------------------- component and period rules
 
     [Fact]
-    public async Task CreateAsync_ForAMonthlyComponentWithNoMonth_Throws()
+    public async Task CreateAsync_ForAPatientSafetyEntryWithAMonth_Succeeds()
     {
-        // Saved, this row would match no month, so it would be invisible to /msc forever.
-        var act = async () => await _service.CreateAsync(
-            Entry(month: null), CancellationToken.None);
+        // Patient safety is reported monthly like everything else, so a month is required
+        // rather than refused. The path naming itself annual does not make it a yearly
+        // obligation.
+        var created = await _service.CreateAsync(PatientSafetyEntry(month: 5), CancellationToken.None);
 
-        (await act.Should().ThrowAsync<InvalidReportingPlanEntryException>())
-            .WithMessage("*monthly*");
-        _repository.Entries.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task CreateAsync_ForAnAnnualComponentWithAMonth_Throws()
-    {
-        // The mirror failure: /ps/annual/mrp does not filter on month, so a stray month makes
-        // the row appear in the annual plan while looking like a monthly entry in storage.
-        var entry = AnnualEntry();
-        entry.ReportingMonth = 5;
-
-        var act = async () => await _service.CreateAsync(entry, CancellationToken.None);
-
-        (await act.Should().ThrowAsync<InvalidReportingPlanEntryException>())
-            .WithMessage("*annually*");
-        _repository.Entries.Should().BeEmpty();
+        created.ReportingMonth.Should().Be(5);
+        created.Component.Should().Be(ReportingComponents.Ps);
     }
 
     [Theory]
@@ -500,7 +485,7 @@ public class ReportingPlanServiceTests
             {
                 Id = existing.Id,
                 FacilityId = "F1",
-                Component = ReportingComponents.Ps,
+                Component = "XYZ",
                 Measure = "HAI",
                 ReportingMonth = 5,
                 ReportingYear = 2026,
@@ -541,9 +526,9 @@ public class ReportingPlanServiceTests
         // Annual entries have a null month, and NULL compares as a value in the unique
         // index. If the pre-check treated null as "no constraint" the duplicate would slip
         // through to the database and surface as a 500 instead of a 409.
-        _repository.Seed(AnnualEntry());
+        _repository.Seed(PatientSafetyEntry());
 
-        var act = async () => await _service.CreateAsync(AnnualEntry(), CancellationToken.None);
+        var act = async () => await _service.CreateAsync(PatientSafetyEntry(), CancellationToken.None);
 
         await act.Should().ThrowAsync<DuplicateReportingPlanEntryException>();
         _repository.Entries.Should().ContainSingle();
@@ -556,7 +541,7 @@ public class ReportingPlanServiceTests
         // legitimate pair of rows rather than a duplicate.
         _repository.Seed(Entry(measure: "SHARED"));
 
-        await _service.CreateAsync(AnnualEntry(measure: "SHARED"), CancellationToken.None);
+        await _service.CreateAsync(PatientSafetyEntry(measure: "SHARED"), CancellationToken.None);
 
         _repository.Entries.Should().HaveCount(2);
     }
@@ -616,7 +601,6 @@ public class ReportingPlanServiceTests
     [Fact]
     public async Task UpdateAsync_CanMoveAnEntryBetweenComponents()
     {
-        // Changing the component also changes the cadence, so the month has to go with it.
         var existing = Entry();
         _repository.Seed(existing);
 
@@ -627,7 +611,7 @@ public class ReportingPlanServiceTests
                 FacilityId = existing.FacilityId,
                 Component = ReportingComponents.Ps,
                 Measure = existing.Measure,
-                ReportingMonth = null,
+                ReportingMonth = existing.ReportingMonth,
                 ReportingYear = existing.ReportingYear,
                 IsReporting = "Y"
             },
@@ -635,7 +619,7 @@ public class ReportingPlanServiceTests
 
         result.Should().NotBeNull();
         result!.Component.Should().Be(ReportingComponents.Ps);
-        result.ReportingMonth.Should().BeNull();
+        result.ReportingMonth.Should().Be(existing.ReportingMonth);
     }
 
     [Fact]
@@ -716,7 +700,7 @@ public class ReportingPlanServiceTests
     {
         // A teardown between test runs has to leave nothing behind, so it cannot be
         // component-scoped.
-        _repository.Seed(Entry(), AnnualEntry(), Entry(facilityId: "F2"));
+        _repository.Seed(Entry(), PatientSafetyEntry(), Entry(facilityId: "F2"));
 
         var removed = await _service.DeleteByFacilityAsync("F1", CancellationToken.None);
 

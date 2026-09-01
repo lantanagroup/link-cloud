@@ -36,7 +36,7 @@ public class ReportingPlanSemanticsTests
 
     /// <summary>A monthly (MSC) entry.</summary>
     private static ReportingPlanEntryEntity Entry(
-        string facilityId = "F1", string measure = "HOB", int? month = 5, int year = 2026, string isReporting = "Y") =>
+        string facilityId = "F1", string measure = "HOB", int month = 5, int year = 2026, string isReporting = "Y") =>
         new()
         {
             FacilityId = facilityId,
@@ -47,15 +47,16 @@ public class ReportingPlanSemanticsTests
             IsReporting = isReporting
         };
 
-    /// <summary>An annual (PS) entry, which carries no month.</summary>
-    private static ReportingPlanEntryEntity AnnualEntry(
-        string facilityId = "F1", string measure = "HAI", int year = 2026, string isReporting = "Y") =>
+    /// <summary>A patient-safety (PS) entry. Reported monthly, like every other component.</summary>
+    private static ReportingPlanEntryEntity PatientSafetyEntry(
+        string facilityId = "F1", string measure = "HAI", int month = 5, int year = 2026,
+        string isReporting = "Y") =>
         new()
         {
             FacilityId = facilityId,
             Component = ReportingComponents.Ps,
             Measure = measure,
-            ReportingMonth = null,
+            ReportingMonth = month,
             ReportingYear = year,
             IsReporting = isReporting
         };
@@ -81,14 +82,14 @@ public class ReportingPlanSemanticsTests
             ReportingComponents.Msc, facilityId, null, month, year, CancellationToken.None);
     }
 
-    private async Task<IReadOnlyList<ReportingPlanEntryEntity>> AnnualPlanAsync(
-        string facilityId = "F1", int year = 2026)
+    private async Task<IReadOnlyList<ReportingPlanEntryEntity>> PatientSafetyPlanAsync(
+        string facilityId = "F1", int? month = null, int year = 2026)
     {
         using var scope = _fixture.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IReportingPlanService>();
 
         return await service.GetReportingPlanAsync(
-            ReportingComponents.Ps, facilityId, null, null, year, CancellationToken.None);
+            ReportingComponents.Ps, facilityId, null, month, year, CancellationToken.None);
     }
 
     // ------------------------------------------------------ presence semantics
@@ -178,11 +179,11 @@ public class ReportingPlanSemanticsTests
         await SeedAsync(
             Entry(measure: "HOB"),
             Entry(measure: "HTCDI", month: 6),
-            AnnualEntry(measure: "HAI"),
-            AnnualEntry(measure: "SSI"));
+            PatientSafetyEntry(measure: "HAI"),
+            PatientSafetyEntry(measure: "SSI"));
 
         var monthly = await MonthlyPlanAsync(month: 5, year: 2026);
-        var annual = await AnnualPlanAsync(year: 2026);
+        var annual = await PatientSafetyPlanAsync(year: 2026);
 
         monthly.Select(e => e.Measure).Should().BeEquivalentTo("HOB");
         annual.Select(e => e.Measure).Should().BeEquivalentTo("HAI", "SSI");
@@ -194,36 +195,38 @@ public class ReportingPlanSemanticsTests
         // The two components are independent plans. A shared measure name is a legitimate
         // pair of rows, and the unique index must not treat it as a duplicate.
         await _fixture.ResetAsync();
-        await SeedAsync(Entry(measure: "SHARED"), AnnualEntry(measure: "SHARED"));
+        await SeedAsync(Entry(measure: "SHARED"), PatientSafetyEntry(measure: "SHARED"));
 
         (await MonthlyPlanAsync()).Should().ContainSingle();
-        (await AnnualPlanAsync()).Should().ContainSingle();
+        (await PatientSafetyPlanAsync()).Should().ContainSingle();
     }
 
     [Fact]
-    public async Task AnAnnualPlanIgnoresTheMonthEntirely()
+    public async Task APatientSafetyPlanNarrowsByMonthLikeTheMedicinePlan()
     {
-        // Annual entries carry a null month. If the annual query ever gained a month
-        // predicate, NULL would compare unequal to every value and the plan would come
-        // back empty for every request -- a total outage that no unit test over an
-        // in-memory list would necessarily reproduce.
+        // Patient safety is reported monthly, so the month is a real predicate here and not
+        // a parameter that gets dropped. Seeding a second month proves it narrows rather
+        // than returning the whole year.
         await _fixture.ResetAsync();
-        await SeedAsync(AnnualEntry(measure: "HAI"), AnnualEntry(measure: "SSI"));
+        await SeedAsync(
+            PatientSafetyEntry(measure: "HAI", month: 5),
+            PatientSafetyEntry(measure: "SSI", month: 5),
+            PatientSafetyEntry(measure: "CLABSI", month: 6));
 
-        var plan = await AnnualPlanAsync(year: 2026);
+        var plan = await PatientSafetyPlanAsync(month: 5, year: 2026);
 
         plan.Should().HaveCount(2);
-        plan.Should().OnlyContain(e => e.ReportingMonth == null);
+        plan.Should().OnlyContain(e => e.ReportingMonth == 5);
     }
 
     [Fact]
     public async Task AnnualYearsAreIsolatedFromOneAnother()
     {
         await _fixture.ResetAsync();
-        await SeedAsync(AnnualEntry(measure: "HAI"), AnnualEntry(measure: "SSI", year: 2025));
+        await SeedAsync(PatientSafetyEntry(measure: "HAI"), PatientSafetyEntry(measure: "SSI", year: 2025));
 
-        (await AnnualPlanAsync(year: 2026)).Should().ContainSingle();
-        (await AnnualPlanAsync(year: 2025)).Should().ContainSingle();
-        (await AnnualPlanAsync(year: 2024)).Should().BeEmpty();
+        (await PatientSafetyPlanAsync(year: 2026)).Should().ContainSingle();
+        (await PatientSafetyPlanAsync(year: 2025)).Should().ContainSingle();
+        (await PatientSafetyPlanAsync(year: 2024)).Should().BeEmpty();
     }
 }

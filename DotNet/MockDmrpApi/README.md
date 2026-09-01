@@ -368,42 +368,22 @@ the only table this service has to check against. A **blank** facility identifie
 
 An entry stored with `isReporting` other than `"Y"` is excluded from a plan entirely.
 
-An annual plan omits the root `month` from the response, rather than reporting a zero or a
-stale value that would tell a consumer the plan covers one particular month.
+### 4.1 ⚠️ Both components are reported monthly
 
-### 4.1 ⚠️ The cadence rule, and why the service enforces it
+`/ps/annual/mrp` is **not** an annual plan. The `annual` is part of that operation's path and
+says nothing about its cadence: patient safety is reported monthly, exactly like medicine, and
+both plans narrow by `month` the same way.
 
-A monthly component **requires** a reporting month; an annual one **must omit** it. The rule
-is conditional on the component, so no column constraint or `[Range]` annotation can express
-it — `ReportingPlanService` rejects violations with a `400` naming the cadence.
+Every entry therefore **requires** a reporting month, whatever its component. An entry stored
+without one has no period to be reported against, so no plan returns it — the plan simply comes
+back short, with nothing to indicate a row was skipped. `ReportingPlanService` rejects it with a
+`400` rather than letting that happen quietly.
 
-It has to be enforced rather than merely documented, because both failure modes are silent:
+### 4.2 The unique index
 
-- A **PS entry saved with a month** satisfies the unique index perfectly well, and `/ps/annual/mrp`
-  does not filter on month — so the row is returned for every request, looking correct.
-- An **MSC entry saved without one** matches no month, so `/msc` never returns it. The plan
-  simply comes back short, with nothing to indicate a row was skipped.
-
-Neither produces an error anywhere. The only symptom is a reporting plan that is quietly wrong.
-
-### 4.2 ⚠️ The unique index must not be filtered
-
-The natural key is `(facilityId, component, reportingYear, reportingMonth, measure)`.
-
-`ReportingMonth` is nullable, and **EF's default for a unique index over a nullable column is a
-filtered index** — `WHERE [ReportingMonth] IS NOT NULL`. That would drop every annual row out
-of the index and silently permit duplicate patient-safety entries, which is precisely what the
-index exists to prevent. `ReportingPlanEntryMap` suppresses it with `.HasFilter(null)`, and
-`TheUniqueIndexIsNotFiltered` pins that.
-
-SQL Server then treats NULL as a single value in the index and rejects the second annual row
-(error 2601), which is the behaviour wanted: one PS row per (facility, year, measure), one MSC
-row per (facility, year, month, measure).
-
-⚠️ **The integration fixture runs on SQLite, which does not share that behaviour** — it follows
-the standard, where NULLs are distinct, so the index alone does not stop a duplicate annual
-entry there. What holds on both providers is the service's own pre-check, and that is what the
-tests assert.
+The natural key is `(facilityId, component, reportingYear, reportingMonth, measure)`. Every
+column takes part and none of them is nullable, so the index covers every row without needing a
+filter: one entry per facility, component, period and measure.
 
 ### 4.3 Making the contract endpoints answer slowly
 
@@ -457,13 +437,13 @@ B=http://localhost:6159
 # Start clean
 curl -X DELETE $B/api/mock-dmrp/entries
 
-# Enrol facility 100 in HOB for February 2020 -- monthly, so a month is required
+# Enrol facility 100 in HOB for February 2020
 curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
   -d '{"facilityId":"100","component":"MSC","measure":"HOB","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
-# ...and in HAI for 2020 -- annual, so a month must be omitted
+# ...and in HAI for February 2020 -- patient safety is monthly too
 curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
-  -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingYear":2020,"isReporting":"Y"}'
+  -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
 # Acquire a third-party token
 TOKEN=$(curl -s -X POST $B/api/mock-dmrp/oauth2/token -H 'Content-Type: application/json' \
