@@ -59,16 +59,18 @@ namespace LantanaGroup.Link.Tenant.Utils
                 });
             }
 
-            string? updatedSigningKeySecretId = updatedVendor.Authentication?.SigningKeySecretId;
-            if (updatedSigningKeySecretId != existingSigningKeySecretId)
+            char[]? updatedSigningKeySecretId = updatedVendor.Authentication?.SigningKeySecretId?.ToCharArray(); //char array so it can be cleared from memory asap
+            if (updatedSigningKeySecretId?.ToString() != existingSigningKeySecretId)
             {
                 changes.Add(new PropertyChangeModel
                 {
                     PropertyName = nameof(VendorAuthenticationSettings.SigningKeySecretId),
-                    InitialPropertyValue = existingSigningKeySecretId,
-                    NewPropertyValue = updatedSigningKeySecretId
+                    InitialPropertyValue = existingSigningKeySecretId ?? string.Empty,
+                    NewPropertyValue = updatedSigningKeySecretId?.ToString() ?? string.Empty
                 });
             }
+            if(updatedSigningKeySecretId != null)
+                Array.Clear(updatedSigningKeySecretId);
 
             if (changes.Count == 0)
             {

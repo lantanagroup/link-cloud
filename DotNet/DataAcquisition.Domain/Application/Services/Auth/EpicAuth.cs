@@ -133,13 +133,18 @@ public class EpicAuth : IAuth
             return authSettings.Key;
         }
 
-        var vendorSecretName = await _tenantApiService.GetVendorSigningKeySecretId(facilityId, cancellationToken);
+        //char array so it can be cleared from memory asap
+        var vendorSecretName = (await _tenantApiService.GetVendorSigningKeySecretId(facilityId, cancellationToken))?.ToCharArray();
 
-        var pemName = string.IsNullOrWhiteSpace(vendorSecretName)
-            ? $"{facilityId}{PemSuffix}"
+        var pemName = vendorSecretName == null || vendorSecretName.Length == 0
+            ? $"{facilityId}{PemSuffix}".ToCharArray()
             : vendorSecretName;
 
-        var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
+        var resolvedPem = await _secretManager.GetSecretAsync(pemName?.ToString() ?? "", CancellationToken.None);
+        if(pemName != null)
+        {
+            Array.Clear(pemName);
+        }
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
             throw new InvalidOperationException(

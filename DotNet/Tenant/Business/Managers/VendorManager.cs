@@ -204,7 +204,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             }
             
             string? previousName = existingVendor.Name;
-            string? previousSigningKeySecretId = existingVendor.Authentication?.SigningKeySecretId;
+            char[]? previousSigningKeySecretId = existingVendor.Authentication?.SigningKeySecretId?.ToCharArray(); //char array so it can be cleared from memory asap
 
             existingVendor.Name = vendor.Name ?? existingVendor.Name;
 
@@ -214,7 +214,11 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             AuditEventMessage? auditEvent =
-                Helper.UpdateVendorAuditEvent(existingVendor, previousName, previousSigningKeySecretId);
+                Helper.UpdateVendorAuditEvent(existingVendor, previousName, previousSigningKeySecretId?.ToString());
+            if (previousSigningKeySecretId != null)
+            {
+                Array.Clear(previousSigningKeySecretId);
+            }
             if (auditEvent != null)
             {
                 _createAuditEventCommand.Execute(existingVendor.Id.ToString(), auditEvent, cancellationToken);
