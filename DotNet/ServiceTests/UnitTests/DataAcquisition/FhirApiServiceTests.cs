@@ -1102,7 +1102,7 @@ public class FhirApiServiceTests
         Assert.Equal(3, ids.Count);
         VerifyInformationLog(logger, "Log 935585 retrieving paged results: starting Observation search", Times.Once());
         VerifyInformationLog(logger, "Log 935585 retrieving paged results: Observation page 1 (2 resources this page, 2 total so far, fetching next page)", Times.Once());
-        VerifyInformationLog(logger, "Log 935585 retrieving paged results: Observation page 2 (1 resources this page, 3 total so far, last page)", Times.Once());
+        VerifyInformationLog(logger, "Log 935585 retrieving paged results: Observation page 2 (1 resource this page, 3 total so far, last page)", Times.Once());
     }
 
     [Fact]
@@ -1188,6 +1188,49 @@ public class FhirApiServiceTests
 
         Assert.NotNull(capturedSearchParams);
         Assert.Equal(50, capturedSearchParams.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_QueryPagedOverridesConfiguredPageSize()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        SearchParams? capturedSearchParams = null;
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<SearchFhirCommandRequest, CancellationToken>((request, _) => capturedSearchParams = request.searchParams)
+            .Returns(GetBundleAsync(new Bundle { Entry = [] }));
+
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService(),
+            Options.Create(new FhirSearchSettings { PageSize = 50 })
+        );
+
+        await service.ExecuteSearch(
+            new DataAcquisitionLogModel
+            {
+                FacilityId = "fac-1",
+                CorrelationId = "corr-1",
+                ScheduledReport = new ScheduledReport(),
+                ReportableEvent = ReportableEvent.Adhoc
+            },
+            new FhirQueryModel
+            {
+                IsReference = false,
+                Paged = 25,
+                QueryParameters = ["patient=Patient-1"],
+                ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+            },
+            new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" },
+            ResourceType.Observation);
+
+        Assert.NotNull(capturedSearchParams);
+        Assert.Equal(25, capturedSearchParams.Count);
     }
 
     [Fact]

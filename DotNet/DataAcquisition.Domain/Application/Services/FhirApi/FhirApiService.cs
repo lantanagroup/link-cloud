@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -247,9 +248,12 @@ public class FhirApiService : IFhirApiService
         ApplySearchPageSize(searchParams, fhirQuery);
         var pageNumber = 0;
         _logger.LogInformation(
-            "Log {LogId} retrieving paged results: starting {ResourceType} search",
-            log.Id,
-            resourceType);
+            "Log {LogId} retrieving paged results: starting {ResourceType} search facility={FacilityId} correlationId={CorrelationId} report={ReportTrackingId}",
+            log.Id.SanitizeForLog(),
+            resourceType.SanitizeForLog(),
+            log.FacilityId.SanitizeForLog(),
+            log.CorrelationId.SanitizeForLog(),
+            log.ReportTrackingId.SanitizeForLog());
         try
         {
             await foreach (var bundle in _searchFhirCommand.ExecuteAsync(
@@ -340,14 +344,19 @@ public class FhirApiService : IFhirApiService
 
                 pageNumber++;
                 var hasNextPage = bundle.Link?.Exists(link => link.Relation == "next") == true;
+                var resourceLabel = resources.Count == 1 ? "resource" : "resources";
                 _logger.LogInformation(
-                    "Log {LogId} retrieving paged results: {ResourceType} page {PageNumber} ({PageResourceCount} resources this page, {CumulativeCount} total so far, {PagingStatus})",
-                    log.Id,
-                    resourceType,
+                    "Log {LogId} retrieving paged results: {ResourceType} page {PageNumber} ({PageResourceCount} {ResourceLabel} this page, {CumulativeCount} total so far, {PagingStatus}) facility={FacilityId} correlationId={CorrelationId} report={ReportTrackingId}",
+                    log.Id.SanitizeForLog(),
+                    resourceType.SanitizeForLog(),
                     pageNumber,
                     resources.Count,
+                    resourceLabel,
                     resourceIds.Count,
-                    hasNextPage ? "fetching next page" : "last page");
+                    hasNextPage ? "fetching next page" : "last page",
+                    log.FacilityId.SanitizeForLog(),
+                    log.CorrelationId.SanitizeForLog(),
+                    log.ReportTrackingId.SanitizeForLog());
             }
 
             return resourceIds;

@@ -695,7 +695,10 @@ public class LokiScraper
         }
     }
 
-    public async Task<string?> GetDataAcquisitionActivitySummaryAsync(TimeSpan lookback)
+    public async Task<string?> GetDataAcquisitionActivitySummaryAsync(
+        TimeSpan lookback,
+        string? facilityId = null,
+        string? reportId = null)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -704,6 +707,10 @@ public class LokiScraper
 
         var query =
             $"{{app=\"{_lokiAppLabel}\", component=~\"DataAcquisition.*\"}} |= \"{DataAcquisitionPagingActivity.LogToken}\"";
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            query += $" |= \"{facilityId}\"";
+        if (!string.IsNullOrWhiteSpace(reportId))
+            query += $" |= \"{reportId}\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);

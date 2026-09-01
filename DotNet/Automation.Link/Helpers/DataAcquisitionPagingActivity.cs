@@ -85,7 +85,7 @@ public static class DataAcquisitionPagingActivity
             return;
 
         var resourceType = line[typeStart..searchIdx].Trim();
-        if (!string.IsNullOrWhiteSpace(resourceType) && resourceType.Length <= 40)
+        if (IsValidResourceType(resourceType))
             resourceTypes.Add(resourceType);
     }
 
@@ -107,9 +107,14 @@ public static class DataAcquisitionPagingActivity
             return;
 
         var resourceType = line[(colonIdx + 1)..pageIdx].Trim();
-        if (!string.IsNullOrWhiteSpace(resourceType) && resourceType.Length <= 40)
+        if (IsValidResourceType(resourceType))
             resourceTypes.Add(resourceType);
     }
+
+    private static bool IsValidResourceType(string value)
+        => !string.IsNullOrWhiteSpace(value)
+           && value.Length <= 40
+           && value.All(c => c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z'));
 
     private static void ParseCumulative(string line, ref int maxCumulative)
     {

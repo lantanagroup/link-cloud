@@ -85,12 +85,12 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
-        await CheckPipelineActivityAsync();
+        await CheckPipelineActivityAsync(facilityId, reportId);
 
         return hasCriticalFailure;
     }
 
-    private async Task CheckPipelineActivityAsync()
+    private async Task CheckPipelineActivityAsync(string facilityId, string reportId)
     {
         if (_lokiScraper == null)
             return;
@@ -105,7 +105,10 @@ public class ProgressMonitor
             _lastMeasureEvalActivity = measureEvalActivity;
         }
 
-        var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(
+            TimeSpan.FromSeconds(60),
+            facilityId,
+            reportId);
         if (!string.IsNullOrWhiteSpace(dataAcquisitionActivity))
         {
             _acquisitionActivity.MarkProgress(DateTime.UtcNow);

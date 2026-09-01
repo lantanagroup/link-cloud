@@ -38,6 +38,18 @@ public class DataAcquisitionPagingActivityTests
     }
 
     [Fact]
+    public void Summarize_ignores_non_letter_resource_types()
+    {
+        var summary = DataAcquisitionPagingActivity.Summarize(
+            ["Log 1 retrieving paged results: starting Observation\ninjected search"],
+            TimeSpan.FromSeconds(60));
+
+        summary.Should().NotBeNull();
+        summary.Should().NotContain("injected");
+        summary.Should().NotContain("Observation\ninjected");
+    }
+
+    [Fact]
     public void Summarize_multiple_logs_lists_ids_and_max_page()
     {
         var summary = DataAcquisitionPagingActivity.Summarize(

@@ -11,8 +11,9 @@ public static class FhirSearchLimits
     public const int MaxIdsPerParameter = 100;
 
     /// <summary>
-    /// If one query parameter value has more than <paramref name="maxIds"/>
-    /// comma-separated tokens, return one copy of the parameter list per chunk.
+    /// If any query parameter value has more than <paramref name="maxIds"/>
+    /// comma-separated tokens, split every oversized parameter into chunks and
+    /// return the cartesian product of those chunks (FHIR ANDs distinct params).
     /// Other parameters are copied onto every batch.
     /// </summary>
     public static List<List<string>> SplitOversizedIdParameters(
@@ -26,8 +27,7 @@ public static class FhirSearchLimits
         if (parameters.Count == 0)
             return [[]];
 
-        var oversizedIndex = -1;
-        string[]? oversizedTokens = null;
+        var oversized = new List<(int Index, string Key, string[] Tokens)>();
         for (var i = 0; i < parameters.Count; i++)
         {
             var parts = SplitKeyValue(parameters[i]);
@@ -36,27 +36,27 @@ public static class FhirSearchLimits
 
             var tokens = parts.Value.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (tokens.Length > maxIds)
-            {
-                oversizedIndex = i;
-                oversizedTokens = tokens;
-                break;
-            }
+                oversized.Add((i, parts.Value.Key, tokens));
         }
 
-        if (oversizedIndex < 0 || oversizedTokens == null)
+        if (oversized.Count == 0)
             return [parameters];
 
-        var key = SplitKeyValue(parameters[oversizedIndex])!.Value.Key;
-        var batches = new List<List<string>>();
-        foreach (var chunk in oversizedTokens.Chunk(maxIds))
+        var batches = new List<List<string>> { parameters };
+        foreach (var (index, key, tokens) in oversized)
         {
-            var batch = new List<string>(parameters.Count);
-            for (var i = 0; i < parameters.Count; i++)
+            var next = new List<List<string>>();
+            foreach (var batch in batches)
             {
-                batch.Add(i == oversizedIndex ? $"{key}={string.Join(',', chunk)}" : parameters[i]);
+                foreach (var chunk in tokens.Chunk(maxIds))
+                {
+                    var copy = new List<string>(batch);
+                    copy[index] = $"{key}={string.Join(',', chunk)}";
+                    next.Add(copy);
+                }
             }
 
-            batches.Add(batch);
+            batches = next;
         }
 
         return batches;
