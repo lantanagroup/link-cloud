@@ -81,6 +81,7 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             builder.Services.AddHttpClient(DmrpApiClient.HttpClientName);
             builder.Services.AddSingleton<IDmrpApiTokenProvider, DmrpApiTokenProvider>();
             builder.Services.AddScoped<IDmrpApiClient, DmrpApiClient>();
+            builder.Services.AddScoped<IDmrpReportingPlanSync, DmrpReportingPlanSync>();
 
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.
