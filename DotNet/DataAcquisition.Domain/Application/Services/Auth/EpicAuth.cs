@@ -143,14 +143,14 @@ public class EpicAuth : IAuth
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
             throw new InvalidOperationException(
-                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
+                $"Authentication configuration is incomplete or the signing key could not be resolved.");
 
         return resolvedPem;
     }
 
     private SigningCredentials? TryGetECDsaSigningCredentials(string pem)
     {
-        ECDsa ecdsa = ECDsa.Create();
+        using ECDsa ecdsa = ECDsa.Create();
         try
         {
             ecdsa.ImportFromPem(pem);
@@ -175,7 +175,7 @@ public class EpicAuth : IAuth
 
     private SigningCredentials? TryGetRSASigningCredentials(string pem)
     {
-        RSA rsa = RSA.Create();
+        using RSA rsa = RSA.Create();
         try
         {
             rsa.ImportFromPem(pem);
