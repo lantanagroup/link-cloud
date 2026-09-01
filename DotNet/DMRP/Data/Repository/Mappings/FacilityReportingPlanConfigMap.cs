@@ -26,6 +26,12 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
         /// </summary>
         public const int ComponentMaxLength = 20;
 
+        /// <summary>
+        /// Matches the length the measure mappings themselves allow, so a measure name that can be
+        /// mapped can also be recorded against an enrollment.
+        /// </summary>
+        public const int MeasureMaxLength = 255;
+
         public void Configure(EntityTypeBuilder<FacilityReportingPlan> builder)
         {
             builder.ToTable("FacilityReportingPlans");
@@ -36,9 +42,15 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
                 .IsRequired()
                 .HasMaxLength(FacilityIdMaxLength);
 
+            // Optional: an enrollment is recorded whether or not Link has a mapping for its
+            // measure yet.
             builder.Property(p => p.MeasureMappingId)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(MeasureMappingIdMaxLength);
+
+            builder.Property(p => p.Measure)
+                .IsRequired()
+                .HasMaxLength(MeasureMaxLength);
 
             builder.Property(p => p.Component)
                 .IsRequired()
@@ -55,10 +67,14 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
                 .HasForeignKey(p => p.MeasureMappingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // "Each entry should have a unique combination of FacilityId, MeasureMappingId,
-            // ReportMonth and ReportYear" - enforced here so concurrent writers cannot both pass the
-            // manager's pre-check and insert a duplicate.
-            builder.HasIndex(p => new { p.FacilityId, p.MeasureMappingId, p.ReportingMonth, p.ReportingYear })
+            // One enrollment per facility, component, measure and period - enforced here so
+            // concurrent writers cannot both pass the manager's pre-check and insert a duplicate.
+            //
+            // Keyed on the measure rather than on the mapping. The mapping is optional, and a
+            // nullable column in the key would both leave unmapped rows unconstrained and change
+            // what "duplicate" means the moment an admin mapped one. The measure is what DMRP
+            // actually returns, and it is what stays constant.
+            builder.HasIndex(p => new { p.FacilityId, p.Component, p.Measure, p.ReportingYear, p.ReportingMonth })
                 .IsUnique()
                 .HasDatabaseName(UniquePeriodIndexName);
 

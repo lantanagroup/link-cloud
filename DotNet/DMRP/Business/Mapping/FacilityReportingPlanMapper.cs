@@ -16,9 +16,11 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             ReportingYear = entity.ReportingYear,
             IsReporting = entity.IsReporting,
 
-            // Filled only when the caller loaded the navigation (the per-facility read does);
-            // reads that never touch the mapping leave them null rather than costing a join.
-            Measure = entity.MeasureMapping?.Measure,
+            // The measure is stored on the row, so it answers even for an enrollment Link has
+            // no mapping for. The dQM and frequency are the mapping's, and stay null until one
+            // exists - and until then reads that never load the navigation leave them null
+            // rather than costing a join.
+            Measure = entity.Measure,
             DQM = entity.MeasureMapping?.DQM,
             Frequency = entity.MeasureMapping?.Frequency,
 
@@ -39,7 +41,12 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
         public static FacilityReportingPlan ToEntity(FacilityReportingPlanRequest request) => new()
         {
             FacilityId = request.FacilityId?.Sanitize() ?? string.Empty,
-            MeasureMappingId = request.MeasureMappingId?.Sanitize() ?? string.Empty,
+
+            // Blank becomes null rather than an empty string: an absent mapping is the state of
+            // an enrollment nobody has mapped yet, and an empty foreign key is not a value the
+            // column can hold.
+            MeasureMappingId = NullIfBlank(request.MeasureMappingId?.Sanitize()),
+            Measure = request.Measure?.Sanitize() ?? string.Empty,
 
             // Defaulted rather than required: every enrollment recorded before components existed
             // came from the medicine operation, and a caller that does not know about components
@@ -50,5 +57,8 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             ReportingYear = request.ReportingYear,
             IsReporting = request.IsReporting
         };
+
+        private static string? NullIfBlank(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

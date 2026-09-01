@@ -38,8 +38,8 @@ namespace UnitTests.DMRP
                 .ReturnsAsync(true);
 
             _mockMeasureMappingRepository
-                .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(true);
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new MeasureMapping { Measure = "HOB", DQM = "dqm-HOB" });
 
             _mockRepository
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
@@ -57,6 +57,7 @@ namespace UnitTests.DMRP
         {
             FacilityId = FacilityId,
             MeasureMappingId = Guid.NewGuid().ToString(),
+            Measure = "HOB",
             ReportingMonth = 5,
             ReportingYear = 2026,
             IsReporting = true
@@ -100,17 +101,46 @@ namespace UnitTests.DMRP
         [Theory]
         [InlineData("")]
         [InlineData(null)]
-        public async Task CreateAsync_MissingMeasureMappingId_IsRejected(string? measureMappingId)
+        public async Task CreateAsync_NoMappingAndNoMeasure_IsRejected(string? measureMappingId)
         {
+            // The mapping is optional, but something has to say what the facility is enrolled in.
+            // With neither, the row could not be mapped later either.
             var plan = ValidPlan();
-            plan.MeasureMappingId = measureMappingId!;
+            plan.MeasureMappingId = measureMappingId;
+            plan.Measure = string.Empty;
 
             var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
-            Assert.Equal("MeasureMappingId is required.", ex.Message);
+            Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", ex.Message);
         }
 
         [Fact]
-        public async Task UpdateAsync_MissingMeasureMappingId_IsRejectedAndLeavesTheRowAlone()
+        public async Task CreateAsync_NoMappingButAMeasure_IsAccepted()
+        {
+            // DMRP returns measures Link may have no mapping for yet. The enrollment is recorded
+            // so an admin can map it afterwards, rather than being dropped.
+            var plan = ValidPlan();
+            plan.MeasureMappingId = null;
+            plan.Measure = "HOB";
+
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Null(result.MeasureMappingId);
+            Assert.Equal("HOB", result.Measure);
+        }
+
+        [Fact]
+        public async Task CreateAsync_AMappingWithNoMeasure_TakesTheMeasureFromTheMapping()
+        {
+            var plan = ValidPlan();
+            plan.Measure = string.Empty;
+
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal("HOB", result.Measure);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_NoMappingAndNoMeasure_IsRejectedAndLeavesTheRowAlone()
         {
             var existing = ValidPlan();
 
@@ -119,11 +149,12 @@ namespace UnitTests.DMRP
 
             var update = ValidPlan();
             update.MeasureMappingId = string.Empty;
+            update.Measure = string.Empty;
 
             var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.UpdateAsync(existing.Id, update));
-            Assert.Equal("MeasureMappingId is required.", ex.Message);
+            Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", ex.Message);
 
-            Assert.NotEmpty(existing.MeasureMappingId);
+            Assert.NotEmpty(existing.Measure);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -159,8 +190,8 @@ namespace UnitTests.DMRP
         public async Task CreateAsync_UnknownMeasureMapping_IsRejected()
         {
             _mockMeasureMappingRepository
-                .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(false);
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((MeasureMapping?)null);
 
             var plan = ValidPlan();
 

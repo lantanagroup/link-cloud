@@ -73,6 +73,7 @@ namespace UnitTests.DMRP
             {
                 FacilityId = facilityId,
                 MeasureMappingId = mapping.Id,
+                Measure = mapping.Measure,
                 ReportingMonth = month,
                 ReportingYear = year,
                 IsReporting = isReporting
@@ -398,16 +399,23 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task AMeasureMappingWithReportingPlans_CannotBeDeleted()
+        public async Task RemovingAMeasureMappingLeavesItsReportingPlansUnmapped()
         {
+            // The foreign key is optional now, so EF severs the relationship rather than refusing
+            // the delete: the enrollments survive with no mapping, which is the same state a
+            // measure Link has never mapped is in. What stops an in-use mapping being deleted at
+            // all is the manager's own check, covered by MeasureMappingManagerTests.
             using var context = CreateContext();
             var mapping = AddMapping(context);
             AddPlan(context, mapping);
             await context.SaveChangesAsync();
 
             context.MeasureMappings.Remove(mapping);
+            await context.SaveChangesAsync();
 
-            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+            var plan = await context.FacilityReportingPlans.SingleAsync();
+            Assert.Null(plan.MeasureMappingId);
+            Assert.Equal(mapping.Measure, plan.Measure);
         }
     }
 }

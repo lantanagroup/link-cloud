@@ -82,6 +82,7 @@ namespace UnitTests.DMRP
             {
                 FacilityId = FacilityId,
                 MeasureMappingId = mapping.Id,
+                Measure = mapping.Measure,
                 ReportingMonth = period.Month,
                 ReportingYear = period.Year,
                 IsReporting = isReporting
@@ -275,8 +276,8 @@ namespace UnitTests.DMRP
             var page = await CreateLookAhead(context).GetAsync(FacilityId, null, Anchor);
 
             var measure = Assert.Single(Assert.Single(page.Records).Measures);
-            Assert.Null(measure.Measure);
-            Assert.Equal(mapping.Id, measure.MeasureMappingId);
+            Assert.Equal("HOB", measure.Measure);
+            Assert.Null(measure.DQM);
         }
 
         [Fact]

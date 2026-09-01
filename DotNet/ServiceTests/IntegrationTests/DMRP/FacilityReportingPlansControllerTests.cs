@@ -185,15 +185,32 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFacilityReportingPlan_NullMeasureMappingId_ReturnsBadRequest()
+    public async Task CreateFacilityReportingPlan_NoMappingAndNoMeasure_ReturnsBadRequest()
     {
         var request = await ValidRequestAsync();
         request.MeasureMappingId = null;
+        request.Measure = null;
 
         var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
-        Assert.Equal("MeasureMappingId is required.", problem.Detail);
+        Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task CreateFacilityReportingPlan_NoMappingButAMeasure_RecordsTheEnrollmentUnmapped()
+    {
+        // DMRP returns measures Link may have no mapping for. The enrollment is recorded anyway,
+        // so it is visible to the admin who will map it rather than dropped on the way in.
+        var request = await ValidRequestAsync();
+        request.MeasureMappingId = null;
+        request.Measure = "UNMAPPED-MEASURE";
+
+        var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
+
+        var created = Assert.IsType<FacilityReportingPlanModel>(Assert.IsType<CreatedResult>(result).Value);
+        Assert.Null(created.MeasureMappingId);
+        Assert.Equal("UNMAPPED-MEASURE", created.Measure);
     }
 
     [Fact]
