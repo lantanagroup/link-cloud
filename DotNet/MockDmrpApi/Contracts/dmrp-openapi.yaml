@@ -62,14 +62,14 @@ info:
     `plans` array - not `204`, and not `404`. An empty plan is a
     meaningful answer, not an absent resource.
 
-    ## The same value appears twice, with two types
+    ## The facility appears twice, with two types
 
-    `month` and `year` are NUMERIC on the root object and STRINGS inside
-    `plans`, and the facility is `orgid` (numeric) at the root but
-    `nhsnorgid` (string) inside `plans`. This stand-in reproduces that
-    faithfully. Normalising it would let a consumer write code that works here
-    and fails against the real endpoint, which is precisely what this service
-    exists to prevent.
+    `month` and `year` are numeric both on the root object and inside `plans`.
+    The facility is the one value that is not: `orgid` (numeric) at the root
+    but `nhsnorgid` (string) inside `plans`. This stand-in reproduces that
+    asymmetry faithfully. Normalising it would let a consumer write code that
+    works here and fails against the real endpoint, which is precisely what
+    this service exists to prevent.
 
 servers:
   - url: http://localhost:6159
@@ -241,7 +241,7 @@ components:
           description: |
             The year the result was narrowed to, echoed from the request. Null
             when no year was supplied, in which case `plans` may span several
-            years. NUMERIC here, a string inside `plans`.
+            years. Numeric here and inside `plans` alike.
           example: 2020
         month:
           type: integer
@@ -249,7 +249,7 @@ components:
           nullable: true
           description: |
             The month the result was narrowed to, echoed from the request. Null
-            when no month was supplied. NUMERIC here, a string inside `plans`.
+            when no month was supplied. Numeric here and inside `plans` alike.
           example: 2
         modifyDate:
           type: string

@@ -49,11 +49,11 @@ The two contract endpoints differ in **subject and in cadence**:
 | Endpoint | Component | Subject | Cadence |
 |---|---|---|---|
 | `GET /msc` | `MSC` | Medicine reports | Monthly |
-| `GET /ps/annual/mrp` | `PS` | Patient safety | Annual |
+| `GET /ps/annual/mrp` | `PS` | Patient safety | Monthly |
 
-That cadence difference reaches the schema: `ReportingMonth` is **nullable**, populated for
-MSC and null for PS. Whether it is required depends on the component, which no column
-constraint or range annotation can express, so the service enforces it — see §4.1.
+Both components share that cadence, so `ReportingMonth` is **required** on every entry
+whatever its component, and the `annual` in the patient-safety path says nothing about how
+often it is reported — see §4.1.
 
 ⚠️ **The strings `"MSC"` and `"PS"` are our invention,** as is the response body. Both are
 cheap to change while nothing is deployed.
@@ -75,9 +75,9 @@ Two things about this are easy to get wrong:
   not a whole number — or a month outside 1–12 — is a `400` rather than a filter that quietly
   matches nothing. A typo must not read as "enrolled in nothing", which is the one conclusion
   this API exists to convey.
-- **`month` has no effect on `/ps/annual/mrp`.** Annual entries carry no month, so narrowing by one
-  would exclude every row the endpoint is supposed to return. It is accepted for symmetry and
-  ignored, and the response omits `reportingMonth` regardless.
+- **`month` narrows `/ps/annual/mrp` exactly as it narrows `/msc`.** Patient safety is reported
+  monthly, so the month is a real predicate on both routes rather than a parameter one of them
+  accepts and drops. See §4.1.
 
 The optional parameters are why `DmrpController` restates them as `string?`; see the second
 trap in §2.7.
@@ -288,7 +288,7 @@ Authenticated with the **third party's** bearer token, from `POST /api/mock-dmrp
 | Route | Purpose |
 |---|---|
 | `GET /msc?nhsnorgid=&name=&year=&month=` | Monthly medicine reporting plan (`MSC`) |
-| `GET /ps/annual/mrp?nhsnorgid=&name=&year=&month=` | Annual patient-safety reporting plan (`PS`) |
+| `GET /ps/annual/mrp?nhsnorgid=&name=&year=&month=` | Monthly patient-safety reporting plan (`PS`) |
 
 Only `nhsnorgid` is required. `name`, `year` and `month` each narrow the result when supplied
 and are ignored when not, so a caller passing only `nhsnorgid` gets the facility's whole plan
@@ -347,7 +347,7 @@ Seed only `HOB` for facility `100`, February 2020, then `GET /msc?nhsnorgid=100&
   "modifyDate": "2023-09-09 11:12:12.59",
   "createDate": "2023-09-09 11:12:12.59",
   "plans": [
-    { "name": "HOB", "nhsnorgid": "100", "month": "2", "year": "2020", "reporting": "Y", "rptSeq": 0 }
+    { "name": "HOB", "nhsnorgid": "100", "month": 2, "year": 2020, "reporting": "Y", "rptSeq": 0 }
   ]
 }
 ```
