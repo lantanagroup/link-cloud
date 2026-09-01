@@ -27,6 +27,22 @@ public class FacilityReportingPlanModel
     /// </summary>
     public bool IsReporting { get; set; }
 
+    /// <summary>
+    /// The NHSN measure of the mapping this plan reports against. Populated by reads that resolve
+    /// the mapping (the per-facility view); null elsewhere.
+    /// </summary>
+    public string? Measure { get; set; }
+
+    /// <summary>
+    /// The digital quality measure the mapping evaluates. Populated alongside <see cref="Measure"/>.
+    /// </summary>
+    public string? DQM { get; set; }
+
+    /// <summary>
+    /// The reporting cadence the mapping carries. Populated alongside <see cref="Measure"/>.
+    /// </summary>
+    public Frequency? Frequency { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
