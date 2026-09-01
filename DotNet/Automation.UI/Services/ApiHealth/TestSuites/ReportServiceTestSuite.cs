@@ -182,6 +182,46 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
         const string scheduleUnavailableReason = "Report seed was unavailable. This lifecycle test requires seed-owned schedule data from the seeding phase.";
         const string seededDataUnavailableReason = "Seeded schedule data was available, but dependent entry/resource/population payloads were not yet materialized.";
 
+        // === GET /api/schedules/summaries ===
+        results.Add(await RunStepAsync(StepNames.ReportSummaries200, 200, async () =>
+            await _client.GetReportSummariesAsync(fakeFacilityId, cancellationToken: ct), ct: ct));
+
+        await AddSeededOrSkipAsync(
+            scheduleFacilityId != null,
+            StepNames.ReportSummaries200HasData,
+            200,
+            async () =>
+            {
+                var response = await _client.GetReportSummariesAsync(scheduleFacilityId, cancellationToken: ct);
+                if (response.IsSuccessStatusCode && response.Body?.Records is not { Count: > 0 })
+                {
+                    throw new InvalidOperationException("Expected the seeded facility to have at least one report summary.");
+                }
+
+                return response;
+            },
+            scheduleUnavailableReason);
+
+        // === GET /api/schedules/{id}/summary ===
+        await AddSeededOrSkipAsync(
+            scheduleId != null,
+            StepNames.ReportSummaryGet200HasData,
+            200,
+            async () =>
+            {
+                var response = await _client.GetReportSummaryAsync(scheduleId!, ct);
+                if (response.IsSuccessStatusCode && response.Body is null)
+                {
+                    throw new InvalidOperationException("The report summary endpoint returned no summary for the seeded schedule.");
+                }
+
+                return response;
+            },
+            scheduleUnavailableReason);
+
+        results.Add(await RunStepAsync(StepNames.ReportSummaryGet404, 404, async () =>
+            await _client.GetReportSummaryAsync(fakeReportId, ct), ct: ct));
+
         await AddSeededOrSkipAsync(
             scheduleId != null,
             StepNames.GetSchedule200HasData,
