@@ -1,25 +1,48 @@
 .fhir-server-info {
   --fhir-blue: var(--kendo-color-primary, #0057b7);
   --fhir-blue-dark: var(--kendo-color-primary-hover, #032659);
-  --fhir-green: var(--kendo-color-success, #1e5f25);
+  --fhir-green: #00c853;
   --fhir-red: var(--kendo-color-error, #cc1b22);
   --fhir-gray-50: var(--kendo-color-surface, #f7f9fc);
   --fhir-gray-100: var(--kendo-color-base-hover, #f2f4f7);
   --fhir-gray-200: var(--kendo-color-border, #d0d7de);
   --fhir-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
   --fhir-gray-800: var(--kendo-color-app-text, #1f2328);
-  --fhir-radius: 10px;
+  --fhir-radius: 8px;
 
   color: var(--fhir-gray-800);
   font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .fhir-server-info .card {
   background: var(--kendo-color-app-surface, #ffffff);
   border: 1px solid var(--fhir-gray-200);
-  border-radius: 10px;
-  padding: 28px 32px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-radius: var(--fhir-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.fhir-server-info .card-scroll {
+  padding: 0 32px 28px;
+  border-radius: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.fhir-server-info .card-scroll > * {
+  flex-shrink: 0;
 }
 
 .fhir-server-info .page-header {
@@ -32,6 +55,10 @@
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 6px;
+}
+
+.fhir-server-info .page-header-title:focus {
+  outline: none;
 }
 
 .fhir-server-info .page-header-buttons {
@@ -82,13 +109,17 @@
   font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
-  cursor: help;
+  cursor: pointer;
   position: relative;
   vertical-align: middle;
 }
 
-.fhir-server-info .info-icon:hover,
 .fhir-server-info .info-icon:focus-visible {
+  outline: 2px solid var(--fhir-blue);
+  outline-offset: 2px;
+}
+
+.fhir-server-info .info-icon.info-icon--open {
   background: var(--fhir-blue);
   color: var(--kendo-color-on-inverse, #ffffff);
   outline: none;
@@ -110,7 +141,7 @@
   width: max-content;
   max-width: 280px;
   padding: 9px 11px;
-  border-radius: 10px;
+  border-radius: var(--fhir-radius);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   z-index: 200;
 }
@@ -125,8 +156,7 @@
   border-top-color: var(--fhir-gray-800);
 }
 
-.fhir-server-info .info-icon:hover .tooltip-bubble,
-.fhir-server-info .info-icon:focus-visible .tooltip-bubble {
+.fhir-server-info .info-icon.info-icon--open .tooltip-bubble {
   display: block;
 }
 
@@ -149,43 +179,39 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
-  padding: 9px 14px;
-  border: 1px solid var(--fhir-gray-200);
-  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--fhir-blue);
+  border-radius: var(--fhir-radius);
   text-decoration: none;
-  color: var(--fhir-blue-dark);
+  color: var(--fhir-blue);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14px;
   background: var(--kendo-color-app-surface, #ffffff);
 }
 
 .fhir-server-info .download-link:hover {
-  border-color: var(--fhir-blue);
-  background: var(--fhir-gray-50);
+  background: var(--fhir-gray-100);
+}
+
+.fhir-server-info .card .nhsn-link__step-actions {
+  position: static;
+  margin-top: 0;
+  padding: 16px 32px 28px;
 }
 
 .fhir-server-info .triplet {
   display: flex;
-  gap: 12px;
+  gap: 1rem;
 }
 
 .fhir-server-info .triplet .k-form-field {
   flex: 1;
 }
 
-.fhir-server-info .nhsn-link__step-actions {
-  gap: 10px;
-  margin-top: 24px;
-  padding-top: 0;
-  border-top: none;
-  flex-wrap: wrap;
-}
-
 .fhir-server-info .fhir-test-result {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 18px;
   font-weight: 600;
   font-size: 14px;
 }
@@ -211,6 +237,23 @@
   background: var(--fhir-red);
 }
 
+.fhir-server-info .result-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2.5px solid var(--fhir-gray-200);
+  border-top-color: var(--fhir-blue);
+  border-radius: 50%;
+  animation: fhir-test-spin 0.7s linear infinite;
+}
+
+@keyframes fhir-test-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .fhir-server-info .k-form-field {
   position: relative;
   margin-bottom: 18px;
@@ -231,7 +274,7 @@
 .fhir-server-info .k-input,
 .fhir-server-info .k-numerictextbox {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--fhir-radius);
   background: var(--kendo-color-app-surface, #ffffff);
 }
 
@@ -280,12 +323,11 @@
   color: var(--fhir-gray-600);
   font-size: 10.5px;
   font-weight: 700;
-  cursor: help;
+  cursor: pointer;
   anchor-name: --fhir-hint-badge;
 }
 
-.fhir-server-info .k-form-field:has(.k-form-hint) .k-label:hover::after,
-.fhir-server-info .k-form-field:has(.k-form-hint) .k-label:focus-within::after {
+.fhir-server-info .k-form-field--hint-open .k-label::after {
   background: var(--fhir-blue);
   color: var(--kendo-color-on-inverse, #ffffff);
 }
@@ -304,7 +346,6 @@
   }
 }
 
-.fhir-server-info .k-label:hover ~ .k-form-hint,
-.fhir-server-info .k-label:focus-within ~ .k-form-hint {
+.fhir-server-info .k-form-field--hint-open .k-form-hint {
   display: block;
 }

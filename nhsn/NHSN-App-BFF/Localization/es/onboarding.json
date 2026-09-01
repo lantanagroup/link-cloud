@@ -26,6 +26,27 @@
       "year": "Año del Informe",
       "measures": "Medidas de NHSN"
     },
+    "months": {
+      "january": "Enero",
+      "february": "Febrero",
+      "march": "Marzo",
+      "april": "Abril",
+      "may": "Mayo",
+      "june": "Junio",
+      "july": "Julio",
+      "august": "Agosto",
+      "september": "Septiembre",
+      "october": "Octubre",
+      "november": "Noviembre",
+      "december": "Diciembre"
+    },
+    "measures": {
+      "adultSepsis": "Sepsis en Adultos, Bacteriemia y Fungemia",
+      "antimicrobialUseResistance": "Uso y Resistencia Antimicrobiana (AU/AR)",
+      "cDifficile": "Infección por C. Difficile",
+      "glycemicControl": "Control Glucémico",
+      "respiratoryPathogens": "Vigilancia de Patógenos Respiratorios (RPS)"
+    },
     "scheduleUnavailable": "No se pudo recuperar el cronograma del plan de informes. La inscripción no se puede completar hasta que esté disponible."
   },
   "messages": {
@@ -93,6 +114,7 @@
       "loadError": "No se pudo cargar la información del servidor FHIR.",
       "saveSuccess": "Información del servidor FHIR guardada.",
       "saveError": "No se pudo guardar la información del servidor FHIR.",
+      "testing": "Probando la conexión…",
       "testSuccess": "La prueba de conexión fue exitosa.",
       "testFailure": "La prueba de conexión falló.",
       "testError": "No se pudo probar la conexión.",

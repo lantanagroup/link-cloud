@@ -1,47 +1,47 @@
-/*
- * Palette, radius and font stack lifted from the POC (NHSN-Onboarding-POC/index.html)
- * so this shell and the POC read as the same product. Scoped to `.nhsn-link` rather
- * than `:root` because this component is embedded in a host page and must not leak
- * variables onto it. The --kendo-* overrides retune @nhsn/nhsn-react-core's own
- * components (Button, DataGrid2, etc.) to the same palette without touching the
- * package, so "packages/nhsn-react-core" components pick this up automatically.
- */
 .nhsn-link {
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--kendo-font-family, 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif);
   font-size: 15px;
   line-height: 1.5;
   color: var(--kendo-color-app-text, #1f2328);
   background: var(--kendo-color-surface, #f7f9fc);
   height: 100vh;
   overflow: hidden;
+  --nhsn-scrollbar-thumb: var(--kendo-color-border, #d0d7de);
+  --nhsn-scrollbar-thumb-hover: var(--kendo-color-app-text-subtle, #5a5f69);
 }
 
 .nhsn-link h1,
 .nhsn-link h2,
 .nhsn-link h3 {
-  font-family: inherit;
+  font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
 }
 
-* {
+.nhsn-link,
+.nhsn-link * {
   scrollbar-width: thin;
+  scrollbar-color: var(--nhsn-scrollbar-thumb) transparent;
 }
 
-*::-webkit-scrollbar {
+.nhsn-link::-webkit-scrollbar,
+.nhsn-link *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-*::-webkit-scrollbar-track {
+.nhsn-link::-webkit-scrollbar-track,
+.nhsn-link *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-*::-webkit-scrollbar-thumb {
-  background-color: var(--kendo-color-border, #d0d7de);
+.nhsn-link::-webkit-scrollbar-thumb,
+.nhsn-link *::-webkit-scrollbar-thumb {
+  background-color: var(--nhsn-scrollbar-thumb);
   border-radius: 8px;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-  background-color: var(--kendo-color-app-text-subtle, #5a5f69);
+.nhsn-link::-webkit-scrollbar-thumb:hover,
+.nhsn-link *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--nhsn-scrollbar-thumb-hover);
 }
 
 .nhsn-link h1 {
@@ -52,20 +52,6 @@
 .nhsn-link h2 {
   font-size: 17px;
   margin: 0 0 14px;
-}
-
-.nhsn-link__testing-banner {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.65rem 1rem;
-  background: var(--kendo-color-warning-subtle, #fdf7eb);
-  color: var(--kendo-color-warning-emphasis, #975722);
-  border-bottom: 1px solid var(--kendo-color-warning, #de8a05);
-  font-weight: 700;
-  text-align: center;
 }
 
 .nhsn-link__layout {
@@ -83,14 +69,14 @@
 .nhsn-link__panel,
 .nhsn-link__content {
   background: var(--kendo-color-app-surface, #ffffff);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
 }
 
 .nhsn-link__content {
-  padding: 28px 32px;
+  padding: 0 32px 28px;
 }
 
 .nhsn-link__content .page-header-title:focus {
@@ -156,7 +142,7 @@
   border: 1px solid var(--kendo-color-border, #d0d7de);
   background: var(--kendo-color-app-surface, #ffffff);
   color: var(--kendo-color-app-text, #1f2328);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 0.6rem 0.75rem;
   text-align: left;
   cursor: pointer;
@@ -166,19 +152,6 @@
   background: var(--kendo-color-primary, #0057b7);
   color: var(--kendo-color-on-primary, #ffffff);
   border-color: var(--kendo-color-primary, #0057b7);
-}
-
-.nhsn-link__action-button {
-  border: none;
-  background: var(--kendo-color-primary, #0057b7);
-  color: var(--kendo-color-on-primary, #ffffff);
-  border-radius: 10px;
-  padding: 0.65rem 0.9rem;
-  cursor: pointer;
-}
-
-.nhsn-link__action-button:hover:not(:disabled) {
-  background: var(--nhsn-blue-dark);
 }
 
 .nhsn-link__state {
@@ -198,27 +171,17 @@
   text-align: center;
 }
 
-.nhsn-link__state--error,
-.nhsn-link__state--warning {
+.nhsn-link__state--error {
   display: block;
   min-height: 0;
   margin: 0 0 1rem 0;
   padding: 0.85rem 1rem;
-  border-radius: 10px;
+  border-radius: 8px;
   border-left: 4px solid;
   text-align: left;
-}
-
-.nhsn-link__state--error {
   background: var(--kendo-color-error-subtle, #fcf2f1);
   border-left-color: var(--kendo-color-error, #cc1b22);
   color: var(--kendo-color-error-on-subtle, #961c1c);
-}
-
-.nhsn-link__state--warning {
-  background: var(--kendo-color-warning-subtle, #fdf7eb);
-  border-left-color: var(--kendo-color-warning, #de8a05);
-  color: var(--kendo-color-warning-emphasis, #975722);
 }
 
 /* ---------------------------------------------------------- step machine */
@@ -236,17 +199,22 @@
 
 .nhsn-link__step-nav {
   background: linear-gradient(180deg, #063f78, #0b5cab);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 24px 18px;
   color: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  --nhsn-scrollbar-thumb: rgba(255, 255, 255, 0.4);
+  --nhsn-scrollbar-thumb-hover: rgba(255, 255, 255, 0.65);
 }
 
 .nhsn-link__step-nav-title {
+  flex: none;
   margin: 0 0 2px 0;
   font-size: 20px;
   font-weight: 700;
@@ -254,6 +222,7 @@
 }
 
 .nhsn-link__step-nav-subtitle {
+  flex: none;
   display: block;
   margin: 0;
   font-size: 12px;
@@ -265,6 +234,7 @@
 }
 
 .nhsn-link__step-nav-facility {
+  flex: none;
   margin-top: 14px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.12);
@@ -291,9 +261,13 @@
      otherwise every row reads "1. 1 Welcome". */
   list-style: none;
   margin: 22px 0 0 0;
-  padding: 0;
+  padding: 0 6px 0 0;
   display: grid;
+  align-content: start;
   gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .nhsn-link__step {
@@ -370,7 +344,33 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content {
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
   overflow-y: auto;
+  isolation: isolate;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content > * {
+  flex-shrink: 0;
+}
+
+.nhsn-link__step-panel :has(> .page-header) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+  padding-top: 28px;
+  background-color: var(--kendo-color-app-surface, #ffffff);
 }
 
 .nhsn-link__subtitle {
@@ -383,10 +383,51 @@
 
 .nhsn-link__step-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--kendo-color-border, #d0d7de);
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.nhsn-link__step-actions .k-button.k-button-primary {
+  background: var(--kendo-color-primary, #0057b7);
+  border-color: var(--kendo-color-primary, #0057b7);
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.nhsn-link__step-actions .k-button.k-button-primary:hover {
+  background: var(--kendo-color-primary-hover, #032659);
+  border-color: var(--kendo-color-primary-hover, #032659);
+}
+
+.nhsn-link__step-actions .k-button.k-button-base {
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.nhsn-link__step-actions .k-button.k-button-base:hover {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__step-actions .k-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nhsn-link__step-panel .nhsn-link__step-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  flex: none;
+  margin-top: auto;
+  background-color: var(--kendo-color-app-surface, #ffffff);
 }
 
 .nhsn-link__saving {
@@ -432,7 +473,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.85rem 1rem;
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--kendo-color-on-inverse, #ffffff);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
@@ -470,89 +511,49 @@
   margin: 0 0 1rem 0;
 }
 
-.nhsn-link__field-error {
-  color: var(--kendo-color-error, #cc1b22);
-  font-weight: 600;
-  margin: 0.35rem 0 0 0;
-  font-size: 0.85rem;
-}
-
-.nhsn-link__form-grid {
-  display: grid;
-  gap: 1rem;
-  max-width: 640px;
-  margin-bottom: 1rem;
-}
-
-.nhsn-link__form-grid--pair {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.nhsn-link__form-grid--triplet {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-width: none;
-  margin-top: 0.5rem;
-  margin-bottom: 0;
-}
-
-.nhsn-link__required-marker {
-  color: var(--kendo-color-error, #cc1b22);
-}
-
-.nhsn-link__required-hint {
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
-  font-size: 0.85rem;
-  margin: 0 0 1rem 0;
-}
-
-.nhsn-link__section-title {
-  font-weight: 700;
-  margin: 1.25rem 0 0.5rem 0;
-}
-
-.nhsn-link__jwks-box {
-  max-width: 640px;
-  background: var(--kendo-color-surface, #f7f9fc);
-  border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.nhsn-link__jwks-box .nhsn-link__section-title {
-  margin-top: 0;
-}
-
-.nhsn-link__download-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--kendo-color-primary, #0057b7);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.nhsn-link__download-link:hover {
-  text-decoration: underline;
-}
-
 .nhsn-link__field {
   max-width: 420px;
   margin-bottom: 1rem;
 }
 
-.nhsn-link__form-grid .nhsn-link__field {
-  max-width: none;
-  margin-bottom: 0;
+.nhsn-link .k-form-hint {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  top: auto;
+  left: 0;
+  right: auto;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  background: var(--kendo-color-app-text, #1f2328);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+}
+
+.nhsn-link .k-form-hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  border: 5px solid transparent;
+  border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
 /* ------------------------------------------- facility-info (onboarding POC parity) */
 
 .nhsn-facility-info {
-  padding: 28px 32px;
+  padding: 0 32px 28px;
   border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .nhsn-facility-info .page-header {
@@ -560,9 +561,6 @@
   border-bottom: none !important;
 }
 
-/* Reporting Plan, Manual Upload and Enrollment Complete read as one flowing
-   card in the POC design, so the header/footer dividers page-header and
-   step-actions normally draw are dropped on just these three steps. */
 .nhsn-link__reporting-plan .page-header,
 .nhsn-link__manual-upload .page-header,
 .nhsn-link__complete .page-header,
@@ -571,30 +569,46 @@
   border-bottom: none !important;
 }
 
-.nhsn-link__reporting-plan .nhsn-link__step-actions,
-.nhsn-link__manual-upload .nhsn-link__step-actions,
-.nhsn-link__complete .nhsn-link__step-actions,
-.nhsn-link__welcome .nhsn-link__step-actions {
-  border-top: none;
+.nhsn-link__reporting-plan .nhsn-link__subtitle,
+.nhsn-link__manual-upload .nhsn-link__subtitle,
+.nhsn-link__complete .nhsn-link__subtitle,
+.nhsn-link__welcome .nhsn-link__subtitle {
+  max-width: none;
 }
 
-.nhsn-link__reporting-plan-table-scroll {
-  display: inline-block;
-  max-width: 780px;
+.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll {
+  display: block;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
-  overflow: hidden;
+  border-radius: 8px;
 }
 
 .nhsn-link__reporting-plan-table {
-  width: auto;
+  width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
+}
+
+.nhsn-link__reporting-plan-table th:first-child,
+.nhsn-link__reporting-plan-table td:first-child {
+  width: 24%;
+  white-space: nowrap;
+}
+
+.nhsn-link__reporting-plan-table th:nth-child(2),
+.nhsn-link__reporting-plan-table td:nth-child(2) {
+  width: 22%;
+  white-space: nowrap;
 }
 
 .nhsn-link__reporting-plan-table th:last-child,
 .nhsn-link__reporting-plan-table td:last-child {
-  max-width: 380px;
+  width: 54%;
 }
 
 .nhsn-link__reporting-plan-table {
@@ -602,7 +616,10 @@
 }
 
 .nhsn-link__reporting-plan-table th {
-  padding: 9px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 9px;
   background: var(--kendo-color-surface, #f7f9fc);
   border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
   text-align: left;
@@ -614,7 +631,7 @@
 }
 
 .nhsn-link__reporting-plan-table td {
-  padding: 9px 10px;
+  padding: 7px 9px;
   border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
   vertical-align: top;
 }
@@ -700,32 +717,37 @@
   display: none;
 }
 
-.nhsn-facility-info #facilityTimeZone_label::after {
+.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label::after {
   content: '?';
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 15px;
   height: 15px;
-  margin-left: 6px;
+  flex: 0 0 15px;
   border-radius: 50%;
   background: var(--kendo-color-border, #d0d7de);
   color: var(--kendo-color-app-text-subtle, #5a5f69);
   font-size: 10.5px;
   font-weight: 700;
-  cursor: help;
-  anchor-name: --facility-tz-hint-badge;
+  cursor: pointer;
+  anchor-name: --facility-hint-badge;
 }
 
-.nhsn-facility-info #facilityTimeZone_label:hover::after,
-.nhsn-facility-info #facilityTimeZone_label:focus-within::after {
+.nhsn-facility-info .k-form-field--hint-open .k-label::after {
   background: var(--kendo-color-primary, #0057b7);
   color: var(--kendo-color-on-primary, #ffffff);
 }
 
-@supports (position-anchor: --facility-tz-hint-badge) {
+@supports (position-anchor: --facility-hint-badge) {
   .nhsn-facility-info .k-form-hint {
-    position-anchor: --facility-tz-hint-badge;
+    position-anchor: --facility-hint-badge;
     left: anchor(center);
     bottom: calc(anchor(top) + 9px);
     transform: translateX(-50%);
@@ -737,15 +759,14 @@
   }
 }
 
-.nhsn-facility-info #facilityTimeZone_label:hover ~ #facilityTimeZone_hint,
-.nhsn-facility-info #facilityTimeZone_label:focus-within ~ #facilityTimeZone_hint {
+.nhsn-facility-info .k-form-field--hint-open .k-form-hint {
   display: block;
 }
 
 .nhsn-facility-info .k-dropdownlist {
   background: var(--kendo-color-app-surface, #ffffff);
   border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .nhsn-facility-info .k-dropdownlist.k-focus,
@@ -763,7 +784,7 @@
 
 .nhsn-facility-info-popup.k-list-container {
   border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
@@ -799,43 +820,8 @@
   color: var(--kendo-color-on-primary, #ffffff);
 }
 
-.nhsn-facility-info .nhsn-link__step-actions {
-  gap: 10px;
-  margin-top: 24px;
-  padding-top: 0;
-  border-top: none;
-}
-
 .nhsn-facility-info .nhsn-link__form-error {
   font-size: 15px;
-}
-
-.nhsn-facility-info .k-button.k-button-primary {
-  background: var(--kendo-color-primary, #0057b7);
-  border-color: var(--kendo-color-primary, #0057b7);
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 10px;
-}
-
-.nhsn-facility-info .k-button.k-button-primary:hover {
-  background: var(--kendo-color-primary-hover, #032659);
-  border-color: var(--kendo-color-primary-hover, #032659);
-}
-
-.nhsn-facility-info .k-button.k-button-base {
-  background: var(--kendo-color-app-surface, #ffffff);
-  color: var(--kendo-color-primary, #0057b7);
-  border: 1px solid var(--kendo-color-primary, #0057b7);
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 10px;
-}
-
-.nhsn-facility-info .k-button.k-button-base:hover {
-  background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
 /* ------------------------------------------------------- manual upload */
@@ -851,7 +837,7 @@
   background: var(--kendo-color-app-surface, #ffffff);
   color: var(--kendo-color-primary, #0057b7);
   border: 1px solid var(--kendo-color-primary, #0057b7);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 0.65rem 1rem;
   font-size: 14px;
   font-weight: 600;
@@ -894,7 +880,7 @@
   max-width: 420px;
   padding: 0.4rem;
   border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--kendo-color-app-surface, #ffffff);
   color: var(--kendo-color-app-text, #1f2328);
   font-size: 14px;
@@ -926,13 +912,6 @@
   font-size: 0.85rem;
 }
 
-.nhsn-link__error-message {
-  margin: 0.5rem 0 1.25rem 0;
-  color: var(--kendo-color-error, #cc1b22);
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
 @media (max-width: 768px) {
   .nhsn-link {
     height: auto;
@@ -961,5 +940,31 @@
   .nhsn-link__step-panel {
     height: auto;
     overflow: visible;
+  }
+
+  .nhsn-link__steps {
+    flex: none;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .nhsn-link__step-panel > .nhsn-link__content,
+  .fhir-server-info,
+  .fhir-server-info .card,
+  .fhir-server-info .card-scroll {
+    flex: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__step-panel :has(> .page-header) {
+    position: static;
+  }
+
+  .nhsn-link__step-panel .nhsn-link__step-actions,
+  .fhir-server-info .card .nhsn-link__step-actions {
+    position: static;
+    margin-top: 1.5rem;
+    padding: 0;
   }
 }

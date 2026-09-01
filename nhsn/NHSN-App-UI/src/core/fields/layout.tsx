@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Badge,
   FormSection,
+  MessageContainer,
   NHSNLoadingIndicator,
   NoData,
   PageHeader,
@@ -44,4 +45,4 @@ export function StepActions({children}: StepActionsProps) {
   return <div className="nhsn-link__step-actions">{children}</div>;
 }
 
-export {Badge, FormSection, NHSNLoadingIndicator, NoData, PageHeader, RequiredFieldNotice};
+export {Badge, FormSection, MessageContainer, NHSNLoadingIndicator, NoData, PageHeader, RequiredFieldNotice};
