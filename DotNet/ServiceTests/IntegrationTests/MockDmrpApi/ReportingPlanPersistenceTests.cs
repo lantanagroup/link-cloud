@@ -40,7 +40,7 @@ public class ReportingPlanPersistenceTests
             IsReporting = "Y"
         };
 
-    /// <summary>An annual (PS) entry, which carries no month.</summary>
+    /// <summary>A patient-safety (PS) entry, reported monthly exactly as medicine is.</summary>
     private static ReportingPlanEntryEntity PatientSafetyEntry(
         string facilityId = "F1", string measure = "HAI", int month = 5, int year = 2026) =>
         new()

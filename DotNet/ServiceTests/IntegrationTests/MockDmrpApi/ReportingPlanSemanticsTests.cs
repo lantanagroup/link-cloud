@@ -171,10 +171,10 @@ public class ReportingPlanSemanticsTests
     [Fact]
     public async Task ComponentsAreIsolatedFromOneAnother()
     {
-        // Both plans come out of one table, and the annual query does not filter on month.
-        // Without the component in the predicate that omission would pull every monthly
-        // entry for the year into the annual plan, and the response would still look
-        // perfectly well formed.
+        // Both plans come out of one table, and this query narrows by year alone. Without
+        // the component in the predicate that would pull every medicine entry for the year
+        // into the patient-safety plan, and the response would still look perfectly well
+        // formed.
         await _fixture.ResetAsync();
         await SeedAsync(
             Entry(measure: "HOB"),

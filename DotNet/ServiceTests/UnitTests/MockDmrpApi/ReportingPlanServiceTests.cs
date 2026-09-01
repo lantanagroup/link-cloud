@@ -43,7 +43,7 @@ public class ReportingPlanServiceTests
             CreateDate = DateTime.UtcNow
         };
 
-    /// <summary>An annual (PS) entry, which carries no reporting month.</summary>
+    /// <summary>A patient-safety (PS) entry, reported monthly exactly as medicine is.</summary>
     private static ReportingPlanEntryEntity PatientSafetyEntry(
         string facilityId = "F1",
         string measure = "HAI",
@@ -392,8 +392,8 @@ public class ReportingPlanServiceTests
     [Fact]
     public async Task CreateAsync_WithAWhitespaceOnlyMeasure_IsRejected()
     {
-        // Trimming turns "   " into "", which the cadence guard would let through -- an entry
-        // with no measure at all. The measure has to survive the trim.
+        // Trimming turns "   " into "", which the component and period guard would let
+        // through -- an entry with no measure at all. The measure has to survive the trim.
         var act = async () => await _service.CreateAsync(
             Entry(measure: "   "), CancellationToken.None);
 
@@ -478,6 +478,7 @@ public class ReportingPlanServiceTests
     public async Task UpdateAsync_AppliesTheSamePeriodRulesAsCreate()
     {
         var existing = Entry();
+        var originalMonth = existing.ReportingMonth;
         _repository.Seed(existing);
 
         var act = async () => await _service.UpdateAsync(
@@ -485,16 +486,18 @@ public class ReportingPlanServiceTests
             {
                 Id = existing.Id,
                 FacilityId = "F1",
-                Component = "XYZ",
+                Component = ReportingComponents.Msc,
                 Measure = "HAI",
-                ReportingMonth = 5,
+                // Out of range, which is the period rule create is held to. An unknown
+                // component would trip a different branch and leave this path untested.
+                ReportingMonth = 13,
                 ReportingYear = 2026,
                 IsReporting = "Y"
             },
             CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidReportingPlanEntryException>();
-        _repository.Entries[0].Component.Should().Be(ReportingComponents.Msc, "the update must not partially apply");
+        _repository.Entries[0].ReportingMonth.Should().Be(originalMonth, "the update must not partially apply");
     }
 
     // -------------------------------------------------------------------- create
@@ -521,11 +524,11 @@ public class ReportingPlanServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_ForAnAnnualComponent_StillRejectsADuplicate()
+    public async Task CreateAsync_ForPatientSafety_StillRejectsADuplicate()
     {
-        // Annual entries have a null month, and NULL compares as a value in the unique
-        // index. If the pre-check treated null as "no constraint" the duplicate would slip
-        // through to the database and surface as a 500 instead of a 409.
+        // Patient safety is reported monthly like medicine, so a duplicate has the same
+        // shape on both components. The pre-check has to catch it before the database does,
+        // or the clash surfaces as a 500 instead of a 409.
         _repository.Seed(PatientSafetyEntry());
 
         var act = async () => await _service.CreateAsync(PatientSafetyEntry(), CancellationToken.None);
