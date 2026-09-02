@@ -32,14 +32,18 @@ public sealed record RunMetricsCaptureInput(
     IReadOnlyList<string>? Measures = null,
     Guid? QueryPlanTemplateId = null,
     Guid? NormalizationSuiteId = null,
-    long? GenerationDurationMs = null);
+    long? GenerationDurationMs = null,
+    DateTime? ReportCreatedAt = null,
+    DateTime? SubmittedAt = null);
 
 public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 {
+    // Query Dispatch meters only fire on the scheduled discharge job, which adhoc
+    // metrics runs never execute. Leave that service's OTEL instruments in place
+    // for Grafana; do not show an always-empty step here.
     internal static readonly StageQuery[] StageHistograms =
     [
         new("acquisition", "link_data_acq_query_duration_milliseconds", null, null),
-        new("dispatch", "link_querydispatch_dispatch_duration_milliseconds", "link_querydispatch_patients_dispatched_count", "failure"),
         new("normalization", "link_normalization_duration_milliseconds", null, null),
         new("measureeval", "link_measureeval_eval_duration_milliseconds", "link_measureeval_eval_count", "failure"),
         new("validation", "link_validation_validate_duration_milliseconds", "link_validation_counter", "Failed"),
@@ -83,7 +87,8 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         if (!input.IsMetricsRun)
             return null;
 
-        var e2eSeconds = Math.Max(0, (input.FinishedAt - input.StartedAt).TotalSeconds);
+        var window = ResolvePipelineWindow(input.StartedAt, input.FinishedAt, input.ReportCreatedAt, input.SubmittedAt);
+        var e2eSeconds = Math.Max(0, (window.FinishedAt - window.StartedAt).TotalSeconds);
         var wait = ResolvePrometheusWait();
         var endpoint = _telemetry.PrometheusQueryEndpoint?.Trim();
         var stagesUnavailable = string.IsNullOrWhiteSpace(endpoint);
@@ -96,19 +101,38 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         {
             try
             {
-                await DelayAsync(wait, cancellationToken);
-                var evaluationTime = _time.GetUtcNow();
-                var windowSeconds = Math.Max(60, (int)Math.Ceiling(e2eSeconds + wait.TotalSeconds + 5));
-                var anyStage = false;
-                foreach (var stageQuery in StageHistograms)
+                if (!await _prometheus.IsReachableAsync(cancellationToken))
                 {
-                    var snapshot = await QueryStageAsync(stageQuery, input.FacilityId, windowSeconds, evaluationTime, cancellationToken);
-                    stages[stageQuery.Stage] = snapshot;
-                    if (!snapshot.Unavailable)
-                        anyStage = true;
+                    _logger.LogWarning(
+                        "Prometheus is not reachable at {Endpoint} for metrics run {RunId} facility {FacilityId}; persisting wall-clock snapshot without step timings.",
+                        endpoint,
+                        input.RunId,
+                        input.FacilityId);
+                    stagesUnavailable = true;
                 }
+                else
+                {
+                    await DelayAsync(wait, cancellationToken);
+                    var evaluationTime = _time.GetUtcNow();
+                    var anyStage = false;
+                    foreach (var stageQuery in StageHistograms)
+                    {
+                        var snapshot = await QueryStageAsync(stageQuery, input.FacilityId, evaluationTime, cancellationToken);
+                        stages[stageQuery.Stage] = snapshot;
+                        if (!snapshot.Unavailable)
+                            anyStage = true;
+                    }
 
-                stagesUnavailable = !anyStage;
+                    stagesUnavailable = !anyStage;
+                    if (stagesUnavailable)
+                    {
+                        _logger.LogWarning(
+                            "Prometheus at {Endpoint} had no step timings for metrics run {RunId} facility {FacilityId}.",
+                            endpoint,
+                            input.RunId,
+                            input.FacilityId);
+                    }
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -116,7 +140,12 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Prometheus enrichment failed for metrics run {RunId}; persisting wall-clock snapshot.", input.RunId);
+                _logger.LogWarning(
+                    ex,
+                    "Prometheus enrichment failed for metrics run {RunId} at {Endpoint} facility {FacilityId}; persisting wall-clock snapshot.",
+                    input.RunId,
+                    endpoint,
+                    input.FacilityId);
                 stagesUnavailable = true;
             }
         }
@@ -132,8 +161,8 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             BenchmarkKey = input.BenchmarkKey,
             FacilityId = input.FacilityId,
             ReportId = input.ReportId,
-            StartedAt = input.StartedAt,
-            FinishedAt = input.FinishedAt,
+            StartedAt = window.StartedAt,
+            FinishedAt = window.FinishedAt,
             CreatedAt = _time.GetUtcNow(),
             Outcome = input.Outcome,
             PatientCount = input.PatientCount,
@@ -190,7 +219,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         {
             var previousAny = await _store.GetPreviousAsync(
                 scenarioId,
-                input.FinishedAt,
+                window.FinishedAt,
                 input.RunId,
                 cancellationToken);
             document.ScenarioVersion = MetricsScenarioFingerprint.NextVersion(
@@ -201,11 +230,11 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             previous = await _store.GetPreviousSucceededSameFingerprintAsync(
                 scenarioId,
                 document.ScenarioFingerprint ?? "",
-                input.FinishedAt,
+                window.FinishedAt,
                 input.RunId,
                 cancellationToken) ?? await _store.GetPreviousSucceededAsync(
                 scenarioId,
-                input.FinishedAt,
+                window.FinishedAt,
                 input.RunId,
                 cancellationToken);
         }
@@ -260,6 +289,32 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         await completion.Task;
     }
 
+    /// <summary>
+    /// Metrics total time is report created → ABS submit, not execute-start through
+    /// cleanup or the Prometheus wait.
+    /// </summary>
+    public static (DateTimeOffset StartedAt, DateTimeOffset FinishedAt) ResolvePipelineWindow(
+        DateTimeOffset runStartedAt,
+        DateTimeOffset runFinishedAt,
+        DateTime? reportCreatedAt,
+        DateTime? submittedAt)
+    {
+        if (reportCreatedAt is DateTime created && submittedAt is DateTime submitted)
+        {
+            var start = AsUtc(created);
+            var end = AsUtc(submitted);
+            if (end > start)
+                return (start, end);
+        }
+
+        return (runStartedAt, runFinishedAt);
+    }
+
+    private static DateTimeOffset AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Unspecified
+            ? new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc))
+            : new DateTimeOffset(value.ToUniversalTime());
+
     public static TimeSpan ResolvePrometheusWait()
     {
         var exportMs = 60_000;
@@ -274,30 +329,29 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     private async Task<StageLatencySnapshot> QueryStageAsync(
         StageQuery stage,
         string facilityId,
-        int windowSeconds,
         DateTimeOffset evaluationTime,
         CancellationToken cancellationToken)
     {
         var facility = EscapePromLabel(facilityId);
-        var selector = $"{stage.HistogramBase}_bucket{{facility_id=\"{facility}\"}}[{windowSeconds}s]";
-        var countSelector = $"sum(increase({stage.HistogramBase}_count{{facility_id=\"{facility}\"}}[{windowSeconds}s]))";
+        var bucketSelector = $"{stage.HistogramBase}_bucket{{facility_id=\"{facility}\"}}";
+        var countSelector = $"sum({stage.HistogramBase}_count{{facility_id=\"{facility}\"}})";
 
         var count = await _prometheus.QueryScalarAsync(countSelector, evaluationTime, cancellationToken);
         if (count is null or <= 0)
             return new StageLatencySnapshot { Unavailable = true };
 
         var p50 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.50, sum by (le) (increase({selector})))", evaluationTime, cancellationToken);
+            $"histogram_quantile(0.50, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
         var p95 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.95, sum by (le) (increase({selector})))", evaluationTime, cancellationToken);
+            $"histogram_quantile(0.95, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
         var p99 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.99, sum by (le) (increase({selector})))", evaluationTime, cancellationToken);
+            $"histogram_quantile(0.99, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
 
         double errorCount = 0;
         if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) && !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
         {
             var errorSelector =
-                $"sum(increase({stage.ErrorCounter}{{facility_id=\"{facility}\",outcome=\"{EscapePromLabel(stage.ErrorOutcome)}\"}}[{windowSeconds}s]))";
+                $"sum({stage.ErrorCounter}{{facility_id=\"{facility}\",outcome=\"{EscapePromLabel(stage.ErrorOutcome)}\"}})";
             errorCount = await _prometheus.QueryScalarAsync(errorSelector, evaluationTime, cancellationToken) ?? 0;
         }
 

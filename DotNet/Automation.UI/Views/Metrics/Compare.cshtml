@@ -1,11 +1,10 @@
 @model MetricsCompareViewModel
 @{
     ViewData["Title"] = "Compare runs";
-    var stages = new[] { "acquisition", "dispatch", "normalization", "measureeval", "validation", "submission" };
+    var stages = new[] { "acquisition", "normalization", "measureeval", "validation", "submission" };
     string DisplayName(string key) => key switch
     {
         "acquisition" => "Data Acquisition",
-        "dispatch" => "Query Dispatch",
         "normalization" => "Normalization",
         "measureeval" => "Measure Evaluation",
         "validation" => "Validation",

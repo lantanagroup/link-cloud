@@ -50,13 +50,44 @@ public class MetricsRunPresenterTests
     }
 
     [Fact]
-    public async Task GetDetail_returns_null_when_run_missing()
+    public async Task GetDetail_returns_null_when_run_and_snapshot_are_missing()
     {
         var presenter = CreatePresenter(run: null, snapshot: null);
 
         var detail = await presenter.GetDetailAsync(Guid.NewGuid());
 
         detail.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteSnapshot_deletes_metrics_row_only()
+    {
+        var runId = Guid.NewGuid();
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.DeleteAsync(runId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var manager = new Mock<IAutomationRunManager>(MockBehavior.Strict);
+        var presenter = new MetricsRunPresenter(store.Object, manager.Object, Mock.Of<IScenarioStore>());
+
+        var deleted = await presenter.DeleteSnapshotAsync(runId);
+
+        deleted.Should().BeTrue();
+        store.Verify(s => s.DeleteAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
+        manager.Verify(m => m.DeleteRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetDetail_returns_snapshot_when_run_was_deleted()
+    {
+        var snapshot = Document();
+        var presenter = CreatePresenter(run: null, snapshot);
+
+        var detail = await presenter.GetDetailAsync(snapshot.RunId);
+
+        detail.Should().NotBeNull();
+        detail!.RunId.Should().Be(snapshot.RunId);
+        detail.RunAvailable.Should().BeFalse();
+        detail.E2eDurationSeconds.Should().Be(90);
+        detail.ScenarioName.Should().Be("perf-scenario");
     }
 
     [Fact]
@@ -80,6 +111,7 @@ public class MetricsRunPresenterTests
 
         detail.Should().NotBeNull();
         detail!.StagesUnavailable.Should().BeTrue();
+        detail.RunAvailable.Should().BeTrue();
         detail.Stages.Values.Should().OnlyContain(s => s.Unavailable);
         detail.PatientCount.Should().Be(10);
         detail.E2eDurationSeconds.Should().BeGreaterThan(0);
@@ -139,7 +171,37 @@ public class MetricsRunPresenterTests
         dashboard.ScenarioCards[0].RunCount.Should().Be(2);
         dashboard.ScenarioCards[0].GotSlower.Should().BeTrue();
         dashboard.ScenarioCards[0].LastE2eSeconds.Should().Be(90);
-        dashboard.Services.Should().HaveCount(6);
+        dashboard.Services.Should().HaveCount(5);
+        dashboard.Services.Select(s => s.Key).Should().Equal(
+            "acquisition", "normalization", "measureeval", "validation", "submission");
+    }
+
+    [Fact]
+    public async Task GetDashboard_groups_metrics_without_scenario_id_by_matching_name()
+    {
+        var scenarioId = Guid.NewGuid();
+        var orphan = Document();
+        orphan.ScenarioId = null;
+        orphan.ScenarioName = "Monthly 150";
+        orphan.E2eDurationSeconds = 77;
+
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.ListPageAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new[] { orphan }.ToList(), 1L));
+        store.Setup(s => s.ListSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { orphan });
+        var scenarios = new Mock<IScenarioStore>();
+        scenarios.Setup(s => s.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestScenarioDefinition { Id = scenarioId, Name = "Monthly 150", IsMetricsRun = true }]);
+
+        var presenter = new MetricsRunPresenter(store.Object, Mock.Of<IAutomationRunManager>(), scenarios.Object);
+        var dashboard = await presenter.GetDashboardAsync(1, 20);
+
+        dashboard.ScenarioCards.Should().ContainSingle();
+        dashboard.ScenarioCards[0].ScenarioId.Should().Be(scenarioId);
+        dashboard.ScenarioCards[0].Name.Should().Be("Monthly 150");
+        dashboard.ScenarioCards[0].RunCount.Should().Be(1);
+        dashboard.ScenarioCards[0].LastE2eSeconds.Should().Be(77);
     }
 
     [Fact]
@@ -236,7 +298,6 @@ public class MetricsRunPresenterTests
             Stages = new Dictionary<string, StageLatencySnapshot>(StringComparer.Ordinal)
             {
                 ["acquisition"] = new StageLatencySnapshot { Unavailable = true },
-                ["dispatch"] = new StageLatencySnapshot { Unavailable = true },
                 ["normalization"] = new StageLatencySnapshot { Unavailable = true },
                 ["measureeval"] = new StageLatencySnapshot { Unavailable = true },
                 ["validation"] = new StageLatencySnapshot { Unavailable = true },

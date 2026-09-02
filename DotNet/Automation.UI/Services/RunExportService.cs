@@ -342,7 +342,8 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.DataAcquisition is { } da)
             AppendServiceStats(sb, "Data Acquisition",
                 da.CompletionRatePerSecond, da.ResourceCount, da.AverageResourcesPerSecond,
-                da.StatusCounts, funnelCounts: null, da.ResourceTypeCounts, da.ThroughputBuckets, da.Errors);
+                da.StatusCounts, funnelCounts: null, da.ResourceTypeCounts, da.ThroughputBuckets, da.Errors,
+                da.ActiveDurationSeconds);
 
         await AppendRawDomainAsync(sb, runId, "acquisitionSummary", "Raw acquisition summary", ct);
         await AppendAcquisitionLogsAsync(sb, runId, ct);
@@ -414,7 +415,8 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.Validation is { } v)
             AppendServiceStats(sb, "Validation",
                 v.CompletionRatePerSecond, v.ResourceCount, v.AverageResourcesPerSecond,
-                v.StatusCounts, v.FunnelCounts, v.ResourceTypeCounts, v.ThroughputBuckets, v.Errors);
+                v.StatusCounts, v.FunnelCounts, v.ResourceTypeCounts, v.ThroughputBuckets, v.Errors,
+                v.ActiveDurationSeconds);
 
         if (pipeline?.ValidatorResults is { Count: > 0 } validators)
         {
@@ -439,7 +441,8 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.MeasureEval is { } me)
             AppendServiceStats(sb, "Measure Eval",
                 me.CompletionRatePerSecond, me.ResourceCount, me.AverageResourcesPerSecond,
-                me.StatusCounts, me.FunnelCounts, me.ResourceTypeCounts, me.ThroughputBuckets, me.Errors);
+                me.StatusCounts, me.FunnelCounts, me.ResourceTypeCounts, me.ThroughputBuckets, me.Errors,
+                me.ActiveDurationSeconds);
 
         await AppendRawDomainAsync(sb, runId, "measureResources", "Raw measure-eval resource counts", ct);
         return sb.ToString();
@@ -457,7 +460,8 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.Normalization is { } n)
             AppendServiceStats(sb, "Normalization",
                 n.CompletionRatePerSecond, n.ResourceCount, n.AverageResourcesPerSecond,
-                n.StatusCounts, n.FunnelCounts, n.ResourceTypeCounts, n.ThroughputBuckets, n.Errors);
+                n.StatusCounts, n.FunnelCounts, n.ResourceTypeCounts, n.ThroughputBuckets, n.Errors,
+                n.ActiveDurationSeconds);
 
         var evidence = await TryGetNormalizationEvidenceAsync(runId, ct);
         sb.Append(NormalizationDiagnosticsWriter.FormatExportAppendix(evidence));
@@ -693,12 +697,16 @@ public sealed class RunExportService : IRunExportService
         IReadOnlyList<PipelineSummarySnapshotBuilder.CategoryCountSnapshot>? funnelCounts,
         IReadOnlyList<PipelineSummarySnapshotBuilder.CategoryCountSnapshot>? resourceTypeCounts,
         IReadOnlyList<PipelineSummarySnapshotBuilder.ThroughputBucketSnapshot>? throughput,
-        IReadOnlyList<string>? errors)
+        IReadOnlyList<string>? errors,
+        double? activeDurationSeconds = null)
     {
         WriteKvp(sb, "Service", serviceName);
         WriteKvp(sb, "Completion rate (events/s)", completionRatePerSecond.ToString("F2", CultureInfo.InvariantCulture));
         WriteKvp(sb, "Resource count", resourceCount.ToString("N0", CultureInfo.InvariantCulture));
         WriteKvp(sb, "Avg resources/s", avgResourcesPerSecond.ToString("F2", CultureInfo.InvariantCulture));
+        WriteKvp(sb, "Active duration", activeDurationSeconds is > 0
+            ? $"{activeDurationSeconds.Value.ToString("F2", CultureInfo.InvariantCulture)}s"
+            : "n/a");
 
         AppendCounts(sb, "Status counts", statusCounts);
         AppendCounts(sb, "Funnel counts", funnelCounts);

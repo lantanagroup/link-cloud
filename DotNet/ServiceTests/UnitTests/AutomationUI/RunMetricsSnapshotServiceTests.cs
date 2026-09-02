@@ -14,6 +14,67 @@ namespace UnitTests.AutomationUI;
 public class RunMetricsSnapshotServiceTests
 {
     [Fact]
+    public void Pipeline_window_uses_report_created_to_abs_submit()
+    {
+        var runStart = new DateTimeOffset(2026, 9, 2, 17, 33, 26, TimeSpan.Zero);
+        var runEnd = runStart.AddSeconds(322);
+        var created = new DateTime(2026, 9, 2, 17, 34, 0, DateTimeKind.Utc);
+        var submitted = new DateTime(2026, 9, 2, 17, 35, 41, DateTimeKind.Utc);
+
+        var window = RunMetricsSnapshotService.ResolvePipelineWindow(runStart, runEnd, created, submitted);
+
+        window.StartedAt.Should().Be(new DateTimeOffset(created, TimeSpan.Zero));
+        window.FinishedAt.Should().Be(new DateTimeOffset(submitted, TimeSpan.Zero));
+        (window.FinishedAt - window.StartedAt).TotalSeconds.Should().Be(101);
+    }
+
+    [Fact]
+    public void Pipeline_window_falls_back_to_run_clock_when_submit_is_missing()
+    {
+        var runStart = new DateTimeOffset(2026, 9, 2, 17, 33, 26, TimeSpan.Zero);
+        var runEnd = runStart.AddSeconds(322);
+
+        var window = RunMetricsSnapshotService.ResolvePipelineWindow(runStart, runEnd, runStart.UtcDateTime, null);
+
+        window.StartedAt.Should().Be(runStart);
+        window.FinishedAt.Should().Be(runEnd);
+    }
+
+    [Fact]
+    public async Task Capture_stores_pipeline_window_not_cleanup_or_prom_wait()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var service = CreateService(store.Object, new TelemetrySettings());
+        var runStart = new DateTimeOffset(2026, 9, 2, 17, 33, 26, TimeSpan.Zero);
+        var created = new DateTime(2026, 9, 2, 17, 34, 0, DateTimeKind.Utc);
+        var submitted = new DateTime(2026, 9, 2, 17, 35, 41, DateTimeKind.Utc);
+
+        await service.CaptureAsync(Input(
+            isMetricsRun: true,
+            startedAt: runStart,
+            finishedAt: runStart.AddSeconds(322),
+            reportCreatedAt: created,
+            submittedAt: submitted));
+
+        saved.Should().NotBeNull();
+        saved!.Outcome.Should().Be("Succeeded");
+        saved.E2eDurationSeconds.Should().Be(101);
+        saved.StartedAt.Should().Be(new DateTimeOffset(created, TimeSpan.Zero));
+        saved.FinishedAt.Should().Be(new DateTimeOffset(submitted, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void Stage_histograms_omit_query_dispatch()
+    {
+        RunMetricsSnapshotService.StageHistograms.Select(s => s.Stage)
+            .Should().Equal("acquisition", "normalization", "measureeval", "validation", "submission");
+    }
+
+    [Fact]
     public void Prometheus_wait_defaults_to_71_seconds()
     {
         var previous = Environment.GetEnvironmentVariable("OTEL_METRIC_EXPORT_INTERVAL");
@@ -104,6 +165,7 @@ public class RunMetricsSnapshotServiceTests
             .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
             .Returns(Task.CompletedTask);
         var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
                 query.Contains("histogram_quantile(0.95", StringComparison.Ordinal) ? 1234
@@ -130,6 +192,44 @@ public class RunMetricsSnapshotServiceTests
         saved.ScenarioVersion.Should().Be(1);
         saved.Thetis.DurationMs.Should().Be(0);
         metrics.Verify(m => m.IncrementSnapshotMissing(), Times.Never);
+        prom.Verify(p => p.QueryScalarAsync(
+            It.Is<string>(q => q.Contains("increase(", StringComparison.Ordinal)),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        prom.Verify(p => p.QueryScalarAsync(
+            It.Is<string>(q => q.StartsWith("sum(link_data_acq_query_duration_milliseconds_count{", StringComparison.Ordinal)),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        prom.Verify(p => p.QueryScalarAsync(
+            It.Is<string>(q => q.Contains("histogram_quantile(0.95, sum by (le) (link_data_acq_query_duration_milliseconds_bucket{", StringComparison.Ordinal)
+                && !q.Contains("[", StringComparison.Ordinal)),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task Capture_marks_stage_unavailable_when_prom_count_is_zero()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true));
+
+        saved.Should().NotBeNull();
+        saved!.Stages.Values.Should().OnlyContain(s => s.Unavailable);
     }
 
     [Fact]
@@ -138,6 +238,7 @@ public class RunMetricsSnapshotServiceTests
         var finishedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
         DateTimeOffset? queriedAt = null;
         var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
             .Callback<string, DateTimeOffset, CancellationToken>((_, time, _) => queriedAt = time)
             .ReturnsAsync(1);
@@ -156,6 +257,30 @@ public class RunMetricsSnapshotServiceTests
 
         queriedAt.Should().NotBeNull();
         queriedAt!.Value.Should().BeAfter(finishedAt);
+    }
+
+    [Fact]
+    public async Task Capture_when_prometheus_unreachable_skips_queries_and_marks_stages_unavailable()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>(MockBehavior.Strict);
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true));
+
+        saved.Should().NotBeNull();
+        saved!.Stages.Values.Should().OnlyContain(s => s.Unavailable);
+        prom.Verify(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static RunMetricsSnapshotService CreateService(
@@ -179,7 +304,9 @@ public class RunMetricsSnapshotServiceTests
         int patientCount = 4,
         DateTimeOffset? startedAt = null,
         int? targetDurationSeconds = null,
-        DateTimeOffset? finishedAt = null)
+        DateTimeOffset? finishedAt = null,
+        DateTime? reportCreatedAt = null,
+        DateTime? submittedAt = null)
     {
         var finished = finishedAt ?? DateTimeOffset.UtcNow;
         return new RunMetricsCaptureInput(
@@ -206,7 +333,9 @@ public class RunMetricsSnapshotServiceTests
                     IssueCount = 0
                 }
             ],
-            targetDurationSeconds);
+            targetDurationSeconds,
+            ReportCreatedAt: reportCreatedAt,
+            SubmittedAt: submittedAt);
     }
 
     private sealed class ImmediateTimeProvider : TimeProvider

@@ -19,6 +19,12 @@ public class MetricsRunListItem
 
 public sealed class MetricsRunDetailViewModel : MetricsRunListItem
 {
+    /// <summary>
+    /// False when the operational run (logs, diagnostics) was deleted.
+    /// The metrics snapshot can still be viewed.
+    /// </summary>
+    public bool RunAvailable { get; set; }
+
     public string? BenchmarkKey { get; set; }
     public int PatientCount { get; set; }
     public double? ResourcesPerSecond { get; set; }

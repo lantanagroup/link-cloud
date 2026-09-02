@@ -110,7 +110,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
-            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled),
+            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
             Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
         };
 

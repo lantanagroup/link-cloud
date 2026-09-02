@@ -137,6 +137,7 @@ public class StartScenarioRequest : IValidatableObject
     public static StartScenarioRequest FromScenario(TestScenarioDefinition scenario) => new()
     {
         Scenario = AutomationScenarioKind.Custom,
+        ScenarioId = scenario.Id,
         ScenarioName = scenario.Name,
         RunConfigurationJson = SerializeScenarioConfiguration(scenario),
         ReportMethod = scenario.ReportMethod,

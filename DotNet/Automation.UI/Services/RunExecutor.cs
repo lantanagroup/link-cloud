@@ -858,11 +858,7 @@ internal sealed class RunExecutor
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
-                        // Match ResourceType= in the summary line, not a bare type name.
-                        // "Patient" is a substring of PatientId= on every resource's log, so a
-                        // bare filter returns the whole run (and at 100+ patients can miss
-                        // the actual ResourceType=Patient lines or time out).
-                        var resourceTypeFilter = $"ResourceType={resourceType}";
+                        var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
                         var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
                             normalizationSummaryMarker,
@@ -871,8 +867,20 @@ internal sealed class RunExecutor
                             limit: 5000,
                             maxPages: 20);
 
-                        output.WriteLine($"[Normalization Suite] Loki evidence for {resourceTypeFilter}: {logsForResourceType.Count} line(s).");
+                        output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
+                    }
+
+                    if (logs.Count == 0)
+                    {
+                        output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
+                        logs = await lokiScraper.QueryServiceLogsAsync(
+                            LokiScraper.Components.Normalization,
+                            normalizationSummaryMarker,
+                            lookback,
+                            additionalContainsFilters: runScopeFilters,
+                            limit: 5000,
+                            maxPages: 20);
                     }
                 }
                 else
@@ -953,14 +961,24 @@ internal sealed class RunExecutor
             if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                 throw new OperationCanceledException("Run was cancelled.");
 
-            state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
-            await _orchestrator.CompleteRunAsync(state.RunId);
-            await callbacks.BroadcastStatus();
-            if (state.Options.IsMetricsRun)
+            AutomationRunMetricsDocument? metricsSnapshot = null;
+            if (MetricsCapturePolicy.ShouldCapture(state.Options.IsMetricsRun, validatorsPassed: true))
+            {
+                state.Status = AutomationRunStatus.CollectingMetrics;
+                await _orchestrator.CompleteRunAsync(state.RunId);
+                await callbacks.BroadcastStatus();
                 output.WriteLine("Collecting step timings… this can take about a minute.");
-            var metricsSnapshot = await CaptureMetricsSnapshotAsync(
-                state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
+                metricsSnapshot = await CaptureMetricsSnapshotAsync(
+                    state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
+            }
+            else
+            {
+                await _orchestrator.CompleteRunAsync(state.RunId);
+            }
+
             if (state.Options.FailRunOnBenchmark
                 && metricsSnapshot?.Benchmark.Pass == false)
             {
@@ -975,6 +993,7 @@ internal sealed class RunExecutor
                 return;
             }
 
+            state.Status = AutomationRunStatus.Succeeded;
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -995,7 +1014,6 @@ internal sealed class RunExecutor
             state.Error = ex.Message;
             state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
-            await CaptureMetricsSnapshotAsync(state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
         }
@@ -1033,6 +1051,20 @@ internal sealed class RunExecutor
             var resourcesMin = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMin ?? state.Options.ResourcesPerPatient;
             var resourcesMax = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? state.Options.ResourcesPerPatient;
 
+            DateTime? reportCreatedAt = null;
+            DateTime? submittedAt = null;
+            try
+            {
+                var schedule = await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(
+                    state.RunId, "schedule", cancellationToken);
+                reportCreatedAt = schedule?.Data?.CreateDate;
+                submittedAt = schedule?.Data?.SubmitReportDateTime;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not read report schedule timestamps for metrics run {RunId}", state.RunId);
+            }
+
             return await service.CaptureAsync(
                 new RunMetricsCaptureInput(
                     state.RunId,
@@ -1040,7 +1072,7 @@ internal sealed class RunExecutor
                     state.RunNameOverride ?? state.Scenario.ToString(),
                     state.Options.BenchmarkKey,
                     state.Options.IsMetricsRun,
-                    state.Status.ToString(),
+                    AutomationRunStatus.Succeeded.ToString(),
                     state.FacilityId ?? state.RunId.ToString(),
                     state.ReportId ?? string.Empty,
                     state.StartedAt ?? state.CreatedAt,
@@ -1056,7 +1088,9 @@ internal sealed class RunExecutor
                     state.Options.SelectedMeasures.Select(m => m.ToString()).ToList(),
                     state.Options.QueryPlanTemplateId,
                     state.Options.NormalizationSuiteId,
-                    generationDurationMs),
+                    generationDurationMs,
+                    reportCreatedAt,
+                    submittedAt),
                 cancellationToken);
         }
         catch (Exception ex)

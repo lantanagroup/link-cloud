@@ -44,4 +44,15 @@ public class MetricsController(MetricsRunPresenter presenter) : Controller
 
         return View(compare);
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var deleted = await presenter.DeleteSnapshotAsync(id, cancellationToken);
+        if (!deleted)
+            return NotFound();
+
+        return RedirectToAction(nameof(Index));
+    }
 }

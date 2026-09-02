@@ -65,7 +65,7 @@
                     <td>@run.PatientCount</td>
                     <td>@run.Seed</td>
                     <td>
-                        <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : run.Status == AutomationRunStatus.Running ? "au-badge-active" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status</span>
+                        <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : run.Status.IsInProgress() ? "au-badge-active" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status.ToDisplayName()</span>
                     </td>
                     <td class="small text-muted">@(run.Duration ?? "–")</td>
                     <td>@run.CreatedAt.LocalDateTime</td>
@@ -73,11 +73,11 @@
                     <td class="text-nowrap">
                         <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
                             <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action" title="View details"><i class="bi bi-box-arrow-up-right"></i></a>
-                            @if (run.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+                            @if (run.Status.IsCancellable())
                             {
                                 <button type="button" class="btn btn-sm btn-outline-warning btn-cancel-run" data-run-id="@run.RunId"><i class="bi bi-x-circle"></i></button>
                             }
-                            @if (run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
+                            @if (run.Status.IsTerminal())
                             {
                                 <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action" title="Export diagnostics ZIP"><i class="bi bi-download"></i></a>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-delete-run" data-run-id="@run.RunId"><i class="bi bi-trash"></i></button>

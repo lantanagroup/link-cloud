@@ -95,7 +95,15 @@ public class PipelineDataReader
 
     public record MeasureReportInfo(string? MeasureReportId, string? Status, string? ReportType, List<ResourceCountInfo> ResourceCounts);
     public record ResourceCountInfo(string ResourceType, int ResourceCount);
-    public record ReportEntryInfo(Guid Id, string? FacilityId, string PatientId, string? ReportingStatus, string? SubmissionStatus, List<MeasureReportInfo> MeasureReports);
+    public record ReportEntryInfo(
+        Guid Id,
+        string? FacilityId,
+        string PatientId,
+        string? ReportingStatus,
+        string? SubmissionStatus,
+        List<MeasureReportInfo> MeasureReports,
+        DateTime? CreateDate = null,
+        DateTime? ModifyDate = null);
     public record EntryMeasureReportInfo(Guid Id, string? ReportType, string? MeasureReportId, string? Status, string PatientId, List<ResourceCountInfo> ResourceCounts);
     public record ScheduleReportTypeInfo(string ReportType);
     public record ReportPopulationInfo(string? ReportType, List<GroupPopulationInfo> GroupPopulations);
@@ -111,7 +119,11 @@ public class PipelineDataReader
         string? QueryPhase,
         List<string> Notes,
         List<string> ResourceAcquiredIds,
-        List<FhirQueryInfo> FhirQueries);
+        List<FhirQueryInfo> FhirQueries,
+        DateTime? ExecutionDate = null,
+        DateTime? CreateDate = null,
+        DateTime? CompletionDate = null,
+        long? CompletionTimeMilliseconds = null);
 
     public record StatusCountInfo(string Status, int Count);
     public record ResourceTypeCountInfo(string ResourceType, int Count);
@@ -189,7 +201,9 @@ public class PipelineDataReader
                     e.PatientId,
                     e.ReportingStatus.ToString(),
                     e.SubmissionStatus?.ToString(),
-                    mrs);
+                    mrs,
+                    e.CreateDate,
+                    e.ModifyDate);
             }).ToList();
         });
 
@@ -329,7 +343,11 @@ public class PipelineDataReader
                 log.QueryPhase?.ToString(),
                 log.Notes?.ToList() ?? [],
                 log.ResourceAcquiredIds?.ToList() ?? [],
-                log.FhirQuery.Select(fq => new FhirQueryInfo(fq.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).ToList())).ToList())));
+                (log.FhirQuery ?? []).Select(fq => new FhirQueryInfo(fq.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).ToList())).ToList(),
+                log.ExecutionDate,
+                log.CreateDate,
+                log.CompletionDate,
+                log.CompletionTimeMilliseconds)));
 
             if (records.Count < pageSize)
                 break;

@@ -132,7 +132,6 @@ public static class MetricsBenchmarkEvaluator
     internal static string FriendlyStage(string key) => key switch
     {
         "acquisition" => "Data Acquisition",
-        "dispatch" => "Query Dispatch",
         "normalization" => "Normalization",
         "measureeval" => "Measure Evaluation",
         "validation" => "Validation",

@@ -13,7 +13,6 @@ public sealed class MetricsRunPresenter
     private static readonly (string Key, string Name, string Hint)[] ServiceOrder =
     [
         ("acquisition", "Data Acquisition", "Pulling FHIR from the server"),
-        ("dispatch", "Query Dispatch", "Telling Data Acquisition who to pull"),
         ("normalization", "Normalization", "Cleaning and reshaping FHIR"),
         ("measureeval", "Measure Evaluation", "Running the measure"),
         ("validation", "Validation", "Checking the measure report"),
@@ -64,6 +63,10 @@ public sealed class MetricsRunPresenter
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var names = scenarios.ToDictionary(s => s.Id, s => s.Name);
+        var uniqueNameToId = scenarios
+            .GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
 
         return new MetricsDashboardViewModel
         {
@@ -79,7 +82,7 @@ public sealed class MetricsRunPresenter
             ScenarioCount = scenarios.Count,
             RecentRunCount = last14.Count,
             Services = BuildServiceStrip(last14),
-            ScenarioCards = BuildScenarioCards(recent, names),
+            ScenarioCards = BuildScenarioCards(recent, names, uniqueNameToId),
             Runs = records,
             Metadata = metadata,
             MetricsScenarios = scenarios,
@@ -94,8 +97,22 @@ public sealed class MetricsRunPresenter
         Guid scenarioId,
         CancellationToken cancellationToken = default)
     {
-        var docs = await _store.ListByScenarioAsync(scenarioId, cancellationToken);
+        var docs = (await _store.ListByScenarioAsync(scenarioId, cancellationToken)).ToList();
         var scenario = await _scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+        if (scenario != null && !string.IsNullOrWhiteSpace(scenario.Name))
+        {
+            var recent = await _store.ListSinceAsync(DateTimeOffset.UtcNow.AddDays(-HistoryDays), cancellationToken);
+            var orphans = recent.Where(d =>
+                (d.ScenarioId is null || d.ScenarioId == Guid.Empty)
+                && string.Equals(d.ScenarioName, scenario.Name, StringComparison.OrdinalIgnoreCase));
+            docs = docs
+                .Concat(orphans)
+                .GroupBy(d => d.RunId)
+                .Select(g => g.First())
+                .OrderBy(d => d.FinishedAt)
+                .ToList();
+        }
+
         if (docs.Count == 0 && scenario == null)
             return null;
 
@@ -128,26 +145,34 @@ public sealed class MetricsRunPresenter
 
     public async Task<MetricsRunDetailViewModel?> GetDetailAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        var run = await _runManager.GetRunAsync(runId, cancellationToken);
-        if (run == null)
-            return null;
-
         var snapshot = await _store.GetAsync(runId, cancellationToken);
-        if (snapshot == null)
-            return UnavailableFromRun(run);
+        var run = await _runManager.GetRunAsync(runId, cancellationToken);
 
-        var detail = ToDetail(snapshot);
-        if (detail.PreviousRunId == null && snapshot.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
+        if (snapshot != null)
         {
-            var previous = await _store.GetPreviousSucceededAsync(
-                scenarioId,
-                snapshot.FinishedAt,
-                snapshot.RunId,
-                cancellationToken);
-            detail.PreviousRunId = previous?.RunId;
+            var detail = ToDetail(snapshot);
+            detail.RunAvailable = run != null;
+            if (detail.PreviousRunId == null && snapshot.ScenarioId is Guid scenarioId && scenarioId != Guid.Empty)
+            {
+                var previous = await _store.GetPreviousSucceededAsync(
+                    scenarioId,
+                    snapshot.FinishedAt,
+                    snapshot.RunId,
+                    cancellationToken);
+                detail.PreviousRunId = previous?.RunId;
+            }
+
+            return detail;
         }
 
-        return detail;
+        if (run != null)
+        {
+            var fallback = UnavailableFromRun(run);
+            fallback.RunAvailable = true;
+            return fallback;
+        }
+
+        return null;
     }
 
     public async Task<MetricsRunDetailViewModel?> GetCapturedAsync(Guid runId, CancellationToken cancellationToken = default)
@@ -170,6 +195,9 @@ public sealed class MetricsRunPresenter
 
     public Task UpsertBenchmarkAsync(AutomationMetricsBenchmarkDocument document, CancellationToken cancellationToken = default) =>
         _benchmarks.UpsertAsync(document, cancellationToken);
+
+    public Task<bool> DeleteSnapshotAsync(Guid runId, CancellationToken cancellationToken = default) =>
+        _store.DeleteAsync(runId, cancellationToken);
 
     internal static MetricsRunListItem ToListItem(AutomationRunMetricsDocument document)
     {
@@ -321,11 +349,13 @@ public sealed class MetricsRunPresenter
 
     private static IReadOnlyList<MetricsScenarioCardViewModel> BuildScenarioCards(
         IReadOnlyList<AutomationRunMetricsDocument> recent,
-        IReadOnlyDictionary<Guid, string> names)
+        IReadOnlyDictionary<Guid, string> names,
+        IReadOnlyDictionary<string, Guid>? uniqueNameToId = null)
     {
         return recent
-            .Where(d => d.ScenarioId is Guid id && id != Guid.Empty)
-            .GroupBy(d => d.ScenarioId!.Value)
+            .Select(d => (Doc: d, ScenarioId: ResolveScenarioId(d, uniqueNameToId)))
+            .Where(x => x.ScenarioId is Guid id && id != Guid.Empty)
+            .GroupBy(x => x.ScenarioId!.Value, x => x.Doc)
             .Select(g =>
             {
                 var ordered = g.OrderBy(d => d.FinishedAt).ToList();
@@ -351,6 +381,21 @@ public sealed class MetricsRunPresenter
             })
             .OrderByDescending(c => c.LastFinishedAt)
             .ToList();
+    }
+
+    private static Guid? ResolveScenarioId(
+        AutomationRunMetricsDocument document,
+        IReadOnlyDictionary<string, Guid>? uniqueNameToId)
+    {
+        if (document.ScenarioId is Guid id && id != Guid.Empty)
+            return id;
+
+        if (uniqueNameToId != null
+            && !string.IsNullOrWhiteSpace(document.ScenarioName)
+            && uniqueNameToId.TryGetValue(document.ScenarioName, out var matched))
+            return matched;
+
+        return null;
     }
 
     private static double? Median(IEnumerable<double> values)

@@ -62,6 +62,29 @@ public class NormalizationSuiteApplicationValidatorTests
     }
 
     [Fact]
+    public async Task RemoveExtensions_SerilogJsonLokiLine_PassesValidation()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildRemoveExtensionsSuite("Remove Common Extensions", "Observation");
+        var abs = new Dictionary<string, object>
+        {
+            ["patient.ndjson"] = "{\"resourceType\":\"Observation\",\"id\":\"Patient-e38197c4-001-Observation-193\",\"status\":\"final\"}\n"
+        };
+        var logs = new List<string>
+        {
+            LokiEvidenceQueryTests.SerilogJsonSummaryLine("Observation", "Patient-e38197c4-001-Observation-193")
+        };
+
+        await sut.ValidateAllAsync(abs, suite, logs, acquiredResourceTypes: ["Observation"]);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("Evidence found", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("Success=1", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RemoveExtensions_SuccessEvidence_PassesWithoutScanningEveryResource()
     {
         var output = new CapturingOutput();

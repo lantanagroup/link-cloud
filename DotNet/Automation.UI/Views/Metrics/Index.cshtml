@@ -100,7 +100,7 @@
         <span class="small text-muted">One card per metrics scenario. Newer runs sit to the right on the sparkline.</span>
     </div>
 
-    @if (Model.ScenarioCards.Count == 0)
+    @if (Model.ScenarioCards.Count == 0 && Model.Runs.Count == 0)
     {
         <div class="au-card mb-4">
             <div class="card-body py-5 text-center">
@@ -109,7 +109,7 @@
             </div>
         </div>
     }
-    else
+    else if (Model.ScenarioCards.Count > 0)
     {
         <div class="row g-3 mb-4">
             @foreach (var card in Model.ScenarioCards)
@@ -241,6 +241,11 @@
                                     {
                                         <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-outline-secondary">History</a>
                                     }
+                                    <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
+                                          onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                    </form>
                                 </td>
                             </tr>
                         }

@@ -26,6 +26,21 @@ public static class LokiEvidenceQuery
         TimeSpan.FromMinutes(20)
     ];
 
+    /// <summary>
+    /// Literal Loki <c>|=</c> needle for a resource type on Serilog JSON lines.
+    /// Rendered console text uses <c>ResourceType=Observation</c>, but the Loki
+    /// sink stores <c>"ResourceType":"Observation"</c>, so the rendered form is
+    /// not a substring and per-type scrapes return zero lines. A bare type name
+    /// is also wrong: <c>Patient</c> matches <c>PatientId</c> on every resource.
+    /// </summary>
+    public static string ResourceTypeContainsFilter(string resourceType)
+    {
+        if (string.IsNullOrWhiteSpace(resourceType))
+            throw new ArgumentException("Resource type is required.", nameof(resourceType));
+
+        return $"\"ResourceType\":\"{resourceType.Trim()}\"";
+    }
+
     public static TimeSpan LookbackForAttempt(TimeSpan configuredWindow, int attemptIndex)
     {
         if (attemptIndex <= 0 || attemptIndex > WidenedWindows.Length)

@@ -384,7 +384,7 @@ public class AutomationRunManager : IAutomationRunManager
             return null;
         }
 
-        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
+        var isFinal = status.IsTerminal();
 
         try
         {
@@ -395,6 +395,7 @@ public class AutomationRunManager : IAutomationRunManager
                 var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
                 var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
+                var acquisitionLogs = await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
@@ -414,6 +415,7 @@ public class AutomationRunManager : IAutomationRunManager
                     Entries = entries,
                     Populations = populations,
                     AcquisitionSummary = acquisitionSummary,
+                    AcquisitionLogs = acquisitionLogs,
                     MeasureEvalResourceCounts = measureResources,
                     ValidatorResults = validatorResults
                 };

@@ -1,10 +1,9 @@
 @model MetricsRunDetailViewModel
 @{
-    var stageOrder = new[] { "acquisition", "dispatch", "normalization", "measureeval", "validation", "submission" };
+    var stageOrder = new[] { "acquisition", "normalization", "measureeval", "validation", "submission" };
     string DisplayName(string key) => key switch
     {
         "acquisition" => "Data Acquisition",
-        "dispatch" => "Query Dispatch",
         "normalization" => "Normalization",
         "measureeval" => "Measure Evaluation",
         "validation" => "Validation",
@@ -14,7 +13,6 @@
     string StageHint(string key) => key switch
     {
         "acquisition" => "Pulling FHIR resources from the server",
-        "dispatch" => "Telling Data Acquisition which patients to pull",
         "normalization" => "Cleaning and reshaping FHIR",
         "measureeval" => "Running the eCQM / measure against the data",
         "validation" => "Checking the measure report",

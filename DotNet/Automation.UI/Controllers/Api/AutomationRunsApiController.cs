@@ -127,9 +127,11 @@ public sealed class AutomationRunsApiController(
     }
 
     /// <summary>
-    /// Returns the persisted Metrics snapshot for a run. 404 if the run is missing.
-    /// When the snapshot row is missing, returns wall-clock fields with stages marked unavailable.
-    /// Does not query Prometheus.
+    /// Returns the persisted Metrics snapshot for a run. 404 only when both the
+    /// operational run and the metrics snapshot are missing. A deleted run still
+    /// returns 200 when <c>automation_run_metrics</c> has a row. When the snapshot
+    /// row is missing but the run exists, returns wall-clock fields with stages
+    /// marked unavailable. Does not query Prometheus.
     /// </summary>
     [HttpGet("{runId:guid}/metrics")]
     [ProducesResponseType(typeof(MetricsRunDetailViewModel), StatusCodes.Status200OK)]

@@ -9,6 +9,27 @@ namespace UnitTests.AutomationUI;
 public class LokiEvidenceQueryTests
 {
     [Fact]
+    public void ResourceTypeContainsFilter_matches_serilog_json_not_rendered_equals()
+    {
+        var jsonLine = SerilogJsonSummaryLine("Observation", "obs-1");
+
+        jsonLine.Should().NotContain("ResourceType=Observation");
+        jsonLine.Should().Contain(LokiEvidenceQuery.ResourceTypeContainsFilter("Observation"));
+        jsonLine.Should().NotContain(LokiEvidenceQuery.ResourceTypeContainsFilter("Patient"));
+        jsonLine.Should().NotContain(LokiEvidenceQuery.ResourceTypeContainsFilter("Encounter"));
+    }
+
+    [Fact]
+    public void ResourceTypeContainsFilter_patient_does_not_match_patient_id_on_other_types()
+    {
+        var jsonLine = SerilogJsonSummaryLine("Observation", "Patient-e38197c4-001-Observation-193", patientId: "Patient-e38197c4-001");
+
+        jsonLine.Should().Contain("PatientId");
+        jsonLine.Should().NotContain(LokiEvidenceQuery.ResourceTypeContainsFilter("Patient"));
+        jsonLine.Should().Contain(LokiEvidenceQuery.ResourceTypeContainsFilter("Observation"));
+    }
+
+    [Fact]
     public void Lookback_widens_to_at_least_configured_and_step_windows()
     {
         LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(5), 0).Should().Be(TimeSpan.FromMinutes(5));
@@ -135,6 +156,23 @@ public class LokiEvidenceQueryTests
 
     private static string SummaryLine(string resourceType, string resourceId) =>
         $"[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType={resourceType}, ResourceId={resourceId}, Steps=[1:RemoveExtensions:Remove Common Extensions:Success]";
+
+    internal static string SerilogJsonSummaryLine(
+        string resourceType,
+        string resourceId,
+        string patientId = "Patient-e38197c4-001") =>
+        "{" +
+        $"\"Message\":\"[NormalizationExecutionSummary] FacilityId=\\\"f1\\\", PatientId=\\\"{patientId}\\\", CorrelationId=\\\"c1\\\", ReportTrackingId=\\\"r1\\\", ResourceType=\\\"{resourceType}\\\", ResourceId=\\\"{resourceId}\\\", Steps=[\\\"1:RemoveExtensions:Remove Common Extensions:Success | 2:RemoveExtensions:Remove Observation Datetime Extension:Success\\\"]\"," +
+        "\"MessageTemplate\":\"[NormalizationExecutionSummary] FacilityId={FacilityId}, PatientId={PatientId}, CorrelationId={CorrelationId}, ReportTrackingId={ReportTrackingId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]\"," +
+        "\"FacilityId\":\"f1\"," +
+        $"\"PatientId\":\"{patientId}\"," +
+        "\"CorrelationId\":\"c1\"," +
+        "\"ReportTrackingId\":\"r1\"," +
+        $"\"ResourceType\":\"{resourceType}\"," +
+        $"\"ResourceId\":\"{resourceId}\"," +
+        "\"Steps\":\"1:RemoveExtensions:Remove Common Extensions:Success | 2:RemoveExtensions:Remove Observation Datetime Extension:Success\"," +
+        "\"level\":\"info\"" +
+        "}";
 
     private sealed class CapturingOutput : IAutomationOutput
     {

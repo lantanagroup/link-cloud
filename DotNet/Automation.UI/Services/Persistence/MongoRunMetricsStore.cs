@@ -22,6 +22,12 @@ public sealed class MongoRunMetricsStore : IRunMetricsStore
             cancellationToken);
     }
 
+    public async Task<bool> DeleteAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var result = await _collection.DeleteOneAsync(d => d.RunId == runId, cancellationToken);
+        return result.DeletedCount > 0;
+    }
+
     public async Task<AutomationRunMetricsDocument?> GetAsync(Guid runId, CancellationToken cancellationToken = default)
     {
         return await _collection.Find(d => d.RunId == runId).FirstOrDefaultAsync(cancellationToken);

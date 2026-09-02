@@ -42,6 +42,25 @@ public class NormalizationExecutionSummaryParserTests
     }
 
     [Fact]
+    public void ParseLine_reads_serilog_json_loki_payload_for_remove_extensions()
+    {
+        var line = LokiEvidenceQueryTests.SerilogJsonSummaryLine("Observation", "Patient-e38197c4-001-Observation-193");
+
+        var steps = NormalizationExecutionSummaryParser.ParseLine(line);
+
+        steps.Should().HaveCount(2);
+        steps[0].ResourceType.Should().Be("Observation");
+        steps[0].ResourceId.Should().Be("Patient-e38197c4-001-Observation-193");
+        steps[0].Sequence.Should().Be(1);
+        steps[0].OperationType.Should().Be("RemoveExtensions");
+        steps[0].OperationName.Should().Be("Remove Common Extensions");
+        steps[0].Outcome.Should().Be("Success");
+        steps[1].Sequence.Should().Be(2);
+        steps[1].OperationName.Should().Be("Remove Observation Datetime Extension");
+        steps[1].Outcome.Should().Be("Success");
+    }
+
+    [Fact]
     public void NamesMatch_treats_sanitized_em_dash_as_equal()
     {
         var suiteName = "Live Patient Test cleanup — Code map Location.type (http://hospital.example.org/locations)";

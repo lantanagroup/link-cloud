@@ -664,6 +664,7 @@ public class StartScenarioRequestResolverTests
     {
         var scenario = new TestScenarioDefinition
         {
+            Id = Guid.NewGuid(),
             Name = "perf",
             IsMetricsRun = true,
             BenchmarkKey = "saved-key",
@@ -675,6 +676,7 @@ public class StartScenarioRequestResolverTests
         var request = StartScenarioRequest.FromScenario(scenario);
         var options = StartScenarioRequestResolver.Resolve(request);
 
+        request.ScenarioId.Should().Be(scenario.Id);
         options.IsMetricsRun.Should().BeTrue();
         options.BenchmarkKey.Should().Be("saved-key");
         options.TargetDurationSeconds.Should().Be(45);

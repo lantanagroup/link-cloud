@@ -58,7 +58,8 @@
         "pre-qualification.write-pre-qual-operation-outcome": "false",
         "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
         "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles",
-        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317"
+        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
+        "Telemetry__PrometheusQueryEndpoint": "http://localhost:9090"
       }
     }
   }
