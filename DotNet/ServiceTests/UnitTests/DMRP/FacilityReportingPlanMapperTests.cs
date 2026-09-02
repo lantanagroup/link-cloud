@@ -20,6 +20,47 @@ namespace UnitTests.DMRP
             ModifyDate = modifyDate
         };
 
+        private static FacilityReportingPlanRequest Request(string? component = null,
+            string? measureMappingId = "22222222-2222-2222-2222-222222222222") => new()
+        {
+            FacilityId = "F1",
+            MeasureMappingId = measureMappingId,
+            Measure = "HOB",
+            Component = component,
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = true
+        };
+
+        [Fact]
+        public void ToEntity_NoComponentSupplied_DefaultsToMsc()
+        {
+            // Every enrollment recorded before the component existed was a measure-and-surveillance
+            // one, so an omitted component means MSC rather than unknown.
+            Assert.Equal(ReportingComponents.Msc, FacilityReportingPlanMapper.ToEntity(Request()).Component);
+        }
+
+        [Theory]
+        [InlineData("msc", "MSC")]
+        [InlineData("Ps", "PS")]
+        [InlineData("pS", "PS")]
+        public void ToEntity_ComponentIsStoredInItsCanonicalCasing(string supplied, string expected)
+        {
+            // The component is part of the unique key, so two casings of one component have to be one
+            // value in the column or the same enrollment can be stored twice.
+            Assert.Equal(expected, FacilityReportingPlanMapper.ToEntity(Request(supplied)).Component);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void ToEntity_BlankMeasureMappingId_IsStoredAsNull(string supplied)
+        {
+            // The column is a foreign key. An empty string is not a mapping that exists, and storing
+            // it as one would fail the constraint rather than record an unmapped enrollment.
+            Assert.Null(FacilityReportingPlanMapper.ToEntity(Request(measureMappingId: supplied)).MeasureMappingId);
+        }
+
         [Fact]
         public void ToModel_TreatsStoredTimestampsAsUtc()
         {

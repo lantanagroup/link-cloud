@@ -219,6 +219,16 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 {
                     plan.Measure = mapping.Measure;
                 }
+                else if (!string.Equals(plan.Measure, mapping.Measure, StringComparison.OrdinalIgnoreCase))
+                {
+                    // The measure is the fact DMRP reported; the mapping is an admin's later decision
+                    // about how to evaluate it. Letting the two contradict each other would store a row
+                    // claiming one measure while scheduling another's dQM, and would put the same
+                    // mapping and period in the table twice under two different measure names -- the
+                    // unique key is on the measure, so it would not stop it.
+                    throw new ReportingPlanValidationException(
+                        $"Measure '{plan.Measure}' does not match measure mapping {plan.MeasureMappingId}, which is for '{mapping.Measure}'.");
+                }
             }
 
             if (string.IsNullOrWhiteSpace(plan.Measure))

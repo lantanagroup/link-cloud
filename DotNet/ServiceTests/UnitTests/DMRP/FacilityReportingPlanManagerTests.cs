@@ -79,6 +79,35 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
+        public async Task CreateAsync_MeasureContradictingItsMapping_IsRejected()
+        {
+            var plan = ValidPlan();
+            plan.Measure = "ZZZ";
+
+            // The default mapping in this fixture is for HOB. The measure is the fact DMRP reported
+            // and the mapping is an admin's decision about how to evaluate it, so a row asserting one
+            // measure while resolving another's dQM is a contradiction rather than an override -- it
+            // would display ZZZ, schedule HOB's dQM, and slip past the unique key, which is on the
+            // measure and would see two different names as two different enrollments.
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+
+            Assert.Contains("ZZZ", ex.Message);
+            Assert.Contains("HOB", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_MeasureMatchingItsMappingInAnotherCase_IsAccepted()
+        {
+            var plan = ValidPlan();
+            plan.Measure = "hob";
+
+            // The check exists to catch a contradiction, not to police casing.
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal("hob", result.Measure);
+        }
+
+        [Fact]
         public async Task CreateAsync_MissingFacilityId_IsRejected()
         {
             var plan = ValidPlan();
