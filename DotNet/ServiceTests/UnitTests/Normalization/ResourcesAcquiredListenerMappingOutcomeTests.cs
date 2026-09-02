@@ -222,13 +222,46 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
 
         // The indicator is reporting metadata; the pipeline is the product. ResourcesNormalized has already
         // been produced by this point, so letting the exception escape would redeliver the message and
-        // produce it a second time -- a worse outcome than losing the indicator.
+        // produce it a second time -- a worse outcome than losing the indicator. That ordering is what
+        // makes the swallow safe, so it is pinned by the test below rather than left to be reshuffled.
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
 
         // Cleanup follows the produce, so a throw would also have stranded the copied cache keys.
         resourceCache.Verify(
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_ProducesTheOutcomeAfterResourcesNormalized()
+    {
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var normalizedProducer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var order = new List<string>();
+
+        normalizedProducer
+            .Setup(item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("normalized"))
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+
+        var listener = BuildListener(
+            LocationWithTypeCodes("ICU"),
+            CodeMapSequence(("ICU", "1027-4")),
+            outcomeProducer,
+            normalizedProducer);
+
+        Capture(outcomeProducer, _ => order.Add("outcome"));
+
+        await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
+
+        // The order carries the failure semantics, so it is behaviour rather than arrangement. A
+        // ResourcesNormalized failure throws and the whole message is redelivered; produced first, the
+        // outcome would then be produced again for the same pass. Producing it second also means a failure
+        // here can be swallowed without the pipeline caring, because the pipeline's message is already out.
+        Assert.Equal(["normalized", "outcome"], order);
     }
 
     private static void Capture(

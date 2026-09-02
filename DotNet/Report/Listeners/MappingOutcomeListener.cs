@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -197,12 +198,44 @@ public class MappingOutcomeListener : BackgroundService
 
         // Deserialization writes a null over the property initializer, so the collection is only
         // non-null by convention.
-        var scheduleIds = (value.ScheduledReports ?? [])
+        var trackingIds = (value.ScheduledReports ?? [])
             .Select(sr => sr.ReportTrackingId)
+            .ToList();
+
+        var scheduleIds = trackingIds
             .Where(id => Guid.TryParse(id, out _))
             .Select(Guid.Parse!)
             .Distinct()
             .ToList();
+
+        // A tracking id is a ReportSchedule id put on the wire as a string, so one that will not parse is
+        // an upstream defect rather than a variant to tolerate. Dropping the bad ones is still the right
+        // call when others are usable -- refusing the whole message would discard the outcomes for the
+        // schedules that are fine -- but it must not happen in silence, or a patient's indicators simply
+        // never appear and there is nothing to search for.
+        // Counted directly rather than as a difference against scheduleIds, which is deduplicated: the
+        // same schedule listed twice is legitimate, and subtracting would report it as an unparsable id.
+        var unusable = trackingIds.Where(id => !Guid.TryParse(id, out _)).ToList();
+
+        if (unusable.Count > 0)
+        {
+            _logger.LogWarning(
+                "{Listener}: Discarded {Count} unparsable report tracking id(s) on a MappingOutcomeEvaluated " +
+                "message for facility {FacilityId}, patient {PatientId}: {TrackingIds}",
+                nameof(MappingOutcomeListener),
+                unusable.Count,
+                facilityId.SanitizeForLog(),
+                patientId.SanitizeForLog(),
+                string.Join(", ", unusable).SanitizeForLog());
+        }
+
+        if (scheduleIds.Count == 0)
+        {
+            // Nothing left to write to. Committing here would retire a message that recorded nothing,
+            // which is the same outcome as the malformed ones the guard above rejects.
+            throw new DeadLetterException(
+                "MappingOutcomeEvaluated message carried no usable report tracking id");
+        }
 
         var now = DateTime.UtcNow;
 

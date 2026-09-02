@@ -37,6 +37,7 @@ public class MappingOutcomeListenerTests
     private static readonly Guid ScheduleId = Guid.NewGuid();
 
     private readonly Mock<IReportEntryMappingOutcomeManager> _manager = new();
+    private readonly Mock<ILogger<MappingOutcomeListener>> _logger = new();
     private readonly MappingOutcomeListener _listener;
 
     private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, string>> _consumeHandler = new();
@@ -62,7 +63,7 @@ public class MappingOutcomeListenerTests
         scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
         _listener = new MappingOutcomeListener(
-            Mock.Of<ILogger<MappingOutcomeListener>>(),
+            _logger.Object,
             Mock.Of<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>(),
             new ServiceInformation { ServiceConfigName = "Report" },
             _consumeHandler.Object,
@@ -330,10 +331,85 @@ public class MappingOutcomeListenerTests
 
         await ConsumeAsync(message);
 
+        // Refusing the whole message would discard the outcome for the schedule that is perfectly good.
         _manager.Verify(item => item.UpsertAcquisitionOutcomeAsync(
             It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(),
             It.IsAny<MappingIndicatorStatus>(), It.IsAny<MappingIndicatorStatus>(),
             It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        // Skipping it quietly is the part that bites: a tracking id is a schedule id put on the wire, so
+        // one that will not parse is an upstream defect, and the schedule it named silently gets no
+        // indicators. The warning names the value so there is something to search for.
+        VerifyWarning("not-a-guid");
+    }
+
+    [Fact]
+    public async Task TheSameScheduleListedTwice_IsNotMistakenForABadId()
+    {
+        var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
+        message.Message.Value.ScheduledReports.Add(new ScheduledReport { ReportTrackingId = ScheduleId.ToString() });
+
+        await ConsumeAsync(message);
+
+        // Deduplicated before use, so the outcome is written once. Counting the bad ids as the difference
+        // against that deduplicated list would report the repeat as unparsable and warn about nothing.
+        _manager.Verify(item => item.UpsertAcquisitionOutcomeAsync(
+            FacilityId, ScheduleId, PatientId,
+            It.IsAny<MappingIndicatorStatus>(), It.IsAny<MappingIndicatorStatus>(),
+            It.IsAny<string?>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        _logger.Verify(
+            item => item.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task NoUsableReportTrackingId_DeadLetters()
+    {
+        var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
+        message.Message.Value.ScheduledReports =
+            [new ScheduledReport { ReportTrackingId = "not-a-guid" }];
+
+        // There is nothing left to write the outcome to. Committing would retire a message that recorded
+        // nothing at all, which is the same end state as the malformed messages the key guard rejects --
+        // so it belongs in the same place.
+        await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(message));
+
+        _manager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task NoScheduledReportsAtAll_DeadLetters()
+    {
+        var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
+        message.Message.Value.ScheduledReports = [];
+
+        // Same end state by a different route, and Normalization already treats an empty ScheduledReports
+        // as malformed one hop upstream.
+        await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(message));
+    }
+
+    [Fact]
+    public async Task EveryTrackingIdUsable_LogsNoWarning()
+    {
+        var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
+
+        await ConsumeAsync(message);
+
+        // The warning has to stay rare enough to mean something on a topic this busy.
+        _logger.Verify(
+            item => item.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
     }
 
     [Fact]
@@ -408,6 +484,16 @@ public class MappingOutcomeListenerTests
                     pass?.Invoke(correlationId, queryType);
                 })
             .Returns(Task.CompletedTask);
+
+    private void VerifyWarning(string expectedFragment) =>
+        _logger.Verify(
+            item => item.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(expectedFragment)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
 
     private static LocationOrgOutcome Outcome(
         LocationOrgStatus status, int encounterCount, int orgEncounterCount, int assumedOrgEncounterCount) =>

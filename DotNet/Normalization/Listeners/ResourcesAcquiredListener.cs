@@ -354,6 +354,15 @@ public class ResourcesAcquiredListener : BackgroundService
                     correlationId.SanitizeForLog());
             }
 
+            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+
+            // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
+            // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
+            // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
+            // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
+            // avoidable noise on the topic, and this order also means a produce failure here can be
+            // swallowed without the pipeline caring, because the pipeline's own message is already out.
+            //
             // Produced even when nothing was acquired: the configured code maps are declared up front, so
             // this still reports them with zero counts, which is what separates "nothing reached the map"
             // from "no map is configured".
@@ -364,9 +373,6 @@ public class ResourcesAcquiredListener : BackgroundService
                 result.Message.Value,
                 mappingOutcomes,
                 cancellationToken);
-
-
-            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
             await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
         }
