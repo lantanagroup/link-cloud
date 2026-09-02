@@ -229,7 +229,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting,
-                LookAheadWindow(monthsAhead, CurrentPeriod()), cancellationToken);
+                LookAheadWindow(monthsAhead, current), cancellationToken);
 
             return Ok(results);
         }
@@ -305,7 +305,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequestProblem(pagingError);
             }
 
-            var refreshFailure = await RefreshAsync(refresh, facilityId, CurrentPeriod(), cancellationToken);
+            // One reading for the whole request. The refresh, the window and the period the answer is
+            // anchored on all have to mean the same month, and taking the clock more than once lets a
+            // request that spans midnight on the last of the month disagree with itself.
+            var anchor = CurrentPeriod();
+
+            var refreshFailure = await RefreshAsync(refresh, facilityId, anchor, cancellationToken);
 
             if (refreshFailure is not null)
             {
@@ -313,10 +318,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
-
-            // One reading for both. The window and the period it is answered against have to agree,
-            // and taking the clock twice lets them disagree across a month rollover.
-            var anchor = CurrentPeriod();
 
             var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead, anchor), anchor,
                 isReporting ?? true, pageSize, pageNumber, cancellationToken);
