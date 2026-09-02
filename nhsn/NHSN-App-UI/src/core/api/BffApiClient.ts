@@ -1,6 +1,7 @@
 import type {ApiClient, DraftEnvelope} from './ApiClient';
 import type {FacilityDraft} from '../onboarding/types';
 import {HttpClient, pollOperation, type Operation} from './http';
+import {cachedReference} from './referenceCache';
 import type {
   Acknowledgement,
   AcquisitionLogEntry,
@@ -97,24 +98,35 @@ export class BffApiClient implements ApiClient {
 
   // ------------------------------------------------------------ reference data
 
+  // These four are static, same bytes for every facility and user, and back
+  // dropdowns that several steps mount independently — cachedReference is what
+  // keeps walking back and forth across onboarding from refetching each one.
   async getVendorProfiles(): Promise<VendorProfile[]> {
-    const {data} = await this.http.get<VendorProfile[]>('/reference/vendors');
-    return data;
+    return cachedReference('vendors', async () => {
+      const {data} = await this.http.get<VendorProfile[]>('/reference/vendors');
+      return data;
+    });
   }
 
   async getTimezones(): Promise<Timezone[]> {
-    const {data} = await this.http.get<Timezone[]>('/reference/timezones');
-    return data;
+    return cachedReference('timezones', async () => {
+      const {data} = await this.http.get<Timezone[]>('/reference/timezones');
+      return data;
+    });
   }
 
   async getMeasures(): Promise<Measure[]> {
-    const {data} = await this.http.get<Measure[]>('/reference/measures');
-    return data;
+    return cachedReference('measures', async () => {
+      const {data} = await this.http.get<Measure[]>('/reference/measures');
+      return data;
+    });
   }
 
   async getHslocCodes(): Promise<HslocCode[]> {
-    const {data} = await this.http.get<HslocCode[]>('/reference/hsloc-codes');
-    return data;
+    return cachedReference('hsloc-codes', async () => {
+      const {data} = await this.http.get<HslocCode[]>('/reference/hsloc-codes');
+      return data;
+    });
   }
 
   async getEncounterCodes(query: string): Promise<EncounterCode[]> {
