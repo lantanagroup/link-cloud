@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Normalization.Application.Models.FacilityLocationMappings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers;
@@ -47,7 +48,7 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         };
 
         _dbContext.FacilityLocationLocalCodeMappings.Add(mapping);
-        await _dbContext.SaveChangesAsync();
+        await SaveChangesAsync();
 
         return (await _mappingQueries.Get(mapping.Id))!;
     }
@@ -70,7 +71,7 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         mapping.HSLOCId = model.HSLOCId;
         mapping.ModifyDate = DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await SaveChangesAsync();
         return await _mappingQueries.Get(mapping.Id);
     }
 
@@ -115,6 +116,20 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         if (duplicateExists)
         {
             throw new InvalidOperationException("A mapping already exists for this facility location and local code.");
+        }
+    }
+
+    private async Task SaveChangesAsync()
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw new InvalidOperationException(
+                "A mapping already exists for this facility location and local code.",
+                exception);
         }
     }
 }

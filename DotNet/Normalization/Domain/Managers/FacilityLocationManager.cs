@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Normalization.Application.Models.FacilityLocations;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers;
@@ -53,12 +54,31 @@ public class FacilityLocationManager : IFacilityLocationManager
         };
 
         _dbContext.FacilityLocations.Add(facilityLocation);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        await _dbContext.FacilityLocations
-            .Where(location => location.FacilityId == facilityId && location.PartOfId == facilityLocation.LocationId)
-            .ExecuteUpdateAsync(updates => updates
-                .SetProperty(location => location.ParentFacilityLocationId, facilityLocation.Id), cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _dbContext.FacilityLocations
+                .Where(location => location.FacilityId == facilityId && location.PartOfId == facilityLocation.LocationId)
+                .ExecuteUpdateAsync(updates => updates
+                    .SetProperty(location => location.ParentFacilityLocationId, facilityLocation.Id), cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "A facility location with the supplied location identifier already exists.",
+                exception);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
 
         return ToModel(facilityLocation);
     }

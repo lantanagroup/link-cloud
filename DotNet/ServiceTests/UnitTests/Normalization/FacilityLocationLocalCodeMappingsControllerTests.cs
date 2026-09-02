@@ -261,6 +261,27 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         Assert.Equal("The requested facility location does not exist.", problem.Detail);
     }
 
+    [Fact]
+    public async Task Post_DuplicateMapping_ReturnsConflictProblemDetails()
+    {
+        const string errorMessage = "A mapping already exists for this facility location and local code.";
+        var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
+        var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
+        manager.Setup(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>()))
+            .ThrowsAsync(new InvalidOperationException(errorMessage));
+        var controller = CreateController(manager, queries);
+
+        var result = await controller.Post("facility-1", new FacilityLocationLocalCodeMappingPostModel
+        {
+            LocationId = "location-1",
+            LocalCodeSystem = "urn:oid:1.2.3",
+            LocalCode = "local-code"
+        });
+
+        var problem = AssertProblem(result.Result!, HttpStatusCode.Conflict);
+        Assert.Equal(errorMessage, problem.Detail);
+    }
+
     private static FacilityLocationLocalCodeMappingsController CreateController(
         Mock<IFacilityLocationLocalCodeMappingManager> manager,
         Mock<IFacilityLocationLocalCodeMappingQueries> queries) => new(manager.Object, queries.Object);
