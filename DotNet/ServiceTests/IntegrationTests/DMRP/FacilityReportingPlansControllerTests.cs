@@ -79,7 +79,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         // these tests assert on depend on the day they run.
         _clock = new FakeTimeProvider(Now);
 
-        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _sync, _clock)
+        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _sync,
+            _fixture.FacilityExistenceMock.Object, _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -570,6 +571,52 @@ public class FacilityReportingPlansControllerTests : IDisposable
             cancellationToken: CancellationToken.None);
 
         Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_RefreshOnAnUnknownFacility_IsNotFound()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        // Reading an unknown facility answers an empty list, because absence of enrollment is a
+        // meaningful answer. Refreshing one is a write: it would create reporting plan rows keyed on
+        // an id Link has no facility for, which nothing but an explicit delete would ever remove.
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_RefreshOnAnUnknownFacility_IsNotFound()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithoutRefresh_AnUnknownFacilityStillReads()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, refresh: false,
+            cancellationToken: CancellationToken.None);
+
+        // The existence check guards the write, not the read. A plain read of an unknown facility
+        // keeps answering 200 with nothing in it.
+        Assert.IsType<OkObjectResult>(result);
     }
 
     [Fact]

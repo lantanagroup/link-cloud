@@ -64,6 +64,76 @@ namespace UnitTests.DMRP
         private static DmrpReportingPlanEntry Entry(string measure, string component = ReportingComponents.Msc) =>
             new(component, measure, Month, Year);
 
+        /// <summary>
+        /// An entry answering for a period other than the one asked for. The client keeps an entry's
+        /// own month and year in preference to the requested ones, so this is a shape the sync has to
+        /// handle rather than a hypothetical.
+        /// </summary>
+        private static DmrpReportingPlanEntry OffPeriodEntry(string measure, int month, int year,
+            string component = ReportingComponents.Msc) =>
+            new(component, measure, month, year);
+
+        [Fact]
+        public async Task SyncAsync_AnEntryForAnotherPeriod_IsRecordedOnceAcrossRepeatedRuns()
+        {
+            using var context = CreateContext();
+            AddMapping(context, "HOB");
+            await context.SaveChangesAsync();
+
+            var sync = CreateSync(context, Entry("HOB"), OffPeriodEntry("HOB", Month + 1, Year));
+
+            await sync.SyncAsync(FacilityId, Month, Year);
+            await sync.SyncAsync(FacilityId, Month, Year);
+
+            // The comparison set used to be loaded for the requested period alone, so the off-period
+            // row could never match itself and was inserted again on every refresh -- until the second
+            // one hit the unique index, and because the whole sync saves at once, took every
+            // legitimate change of that run down with it.
+            var rows = await context.FacilityReportingPlans
+                .Where(p => p.FacilityId == FacilityId && p.ReportingMonth == Month + 1)
+                .ToListAsync();
+
+            Assert.Single(rows);
+        }
+
+        [Fact]
+        public async Task SyncAsync_TheSameEnrollmentListedTwice_IsRecordedOnce()
+        {
+            using var context = CreateContext();
+            AddMapping(context, "HOB");
+            await context.SaveChangesAsync();
+
+            await CreateSync(context, Entry("HOB"), Entry("HOB")).SyncAsync(FacilityId, Month, Year);
+
+            // Two adds and one SaveChanges is a unique-index violation, and the exception is not a
+            // DmrpApiException, so it would surface as a 500 rather than the documented 502.
+            var rows = await context.FacilityReportingPlans
+                .Where(p => p.FacilityId == FacilityId)
+                .ToListAsync();
+
+            Assert.Single(rows);
+        }
+
+        [Fact]
+        public async Task SyncAsync_DoesNotWithdrawARowInAPeriodItDidNotAskAbout()
+        {
+            using var context = CreateContext();
+            AddMapping(context, "HOB");
+            var other = AddPlan(context, "HOB");
+            other.ReportingMonth = Month + 1;
+            await context.SaveChangesAsync();
+
+            await CreateSync(context, Entry("HOB")).SyncAsync(FacilityId, Month, Year);
+
+            // Absence is how DMRP says "withdrawn", but only for the period the question named. The
+            // widened load must not turn another period's rows into withdrawals just by making them
+            // visible to the comparison.
+            var untouched = await context.FacilityReportingPlans
+                .SingleAsync(p => p.FacilityId == FacilityId && p.ReportingMonth == Month + 1);
+
+            Assert.True(untouched.IsReporting);
+        }
+
         private static MeasureMapping AddMapping(TenantDbContext context, string measure) =>
             context.MeasureMappings.Add(new MeasureMapping
             {

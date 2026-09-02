@@ -44,15 +44,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private readonly IFacilityReportingPlanManager _manager;
         private readonly IFacilityReportingPlanQueries _queries;
         private readonly IFacilityReportingPlanLookAhead _lookAhead;
+        private readonly IFacilityExistence _facilityExistence;
         private readonly IDmrpReportingPlanSync _sync;
         private readonly TimeProvider _timeProvider;
 
-        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, IDmrpReportingPlanSync sync, TimeProvider timeProvider)
+        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, IDmrpReportingPlanSync sync, IFacilityExistence facilityExistence, TimeProvider timeProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
             _lookAhead = lookAhead ?? throw new ArgumentNullException(nameof(lookAhead));
+            _facilityExistence = facilityExistence ?? throw new ArgumentNullException(nameof(facilityExistence));
             _sync = sync ?? throw new ArgumentNullException(nameof(sync));
             _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
@@ -680,6 +682,20 @@ namespace LantanaGroup.Link.DMRP.Controllers
             if (!refresh)
             {
                 return null;
+            }
+
+            // The reads themselves answer for an unknown facility with an empty list, because absence
+            // of enrollment is a meaningful answer. A refresh is not a read: it writes reporting plan
+            // rows keyed on this id, and the sync documents that the facility was already known when
+            // it was asked for -- nothing else establishes that. Without this, a mistyped id whose
+            // value DMRP happens to recognise silently creates rows for a facility Link has no record
+            // of, and only an explicit delete would ever remove them.
+            if (!await _facilityExistence.ExistsAsync(facilityId, cancellationToken))
+            {
+                return Problem(
+                    $"Facility {facilityId} was not found, so its reporting plan cannot be refreshed.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Not Found");
             }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Refresh Facility Reporting Plan");

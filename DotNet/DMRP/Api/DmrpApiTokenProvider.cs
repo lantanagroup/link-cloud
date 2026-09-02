@@ -1,6 +1,7 @@
 using LantanaGroup.Link.DMRP.Config;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.DMRP.Api
 {
@@ -14,6 +15,17 @@ namespace LantanaGroup.Link.DMRP.Api
         /// </summary>
         /// <exception cref="DmrpApiException">The token could not be obtained.</exception>
         Task<string> GetAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Discards the cached token, so the next <see cref="GetAsync"/> fetches a new one.
+        /// </summary>
+        /// <remarks>
+        /// For a caller the API has just refused. A token can stop being accepted well before it
+        /// stops being valid by the clock -- a revoked or rotated credential does exactly that -- and
+        /// without this the cache would keep handing out the dead one until its stated expiry, so
+        /// every call in that window fails with nothing an operator can do but restart the host.
+        /// </remarks>
+        void Invalidate();
     }
 
     /// <summary>
@@ -92,6 +104,13 @@ namespace LantanaGroup.Link.DMRP.Api
             }
         }
 
+        public void Invalidate()
+        {
+            // No lock: a torn read here can only mean an extra token fetch, and taking the gate would
+            // let a failed call block on whichever caller is already fetching.
+            _token = null;
+        }
+
         private bool TryUseCachedToken(out string token)
         {
             token = _token ?? string.Empty;
@@ -121,6 +140,12 @@ namespace LantanaGroup.Link.DMRP.Api
             {
                 response = await client.PostAsJsonAsync(api.TokenUrl, request, cancellationToken);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A client timeout arrives as a TaskCanceledException, which the filter below would
+                // let past as if the caller had cancelled. See the same guard in DmrpApiClient.
+                throw new DmrpApiException("The DMRP API token endpoint timed out.");
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 throw new DmrpApiException("The DMRP API token endpoint could not be reached.", ex);
@@ -138,7 +163,19 @@ namespace LantanaGroup.Link.DMRP.Api
                         $"The DMRP API token endpoint answered {(int)response.StatusCode}.");
                 }
 
-                var token = await response.Content.ReadFromJsonAsync<DmrpTokenResponse>(cancellationToken);
+                DmrpTokenResponse? token;
+
+                try
+                {
+                    token = await response.Content.ReadFromJsonAsync<DmrpTokenResponse>(cancellationToken);
+                }
+                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                {
+                    // Deliberately does not carry the body into the message: a token endpoint's
+                    // response can echo the credential that was sent.
+                    throw new DmrpApiException(
+                        "The DMRP API token endpoint returned a response that could not be read.", ex);
+                }
 
                 if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
                 {

@@ -87,13 +87,37 @@ namespace LantanaGroup.Link.DMRP.Business
 
             var mappings = await ResolveMappingsAsync(entries, cancellationToken);
 
-            var existing = await _plans.FindAsync(p => p.FacilityId == facilityId
-                && p.ReportingMonth == month
-                && p.ReportingYear == year, cancellationToken);
+            // Every period the response actually speaks about, not just the one asked for. The client
+            // keeps an entry's own month and year in preference to the requested ones on purpose, so
+            // a response can carry a period we did not ask about -- and loading only the requested
+            // period would leave such an entry unable to match anything, inserted fresh on every
+            // refresh until it collided with the unique index.
+            var periods = entries
+                .Select(e => (Month: e.ReportingMonth, Year: e.ReportingYear))
+                .Append((Month: month, Year: year))
+                .ToHashSet();
+
+            var months = periods.Select(period => period.Month).Distinct().ToList();
+            var years = periods.Select(period => period.Year).Distinct().ToList();
+
+            // The predicate is the cross product of those months and years, which is as close as a
+            // translatable query gets; the periods actually present are selected out of it here.
+            var candidates = await _plans.FindAsync(p => p.FacilityId == facilityId
+                && months.Contains(p.ReportingMonth)
+                && years.Contains(p.ReportingYear), cancellationToken);
+
+            var existing = candidates
+                .Where(p => periods.Contains((p.ReportingMonth, p.ReportingYear)))
+                .ToList();
 
             var recorded = 0;
             var reinstated = 0;
             var unmapped = 0;
+
+            // What this run has already written. Two entries naming the same enrollment would
+            // otherwise be added twice and break the unique index on save -- and because the whole
+            // sync commits at once, that would throw away every legitimate change alongside them.
+            var added = new HashSet<(string Component, string Measure, int Month, int Year)>();
 
             foreach (var entry in entries)
             {
@@ -108,6 +132,18 @@ namespace LantanaGroup.Link.DMRP.Business
 
                 if (row is null)
                 {
+                    if (!added.Add((entry.Component.ToUpperInvariant(), entry.Measure.ToUpperInvariant(),
+                            entry.ReportingMonth, entry.ReportingYear)))
+                    {
+                        // The same enrollment listed twice in one response. Recording it once is the
+                        // whole of the answer; counting it twice would report work that did not happen.
+                        _logger.LogDebug(
+                            "DMRP listed {Measure} for {Month}/{Year} more than once; the repeat was ignored.",
+                            entry.Measure.SanitizeForLog(), entry.ReportingMonth, entry.ReportingYear);
+
+                        continue;
+                    }
+
                     await _plans.AddAsync(new FacilityReportingPlan
                     {
                         FacilityId = facilityId,
@@ -140,7 +176,11 @@ namespace LantanaGroup.Link.DMRP.Business
                 _plans.Update(row);
             }
 
-            var withdrawn = Withdraw(entries, existing);
+            // Only the period that was asked about. Absence is how DMRP says "withdrawn", but it can
+            // only mean that for the period the question named -- a row in some other period was
+            // never in scope of this answer, so its absence says nothing at all.
+            var withdrawn = Withdraw(entries,
+                existing.Where(p => p.ReportingMonth == month && p.ReportingYear == year).ToList());
 
             await _plans.SaveChangesAsync(cancellationToken);
 

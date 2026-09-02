@@ -88,6 +88,107 @@ namespace UnitTests.DMRP
             return (new DmrpApiClient(factory, tokens, options, NullLogger<DmrpApiClient>.Instance), handler, clock);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task GetReportingPlanAsync_WhenTheApiTimesOut_ReportsItAsAnApiFailure(bool onTheTokenCall)
+        {
+            // Both legs have their own guard, and the token is fetched first -- so a stub that throws
+            // for every request would only ever prove the token provider's, leaving the client's
+            // untested and a plan-call timeout still escaping as a 500.
+            var (client, _, _) = CreateClient(request =>
+            {
+                var isToken = request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal);
+
+                if (isToken == onTheTokenCall)
+                {
+                    throw new TaskCanceledException(
+                        "The request was canceled due to the configured HttpClient.Timeout.",
+                        new TimeoutException());
+                }
+
+                return RouteByPath(request);
+            });
+
+            // HttpClient reports its own timeout as a TaskCanceledException, which is an
+            // OperationCanceledException -- so a filter excluding those lets it past and the request
+            // ends as an unhandled 500 rather than the 502 the endpoint documents. A timeout is the
+            // most likely way a third party fails, so it must land with the other transport faults.
+            await Assert.ThrowsAsync<DmrpApiException>(
+                () => client.GetReportingPlanAsync(FacilityId, 5, 2026));
+        }
+
+        [Fact]
+        public async Task GetReportingPlanAsync_WhenTheCallerCancels_StaysACancellation()
+        {
+            var (client, _, _) = CreateClient(_ => throw new TaskCanceledException());
+
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // The other side of the same distinction: the caller giving up is not an API failure and
+            // must keep unwinding as cancellation rather than being dressed up as a bad gateway.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => client.GetReportingPlanAsync(FacilityId, 5, 2026, cts.Token));
+        }
+
+        [Theory]
+        [InlineData("<html><body>Sign in to continue</body></html>", "text/html")]
+        [InlineData("{\"orgid\":100,\"plans\":[{\"name\":\"HOB\"", "application/json")]
+        public async Task GetReportingPlanAsync_WhenTheBodyCannotBeRead_ReportsItAsAnApiFailure(
+            string body, string contentType)
+        {
+            var (client, _, _) = CreateClient(request =>
+                request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal)
+                    ? TokenResponse()
+                    : new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(body, Encoding.UTF8, contentType)
+                    });
+
+            // A 200 is not a promise of JSON: a proxy or captive portal answers HTML with a success
+            // code, and a connection cut mid-body leaves truncated JSON. Both used to escape the
+            // wrapping as a NotSupportedException or JsonException and surface as a 500.
+            await Assert.ThrowsAsync<DmrpApiException>(
+                () => client.GetReportingPlanAsync(FacilityId, 5, 2026));
+        }
+
+        [Fact]
+        public async Task GetReportingPlanAsync_WhenTheApiRefusesTheToken_TheNextCallFetchesAFreshOne()
+        {
+            var refuse = true;
+
+            var (client, handler, _) = CreateClient(request =>
+            {
+                if (request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal))
+                {
+                    return TokenResponse();
+                }
+
+                if (refuse)
+                {
+                    return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+                }
+
+                return RouteByPath(request);
+            });
+
+            await Assert.ThrowsAsync<DmrpApiException>(
+                () => client.GetReportingPlanAsync(FacilityId, 5, 2026));
+
+            refuse = false;
+            await client.GetReportingPlanAsync(FacilityId, 5, 2026);
+
+            // A token is cached until its stated expiry, but a revoked or rotated credential stops
+            // being accepted long before that. Without discarding it on a 401 the dead token would be
+            // replayed for the rest of its lifetime -- an hour of failing refreshes with nothing an
+            // operator could do but restart the host.
+            var tokenRequests = handler.Requests
+                .Count(r => r.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal));
+
+            Assert.Equal(2, tokenRequests);
+        }
+
         private static HttpResponseMessage RouteByPath(HttpRequestMessage request)
         {
             var path = request.RequestUri!.AbsolutePath;

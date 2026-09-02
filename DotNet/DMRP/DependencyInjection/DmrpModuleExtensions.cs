@@ -78,7 +78,16 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // Registered whether or not DMRP:Api is filled in. An environment with no API to talk to
             // simply never calls it, and the client says so plainly if something does; refusing to
             // register would instead surface as a resolve failure somewhere unrelated.
-            builder.Services.AddHttpClient(DmrpApiClient.HttpClientName);
+            builder.Services.AddHttpClient(DmrpApiClient.HttpClientName, client =>
+            {
+                // Bounded here rather than left at HttpClient's 100-second default, which is far
+                // longer than an admin GET should ever hang on a third party.
+                var seconds = builder.Configuration
+                    .GetSection(DmrpSettings.ConfigSectionName)
+                    .Get<DmrpSettings>()?.Api.TimeoutSeconds ?? 30;
+
+                client.Timeout = TimeSpan.FromSeconds(seconds > 0 ? seconds : 30);
+            });
             builder.Services.AddSingleton<IDmrpApiTokenProvider, DmrpApiTokenProvider>();
             builder.Services.AddScoped<IDmrpApiClient, DmrpApiClient>();
             builder.Services.AddScoped<IDmrpReportingPlanSync, DmrpReportingPlanSync>();

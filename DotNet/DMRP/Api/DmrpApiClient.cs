@@ -4,7 +4,9 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.DMRP.Api
 {
@@ -121,6 +123,14 @@ namespace LantanaGroup.Link.DMRP.Api
             {
                 response = await client.GetAsync(url, cancellationToken);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // HttpClient reports its own timeout as a TaskCanceledException, which is an
+                // OperationCanceledException -- so the filter below lets it past and the request ends
+                // as an unhandled 500. A timeout is the API being unreachable, not the caller giving
+                // up, and the two are told apart by whether our token was actually cancelled.
+                throw new DmrpApiException($"The DMRP API operation /{path} timed out.");
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 throw new DmrpApiException($"The DMRP API operation /{path} could not be reached.", ex);
@@ -130,11 +140,34 @@ namespace LantanaGroup.Link.DMRP.Api
             {
                 if (!response.IsSuccessStatusCode)
                 {
+                    if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                    {
+                        // The token is cached until its stated expiry, but the API has just said it
+                        // will not accept it -- a revoked or rotated credential looks exactly like
+                        // this. Dropping it means the next attempt fetches a fresh one instead of
+                        // replaying the dead one for the rest of its lifetime.
+                        _tokens.Invalidate();
+                    }
+
                     throw new DmrpApiException(
                         $"The DMRP API operation /{path} answered {(int)response.StatusCode}.");
                 }
 
-                var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>(cancellationToken);
+                ReportingPlanResponse? plan;
+
+                try
+                {
+                    plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>(cancellationToken);
+                }
+                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                {
+                    // A 200 is not a promise of JSON. A proxy or captive portal answers HTML with a
+                    // success code (NotSupportedException on the content type), and a connection cut
+                    // mid-body leaves valid-looking truncated JSON (JsonException). Both are the API
+                    // failing us, so both belong with the other transport faults rather than as a 500.
+                    throw new DmrpApiException(
+                        $"The DMRP API operation /{path} returned a response that could not be read.", ex);
+                }
 
                 if (plan is null)
                 {

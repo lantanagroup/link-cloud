@@ -61,6 +61,18 @@ namespace LantanaGroup.Link.DMRP.Config
         /// </remarks>
         public int TokenExpiryMarginSeconds { get; set; } = 60;
 
+        /// <summary>
+        /// How long a single DMRP call may take before it is abandoned, in seconds.
+        /// </summary>
+        /// <remarks>
+        /// These calls run inside an admin GET rather than a background job, so the default
+        /// <see cref="HttpClient"/> timeout of 100 seconds is the wrong order of magnitude: it holds
+        /// the request open long past the point the operator has given up, and long past most proxy
+        /// and gateway timeouts in front of it. Thirty seconds is generous for a plan lookup and
+        /// still answers while someone is watching.
+        /// </remarks>
+        public int TimeoutSeconds { get; set; } = 30;
+
         /// <summary>True when enough is configured to attempt a call.</summary>
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(BaseUrl)
