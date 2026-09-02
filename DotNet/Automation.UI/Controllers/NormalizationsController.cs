@@ -196,21 +196,93 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSuite([FromBody] NormalizationSuiteDefinition model, CancellationToken ct)
+    public async Task<IActionResult> SaveSuite(
+    [FromBody] NormalizationSuiteDefinition model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Suite name is required.");
 
         var existing = await store.GetSuiteByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System suites cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System suites cannot be modified.");
+
+        var sequences = await store.GetAllSequencesAsync(ct);
+
+        var selectedSequences = sequences
+            .Where(s => model.SequenceIds.Contains(s.Id))
+            .ToList();
+
+        var operationOccurrences = new Dictionary<Guid, List<string>>();
+
+        void AddOperationOccurrence(Guid operationId, string source)
+        {
+            if (!operationOccurrences.TryGetValue(operationId, out var sources))
+            {
+                sources = [];
+                operationOccurrences[operationId] = sources;
+            }
+
+            sources.Add(source);
+        }
+
+        // Operations explicitly selected as standalone operations.
+        foreach (var operationId in model.OperationIds)
+        {
+            AddOperationOccurrence(operationId, "Standalone Operations");
+        }
+
+        // Operations included through selected sequences.
+        foreach (var sequence in selectedSequences)
+        {
+            foreach (var entry in sequence.Entries)
+            {
+                AddOperationOccurrence(
+                    entry.OperationId,
+                    $"sequence '{sequence.Name}'");
+            }
+        }
+
+        var duplicateOperationIds = operationOccurrences
+            .Where(x => x.Value.Count > 1)
+            .Select(x => x.Key)
+            .ToList();
+
+        if (duplicateOperationIds.Count > 0)
+        {
+            var operations = await store.GetAllOperationsAsync(ct);
+
+            var operationNames = operations
+                .ToDictionary(o => o.Id, o => o.Name);
+
+            var duplicateMessages = duplicateOperationIds.Select(id =>
+            {
+                var name = operationNames.TryGetValue(id, out var operationName)
+                    ? operationName
+                    : id.ToString();
+
+                var sources = string.Join(
+                    " and ",
+                    operationOccurrences[id].Distinct());
+
+                return $"'{name}' ({sources})";
+            });
+
+            return BadRequest(
+                $"Normalization suite cannot contain the same operation more than once. " +
+                $"Duplicate operation(s): {string.Join(", ", duplicateMessages)}.");
+        }
 
         // Existing suites preserve their current default flag. New suites may
         // carry an explicit initial IsDefault value from the caller.
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertSuiteAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
