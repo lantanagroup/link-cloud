@@ -436,7 +436,7 @@ global:
     defaultValue: "60"
     consumers: ["Tenant"]
   - key: "DMRP:Api:TimeoutSeconds"
-    description: "How long a single DMRP call may take before it is abandoned, in seconds (default 30). These calls run inside an admin GET, so HttpClient's 100-second default would hold the request open long past the point the operator has given up and past most gateway timeouts in front of it."
+    description: "How long a single DMRP call may take before it is abandoned, in seconds (default 30, accepted range 1-600). These calls run inside an admin GET, so HttpClient's 100-second default would hold the request open long past the point the operator has given up and past most gateway timeouts in front of it. A value outside the range falls back to the default rather than failing the call."
     required: false
     defaultValue: "30"
     consumers: ["Tenant"]

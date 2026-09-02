@@ -189,6 +189,46 @@ namespace UnitTests.DMRP
             Assert.Equal(2, tokenRequests);
         }
 
+        [Theory]
+        [InlineData("null")]
+        [InlineData("[]")]
+        public async Task GetReportingPlanAsync_APlansValueThatIsNullOrEmpty_ReadsAsNoEnrollments(string plans)
+        {
+            var (client, _, _) = CreateClient(request =>
+                request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal)
+                    ? TokenResponse()
+                    : Json($$"""{"orgid":100,"year":2026,"month":5,"plans":{{plans}}}"""));
+
+            // The property initializer is no defence: deserialization writes an explicit null over
+            // it, and the count that follows would throw before anything wrapped it -- surfacing as
+            // a 500 rather than the 502 the endpoint documents for a bad answer from DMRP.
+            Assert.Empty(await client.GetReportingPlanAsync(FacilityId, 5, 2026));
+        }
+
+        [Theory]
+        [InlineData(0, 2026)]
+        [InlineData(13, 2026)]
+        [InlineData(5, 1999)]
+        [InlineData(5, 2101)]
+        public async Task GetReportingPlanAsync_AnEntryInAPeriodLinkCannotRecord_IsSkipped(int month, int year)
+        {
+            var (client, _, _) = CreateClient(request =>
+                request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal)
+                    ? TokenResponse()
+                    : Json($$"""
+                        {"orgid":100,"year":2026,"month":5,"plans":[
+                          {"name":"HOB","nhsnorgid":"100","month":{{month}},"year":{{year}},"reporting":"Y"}]}
+                        """));
+
+            var entries = await client.GetReportingPlanAsync(FacilityId, 5, 2026);
+
+            // The sync writes through the repository rather than the manager, so nothing downstream
+            // applies the bounds the API enforces on the same column. A row stored in month 13 sits
+            // outside every look-ahead window and outside the period withdrawal is scoped to, so it
+            // could never be matched, shown or cleared again.
+            Assert.Empty(entries);
+        }
+
         private static HttpResponseMessage RouteByPath(HttpRequestMessage request)
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -329,6 +369,11 @@ namespace UnitTests.DMRP
 
             var entries = await client.GetReportingPlanAsync(FacilityId, 5, 2026);
 
+            // The count first: Assert.All is vacuously true on an empty collection, so on its own
+            // it would pass just as happily if the nameless entry had taken the named one with it.
+            // The stub answers both operations with this payload, so the survivor arrives once per
+            // component.
+            Assert.Equal(2, entries.Count);
             Assert.All(entries, e => Assert.Equal("HOB", e.Measure));
         }
 

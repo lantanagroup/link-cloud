@@ -80,13 +80,12 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // register would instead surface as a resolve failure somewhere unrelated.
             builder.Services.AddHttpClient(DmrpApiClient.HttpClientName, client =>
             {
-                // Bounded here rather than left at HttpClient's 100-second default, which is far
-                // longer than an admin GET should ever hang on a third party.
-                var seconds = builder.Configuration
+                // Bounded rather than left at HttpClient's 100-second default, which is far longer
+                // than an admin GET should hang on a third party. The setting resolves itself, so a
+                // value HttpClient would refuse cannot reach the setter and fail the first refresh.
+                client.Timeout = (builder.Configuration
                     .GetSection(DmrpSettings.ConfigSectionName)
-                    .Get<DmrpSettings>()?.Api.TimeoutSeconds ?? 30;
-
-                client.Timeout = TimeSpan.FromSeconds(seconds > 0 ? seconds : 30);
+                    .Get<DmrpSettings>()?.Api ?? new DmrpApiSettings()).ResolvedTimeout;
             });
             builder.Services.AddSingleton<IDmrpApiTokenProvider, DmrpApiTokenProvider>();
             builder.Services.AddScoped<IDmrpApiClient, DmrpApiClient>();

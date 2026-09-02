@@ -1,3 +1,8 @@
+using System.Linq.Expressions;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Data.Entities;
@@ -55,6 +60,84 @@ namespace UnitTests.DMRP
                 int year, CancellationToken cancellationToken = default) => Task.FromResult(_entries);
         }
 
+        /// <summary>
+        /// Delegates to a real repository, running one action immediately before the first save.
+        /// </summary>
+        /// <remarks>
+        /// The seam a concurrency test needs and the sync does not otherwise offer. Everything the
+        /// sync does happens either side of the save, so this is the only point at which a
+        /// competing writer can be made to commit after this one has already read. Members the sync
+        /// does not use throw rather than delegate: a double that quietly answers calls it was
+        /// never meant to serve hides the test drifting away from the code.
+        /// </remarks>
+        private sealed class SaveInterceptingRepository : IEntityRepository<FacilityReportingPlan>
+        {
+            private readonly IEntityRepository<FacilityReportingPlan> _inner;
+            private readonly Func<Task> _beforeFirstSave;
+            private bool _fired;
+
+            public SaveInterceptingRepository(IEntityRepository<FacilityReportingPlan> inner,
+                Func<Task> beforeFirstSave)
+            {
+                _inner = inner;
+                _beforeFirstSave = beforeFirstSave;
+            }
+
+            public async Task SaveChangesAsync(CancellationToken cancellationToken)
+            {
+                if (!_fired)
+                {
+                    _fired = true;
+                    await _beforeFirstSave();
+                }
+
+                await _inner.SaveChangesAsync(cancellationToken);
+            }
+
+            public Task<List<FacilityReportingPlan>> FindAsync(
+                Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) =>
+                _inner.FindAsync(predicate, cancellationToken);
+
+            public Task<FacilityReportingPlan> AddAsync(FacilityReportingPlan entity,
+                CancellationToken cancellationToken) =>
+                _inner.AddAsync(entity, cancellationToken);
+
+            public void Remove(FacilityReportingPlan entity) => _inner.Remove(entity);
+
+            public void Update(FacilityReportingPlan entity) => _inner.Update(entity);
+
+            public Task SaveChangesAsync() => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> AddAsync(FacilityReportingPlan entity) => throw new NotSupportedException();
+            public Task AddRangeAsync(IEnumerable<FacilityReportingPlan> entity) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> GetAsync(object id) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> GetAsync(object id, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<List<FacilityReportingPlan>> GetAllAsync() => throw new NotSupportedException();
+            public Task<List<FacilityReportingPlan>> GetAllAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<List<FacilityReportingPlan>> FindAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan?> FirstOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan?> FirstOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> FirstAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> FirstAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan?> SingleOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan?> SingleOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> SingleAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<FacilityReportingPlan> SingleAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<int> ExecuteDeleteAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<int> ExecuteDeleteAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<(List<FacilityReportingPlan>, PaginationMetadata)> SearchAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber) => throw new NotSupportedException();
+            public Task<(List<FacilityReportingPlan>, PaginationMetadata)> SearchAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<HealthCheckResult> HealthCheck(int eventId) => throw new NotSupportedException();
+            public Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task StartTransactionAsync() => throw new NotSupportedException();
+            public Task StartTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task CommitTransactionAsync() => throw new NotSupportedException();
+            public Task CommitTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task RollbackTransactionAsync() => throw new NotSupportedException();
+            public Task RollbackTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<bool> AnyAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
+            public Task<bool> AnyAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+        }
+
         private static DmrpReportingPlanSync CreateSync(TenantDbContext context, params DmrpReportingPlanEntry[] entries) =>
             new(new StubClient(entries),
                 new EntityRepository<FacilityReportingPlan, TenantDbContext>(context),
@@ -72,6 +155,57 @@ namespace UnitTests.DMRP
         private static DmrpReportingPlanEntry OffPeriodEntry(string measure, int month, int year,
             string component = ReportingComponents.Msc) =>
             new(component, measure, month, year);
+
+        [Fact]
+        public async Task SyncAsync_LosingTheRaceToAnotherSync_ReconcilesInsteadOfFailing()
+        {
+            using var setup = CreateContext();
+            AddMapping(setup, "HOB");
+            await setup.SaveChangesAsync();
+
+            using var winnerContext = CreateContext();
+            using var loserContext = CreateContext();
+
+            // The overlap has to be built deliberately: the loser must read before the winner
+            // commits and save after it, which is the only ordering that produces the conflict.
+            // Running one sync and then the other proves nothing, because the second one's read
+            // simply finds the first one's row.
+            var winnerCommitted = false;
+
+            var plans = new SaveInterceptingRepository(
+                new EntityRepository<FacilityReportingPlan, TenantDbContext>(loserContext),
+                async () =>
+                {
+                    if (winnerCommitted)
+                    {
+                        return;
+                    }
+
+                    winnerCommitted = true;
+                    await CreateSync(winnerContext, Entry("HOB")).SyncAsync(FacilityId, Month, Year);
+                });
+
+            var loser = new DmrpReportingPlanSync(
+                new StubClient([Entry("HOB")]),
+                plans,
+                new EntityRepository<MeasureMapping, TenantDbContext>(loserContext),
+                NullLogger<DmrpReportingPlanSync>.Instance);
+
+            var result = await loser.SyncAsync(FacilityId, Month, Year);
+
+            // The refresh answers rather than throwing. A DbUpdateException would reach the
+            // controller, which catches DmrpApiException and not this, so two admins refreshing the
+            // same facility at once would see a 500.
+            var rows = await setup.FacilityReportingPlans
+                .Where(p => p.FacilityId == FacilityId)
+                .ToListAsync();
+
+            Assert.Single(rows);
+
+            // On the second attempt the winner's row is there to be found, so there is nothing left
+            // to insert and the sync reports no work rather than claiming a row it did not write.
+            Assert.Equal(0, result.Recorded);
+        }
 
         [Fact]
         public async Task SyncAsync_AnEntryForAnotherPeriod_IsRecordedOnceAcrossRepeatedRuns()

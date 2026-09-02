@@ -96,7 +96,12 @@ namespace LantanaGroup.Link.DMRP.Api
                 _expiresAt = _timeProvider.GetUtcNow()
                     .AddSeconds(Math.Max(0, token.ExpiresIn - api.TokenExpiryMarginSeconds));
 
-                return _token!;
+                // The local, not the field. Invalidate() clears the field without the gate, so a
+                // concurrent one landing between the assignment above and here would hand this
+                // caller a null -- and the client would send Bearer with no credential, take the
+                // 401, and invalidate a token that was valid. What this call fetched is what it
+                // returns; the cache being cleared behind it only costs the next caller a fetch.
+                return token.AccessToken;
             }
             finally
             {
@@ -106,8 +111,10 @@ namespace LantanaGroup.Link.DMRP.Api
 
         public void Invalidate()
         {
-            // No lock: a torn read here can only mean an extra token fetch, and taking the gate would
-            // let a failed call block on whichever caller is already fetching.
+            // No lock: clearing the field costs at worst an extra fetch, and taking the gate would
+            // let a failed call block behind whichever caller is already fetching. Callers return
+            // the token they fetched rather than re-reading the field, so clearing it here cannot
+            // leave anyone holding a null.
             _token = null;
         }
 

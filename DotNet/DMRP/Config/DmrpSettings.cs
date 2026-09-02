@@ -71,7 +71,34 @@ namespace LantanaGroup.Link.DMRP.Config
         /// and gateway timeouts in front of it. Thirty seconds is generous for a plan lookup and
         /// still answers while someone is watching.
         /// </remarks>
-        public int TimeoutSeconds { get; set; } = 30;
+        public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
+
+        internal const int DefaultTimeoutSeconds = 30;
+        internal const int MinimumTimeoutSeconds = 1;
+
+        /// <summary>
+        /// Ten minutes, which is already far past anything a call inside an admin GET could be
+        /// waiting usefully for, and well clear of the roughly 24 days at which
+        /// <see cref="HttpClient.Timeout"/> refuses the value outright.
+        /// </summary>
+        internal const int MaximumTimeoutSeconds = 600;
+
+        /// <summary>
+        /// The configured timeout, or the default when the configured value is not one a call could
+        /// sensibly use.
+        /// </summary>
+        /// <remarks>
+        /// Falling back rather than throwing, and rather than honouring the value: HttpClient rejects
+        /// anything over Int32.MaxValue milliseconds, and because the client is configured when it is
+        /// first created rather than at startup, honouring a nonsense value would surface as a failed
+        /// refresh rather than a service that would not boot. This matches how an unusable facility
+        /// timezone is handled elsewhere in the module -- fall back to something workable rather than
+        /// fail the request over a configuration value.
+        /// </remarks>
+        public TimeSpan ResolvedTimeout =>
+            TimeSpan.FromSeconds(TimeoutSeconds is >= MinimumTimeoutSeconds and <= MaximumTimeoutSeconds
+                ? TimeoutSeconds
+                : DefaultTimeoutSeconds);
 
         /// <summary>True when enough is configured to attempt a call.</summary>
         public bool IsConfigured =>

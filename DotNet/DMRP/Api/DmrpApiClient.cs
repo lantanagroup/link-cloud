@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 
 namespace LantanaGroup.Link.DMRP.Api
 {
@@ -190,9 +191,15 @@ namespace LantanaGroup.Link.DMRP.Api
         private IReadOnlyList<DmrpReportingPlanEntry> Project(ReportingPlanResponse plan, string component,
             int requestedMonth, int requestedYear, string path)
         {
-            var entries = new List<DmrpReportingPlanEntry>(plan.Plans.Count);
+            // The initializer on the property does not survive deserialization: a payload carrying an
+            // explicit "plans": null writes the null straight over it. Null and absent mean the same
+            // thing here anyway -- the facility is enrolled in nothing -- and that is an answer DMRP
+            // is entitled to give, not a fault to raise.
+            var items = plan.Plans ?? [];
 
-            foreach (var item in plan.Plans)
+            var entries = new List<DmrpReportingPlanEntry>(items.Count);
+
+            foreach (var item in items)
             {
                 if (string.IsNullOrWhiteSpace(item.Name))
                 {
@@ -205,11 +212,28 @@ namespace LantanaGroup.Link.DMRP.Api
                     continue;
                 }
 
-                entries.Add(new DmrpReportingPlanEntry(
-                    component,
-                    item.Name.Trim(),
-                    item.Month ?? requestedMonth,
-                    item.Year ?? requestedYear));
+                var month = item.Month ?? requestedMonth;
+                var year = item.Year ?? requestedYear;
+
+                if (month is < ReportingPeriodLimits.MinimumReportingMonth
+                        or > ReportingPeriodLimits.MaximumReportingMonth
+                    || year is < ReportingPeriodLimits.MinimumReportingYear
+                        or > ReportingPeriodLimits.MaximumReportingYear)
+                {
+                    // The same bounds FacilityReportingPlanManager enforces on the API. The sync
+                    // writes through the repository rather than the manager, so without this the
+                    // two doors into the table disagree: a period the API refuses would be stored
+                    // by a refresh, in a period no look-ahead window can match and that withdrawal
+                    // -- scoped to the period asked about -- would never clear.
+                    _logger.LogWarning(
+                        "The DMRP API operation /{Path} returned {Measure} for {Month}/{Year}, which is not a "
+                        + "period Link can record; it was skipped.",
+                        path.SanitizeForLog(), item.Name.Trim().SanitizeForLog(), month, year);
+
+                    continue;
+                }
+
+                entries.Add(new DmrpReportingPlanEntry(component, item.Name.Trim(), month, year));
             }
 
             return entries;

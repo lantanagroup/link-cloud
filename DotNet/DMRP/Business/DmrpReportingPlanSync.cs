@@ -87,6 +87,49 @@ namespace LantanaGroup.Link.DMRP.Business
 
             var mappings = await ResolveMappingsAsync(entries, cancellationToken);
 
+            // Two refreshes for the same facility and period can both read no row and both try to
+            // insert it; the unique index lets one through. That is a lost race rather than a
+            // fault -- the other run recorded exactly what this one meant to -- so the answer is to
+            // read the table again and reconcile against what is now there. Retried once: a second
+            // conflict is no longer a race with a live caller and should surface.
+            //
+            // The alternative, a lock keyed on facility and period, only holds inside one process.
+            // It would look like a fix and quietly stop being one the day Tenant runs more than one
+            // instance, which is the worst way for this to fail.
+            for (var attempt = 1; ; attempt++)
+            {
+                var inserted = new List<FacilityReportingPlan>();
+
+                try
+                {
+                    return await ReconcileAsync(facilityId, month, year, entries, mappings, inserted,
+                        cancellationToken);
+                }
+                catch (Exception exception) when (attempt == 1 && UniquePeriodViolation.Matches(exception))
+                {
+                    _logger.LogInformation(exception,
+                        "A concurrent sync recorded part of facility {FacilityId}'s plan for {Month}/{Year} first; "
+                        + "reconciling against what it wrote.",
+                        facilityId.SanitizeForLog(), month, year);
+
+                    // Removing an entity that is still Added detaches it rather than scheduling a
+                    // delete, which is what lets the next attempt start from a clean context. Rows
+                    // this attempt modified stay tracked and are simply re-applied, which is safe
+                    // because every change it makes is idempotent.
+                    foreach (var row in inserted)
+                    {
+                        _plans.Remove(row);
+                    }
+                }
+            }
+        }
+
+        private async Task<DmrpSyncResult> ReconcileAsync(string facilityId, int month, int year,
+            IReadOnlyList<DmrpReportingPlanEntry> entries,
+            IReadOnlyDictionary<string, string?> mappings,
+            List<FacilityReportingPlan> inserted,
+            CancellationToken cancellationToken)
+        {
             // Every period the response actually speaks about, not just the one asked for. The client
             // keeps an entry's own month and year in preference to the requested ones on purpose, so
             // a response can carry a period we did not ask about -- and loading only the requested
@@ -144,7 +187,7 @@ namespace LantanaGroup.Link.DMRP.Business
                         continue;
                     }
 
-                    await _plans.AddAsync(new FacilityReportingPlan
+                    inserted.Add(await _plans.AddAsync(new FacilityReportingPlan
                     {
                         FacilityId = facilityId,
                         Component = entry.Component,
@@ -153,7 +196,7 @@ namespace LantanaGroup.Link.DMRP.Business
                         ReportingMonth = entry.ReportingMonth,
                         ReportingYear = entry.ReportingYear,
                         IsReporting = true
-                    }, cancellationToken);
+                    }, cancellationToken));
 
                     recorded++;
                     continue;

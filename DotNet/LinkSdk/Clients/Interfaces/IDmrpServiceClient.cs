@@ -58,8 +58,15 @@ public interface IDmrpServiceClient
     /// </remarks>
     /// <param name="monthsAhead">
     /// A window of 1 to 24 periods counting the current one - <c>6</c> is this month and the next
-    /// five. Omit to return every period the facility has a plan for, and to project nothing.
+    /// five. Omit to make every period the facility has a plan for eligible, and to project nothing;
+    /// what comes back is still one page of those, so a facility with a long history needs
+    /// <paramref name="pageSize"/> or <paramref name="pageNumber"/> to see the rest.
     /// </param>
+    /// <param name="pageSize">
+    /// Periods per page, ten by default. The window is applied before the page, so a six-month
+    /// look-ahead fits in one and an omitted window may not.
+    /// </param>
+    /// <param name="pageNumber">One-based.</param>
     /// <param name="isReporting">
     /// Defaults to true on this operation, so the answer is what the facility currently owes rather
     /// than its whole history.
