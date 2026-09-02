@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,23 +497,23 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h1 id="data-access-domain" class="content-heading">Data Access Domain <a id="data-access-domain" href="#data-access-domain" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Access Domain"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+        <h1 id="data-access-domain" class="content-heading">Data Access Domain <a href="#data-access-domain" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Access Domain"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Domain is responsible for storing and managing data (whether it be raw or normalized). It serves as a central repository for all data collected from various sources, providing a foundation for downstream data processing and analysis.</p>
-<h2 id="key-concepts" class="content-heading">Key Concepts <a id="key-concepts" href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="key-concepts" class="content-heading">Key Concepts <a href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><strong>Scalability:</strong> Ability to handle large volumes of data.</li>
 <li><strong>Flexibility:</strong> Support for diverse data types and formats.</li>
 <li><strong>Data Governance:</strong> Policies and controls for managing data.</li>
 </ul>
-<h2 id="responsibilities" class="content-heading">Responsibilities <a id="responsibilities" href="#responsibilities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Responsibilities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="responsibilities" class="content-heading">Responsibilities <a href="#responsibilities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Responsibilities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Ingesting data from various sources.</li>
 <li>Storing data in a scalable and cost-effective manner.</li>
 <li>Maintaining data integrity and availability.</li>
 <li>Providing access to raw data for downstream processing.</li>
 </ul>
-<h2 id="requirements-for-future-consideration" class="content-heading">Requirements for Future Consideration <a id="requirements-for-future-consideration" href="#requirements-for-future-consideration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Requirements for Future Consideration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="user-persona-data-producer" class="content-heading">User Persona: Data Producer <a id="user-persona-data-producer" href="#user-persona-data-producer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Producer"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="requirements-for-future-consideration" class="content-heading">Requirements for Future Consideration <a href="#requirements-for-future-consideration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Requirements for Future Consideration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="user-persona-data-producer" class="content-heading">User Persona: Data Producer <a href="#user-persona-data-producer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Producer"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>As a Data Producer, I want to write a new dataset to an Iceberg table so that it becomes available for downstream consumption with its associated metadata, including schema and provenance.</li>
 <li>As a Data Producer, I want to append new data to an existing Iceberg table so that the table reflects the latest information without disrupting ongoing queries.</li>
@@ -527,7 +529,7 @@
 <li>As a Data Producer, I want to monitor the data writing process to Iceberg so that I can identify and resolve any issues.</li>
 <li>As a Data Producer, I want to rollback to a previous version of the table if a data writing operation introduces errors.</li>
 </ul>
-<h3 id="user-persona-data-consumer-analyst-data-scientist-application" class="content-heading">User Persona: Data Consumer (Analyst, Data Scientist, Application) <a id="user-persona-data-consumer-analyst-data-scientist-application" href="#user-persona-data-consumer-analyst-data-scientist-application" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Consumer (Analyst, Data Scientist, Application)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="user-persona-data-consumer-analyst-data-scientist-application" class="content-heading">User Persona: Data Consumer (Analyst, Data Scientist, Application) <a href="#user-persona-data-consumer-analyst-data-scientist-application" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Consumer (Analyst, Data Scientist, Application)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>As a Data Consumer, I want to query the current version of an Iceberg table so that I can access the latest and most accurate data for analysis or application use.</li>
 <li>As a Data Consumer, I want to query a specific historical version (snapshot) of an Iceberg table (time travel) so that I can analyze data as it existed at a particular point in time for auditing or reproducibility.</li>
@@ -541,7 +543,7 @@
 <li>As a Data Consumer, I want to access the lineage or provenance information of an Iceberg table so that I can understand the data's journey.</li>
 <li>As a Data Consumer, I want to understand the access control policies on an Iceberg table so that I know what data I am authorized to access.</li>
 </ul>
-<h3 id="user-persona-data-administratorengineer" class="content-heading">User Persona: Data Administrator/Engineer <a id="user-persona-data-administrator-engineer" href="#user-persona-data-administrator-engineer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Administrator/Engineer"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="user-persona-data-administrator-engineer" class="content-heading">User Persona: Data Administrator/Engineer <a href="#user-persona-data-administrator-engineer" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: User Persona: Data Administrator/Engineer"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>As a Data Administrator/Engineer, I want to create new Iceberg tables and define their initial schema and partitioning.</li>
 <li>As a Data Administrator/Engineer, I want to manage the metadata store (catalog) for Iceberg tables, ensuring its availability and integrity.</li>
@@ -562,14 +564,14 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
-    nDataAcquisitionWorkerService_1C09C8B6["Service: Data Acquisition Worker Service"]
-    nPatientListsAcquired_4681892E["Event: Patient Lists Acquired"]
-    nCernerPatientsAcquired_3467767F["Event: Cerner Patients Acquired"]
-    nReadyToAcquire_7C2F519C["Event: Ready to Acquire"]
-    nresources_acquired_566EB692["Event: Resources Acquired"]
-    nDataAcquisitionRequested_4BBEB8F8["Command: Data Acquisition Requested"]
+subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionService_2716332D["Service: Data Acquisition Service"]
+    nDataAcquisitionWorkerService_32E6F397["Service: Data Acquisition Worker Service"]
+    nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
+    nCernerPatientsAcquired_4A156AEE["Event: Cerner Patients Acquired"]
+    nReadyToAcquire_6E1EAD0A["Event: Ready to Acquire"]
+    nresources_acquired_6963A69E["Event: Resources Acquired"]
+    nDataAcquisitionRequested_132A644D["Command: Data Acquisition Requested"]
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
