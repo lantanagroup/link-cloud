@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
@@ -66,22 +65,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> RestoreLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}/restore");
-            await SetAuthHeaderAsync(user, request, cancellationToken);
-            return await _client.SendAsync(request, cancellationToken);
-        }
-
-        public async Task<HttpResponseMessage> CancelLogsByFilterAsync(
-            ClaimsPrincipal user,
-            object filter,
-            int minAgeHours,
-            CancellationToken cancellationToken)
-        {
-            var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                $"api/data/acquisition-logs/cancel-by-filter?minAgeHours={minAgeHours}")
-            {
-                Content = JsonContent.Create(filter)
-            };
             await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }

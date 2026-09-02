@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
@@ -12,7 +11,6 @@ public static class RestoreReport
         HttpContext context,
         ReportService reportService,
         DataAcquisitionService dataAcquisitionService,
-        IPipelineAbortRegistry abortRegistry,
         string reportScheduleId)
     {
         var logger = loggerFactory.CreateLogger("RestoreReport");
@@ -57,15 +55,6 @@ public static class RestoreReport
             logger.LogWarning("Acquisition log restore failed for report {ReportScheduleId} with status {StatusCode} — rolling back step 1", reportScheduleId, daResponse.StatusCode);
             await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to restore acquisition logs. Report restore has been rolled back.", StatusCodes.Status500InternalServerError);
-        }
-
-        try
-        {
-            await abortRegistry.ClearAsync(facilityId: null, reportScheduleId, context.RequestAborted);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to clear pipeline abort flag while restoring report {ReportScheduleId}", reportScheduleId);
         }
 
         logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully restored", reportScheduleId);

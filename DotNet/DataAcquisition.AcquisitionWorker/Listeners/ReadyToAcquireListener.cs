@@ -3,13 +3,13 @@ using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -52,17 +52,6 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
-        
-        var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
-        if (abortRegistry != null &&
-            await abortRegistry.IsAbortedAsync(value.FacilityId, value.ReportTrackingId, cancellationToken))
-        {
-            _logger.LogInformation(
-                "Skipping ReadyToAcquire for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}, LogId={LogId}.",
-                value.FacilityId, value.ReportTrackingId, value.LogId);
-            return;
-        }
-
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 

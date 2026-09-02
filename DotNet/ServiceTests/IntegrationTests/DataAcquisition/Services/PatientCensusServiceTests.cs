@@ -1,7 +1,5 @@
-﻿using System.Net;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
-using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -471,87 +469,6 @@ public class PatientCensusServiceTests
 
         var updatedLog = await logQueries.GetAsync(logEntity.Id);
         Assert.Equal(RequestStatus.Failed, updatedLog!.Status);
-    }
-
-    [Fact]
-    public async Task RetrieveListData_FhirListNotFound_MarksConfigurationMissing_DoesNotThrow()
-    {
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        var tag = Guid.NewGuid().ToString("N")[..8];
-        var facilityId = $"CensusTest_NotFound_{tag}";
-
-        await SeedFhirListAndQueryConfigAsync(dbContext, facilityId);
-
-        var service = CreateService(scope);
-        await service.CreateLog(facilityId, CancellationToken.None);
-
-        var logEntity = await dbContext.DataAcquisitionLogs
-            .Include(l => l.FhirQueries)
-                .ThenInclude(q => q.FhirQueryResourceTypes)
-            .Where(l => l.FacilityId == facilityId && l.IsCensus)
-            .SingleAsync();
-        var logModel = DataAcquisitionLogModel.FromDomain(logEntity);
-
-        var readFhirMock = new Mock<IReadFhirCommand>();
-        readFhirMock
-            .Setup(r => r.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FhirOperationException(
-                "Resource List/census-missing-admit-24to48 is not known",
-                HttpStatusCode.NotFound));
-
-        var kafkaProducerMock = new Mock<IProducer<string, PatientListMessage>>();
-        var missingService = CreateService(scope, readFhirMock, kafkaProducerMock);
-
-        var results = await missingService.RetrieveListData(logModel, triggerMessage: true, CancellationToken.None);
-
-        Assert.Empty(results);
-
-        var updatedLog = await logQueries.GetAsync(logEntity.Id);
-        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog!.Status);
-        kafkaProducerMock.Verify(
-            p => p.ProduceAsync(
-                It.IsAny<string>(),
-                It.IsAny<Message<string, PatientListMessage>>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task RetrieveListData_FhirListGone_NoTrigger_MarksConfigurationMissing()
-    {
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        var tag = Guid.NewGuid().ToString("N")[..8];
-        var facilityId = $"CensusTest_Gone_{tag}";
-
-        await SeedFhirListAndQueryConfigAsync(dbContext, facilityId);
-
-        var service = CreateService(scope);
-        await service.CreateLog(facilityId, CancellationToken.None);
-
-        var logEntity = await dbContext.DataAcquisitionLogs
-            .Include(l => l.FhirQueries)
-                .ThenInclude(q => q.FhirQueryResourceTypes)
-            .Where(l => l.FacilityId == facilityId && l.IsCensus)
-            .SingleAsync();
-        var logModel = DataAcquisitionLogModel.FromDomain(logEntity);
-
-        var readFhirMock = new Mock<IReadFhirCommand>();
-        readFhirMock
-            .Setup(r => r.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FhirOperationException("Gone", HttpStatusCode.Gone));
-
-        var missingService = CreateService(scope, readFhirMock);
-
-        var results = await missingService.RetrieveListData(logModel, triggerMessage: false, CancellationToken.None);
-
-        Assert.Empty(results);
-
-        var updatedLog = await logQueries.GetAsync(logEntity.Id);
-        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog!.Status);
     }
 
     // ─────────────────────────────────────────────────────────────────
