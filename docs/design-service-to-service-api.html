@@ -493,28 +493,317 @@
                 </div>
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-<h1>PatientCensusScheduled</h1><p class="text-muted">Patient Census Scheduled</p>
+<h1>Service-to-Service Interactions & API</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produced By:</strong> <a href="service-censusservice.html">Census Service [service]</a></div><div class="mb-3"><strong>Consumed By:</strong> <a href="service-dataacquisitionservice.html">Data Acquisition Service [service]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Signals that the most recent census should be gathered, allowing downstream components to keep their patient lists up
-to date.</p>
-<div class="mermaid-container"><pre class="mermaid">
-flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
-  end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-  end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
-  end
-</pre></div>
+        
+        <h2 id="overview-amp-intent" class="content-heading">Overview &amp; Intent <a href="#overview-amp-intent" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview &amp;amp; Intent"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p><code>LinkApi</code> (encapsulated primarily in the LinkSdk project under DotNet/LinkSdk) is the official client SDK and HTTP abstraction layer for the Link Cloud platform. In a distributed healthcare data platform where microservices interact asynchronously via Kafka events and synchronously via REST APIs, LinkSdk provides a unified, strongly-typed, and resilient mechanism for invoking REST endpoints across all Link microservices.</p>
+<h3 id="core-objectives" class="content-heading">Core Objectives <a href="#core-objectives" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Objectives"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Standardized Inter-Service Communication: Eliminates duplicate HttpClient boilerplate across backend services, orchestration tools (Automation.Link), the management UI (Automation.UI), and automated end-to-end test suites.</li>
+<li>Automated Security &amp; Authentication: Automatically obtains and injects short-lived system Bearer tokens (ICreateSystemToken) into outgoing requests, while supporting development environments through anonymous authentication bypass.
+Diagnostic Transparency (Non-Throwing Responses): Wraps all HTTP responses in <code>LinkApiResponse&lt;T&gt;</code> instead of throwing exceptions on 4xx/5xx responses. This preserves HTTP status codes, request bodies, raw response content, and OpenTelemetry trace identifiers (TraceId) for diagnostics and error reporting.</li>
+<li>Dynamic Service Discovery via Service Registry: Binds to ServiceRegistry configuration so endpoints can resolve dynamic base URLs across local Docker Compose, Kubernetes, and Azure Cloud deployments.</li>
+</ul>
+<h2 id="architectural-design" class="content-heading">Architectural Design <a href="#architectural-design" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architectural Design"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre class="mermaid">graph TD
+    subgraph Consumers["API Consumers"]
+        A1["Automation.Link (CLI / Runner)"]
+        A2["Automation.UI (Web Management)"]
+        A3["BackendE2ETests"]
+        A4["Internal Microservices"]
+    end
+
+    subgraph DI["Dependency Injection &amp; Configuration"]
+        DIReg["AddLinkSdk() (ServiceCollectionExtensions)"]
+        SR["IOptions&amp;lt;ServiceRegistry&amp;gt;"]
+        BO["IOptions&amp;lt;LinkBearerServiceOptions&amp;gt;"]
+        TS["IOptions&amp;lt;LinkTokenServiceSettings&amp;gt;"]
+        ST["ICreateSystemToken (Token Service)"]
+    end
+
+    subgraph Clients["Typed Service Clients"]
+        direction TB
+        C1["FacilityServiceClient\n(IFacilityServiceClient)"]
+        C2["CensusServiceClient\n(ICensusServiceClient)"]
+        C3["DataAcquisitionServiceClient\n(IDataAcquisitionServiceClient)"]
+        C4["NormalizationServiceClient\n(INormalizationServiceClient)"]
+        C5["QueryDispatchServiceClient\n(IQueryDispatchServiceClient)"]
+        C6["ReportServiceClient\n(IReportServiceClient)"]
+        C7["MeasureEvalServiceClient\n(IMeasureEvalServiceClient)"]
+        C8["ValidationServiceClient\n(IValidationServiceClient)"]
+        C9["SubmissionServiceClient\n(ISubmissionServiceClient)"]
+        C10["DmrpServiceClient\n(IDmrpServiceClient)"]
+        C11["AdminBffIntegrationClient\n(IAdminBffIntegrationClient)"]
+    end
+
+    subgraph Core["Core Base Layer (LinkApiClientBase)"]
+        Flurl["FlurlClient Engine\n(Thread-Safe Singleton)"]
+        AuthHook["BeforeCall Hook\n(Bearer JWT Injection)"]
+        JsonConf["JsonSerializerOptions\n(Case-Insensitive, String Enums)"]
+        ExecEng["Execution Engine\n(SendAsync, SendStringAsync, SendBytesAsync)"]
+        TraceEng["Trace Correlation\n(traceparent / X-Trace-Id)"]
+    end
+
+    subgraph Output["Response Abstraction"]
+        Resp["LinkApiResponse&amp;lt;T&amp;gt; / LinkApiResponse"]
+        RespFields["- StatusCode (int)\n- IsSuccessStatusCode (bool)\n- Body (T)\n- RawBody (string)\n- ContentType (string)\n- TraceId (string)\n- RequestUrl / Method / Body"]
+    end
+
+    subgraph TargetServices["Link Backend Microservices"]
+        S1["Tenant / Facility Service (.NET)"]
+        S2["Census Service (.NET)"]
+        S3["Data Acquisition Service (.NET)"]
+        S4["Normalization Service (.NET)"]
+        S5["Query Dispatch Service (.NET)"]
+        S6["Report Service (.NET)"]
+        S7["Measure Evaluation Service (Java)"]
+        S8["Validation Service (Java)"]
+        S9["Submission Service (.NET)"]
+        S10["DMRP Service (.NET)"]
+        S11["Admin BFF Service (.NET)"]
+    end
+
+    %% Consumer to DI / Clients
+    Consumers --> DIReg
+    DIReg --> Clients
+    SR -.-> Clients
+    BO -.-> Clients
+    TS -.-> Clients
+    ST -.-> Clients
+
+    %% Clients to Base
+    Clients --> Core
+    Core --> Flurl
+    AuthHook --> ST
+    Flurl --> TargetServices
+    TargetServices --> ExecEng
+    ExecEng --> TraceEng
+    ExecEng --> Output
+    Output --> Consumers
+</pre>
+<h3 id="base-client-foundation-linkapiclientbase" class="content-heading">Base Client Foundation (LinkApiClientBase) <a href="#base-client-foundation-linkapiclientbase" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Base Client Foundation (LinkApiClientBase)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>All service clients inherit from LinkApiClientBase, which manages:</p>
+<ul>
+<li>Flurl HTTP Client Lifecycle: Initializes a thread-safe FlurlClient instance per service base URL, configuring JSON serialization with case-insensitivity and string-based enum converters (JsonStringEnumConverter).</li>
+<li>Dynamic Per-Request Authentication: Intercepts outgoing requests using BeforeCall hooks to generate or refresh JWT tokens using ICreateSystemToken and the configured SigningKey.</li>
+<li>Execution Pipelines: Exposes protected methods SendAsync<T>(), SendAsync(), SendStringAsync(), and SendBytesAsync() that intercept exceptions (FlurlHttpException) and return safe LinkApiResponse objects.</li>
+<li>Telemetry Correlation: Extracts distributed trace IDs from traceparent (W3C standard) or X-Trace-Id headers on responses to facilitate end-to-end log correlation in Grafana/Loki.</li>
+</ul>
+<h3 id="structured-response-model-linkapiresponse-lt-t-gt" class="content-heading">Structured Response Model (<code>LinkApiResponse&lt;T&gt;</code>) <a href="#structured-response-model-linkapiresponse-lt-t-gt" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Structured Response Model (LinkApiResponse&amp;lt;T&amp;gt;)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Rather than relying on EnsureSuccessStatusCode() which conceals failure context, LinkSdk utilizes LinkApiResponse<T> containing:</p>
+<ul>
+<li>StatusCode: The exact HTTP integer status code (e.g., 200, 201, 204, 400, 404, 500).</li>
+<li>IsSuccessStatusCode: Boolean helper verifying <code>StatusCode gte 200 &amp;&amp; StatusCode lt 300</code></li>
+<li>Body: Strongly-typed deserialized response model (T).</li>
+<li>RawBody: Raw response string for diagnostics when deserialization is skipped or an error is encountered.</li>
+<li>ContentType: Media type of the response (e.g., application/json, application/pdf).</li>
+<li>RequestUrl, RequestMethod, RequestBody: Context regarding the outgoing request.</li>
+<li>TraceId: Extracted trace identifier correlating request and server logs.</li>
+</ul>
+<h3 id="service-client-inventory" class="content-heading">Service Client Inventory <a href="#service-client-inventory" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Client Inventory"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>LinkSdk registers typed interfaces for each domain boundary in the system:</p>
+<p><strong>LinkSdk Service Client Inventory</strong></p>
+<table>
+<thead>
+<tr>
+<th>Client Name</th>
+<th>Interface</th>
+<th>Target Service Domain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FacilityServiceClient</code></td>
+<td><code>IFacilityServiceClient</code></td>
+<td>Tenant, Facility, Vendor, and VendorVersion management</td>
+</tr>
+<tr>
+<td><code>CensusServiceClient</code></td>
+<td><code>ICensusServiceClient</code></td>
+<td>Patient census, facility lists, and scheduling</td>
+</tr>
+<tr>
+<td><code>DataAcquisitionServiceClient</code></td>
+<td><code>IDataAcquisitionServiceClient</code></td>
+<td>FHIR query configurations, query plans, and acquisition logs</td>
+</tr>
+<tr>
+<td><code>NormalizationServiceClient</code></td>
+<td><code>INormalizationServiceClient</code></td>
+<td>Normalization rules, operations, and resource transform configs</td>
+</tr>
+<tr>
+<td><code>QueryDispatchServiceClient</code></td>
+<td><code>IQueryDispatchServiceClient</code></td>
+<td>Query dispatch triggers and schedule management</td>
+</tr>
+<tr>
+<td><code>ReportServiceClient</code></td>
+<td><code>IReportServiceClient</code></td>
+<td>Report schedules, generation requests, and report tracking</td>
+</tr>
+<tr>
+<td><code>MeasureEvalServiceClient</code></td>
+<td><code>IMeasureEvalServiceClient</code></td>
+<td>Measure definition uploads and CQL evaluations (Java service)</td>
+</tr>
+<tr>
+<td><code>ValidationServiceClient</code></td>
+<td><code>IValidationServiceClient</code></td>
+<td>FHIR validation profiles, categories, and rule initializations</td>
+</tr>
+<tr>
+<td><code>SubmissionServiceClient</code></td>
+<td><code>ISubmissionServiceClient</code></td>
+<td>Submission configurations, bundles, and submission manifests</td>
+</tr>
+<tr>
+<td><code>DmrpServiceClient</code></td>
+<td><code>IDmrpServiceClient</code></td>
+<td>Direct Message / DMRP configurations and submissions</td>
+</tr>
+<tr>
+<td><code>AdminBffIntegrationClient</code></td>
+<td><code>IAdminBffIntegrationClient</code></td>
+<td>Admin Backend-for-Frontend aggregation endpoints</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration-amp-dependency-injection" class="content-heading">Configuration &amp; Dependency Injection <a href="#configuration-amp-dependency-injection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration &amp;amp; Dependency Injection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="configuration-settings-appsettings-json" class="content-heading">Configuration Settings (appsettings.json) <a href="#configuration-settings-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Settings (appsettings.json)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>LinkSdk requires ServiceRegistry, LinkTokenServiceSettings, and Authentication configurations:</p>
+<pre><code class="language-json">{
+  &quot;ServiceRegistry&quot;: {
+    &quot;TenantServiceApiUrl&quot;: &quot;http://tenant-service:8080&quot;,
+    &quot;CensusServiceApiUrl&quot;: &quot;http://census-service:8080&quot;,
+    &quot;DataAcquisitionServiceApiUrl&quot;: &quot;http://data-acquisition-service:8080&quot;,
+    &quot;NormalizationServiceApiUrl&quot;: &quot;http://normalization-service:8080&quot;,
+    &quot;QueryDispatchServiceApiUrl&quot;: &quot;http://query-dispatch-service:8080&quot;,
+    &quot;ReportServiceApiUrl&quot;: &quot;http://report-service:8080&quot;,
+    &quot;MeasureServiceApiUrl&quot;: &quot;http://measure-eval-service:8080&quot;,
+    &quot;ValidationServiceApiUrl&quot;: &quot;http://validation-service:8080&quot;,
+    &quot;SubmissionServiceApiUrl&quot;: &quot;http://submission-service:8080&quot;,
+    &quot;DmrpServiceApiUrl&quot;: &quot;http://dmrp-service:8080&quot;,
+    &quot;AdminBffApiUrl&quot;: &quot;http://admin-bff:8080&quot;
+  },
+  &quot;LinkTokenService&quot;: {
+    &quot;SigningKey&quot;: &quot;YourSecureJwtSigningKeyString&quot;
+  },
+  &quot;Authentication&quot;: {
+    &quot;AllowAnonymous&quot;: false
+  }
+}
+</code></pre>
+<h3 id="service-registration" class="content-heading">Service Registration <a href="#service-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>All SDK clients are registered as thread-safe Singletons using AddLinkSdk():</p>
+<pre><code class="language-csharp">using LantanaGroup.Link.Sdk.DependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Register configuration and token generation
+builder.Services.Configure&lt;ServiceRegistry&gt;(builder.Configuration.GetSection(&quot;ServiceRegistry&quot;));
+builder.Services.Configure&lt;LinkTokenServiceSettings&gt;(builder.Configuration.GetSection(&quot;LinkTokenService&quot;));
+builder.Services.Configure&lt;BackendAuthenticationServiceExtension.LinkBearerServiceOptions&gt;(
+    builder.Configuration.GetSection(&quot;Authentication&quot;));
+
+builder.Services.AddSingleton&lt;ICreateSystemToken, CreateSystemTokenService&gt;();
+
+// Register all Link SDK API clients
+builder.Services.AddLinkSdk();
+</code></pre>
+<h2 id="example-usages" class="content-heading">Example Usages <a href="#example-usages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Usages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="example-1-querying-and-creating-a-facility-ifacilityserviceclient" class="content-heading">Example 1: Querying and Creating a Facility (IFacilityServiceClient) <a href="#example-1-querying-and-creating-a-facility-ifacilityserviceclient" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example 1: Querying and Creating a Facility (IFacilityServiceClient)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-csharp">public class FacilityServiceManager
+{
+    private readonly IFacilityServiceClient _facilityClient;
+    private readonly ILogger&lt;FacilityServiceManager&gt; _logger;
+
+    public FacilityServiceManager(IFacilityServiceClient facilityClient, ILogger&lt;FacilityServiceManager&gt; logger)
+    {
+        _facilityClient = facilityClient;
+        _logger = logger;
+    }
+
+    public async Task&lt;FacilityModel?&gt; GetOrCreateFacilityAsync(string facilityId, FacilityModel model, CancellationToken ct)
+    {
+        var getResponse = await _facilityClient.GetAsync(facilityId, ct);
+        if (getResponse.IsSuccessStatusCode &amp;&amp; getResponse.Body != null)
+        {
+            return getResponse.Body;
+        }
+
+        if (getResponse.StatusCode == 404)
+        {
+            _logger.LogInformation(&quot;Facility {FacilityId} not found. Creating...&quot;, facilityId);
+            var createResponse = await _facilityClient.CreateAsync(model, ct);
+
+            if (createResponse.IsSuccessStatusCode)
+            {
+                return createResponse.Body;
+            }
+
+            _logger.LogError(&quot;Failed to create facility. Status: {Status}, TraceId: {TraceId}, Body: {RawBody}&quot;,
+                createResponse.StatusCode, createResponse.TraceId, createResponse.RawBody);
+        }
+
+        return null;
+    }
+}
+</code></pre>
+<h3 id="example-2-managing-fhir-query-configurations-idataacquisitionserviceclient" class="content-heading">Example 2: Managing FHIR Query Configurations (IDataAcquisitionServiceClient) <a href="#example-2-managing-fhir-query-configurations-idataacquisitionserviceclient" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example 2: Managing FHIR Query Configurations (IDataAcquisitionServiceClient)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-csharp">public class DataAcquisitionOrchestrator
+{
+    private readonly IDataAcquisitionServiceClient _dataAcqClient;
+
+    public DataAcquisitionOrchestrator(IDataAcquisitionServiceClient dataAcqClient)
+    {
+        _dataAcqClient = dataAcqClient;
+    }
+
+    public async Task ConfigureFhirQueryAsync(CreateFhirQueryConfigurationRequestApiModel configRequest, CancellationToken ct)
+    {
+        var response = await _dataAcqClient.CreateFhirQueryConfigurationAsync(configRequest, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $&quot;Failed to configure FHIR query. Status: {response.StatusCode}, RequestUrl: {response.RequestUrl}, Error: {response.RawBody}&quot;);
+        }
+    }
+}
+</code></pre>
+<h3 id="example-3-initializing-validation-artifacts-with-diagnostics-ivalidationserviceclient" class="content-heading">Example 3: Initializing Validation Artifacts with Diagnostics (IValidationServiceClient) <a href="#example-3-initializing-validation-artifacts-with-diagnostics-ivalidationserviceclient" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example 3: Initializing Validation Artifacts with Diagnostics (IValidationServiceClient)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-csharp">public class ValidationInitializer
+{
+    private readonly IValidationServiceClient _validationClient;
+    private readonly ILogger&lt;ValidationInitializer&gt; _logger;
+
+    public ValidationInitializer(IValidationServiceClient validationClient, ILogger&lt;ValidationInitializer&gt; logger)
+    {
+        _validationClient = validationClient;
+        _logger = logger;
+    }
+
+    public async Task InitializeAsync(CancellationToken ct)
+    {
+        var existingArtifacts = await _validationClient.GetArtifactsAsync(ct);
+        if (existingArtifacts.IsSuccessStatusCode &amp;&amp; existingArtifacts.Body?.Count &gt; 0)
+        {
+            _logger.LogInformation(&quot;Validation artifacts are already initialized.&quot;);
+            return;
+        }
+
+        var initResponse = await _validationClient.InitializeArtifactsAsync(ct);
+        if (!initResponse.IsSuccessStatusCode)
+        {
+            _logger.LogError(&quot;Validation initialization failed with status {Code} (Trace ID: {TraceId})&quot;,
+                initResponse.StatusCode, initResponse.TraceId);
+        }
+    }
+}
+</code></pre>
 
         
     </div>
@@ -522,18 +811,7 @@ nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
-  end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-  end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
-  end</pre>
+nservice_to_service_api_22E95537["Design: Service-to-Service Interactions & API"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
