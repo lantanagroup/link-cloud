@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
 
   const contextValue = useMemo<NotificationContextValue>(() => ({
     notifySuccess: (message: string) => addNotification(message, 'success', true),
-    notifyError: (message: string) => addNotification(message, 'error', false),
+    notifyError: (message: string) => addNotification(message, 'error', true),
     notifyInfo: (message: string) => addNotification(message, 'info', true),
     closeNotification
   }), [addNotification, closeNotification]);

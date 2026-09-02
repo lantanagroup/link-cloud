@@ -36,7 +36,7 @@ export function WelcomeStep({onNext}: StepProps) {
       <h2>{t('onboarding:welcome.workflowTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.workflowBody')}</p>
 
-      <StepActions>
+      <StepActions saving={saving}>
         <Button onClick={onNext} disabled={saving}>
           {t('common:actions.continue')}
         </Button>

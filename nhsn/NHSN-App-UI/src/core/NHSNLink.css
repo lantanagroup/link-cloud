@@ -330,7 +330,10 @@
 }
 
 .nhsn-link__step--current .nhsn-link__step-index {
+  background: #00c853;
   border-color: #ffffff;
+  color: #063f14;
+  font-weight: 700;
 }
 
 .nhsn-link__step--done .nhsn-link__step-index {
@@ -384,6 +387,7 @@
 .nhsn-link__step-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-top: 24px;
 }
@@ -398,8 +402,8 @@
 }
 
 .nhsn-link__step-actions .k-button.k-button-primary:hover {
-  background: var(--kendo-color-primary-hover, #032659);
-  border-color: var(--kendo-color-primary-hover, #032659);
+  background: var(--kendo-color-primary-hover, #063f78);
+  border-color: var(--kendo-color-primary-hover, #063f78);
 }
 
 .nhsn-link__step-actions .k-button.k-button-base {
@@ -413,7 +417,8 @@
 }
 
 .nhsn-link__step-actions .k-button.k-button-base:hover {
-  background: var(--kendo-color-base-hover, #f2f4f7);
+  background: var(--kendo-color-base-hover, #eef0f3);
+  border-color: var(--kendo-color-primary, #0057b7);
 }
 
 .nhsn-link__step-actions .k-button:disabled {
@@ -432,13 +437,12 @@
 
 .nhsn-link__saving {
   display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  margin-bottom: 0.75rem;
-  border: 2px solid var(--kendo-color-border, #d0d7de);
-  border-top-color: var(--kendo-color-app-text-subtle, #5a5f69);
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2.5px solid var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-primary, #0057b7);
   border-radius: 50%;
-  animation: nhsn-link__spin 0.6s linear infinite;
+  animation: nhsn-link__spin 0.7s linear infinite;
 }
 
 @keyframes nhsn-link__spin {
@@ -786,6 +790,10 @@
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.k-animation-container .nhsn-facility-info-popup.k-list-container {
+  margin-top: 4px;
 }
 
 .nhsn-facility-info-popup .k-list {

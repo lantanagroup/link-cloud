@@ -85,8 +85,8 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
         </MessageContainer>
       )}
 
-      <StepActions>
-        <Button variant="secondary" onClick={onBack}>
+      <StepActions saving={saving}>
+        <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
         <Button onClick={onNext} disabled={saving}>

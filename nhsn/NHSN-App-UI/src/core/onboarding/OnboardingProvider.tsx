@@ -8,9 +8,11 @@ import React, {
   useRef,
   useState
 } from 'react';
+import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
+import {useNotifications} from '../notifications/NotificationProvider';
 import {furthestLegalStep, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
 import {draftReducer, type DraftAction, type DraftSections} from './reducer';
@@ -68,6 +70,8 @@ export function OnboardingProvider({
   children: React.ReactNode;
 }) {
   const api = useApiClient();
+  const {t} = useTranslation('common');
+  const {notifyError} = useNotifications();
   const [draft, dispatch] = useReducer(draftReducer, undefined, createEmptyDraft);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
@@ -167,17 +171,19 @@ export function OnboardingProvider({
   }, [target, baseUrl, loadState, draft.currentStepId, draft.currentView]);
 
   const persistDraft = useCallback(
-    (toSave: FacilityDraft) => {
+    (toSave: FacilityDraft): Promise<boolean> => {
       pendingSaves.current += 1;
       setSaving(true);
 
-      saveChain.current = saveChain.current
+      const outcome = saveChain.current
         .catch(() => undefined)
         .then(async () => {
           try {
             await api.saveDraft(toSave);
+            return true;
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : String(cause));
+            notifyError(cause instanceof Error ? cause.message : t('errors.saveFailed'));
+            return false;
           } finally {
             pendingSaves.current -= 1;
             if (pendingSaves.current === 0) {
@@ -185,8 +191,10 @@ export function OnboardingProvider({
             }
           }
         });
+      saveChain.current = outcome;
+      return outcome;
     },
-    [api]
+    [api, notifyError, t]
   );
 
   // Persist at transitions. popstate cannot be cancelled, so a dirty-navigation
@@ -208,10 +216,16 @@ export function OnboardingProvider({
 
   const goTo = useCallback(
     (stepId: StepId) => {
-      persistDraft(draft);
-      setUrlTarget(undefined);
-      dispatch({type: 'step/unlock', stepId});
-      dispatch({type: 'step/goto', stepId});
+      const nextDraft: FacilityDraft = {...draft, currentStepId: stepId, currentView: undefined};
+      persistDraft(nextDraft).then(saved => {
+        if (!saved) {
+          return;
+        }
+        persistedStep.current = `${stepId}:`;
+        setUrlTarget(undefined);
+        dispatch({type: 'step/unlock', stepId});
+        dispatch({type: 'step/goto', stepId});
+      });
     },
     [draft, persistDraft]
   );

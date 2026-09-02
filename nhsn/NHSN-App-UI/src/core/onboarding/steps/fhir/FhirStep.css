@@ -80,7 +80,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fhir-gray-600);
-  margin: 26px 0 10px;
+  margin: 15px 0 10px;
   font-weight: 600;
 }
 
@@ -165,7 +165,7 @@
   border: 1px solid var(--fhir-gray-200);
   border-radius: var(--fhir-radius);
   padding: 14px 16px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .fhir-server-info .instructions-box p {
@@ -256,7 +256,7 @@
 
 .fhir-server-info .k-form-field {
   position: relative;
-  margin-bottom: 18px;
+  margin-bottom: 15px;
 }
 
 .fhir-server-info .k-label {

@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   Badge,
   FormSection,
@@ -38,11 +39,20 @@ export function Button({
 
 export interface StepActionsProps {
   children: React.ReactNode;
+  saving?: boolean;
 }
 
 /** The Back/Continue row every step ends with. */
-export function StepActions({children}: StepActionsProps) {
-  return <div className="nhsn-link__step-actions">{children}</div>;
+export function StepActions({children, saving}: StepActionsProps) {
+  const {t} = useTranslation('common');
+  return (
+    <div className="nhsn-link__step-actions" aria-busy={saving || undefined}>
+      {children}
+      {saving && (
+        <span className="nhsn-link__saving" role="status" aria-label={t('status.saving')} />
+      )}
+    </div>
+  );
 }
 
 export {Badge, FormSection, MessageContainer, NHSNLoadingIndicator, NoData, PageHeader, RequiredFieldNotice};

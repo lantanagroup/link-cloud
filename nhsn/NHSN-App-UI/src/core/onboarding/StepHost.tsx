@@ -65,7 +65,7 @@ export function StepHost() {
                 <button
                   type="button"
                   className="nhsn-link__step-button"
-                  disabled={!unlocked}
+                  disabled={!unlocked || saving}
                   onClick={() => goTo(entry.id)}>
                   <span className="nhsn-link__step-index">{index + 1}</span>
                   <span className="nhsn-link__step-label">{t(entry.labelKey)}</span>
@@ -78,14 +78,6 @@ export function StepHost() {
 
       {/* No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict. */}
       <section className="nhsn-link__step-panel" aria-live="polite">
-
-        {saving && (
-          <span
-            className="nhsn-link__saving"
-            role="status"
-            aria-label={t('common:status.saving')}
-          />
-        )}
 
         {step ? (
           <Suspense fallback={<NHSNLoadingIndicator />}>
