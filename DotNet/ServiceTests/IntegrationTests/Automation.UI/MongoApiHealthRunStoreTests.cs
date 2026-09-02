@@ -4,35 +4,26 @@ using FluentAssertions;
 using MongoDB.Driver;
 using Task = System.Threading.Tasks.Task;
 
-namespace UnitTests.AutomationUI;
+namespace IntegrationTests.AutomationUI;
 
-[Trait("Category", "IntegrationTests")]
+[Collection(IntegrationTestCollection.Name)]
 public class MongoApiHealthRunStoreTests : IAsyncLifetime
 {
-    private readonly MongoClient _client;
+    private readonly AutomationUIIntegrationTestFixture _fixture;
     private readonly IMongoDatabase _database;
     private readonly MongoApiHealthRunStore _store;
-    private readonly string _databaseName;
 
-    public MongoApiHealthRunStoreTests()
+    public MongoApiHealthRunStoreTests(
+        AutomationUIIntegrationTestFixture fixture)
     {
-        var connectionString =
-            Environment.GetEnvironmentVariable("AUTOMATION_UI_TEST_MONGO")
-            ?? "mongodb://localhost:17017/?directConnection=true";
-
-        _client = new MongoClient(connectionString);
-
-        _databaseName = $"automation_ui_api_health_tests_{Guid.NewGuid():N}";
-        _database = _client.GetDatabase(_databaseName);
+        _fixture = fixture;
+        _database = fixture.Database;
         _store = new MongoApiHealthRunStore(_database);
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => _fixture.ResetAsync();
 
-    public async Task DisposeAsync()
-    {
-        await _client.DropDatabaseAsync(_databaseName);
-    }
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task SaveRunResultsAsync_PersistsEndpointResultSeparately()
