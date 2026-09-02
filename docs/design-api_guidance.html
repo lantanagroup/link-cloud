@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -503,14 +505,14 @@
 <li><strong>Evolve Independently from Clients</strong>: Versioning of the API to allow clients to continue to use the API in a previous state</li>
 <li><strong>Resource Based</strong>: Every API should be designed around a resource (model representation of an object)</li>
 </ul>
-<h1 id="api-standardization" class="content-heading">API Standardization <a id="api-standardization" href="#api-standardization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: API Standardization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="swagger" class="content-heading">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="api-standardization" class="content-heading">API Standardization <a href="#api-standardization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: API Standardization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="swagger" class="content-heading">Swagger <a href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Each API should implement swagger documentation.</p>
 <ul>
 <li><a href="https://learn.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle?view=aspnetcore-8.0&amp;tabs=visual-studio">.NET</a></li>
 <li><a href="https://swagger.io/tools/open-source/open-source-integrations/">Java</a></li>
 </ul>
-<h2 id="versioning" class="content-heading">Versioning <a id="versioning" href="#versioning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Versioning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="versioning" class="content-heading">Versioning <a href="#versioning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Versioning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Do we want to do this?</p>
 <p>By versioning our APIs we can make breaking changes without impacting clients. When a breaking change occurs a new version of the API can be released and clients can choose when to migrate to the new version of the API and make changes necessary to work with the new version.</p>
 <p>URL versioning can be accomplished as follows:</p>
@@ -518,7 +520,7 @@
 <li><code>https://tenant-service/api/v1/facilities</code></li>
 <li><code>https://tenant-service/api/v2/facilities</code></li>
 </ul>
-<h2 id="error-response" class="content-heading">Error Response <a id="error-response" href="#error-response" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="error-response" class="content-heading">Error Response <a href="#error-response" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>When an error occurs in an API an HTTP response with a status code of 500 (Internal Server Error) should be returned. The body of the response should be that of a the Problem Details object. See more <a href="https://datatracker.ietf.org/doc/html/rfc7807">here</a>.</p>
 <pre><code class="language-json">{
   &quot;type&quot;: &quot;&lt;https://tools.ietf.org/html/rfc7231#section-6.6.1&gt;&quot;,
@@ -538,11 +540,11 @@
 <li>502 Bad Gateway - This indicates an invalid response from an upstream server.</li>
 <li>503 Service Unavailable - This indicates that something unexpected happened on server side (It can be anything like server overload, some parts of the system failed, etc.).</li>
 </ul>
-<h2 id="hypertext-as-the-engine-of-application-state-hateoas" class="content-heading">Hypertext as the Engine of Application State (HATEOAS) <a id="hypertext-as-the-engine-of-application-state-hateoas" href="#hypertext-as-the-engine-of-application-state-hateoas" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Hypertext as the Engine of Application State (HATEOAS)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="hypertext-as-the-engine-of-application-state-hateoas" class="content-heading">Hypertext as the Engine of Application State (HATEOAS) <a href="#hypertext-as-the-engine-of-application-state-hateoas" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Hypertext as the Engine of Application State (HATEOAS)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>This concept can provide a client with additional operations that can be performed against resources associated with the request. An additional benefit to this is the API can make changes to its URI scheme without breaking clients.</p>
 <p>Since we are using swagger, I don’t believe it is really necessary to include HATEOAS and more than likely it doesn’t make sense to use both at the same time.</p>
 <p>Model for hypermedia links based on <a href="https://datatracker.ietf.org/doc/html/rfc8288">RFC-8288</a>.</p>
-<h3 id="weblink-model" class="content-heading">WebLink Model <a id="weblink-model" href="#weblink-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: WebLink Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="weblink-model" class="content-heading">WebLink Model <a href="#weblink-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: WebLink Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">
 {
   &quot;rel&quot;: &quot;resource&quot;,
@@ -551,12 +553,12 @@
   &quot;types&quot;: [&quot;&lt;media types&gt;&quot;]
 }
 </code></pre>
-<h2 id="http-verbs" class="content-heading">HTTP Verbs <a id="http-verbs" href="#http-verbs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HTTP Verbs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="post" class="content-heading">[POST] <a id="post" href="#post" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [POST]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="http-verbs" class="content-heading">HTTP Verbs <a href="#http-verbs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HTTP Verbs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="post" class="content-heading">[POST] <a href="#post" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [POST]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When a POST method will create a new resource, it will return an HTTP response with a status code of 201 (Created). The URI of the new resource will be included in the Location header of the response. The response body will contain the the APIs representation of the resource (only return the properties of the entity that has been deemed necessary for clients, exclude sensitive or internal only properties).</p>
 <p>When a POST method does some processing, but does not create a new resource, it will return a status code of 200 and return the result of the operation in the response body. If there is no result to return that is deemed of value to the client, the endpoint can return a status code of 204 (No Content).</p>
 <p>If a client submits a POST request with invalid data, the endpoint should return a HTTP response with a status code of 400 (Bad Request). The response body should contain additional details as to why the request was invalid.</p>
-<h4 id="example-request-httpstenant-serviceapifacilities" class="content-heading">Example Request: <code>https://tenant-service/api/facilities</code> <a id="example-request-https-tenant-service-api-facilities" href="#example-request-https-tenant-service-api-facilities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-request-https-tenant-service-api-facilities" class="content-heading">Example Request: <code>https://tenant-service/api/facilities</code> <a href="#example-request-https-tenant-service-api-facilities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>[POST] <code>https://tenant-service/api/facilities</code> HTTP/1.1</p>
 <p>Content-Type: application/json; charset=utf-8</p>
 <pre><code class="language-json">{
@@ -564,19 +566,19 @@
     &quot;facilityName&quot;: &quot;Facility Full Name&quot;
 }
 </code></pre>
-<h4 id="example-response" class="content-heading">Example Response <a id="example-response" href="#example-response" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-response" class="content-heading">Example Response <a href="#example-response" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-json">{
     &quot;id&quot;: &quot;8f9f1e36-a969-41e0-9c8f-fbb4496b0201&quot;,
     &quot;facilityId&quot;: &quot;FacilityID&quot;,
     &quot;facilityName&quot;: &quot;Facility Full Name&quot;
 }
 </code></pre>
-<h3 id="put" class="content-heading">[PUT] <a id="put" href="#put" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [PUT]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="put" class="content-heading">[PUT] <a href="#put" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [PUT]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>An endpoint that accepts a PUT request for a resource should check to see if the resource provided by the client already exists. If the resource already exists it should update that resource, however if the resource provided by the client does not exist, it should return a Problem result and not Create an entry.</p>
 <p>If the request contains a resource that does not exist, the format of the id will also need to be checked. If the format of the id provided does not match the UUID format that has been decided on for the resource then the API should return an HTTP response with a status code of 400 (Bad Request). The response body should contain a message that states “Invalid Id format”.</p>
 <p>When a PUT request updates an existing resource, it will return an HTTP response with a status code of 202 (Accepted).</p>
 <p>The request body should be a resource with an id element that has an identical value to the id in the URL. If no id element is provided, or the id does not match with the id in the URL, the endoint will return with a status code of 400 (Bad Request).</p>
-<h4 id="example-request-httpstenant-serviceapifacilitiesid" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a id="example-request-https-tenant-service-api-facilities-id" href="#example-request-https-tenant-service-api-facilities-id" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-request-https-tenant-service-api-facilities-id" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a href="#example-request-https-tenant-service-api-facilities-id" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>PUT <code>https://tenant-service/api/facilities/deba542d-0c75-449e-bea4-30671a9d7d9e</code> HTTP/1.1</p>
 <p>Content-Type: application/json; charset=utf-8</p>
 <pre><code class="language-json">{
@@ -585,17 +587,17 @@
   &quot;facilityName&quot;: &quot;Facility Full Name&quot;
 }
 </code></pre>
-<h3 id="patch" class="content-heading">[PATCH] <a id="patch" href="#patch" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [PATCH]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="patch" class="content-heading">[PATCH] <a href="#patch" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [PATCH]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>TBD if use cases exist for this</p>
-<h3 id="get" class="content-heading">[GET] <a id="get" href="#get" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [GET]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="get" class="content-heading">[GET] <a href="#get" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: [GET]"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When a GET request successfully retrieves the resource asked for, it will return an HTTP status code of 200 (OK). The response body will contain the the APIs representation of the resource (only return the properties of the entity that has been deemed necessary for clients, exclude sensitive or internal only properties).</p>
 <p>If the resource requested cannot be found, the response should be an HTTP status code for 404 (Not Found).</p>
 <p>An interesting security discussion probably should happen around the Ids used. If the resource is sensitive, account for example, it is a good idea to use a UUID instead of something like an incremented identity column. Even string based identifiers can be problematic.
 <br/>The reason for this is with incremented identifiers and string based names a user can make fairly good guesses of other Ids they can put int he request. This can be used for malicious intent as responses like Not Found or Unauthorized is useful information. If I get a Unauthorized I know that Id exists for instance. Then you can use that information to try other methods such as social engineering.</p>
-<h4 id="example-request-httpstenant-serviceapifacilitiesid-1" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a id="example-request-https-tenant-service-api-facilities-id-1" href="#example-request-https-tenant-service-api-facilities-id-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-request-https-tenant-service-api-facilities-id-1" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a href="#example-request-https-tenant-service-api-facilities-id-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>GET <code>https://tenant-service/api/facilities/deba542d-0c75-449e-bea4-30671a9d7d9e</code> HTTP/1.1</p>
 <p>Content-Type: application/json; charset=utf-8</p>
-<h4 id="example-response-1" class="content-heading">Example Response <a id="example-response-1" href="#example-response-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-response-1" class="content-heading">Example Response <a href="#example-response-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-json">{
     &quot;id&quot;: &quot;deba542d-0c75-449e-bea4-30671a9d7d9e&quot;,
     &quot;facilityId&quot;: &quot;FacilityID&quot;,
@@ -604,14 +606,14 @@
 </code></pre>
 <p>If the request is made to an endpoint that performs a search, it will return an HTTP status code of 200 (OK). The response body will contain a PagedListModel that contains an array of the resource model and a PagedMetadata object.</p>
 <p>If the request is made to an endpoint that performs a search and no results were found, it should return an HTTP status code of 204 (No Content).</p>
-<h4 id="pagedmodel-interface" class="content-heading">PagedModel Interface <a id="pagedmodel-interface" href="#pagedmodel-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PagedModel Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="pagedmodel-interface" class="content-heading">PagedModel Interface <a href="#pagedmodel-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PagedModel Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-csharp">public interface IPagedModel&lt;T&gt; where T : class
 {
     public List&lt;T&gt; Records { get; set; }
     public PaginationMetadata Metadata { get; set; }
 }
 </code></pre>
-<h4 id="paginationmetadata-interface" class="content-heading">PaginationMetadata Interface <a id="paginationmetadata-interface" href="#paginationmetadata-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PaginationMetadata Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="paginationmetadata-interface" class="content-heading">PaginationMetadata Interface <a href="#paginationmetadata-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PaginationMetadata Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-csharp">public interface IPaginationMetadata
 {
     int PageSize { get; }
@@ -619,7 +621,7 @@
     long TotalCount { get; }
 }
 </code></pre>
-<h4 id="example-of-a-concrete-implementation-in-the-demo-api-gateway" class="content-heading">Example of a concrete implementation in the Demo API Gateway <a id="example-of-a-concrete-implementation-in-the-demo-api-gateway" href="#example-of-a-concrete-implementation-in-the-demo-api-gateway" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example of a concrete implementation in the Demo API Gateway"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-of-a-concrete-implementation-in-the-demo-api-gateway" class="content-heading">Example of a concrete implementation in the Demo API Gateway <a href="#example-of-a-concrete-implementation-in-the-demo-api-gateway" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example of a concrete implementation in the Demo API Gateway"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-csharp">public class PaginationMetadata : IPaginationMetadata
 {
     public int PageSize { get; set; }
@@ -637,10 +639,10 @@
     }
 }
 </code></pre>
-<h4 id="example-request-httpstenant-serviceapifacilitiespagesize10pagenumber1" class="content-heading">Example Request: <code>https://tenant-service/api/facilities?pageSize=10&amp;pageNumber=1</code> <a id="example-request-https-tenant-service-api-facilities-pagesize-10-amp-pagenumber-1" href="#example-request-https-tenant-service-api-facilities-pagesize-10-amp-pagenumber-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities?pageSize=10&amp;amp;pageNumber=1"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-request-https-tenant-service-api-facilities-pagesize-10-amp-pagenumber-1" class="content-heading">Example Request: <code>https://tenant-service/api/facilities?pageSize=10&amp;pageNumber=1</code> <a href="#example-request-https-tenant-service-api-facilities-pagesize-10-amp-pagenumber-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities?pageSize=10&amp;amp;pageNumber=1"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>GET <code>https://tenant-service/api/facilities?pageSize=10&amp;pageNumber=1</code> HTTP/1.1</p>
 <p>Content-Type: application/json; charset=utf-8</p>
-<h4 id="example-response-2" class="content-heading">Example Response <a id="example-response-2" href="#example-response-2" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-response-2" class="content-heading">Example Response <a href="#example-response-2" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-json">{
     &quot;records&quot;: [{
         &quot;id&quot;: &quot;1029c167-4a9b-42f5-9f8b-dc82eb301a3f&quot;,
@@ -661,14 +663,14 @@
 }
 </code></pre>
 <p>How do we want to handle UI concerns such as populating drop down lists with key value pairs? Do we want to create custom endpoints that return only the needed key value pair. Do we want to use a GET baseUrl/resource that will return a subset of resource data and then the UI would map it to a key value pair model?</p>
-<h3 id="delete" class="content-heading">DELETE <a id="delete" href="#delete" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="delete" class="content-heading">DELETE <a href="#delete" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When a DELETE request successfully removes a resource, it will return an HTTP response with a status code of 204 (No Content).</p>
-<h4 id="example-request-httpstenant-serviceapifacilitiesid-2" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a id="example-request-https-tenant-service-api-facilities-id-2" href="#example-request-https-tenant-service-api-facilities-id-2" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-request-https-tenant-service-api-facilities-id-2" class="content-heading">Example Request: <code>https://tenant-service/api/facilities/{{id}}</code> <a href="#example-request-https-tenant-service-api-facilities-id-2" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Request: https://tenant-service/api/facilities/{{id}}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>DELETE <code>https://tenant-service/api/facilities/deba542d-0c75-449e-bea4-30671a9d7d9e</code> HTTP/1.1</p>
 <p>Content-Type: application/json; charset=utf-8</p>
-<h1 id="http-clients" class="content-heading">HTTP Clients <a id="http-clients" href="#http-clients" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HTTP Clients"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="http-clients" class="content-heading">HTTP Clients <a href="#http-clients" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HTTP Clients"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Typed clients can be created for each underlying service the API will be communicating with. This use of the HttpClientFactory helps prevent build up of underlying network sockets that are not immediately released with a HttpClient is disposed. See more <a href="https://learn.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/use-httpclientfactory-to-implement-resilient-http-requests">here</a>.</p>
-<h2 id="typed-client-interface" class="content-heading">Typed Client Interface <a id="typed-client-interface" href="#typed-client-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Typed Client Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="typed-client-interface" class="content-heading">Typed Client Interface <a href="#typed-client-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Typed Client Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 {
     public interface INotificationService
@@ -682,7 +684,7 @@
     }
 }
 </code></pre>
-<h2 id="typed-client-implementation" class="content-heading">Typed Client Implementation <a id="typed-client-implementation" href="#typed-client-implementation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Typed Client Implementation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="typed-client-implementation" class="content-heading">Typed Client Implementation <a href="#typed-client-implementation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Typed Client Implementation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 {
     public class NotificationService : INotificationService
@@ -709,20 +711,20 @@
     }
 }
 </code></pre>
-<h2 id="adding-typed-services" class="content-heading">Adding typed services <a id="adding-typed-services" href="#adding-typed-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding typed services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="adding-typed-services" class="content-heading">Adding typed services <a href="#adding-typed-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding typed services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">builder.Services.AddHeaderPropagation(opts =&gt; {
     opts.Headers.Add(&quot;Authorization&quot;);
 });
 
 builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;();
 </code></pre>
-<h2 id="header-propagation" class="content-heading">Header Propagation <a id="header-propagation" href="#header-propagation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Header Propagation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="header-propagation" class="content-heading">Header Propagation <a href="#header-propagation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Header Propagation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Header propagation allows you to add a header value from an incoming request to a request made by the receiving API. The most likely example of this would be an authorization header.</p>
-<h3 id="adding-the-typed-client-and-header-propagation" class="content-heading">Adding the typed client and Header Propagation <a id="adding-the-typed-client-and-header-propagation" href="#adding-the-typed-client-and-header-propagation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding the typed client and Header Propagation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<h3 id="nuget-package" class="content-heading">NuGet package <a id="nuget-package" href="#nuget-package" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: NuGet package"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="adding-the-typed-client-and-header-propagation" class="content-heading">Adding the typed client and Header Propagation <a href="#adding-the-typed-client-and-header-propagation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding the typed client and Header Propagation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="nuget-package" class="content-heading">NuGet package <a href="#nuget-package" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: NuGet package"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><a href="https://www.nuget.org/packages/Microsoft.AspNetCore.HeaderPropagation/">NuGet package</a></p>
 <p><code>dotnet add package Microsoft.AspNetCore.HeaderPropagation --version 7.0.8</code></p>
-<h3 id="adding-header-propagation-to-services" class="content-heading">Adding header propagation to services <a id="adding-header-propagation-to-services" href="#adding-header-propagation-to-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding header propagation to services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="adding-header-propagation-to-services" class="content-heading">Adding header propagation to services <a href="#adding-header-propagation-to-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding header propagation to services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-csharp">builder.Services.AddHeaderPropagation(opts =&gt; {
     opts.Headers.Add(&quot;Authorization&quot;);
 });
@@ -730,7 +732,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
 builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;().AddHeaderPropagation();
 </code></pre>
 <p>Header propagation will automatically add specified headers to the http client connections to underlying services. In this example we are propagating the Authorization header that contains the bearer token from the client request. See more <a href="https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.dependencyinjection.headerpropagationservicecollectionextensions.addheaderpropagation?view=aspnetcore-7.0">here</a>.</p>
-<h2 id="using-the-typed-clients" class="content-heading">Using the typed clients <a id="using-the-typed-clients" href="#using-the-typed-clients" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Using the typed clients"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="using-the-typed-clients" class="content-heading">Using the typed clients <a href="#using-the-typed-clients" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Using the typed clients"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">namespace LantanaGroup.Link.DemoApiGateway.Controllers
 {
     [Route(&quot;api/notification&quot;)]
@@ -785,7 +787,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
     }
 }
 </code></pre>
-<h1 id="route-guidelines" class="content-heading">Route Guidelines <a id="route-guidelines" href="#route-guidelines" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Route Guidelines"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="route-guidelines" class="content-heading">Route Guidelines <a href="#route-guidelines" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Route Guidelines"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p><strong>1. Remove component name from route</strong></p>
 <p>To simplify route definitions, the URL within the request should be a sufficient indicator on which Link Cloud component is being accessed.</p>
 <table>
@@ -871,7 +873,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
 </tr>
 </tbody>
 </table>
-<h1 id="additional-resources" class="content-heading">Additional Resources <a id="additional-resources" href="#additional-resources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Additional Resources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="additional-resources" class="content-heading">Additional Resources <a href="#additional-resources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Additional Resources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ul>
 <li><a href="./authorization_policies.md">Authorization Policies</a></li>
 <li><a href="./logging_error_handling.md">Logging and Error Handling</a></li>
@@ -884,7 +886,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-napi_guidance_6524503D["Design: API Guidance"]</pre>
+napi_guidance_4CA65F28["Design: API Guidance"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
