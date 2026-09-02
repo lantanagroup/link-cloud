@@ -122,6 +122,85 @@ public class DiagnosticsAbsReplayPredictorTests
         AssertCount(predicted, "Patient", 1);
     }
 
+    [Fact]
+    public void Org_map_scopes_cql_ip_windows_so_unlinked_diagnostic_reports_outside_org_encounters_are_excluded()
+    {
+        // Mega-patient shape: ORM keeps one IMP encounter; a second IMP at a
+        // non-org location covers the whole report period. DiagnosticReports have
+        // no encounter reference (DA still forwards them). MeasureEval IP is the
+        // org encounter only, so CQL `effective overlaps IP.period` must use that
+        // window — not the non-org IMP.
+        const string patientId = "org-scope-patient";
+        const string orgCondition =
+            "Location.identifier.where(system='urn:test:loc' and value='org-root').exists()";
+        var bundleJson = """
+            {
+              "resourceType":"Bundle",
+              "type":"collection",
+              "entry":[
+                {"resource":{"resourceType":"Patient","id":"org-scope-patient"}},
+                {"resource":{"resourceType":"Location","id":"L-ORG",
+                  "identifier":[{"system":"urn:test:loc","value":"org-root"}]}},
+                {"resource":{"resourceType":"Location","id":"L-OTHER",
+                  "identifier":[{"system":"urn:test:loc","value":"other"}]}},
+                {"resource":{"resourceType":"Encounter","id":"E-ORG",
+                  "status":"in-progress",
+                  "class":{"system":"http://terminology.hl7.org/CodeSystem/v3-ActCode","code":"IMP"},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "period":{"start":"2026-07-12T06:00:00Z","end":"2026-07-29T14:00:00Z"},
+                  "location":[{"location":{"reference":"Location/L-ORG"}}]}},
+                {"resource":{"resourceType":"Encounter","id":"E-OTHER",
+                  "status":"in-progress",
+                  "class":{"system":"http://terminology.hl7.org/CodeSystem/v3-ActCode","code":"IMP"},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "period":{"start":"2026-07-01T00:00:00Z","end":"2026-07-31T23:59:59Z"},
+                  "location":[{"location":{"reference":"Location/L-OTHER"}}]}},
+                {"resource":{"resourceType":"DiagnosticReport","id":"DR-IN",
+                  "status":"final",
+                  "code":{"coding":[{"system":"http://loinc.org","code":"58410-2"}]},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "effectiveDateTime":"2026-07-20T12:00:00Z"}},
+                {"resource":{"resourceType":"DiagnosticReport","id":"DR-OUT",
+                  "status":"final",
+                  "code":{"coding":[{"system":"http://loinc.org","code":"58410-2"}]},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "effectiveDateTime":"2026-07-03T12:00:00Z"}},
+                {"resource":{"resourceType":"MedicationRequest","id":"MR-IN",
+                  "status":"active","intent":"order",
+                  "medicationCodeableConcept":{"coding":[{"system":"http://www.nlm.nih.gov/research/umls/rxnorm","code":"197361"}]},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "authoredOn":"2026-07-20T12:00:00Z"}},
+                {"resource":{"resourceType":"MedicationRequest","id":"MR-OUT",
+                  "status":"active","intent":"order",
+                  "medicationCodeableConcept":{"coding":[{"system":"http://www.nlm.nih.gov/research/umls/rxnorm","code":"197361"}]},
+                  "subject":{"reference":"Patient/org-scope-patient"},
+                  "authoredOn":"2026-07-03T12:00:00Z"}}
+              ]
+            }
+            """;
+
+        var periodStart = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodEnd = new DateTime(2026, 7, 31, 23, 59, 59, DateTimeKind.Utc);
+        var manifest = AbsSubmissionPredictor.PredictImportedBundle(
+            bundleJson,
+            patientId,
+            periodStart,
+            periodEnd,
+            organizationLocationConditionFhirPaths: [orgCondition]);
+        var predicted = ClinicalCounts(manifest, patientId);
+        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+
+        AssertCount(predicted, "Encounter", 1);
+        AssertCount(predicted, "DiagnosticReport", 1);
+        AssertCount(predicted, "MedicationRequest", 1);
+        keys.Should().Contain("Encounter/E-ORG");
+        keys.Should().NotContain("Encounter/E-OTHER");
+        keys.Should().Contain("DiagnosticReport/DR-IN");
+        keys.Should().NotContain("DiagnosticReport/DR-OUT");
+        keys.Should().Contain("MedicationRequest/MR-IN");
+        keys.Should().NotContain("MedicationRequest/MR-OUT");
+    }
+
     private static void AssertCount(Dictionary<string, int> predicted, string resourceType, int expected)
     {
         predicted.Should().ContainKey(resourceType);

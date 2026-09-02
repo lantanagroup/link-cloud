@@ -40,6 +40,41 @@ public class CqlTextTests
     }
 
     [Fact]
+    public void AchMonthly_DiagnosticReport_rules_require_ip_period_overlap()
+    {
+        var model = CqlInstanceFilterAnalyzer.Analyze(
+            ProfiledMeasureCatalog.ReadBundleJson(
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation));
+        var drRules = model.Rules
+            .Where(r => string.Equals(r.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.NotEmpty(drRules);
+        var summary = string.Join("; ", drRules.Select(DescribeRule));
+        Assert.True(
+            drRules.All(r => r.Date == CqlInstanceFilterAnalyzer.DateRelation.OverlapsIpPeriod),
+            $"ACH Monthly DiagnosticReport rules must overlap IP.period, got: {summary}");
+    }
+
+    [Fact]
+    public void AchMonthly_MedicationRequest_rules_require_authored_on_during_ip()
+    {
+        var model = CqlInstanceFilterAnalyzer.Analyze(
+            ProfiledMeasureCatalog.ReadBundleJson(
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation));
+        var mrRules = model.Rules
+            .Where(r => string.Equals(r.ResourceType, "MedicationRequest", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.NotEmpty(mrRules);
+        var summary = string.Join("; ", mrRules.Select(DescribeRule));
+        Assert.True(
+            mrRules.All(r => r.Date == CqlInstanceFilterAnalyzer.DateRelation.DuringIpPeriod),
+            $"ACH Monthly MedicationRequest rules must be authoredOn during IP.period, got: {summary}");
+    }
+
+    private static string DescribeRule(CqlInstanceFilterAnalyzer.CqlInclusionRule rule)
+        => $"{rule.ResourceType} Date={rule.Date} catAny=[{string.Join(",", rule.CategoryAnyOf ?? [])}] catNone=[{string.Join(",", rule.CategoryNoneOf ?? [])}] status=[{string.Join(",", rule.StatusAnyOf ?? [])}] ipExists={rule.RequireIpExists} drResultRefs={rule.DiagnosticReportResultsReferenceMatchingObservations} includeAllLinked={rule.IncludeAllWhenAnyObservationLinkedReportExists}";
+
+    [Fact]
     public void ParseValuesetDeclarations_SurviveCommentStripOnEmbeddedMeasures()
     {
         foreach (var measure in new[]

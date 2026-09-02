@@ -5,18 +5,20 @@ using System.Text.Json;
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Runs the same generation-time ABS prediction the pipeline uses (CQL instance
-/// filter + query-plan acquisition simulation + type gates) without uploading
-/// to FHIR. Tests replay imported bundles / Run Diagnostics artifacts through
-/// this helper and compare <see cref="GenerationManifest.GetExpectedAbsCountsForPatient"/>
-/// to the ABS type counts captured for that run.
+/// Runs the same generation-time ABS prediction the pipeline uses (query-plan
+/// acquisition simulation, organization resource map scope, then CQL instance
+/// filter against the remaining IP windows) without uploading to FHIR. Tests
+/// replay imported bundles / Run Diagnostics artifacts through this helper and
+/// compare <see cref="GenerationManifest.GetExpectedAbsCountsForPatient"/> to
+/// the ABS type counts captured for that run.
 /// </summary>
 public static class AbsSubmissionPredictor
 {
     /// <summary>
     /// Populates <paramref name="manifestBuilder"/> for one patient: period-aware
-    /// Q/NQ, CQL SDE exclusions, generated keys, and simulated-acquired keys.
-    /// Returns the eligibility profile after measurement-period adjustment.
+    /// Q/NQ, query-plan acquisition, organization resource map scope, then CQL SDE
+    /// exclusions against the remaining IP windows. Returns the eligibility profile
+    /// after measurement-period adjustment.
     /// </summary>
     public static PatientProfile PopulateManifest(
         GenerationManifest.IncrementalBuilder manifestBuilder,
@@ -54,12 +56,6 @@ public static class AbsSubmissionPredictor
                 measurementPeriodEnd,
                 output);
 
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
         }
 
         manifestBuilder.AddPatient(patientId, effectiveProfile);
@@ -82,8 +78,41 @@ public static class AbsSubmissionPredictor
                 patientSimEntries,
                 sharedSimEntries,
                 acquisitionSimulation.OrganizationLocationConditionFhirPaths,
+                cqlFilteredKeys: null);
+
+            // MeasureEval only sees org-mapped encounters (DA strips the rest). CQL
+            // `effective overlaps IP.period` must use those remaining windows, not the
+            // pre-org IMP set. Unlinked DiagnosticReports stay in the acquired set and
+            // are then date-filtered against the org IP.
+            if (cqlInput != null
+                && acquisitionSimulation.OrganizationLocationConditionFhirPaths is { Count: > 0 })
+            {
+                cqlInput = RestrictEncountersToAcquired(cqlInput, acquiredKeys);
+            }
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (cqlInput != null && qualifyingMeasures.Count > 0)
+            {
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
                 cqlFilteredKeys);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
+        }
+        else
+        {
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (cqlInput != null && qualifyingMeasures.Count > 0)
+            {
+                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
         }
 
         return effectiveProfile;
@@ -101,7 +130,8 @@ public static class AbsSubmissionPredictor
         DateTime periodEnd,
         IReadOnlyList<ProfiledMeasureType>? measures = null,
         QueryPlanInput? queryPlan = null,
-        IAutomationOutput? output = null)
+        IAutomationOutput? output = null,
+        IReadOnlyList<string>? organizationLocationConditionFhirPaths = null)
     {
         measures ??= [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
         queryPlan ??= QueryPlanDefaults.GetDefaultAsInput();
@@ -116,7 +146,8 @@ public static class AbsSubmissionPredictor
         {
             QueryPlan = queryPlan,
             ClinicalPeriodStart = startIso,
-            ClinicalPeriodEnd = endIso
+            ClinicalPeriodEnd = endIso,
+            OrganizationLocationConditionFhirPaths = organizationLocationConditionFhirPaths
         };
 
         var builder = new GenerationManifest.IncrementalBuilder();
@@ -213,5 +244,23 @@ public static class AbsSubmissionPredictor
         }
 
         return profile with { MeasureEligibilities = adjusted };
+    }
+
+    private static CqlFilterSimulator.PatientCqlInput RestrictEncountersToAcquired(
+        CqlFilterSimulator.PatientCqlInput input,
+        IReadOnlySet<string> acquiredKeys)
+    {
+        var acquiredEncounterIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in acquiredKeys)
+        {
+            if (!key.StartsWith("Encounter/", StringComparison.OrdinalIgnoreCase))
+                continue;
+            acquiredEncounterIds.Add(key["Encounter/".Length..]);
+        }
+
+        return input with
+        {
+            Encounters = input.Encounters.Where(enc => acquiredEncounterIds.Contains(enc.EncounterId)).ToList()
+        };
     }
 }
