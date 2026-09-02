@@ -171,6 +171,12 @@ public sealed class DmrpTestSuite : ServiceTestSuiteBase
                 : await RunStepAsync<FacilityReportingPlanModel>(StepNames.PlanPost400UnknownMapping, 400, () =>
                     _client.CreateFacilityReportingPlanAsync(Plan(facilityId, unknownId), ct), ct));
 
+            results.Add(mappingId is null || facilityId is null
+                ? SkipStepAsync(StepNames.PlanPost400UnknownComponent, FixturesMissing)
+                : await RunStepAsync<FacilityReportingPlanModel>(StepNames.PlanPost400UnknownComponent, 400, () =>
+                    _client.CreateFacilityReportingPlanAsync(
+                        Plan(facilityId, mappingId, component: "NOTACOMPONENT"), ct), ct));
+
             // === GET /api/dmrp/reporting-plans ===
 
             results.Add(planId is null
@@ -185,6 +191,22 @@ public sealed class DmrpTestSuite : ServiceTestSuiteBase
                 ? SkipStepAsync(StepNames.PlansForFacilityGet200, FacilityMissing)
                 : await RunStepAsync<List<FacilityReportingPlanModel>>(StepNames.PlansForFacilityGet200, 200, () =>
                     _client.GetFacilityReportingPlansForFacilityAsync(facilityId, cancellationToken: ct), ct));
+
+            results.Add(facilityId is null
+                ? SkipStepAsync(StepNames.PlansForFacilityGet200LookAhead, FacilityMissing)
+                : await RunStepAsync<List<FacilityReportingPlanModel>>(
+                    StepNames.PlansForFacilityGet200LookAhead, 200, () =>
+                        _client.GetFacilityReportingPlansForFacilityAsync(facilityId, monthsAhead: 6,
+                            cancellationToken: ct), ct));
+
+            // The window is not the periods read's alone: the flat read takes it too, validates it
+            // the same way, and answers it against the same current period.
+            results.Add(facilityId is null
+                ? SkipStepAsync(StepNames.PlansForFacilityGet400MonthsAhead, FacilityMissing)
+                : await RunStepAsync<List<FacilityReportingPlanModel>>(
+                    StepNames.PlansForFacilityGet400MonthsAhead, 400, () =>
+                        _client.GetFacilityReportingPlansForFacilityAsync(facilityId, monthsAhead: 0,
+                            cancellationToken: ct), ct));
 
             results.Add(facilityId is null
                 ? SkipStepAsync(StepNames.PlanPeriodsGet200, FacilityMissing)
@@ -377,11 +399,22 @@ public sealed class DmrpTestSuite : ServiceTestSuiteBase
             Frequency = frequency
         };
 
-    private static FacilityReportingPlanRequest Plan(string facilityId, string measureMappingId) =>
+    /// <summary>
+    /// The reporting plan this suite creates for itself.
+    /// </summary>
+    /// <remarks>
+    /// The component is sent explicitly, and deliberately not the one the API defaults to, so a
+    /// create that silently ignored the field would still be caught. The literal is spelled out
+    /// rather than taken from the module's own constant: this suite is a client, and a client that
+    /// shares the server's vocabulary cannot notice the server changing it.
+    /// </remarks>
+    private static FacilityReportingPlanRequest Plan(string facilityId, string measureMappingId,
+        string component = "PS") =>
         new()
         {
             FacilityId = facilityId,
             MeasureMappingId = measureMappingId,
+            Component = component,
             ReportingMonth = ReportingMonth,
             ReportingYear = ReportingYear,
             IsReporting = true
