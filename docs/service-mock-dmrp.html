@@ -493,47 +493,256 @@
                 </div>
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-<h1>PatientCensusScheduled</h1><p class="text-muted">Patient Census Scheduled</p>
+<h1>Mock DMRP</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produced By:</strong> <a href="service-censusservice.html">Census Service [service]</a></div><div class="mb-3"><strong>Consumed By:</strong> <a href="service-dataacquisitionservice.html">Data Acquisition Service [service]</a></div>
+        <div class="mb-3"><strong>Produces:</strong> None</div><div class="mb-3"><strong>Consumes:</strong> None</div>
         <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Signals that the most recent census should be gathered, allowing downstream components to keep their patient lists up
-to date.</p>
-<div class="mermaid-container"><pre class="mermaid">
-flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
-  end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-  end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
-  end
-</pre></div>
+<p>An externally developed NHSN application is responsible for managing facility digital monthly reporting plans (DMRP). These plans track which NHSN measures (example: Hypo and RPS) a facility is enrolled in reporting for. Link Cloud interfaces with a deployed DMRP Rest API to manage the scheduled reporting plan for a facility. Because the DMRP API is exclusively available within the CDC environment, a version of the API has been developed to test external dependencies needed for scheduled reporting workflows.</p>
 
         
+<h3 class="mt-4">OpenAPI Operations</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-health" aria-expanded="false"><strong>GET</strong> <code>/health</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-health" class="card-body export-collapsible">
+    <p class="text-muted">Health check endpoint</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-msc" aria-expanded="false"><strong>GET</strong> <code>/msc</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-msc" class="card-body export-collapsible">
+    <p class="text-muted">Monthly medicine reporting plan. Placeholder shape.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>nhsnorgid</td><td>string</td><td>No</td><td></td></tr><tr><td>name</td><td>string</td><td>No</td><td></td></tr><tr><td>year</td><td>string</td><td>No</td><td></td></tr><tr><td>month</td><td>string</td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-ps-annual" aria-expanded="false"><strong>GET</strong> <code>/ps/annual</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-ps-annual" class="card-body export-collapsible">
+    <p class="text-muted">Annual patient-safety reporting plan. Placeholder shape.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>nhsnorgid</td><td>string</td><td>No</td><td></td></tr><tr><td>name</td><td>string</td><td>No</td><td></td></tr><tr><td>year</td><td>string</td><td>No</td><td></td></tr><tr><td>month</td><td>string</td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-api-mock-dmrp-entries-id" aria-expanded="false"><strong>GET</strong> <code>/api/mock-dmrp/entries/{id}</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-api-mock-dmrp-entries-id" class="card-body export-collapsible">
+    <p class="text-muted">Gets one entry by identifier.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-put-api-mock-dmrp-entries-id" aria-expanded="false"><strong>PUT</strong> <code>/api/mock-dmrp/entries/{id}</code></a></div>
+  <div id="openapi-card-mock-dmrp-put-api-mock-dmrp-entries-id" class="card-body export-collapsible">
+    <p class="text-muted">Updates an existing entry. Never creates one.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-delete-api-mock-dmrp-entries-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/mock-dmrp/entries/{id}</code></a></div>
+  <div id="openapi-card-mock-dmrp-delete-api-mock-dmrp-entries-id" class="card-body export-collapsible">
+    <p class="text-muted">Deletes one entry.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-api-mock-dmrp-facilities-facilityid-entries" aria-expanded="false"><strong>GET</strong> <code>/api/mock-dmrp/facilities/{facilityId}/entries</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-api-mock-dmrp-facilities-facilityid-entries" class="card-body export-collapsible">
+    <p class="text-muted">Gets a facility&#39;s entries, paged. Answers an empty page when it has none.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>pageSize</td><td>integer (int32)</td><td>No</td><td></td></tr><tr><td>pageNumber</td><td>integer (int32)</td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-delete-api-mock-dmrp-facilities-facilityid-entries" aria-expanded="false"><strong>DELETE</strong> <code>/api/mock-dmrp/facilities/{facilityId}/entries</code></a></div>
+  <div id="openapi-card-mock-dmrp-delete-api-mock-dmrp-facilities-facilityid-entries" class="card-body export-collapsible">
+    <p class="text-muted">Deletes a facility&#39;s entries. Idempotent.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td>string</td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-api-mock-dmrp-entries-search" aria-expanded="false"><strong>GET</strong> <code>/api/mock-dmrp/entries/search</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-api-mock-dmrp-entries-search" class="card-body export-collapsible">
+    <p class="text-muted">Searches entries. Every filter is optional; answers an empty page when nothing matches.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td>string</td><td>No</td><td></td></tr><tr><td>component</td><td>string</td><td>No</td><td></td></tr><tr><td>measure</td><td>string</td><td>No</td><td></td></tr><tr><td>reportingMonth</td><td>integer (int32)</td><td>No</td><td></td></tr><tr><td>reportingYear</td><td>integer (int32)</td><td>No</td><td></td></tr><tr><td>isReporting</td><td>string</td><td>No</td><td></td></tr><tr><td>sortBy</td><td>object</td><td>No</td><td>Fields a reporting plan entry search may be sorted by.</td></tr><tr><td>sortOrder</td><td>object</td><td>No</td><td></td></tr><tr><td>pageSize</td><td>integer (int32)</td><td>No</td><td></td></tr><tr><td>pageNumber</td><td>integer (int32)</td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-post-api-mock-dmrp-entries" aria-expanded="false"><strong>POST</strong> <code>/api/mock-dmrp/entries</code></a></div>
+  <div id="openapi-card-mock-dmrp-post-api-mock-dmrp-entries" class="card-body export-collapsible">
+    <p class="text-muted">Creates an entry.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-delete-api-mock-dmrp-entries" aria-expanded="false"><strong>DELETE</strong> <code>/api/mock-dmrp/entries</code></a></div>
+  <div id="openapi-card-mock-dmrp-delete-api-mock-dmrp-entries" class="card-body export-collapsible">
+    <p class="text-muted">Deletes every entry.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-api-mock-dmrp-delay" aria-expanded="false"><strong>GET</strong> <code>/api/mock-dmrp/delay</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-api-mock-dmrp-delay" class="card-body export-collapsible">
+    <p class="text-muted">Gets the artificial delay currently applied to the contract endpoints.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-put-api-mock-dmrp-delay" aria-expanded="false"><strong>PUT</strong> <code>/api/mock-dmrp/delay</code></a></div>
+  <div id="openapi-card-mock-dmrp-put-api-mock-dmrp-delay" class="card-body export-collapsible">
+    <p class="text-muted">Sets an artificial delay on the contract endpoints, for exercising a caller&#39;s timeout
+and retry behaviour against a slow upstream.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-delete-api-mock-dmrp-delay" aria-expanded="false"><strong>DELETE</strong> <code>/api/mock-dmrp/delay</code></a></div>
+  <div id="openapi-card-mock-dmrp-delete-api-mock-dmrp-delay" class="card-body export-collapsible">
+    <p class="text-muted">Removes any artificial delay. Idempotent.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-post-api-mock-dmrp-oauth2-token" aria-expanded="false"><strong>POST</strong> <code>/api/mock-dmrp/oauth2/token</code></a></div>
+  <div id="openapi-card-mock-dmrp-post-api-mock-dmrp-oauth2-token" class="card-body export-collapsible">
+    <p class="text-muted">Issues the token the contract endpoints accept, standing in for the reporting
+system&#39;s authorization server.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-mock-dmrp-get-api-mock-dmrp-info" aria-expanded="false"><strong>GET</strong> <code>/api/mock-dmrp/info</code></a></div>
+  <div id="openapi-card-mock-dmrp-get-api-mock-dmrp-info" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
     </div>
     <div class="col-md-4">
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
-  end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-  end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
-  end</pre>
+nmock_dmrp_2635C59E["Service: Mock DMRP"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
