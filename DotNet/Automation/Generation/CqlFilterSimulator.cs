@@ -187,7 +187,10 @@ public static class CqlFilterSimulator
     {
         var included = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var rule in model.Rules.Where(r => !r.SpecimenFromMatchingObservations))
+        foreach (var rule in model.Rules.Where(r =>
+                     !r.SpecimenFromMatchingObservations
+                     && !r.DiagnosticReportResultsReferenceMatchingObservations
+                     && !r.IncludeAllWhenAnyObservationLinkedReportExists))
         {
             switch (rule.ResourceType)
             {
@@ -303,6 +306,85 @@ public static class CqlFilterSimulator
             }
         }
 
+        foreach (var rule in model.Rules.Where(r => r.DiagnosticReportResultsReferenceMatchingObservations))
+        {
+            if (rule.RequireIpExists && input.IpWindows.Count == 0)
+                continue;
+
+            var sourceObs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var obsRule in rule.ObservationSourceRules)
+            {
+                foreach (var o in input.Observations)
+                {
+                    if (MatchesObservation(o, obsRule, input))
+                        sourceObs.Add(o.ResourceId);
+                }
+            }
+
+            if (sourceObs.Count == 0)
+                continue;
+
+            foreach (var d in input.DiagnosticReports)
+            {
+                if (rule.StatusAnyOf is { Count: > 0 }
+                    && (string.IsNullOrWhiteSpace(d.Status)
+                        || (!rule.StatusAnyOf.Contains(d.Status) && !StatusMatchesFhirEnum(d.Status, rule.StatusAnyOf))))
+                {
+                    continue;
+                }
+
+                if (!d.ResultReferences.Any(reference =>
+                        sourceObs.Contains(ReferenceId(reference))))
+                {
+                    continue;
+                }
+
+                if (!PassesDate(rule.Date, d.EffectiveStart, d.EffectiveEnd, input))
+                    continue;
+
+                included.Add($"DiagnosticReport/{d.ResourceId}");
+            }
+        }
+
+        foreach (var rule in model.Rules.Where(r => r.IncludeAllWhenAnyObservationLinkedReportExists))
+        {
+            if (rule.RequireIpExists && input.IpWindows.Count == 0)
+                continue;
+
+            var sourceObs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var obsRule in rule.ObservationSourceRules)
+            {
+                foreach (var o in input.Observations)
+                {
+                    if (MatchesObservation(o, obsRule, input))
+                        sourceObs.Add(o.ResourceId);
+                }
+            }
+
+            if (sourceObs.Count == 0)
+                continue;
+
+            var anyLinkedReport = input.DiagnosticReports.Any(d =>
+                d.ResultReferences.Any(reference => sourceObs.Contains(ReferenceId(reference))));
+            if (!anyLinkedReport)
+                continue;
+
+            foreach (var d in input.DiagnosticReports)
+            {
+                if (rule.StatusAnyOf is { Count: > 0 }
+                    && (string.IsNullOrWhiteSpace(d.Status)
+                        || (!rule.StatusAnyOf.Contains(d.Status) && !StatusMatchesFhirEnum(d.Status, rule.StatusAnyOf))))
+                {
+                    continue;
+                }
+
+                if (!PassesDate(rule.Date, d.EffectiveStart, d.EffectiveEnd, input))
+                    continue;
+
+                included.Add($"DiagnosticReport/{d.ResourceId}");
+            }
+        }
+
         return included;
     }
 
@@ -335,15 +417,21 @@ public static class CqlFilterSimulator
     {
         var start = c.OnsetStart == default ? c.RecordedDate : c.OnsetStart;
         var end = c.OnsetEnd == default ? start : c.OnsetEnd;
-        if (!PassesCommon(rule, input, start, end, c.EncounterReference, c.CategoryCodes, status: c.IsActive ? "active" : string.Empty, codes: []))
+        if (!PassesCommon(rule, input, start, end, encounterReference: null, c.CategoryCodes, status: c.IsActive ? "active" : string.Empty, codes: []))
             return false;
-        if (rule.RequireEncounterLinkedToIp && !input.IpWindows.AnyEncounterMatches(c.EncounterReference))
+        if (rule.RequireEncounterLinkedToIp
+            && !input.IpWindows.AnyEncounterMatches(c.EncounterReference)
+            && !IpEncounterDiagnosesContain(input, c.ResourceId))
+        {
             return false;
+        }
+
         return true;
     }
 
     private static bool MatchesObservation(ObservationContext o, CqlInstanceFilterAnalyzer.CqlInclusionRule rule, PatientCqlInput input)
-        => PassesCommon(
+    {
+        if (PassesCommon(
             rule,
             input,
             o.EffectiveStart,
@@ -351,10 +439,41 @@ public static class CqlFilterSimulator
             encounterReference: null,
             o.CategoryCodes,
             o.Status,
-            codes: string.IsNullOrWhiteSpace(o.LoincCode) ? [] : [o.LoincCode]);
+            codes: string.IsNullOrWhiteSpace(o.LoincCode) ? [] : [o.LoincCode]))
+        {
+            return true;
+        }
+
+        if (!rule.AllowSpecimenCollectionDuringIp)
+            return false;
+
+        if (!PassesCommonExceptDate(
+            rule,
+            input,
+            encounterReference: null,
+            o.CategoryCodes,
+            o.Status,
+            codes: string.IsNullOrWhiteSpace(o.LoincCode) ? [] : [o.LoincCode]))
+        {
+            return false;
+        }
+
+        var specimenId = ReferenceId(o.SpecimenReference);
+        if (string.IsNullOrWhiteSpace(specimenId))
+            return false;
+        var specimen = input.Specimens.FirstOrDefault(s =>
+            string.Equals(s.ResourceId, specimenId, StringComparison.OrdinalIgnoreCase));
+        if (specimen == null)
+            return false;
+        return PassesDate(
+            CqlInstanceFilterAnalyzer.DateRelation.DuringIpPeriod,
+            specimen.CollectionStart,
+            specimen.CollectionEnd,
+            input);
+    }
 
     private static bool MatchesDiagnosticReport(DiagnosticReportContext d, CqlInstanceFilterAnalyzer.CqlInclusionRule rule, PatientCqlInput input)
-        => PassesCommon(rule, input, d.EffectiveStart, d.EffectiveEnd, null, d.CategoryCodes, status: null, codes: []);
+        => PassesCommon(rule, input, d.EffectiveStart, d.EffectiveEnd, null, d.CategoryCodes, d.Status, d.Codes);
 
     private static bool MatchesProcedure(ProcedureContext p, CqlInstanceFilterAnalyzer.CqlInclusionRule rule, PatientCqlInput input)
         => PassesCommon(rule, input, p.PerformedStart, p.PerformedEnd, p.EncounterReference, categories: [], status: null, p.Codes);
@@ -449,13 +568,62 @@ public static class CqlFilterSimulator
 
         if (rule.CodeAnyOf is { Count: > 0 } && !codes.Any(c => rule.CodeAnyOf.Contains(c)))
             return false;
-        if (rule.RequireEncounterLinkedToIp
-            && !input.IpWindows.AnyEncounterMatches(encounterReference))
+        // Encounter-link (Condition.encounter or IP.diagnosis) is evaluated in
+        // MatchesCondition so diagnosis-only Conditions are not dropped.
+
+        return PassesDate(rule.Date, start, end, input);
+    }
+
+    private static bool PassesCommonExceptDate(
+        CqlInstanceFilterAnalyzer.CqlInclusionRule rule,
+        PatientCqlInput input,
+        string? encounterReference,
+        IReadOnlyList<string> categories,
+        string? status,
+        IReadOnlyList<string> codes,
+        string? intent = null)
+    {
+        if (rule.RequireIpExists && input.IpWindows.Count == 0)
+            return false;
+        if (rule.CategoryAnyOf is { Count: > 0 } && !categories.Any(c => rule.CategoryAnyOf.Contains(c)))
+            return false;
+        if (rule.CategoryNoneOf is { Count: > 0 } && categories.Any(c => rule.CategoryNoneOf.Contains(c)))
+            return false;
+        if (rule.StatusAnyOf is { Count: > 0 }
+            && (string.IsNullOrWhiteSpace(status)
+                || (!rule.StatusAnyOf.Contains(status) && !StatusMatchesFhirEnum(status, rule.StatusAnyOf))))
         {
             return false;
         }
 
-        return PassesDate(rule.Date, start, end, input);
+        if (rule.IntentAnyOf is { Count: > 0 }
+            && (string.IsNullOrWhiteSpace(intent) || !rule.IntentAnyOf.Contains(intent)))
+        {
+            return false;
+        }
+
+        if (rule.CodeAnyOf is { Count: > 0 } && !codes.Any(c => rule.CodeAnyOf.Contains(c)))
+            return false;
+
+        return true;
+    }
+
+    private static bool IpEncounterDiagnosesContain(PatientCqlInput input, string conditionId)
+    {
+        if (string.IsNullOrWhiteSpace(conditionId))
+            return false;
+        foreach (var enc in EffectiveEncounters(input))
+        {
+            if (!input.IpWindows.AnyEncounterMatches(enc.EncounterId))
+                continue;
+            foreach (var reference in enc.DiagnosisConditionIds)
+            {
+                if (string.Equals(ReferenceId(reference), conditionId, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool PassesDate(
@@ -535,6 +703,7 @@ public static class CqlFilterSimulator
         string Status)
     {
         public IReadOnlyList<string> LocationReferences { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<string> DiagnosisConditionIds { get; init; } = Array.Empty<string>();
     }
 
     public sealed record LocationContext(string ResourceId);
@@ -576,6 +745,9 @@ public static class CqlFilterSimulator
         DateTime EffectiveEnd)
     {
         public IReadOnlyList<string> CategoryCodes { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<string> Codes { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<string> ResultReferences { get; init; } = Array.Empty<string>();
+        public string Status { get; init; } = string.Empty;
 
         public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
             EffectiveStart <= periodEnd && EffectiveEnd >= periodStart;

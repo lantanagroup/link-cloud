@@ -906,4 +906,141 @@ public class CqlFilterSimulatorTests
         Assert.DoesNotContain("Location/StepDown", excluded);
         Assert.DoesNotContain("Location/Hospital", excluded);
     }
+
+    // ---------- Daily DiagnosticReport valueset + result.references ----------
+
+    [Fact]
+    public void AchDaily_DiagnosticReport_NonRespiratoryLoinc_IsExcluded()
+    {
+        // Daily has no "SDE All DiagnosticReports". Coded SDEs are COVID/flu/RSV
+        // LOINCs; generator CBC/CMP panels must not be predicted into ABS.
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-cbc", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LAB"],
+            Codes = ["58410-2"],
+            Status = "final"
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.Contains("DiagnosticReport/DR-cbc", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_DiagnosticReport_CovidLoinc_IsKept()
+    {
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-covid", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LAB"],
+            Codes = ["94500-6"],
+            Status = "final"
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            InputWithDiagnosticReports(report));
+
+        Assert.DoesNotContain("DiagnosticReport/DR-covid", excluded);
+    }
+
+    [Fact]
+    public void AchDaily_DiagnosticReport_ResultReferencesCovidObservation_IsKeptEvenWhenCodeIsCbc()
+    {
+        var covidObs = LabObservationWithSpecimen("O-covid", "94500-6", "S-unused");
+        var report = new CqlFilterSimulator.DiagnosticReportContext("DR-cbc-with-covid-result", EncStart.AddHours(1), EncStart.AddHours(2))
+        {
+            CategoryCodes = ["LAB"],
+            Codes = ["58410-2"],
+            Status = "final",
+            ResultReferences = ["Observation/O-covid"]
+        };
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            new[] { covidObs })
+        {
+            DiagnosticReports = [report]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation],
+            input);
+
+        Assert.DoesNotContain("DiagnosticReport/DR-cbc-with-covid-result", excluded);
+    }
+
+    // ---------- Monthly Condition IP.diagnosis (no Condition.encounter) ----------
+
+    [Fact]
+    public void AchMonthly_Condition_ListedOnIpDiagnosis_WithoutEncounterReference_IsKept()
+    {
+        var encounter = new CqlFilterSimulator.EncounterContext("E1", EncStart, EncEnd, "IMP", "finished")
+        {
+            DiagnosisConditionIds = ["Condition/C-dx-only"]
+        };
+        var condition = new CqlFilterSimulator.ConditionContext(
+            ResourceId: "C-dx-only",
+            IsActive: true,
+            RecordedDate: EncStart.Date,
+            EncounterReference: string.Empty,
+            CategoryCodes: ["encounter-diagnosis"]);
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", encounter.EncounterId, EncStart, EncEnd,
+            new[] { condition },
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        {
+            Encounters = [encounter]
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            input);
+
+        Assert.DoesNotContain("Condition/C-dx-only", excluded);
+    }
+
+    // ---------- Hypo glucose: specimen collection during IP, effective outside ----------
+
+    [Fact]
+    public void Hypoglycemic_GlucoseObservation_EffectiveOutsideIp_SpecimenCollectedDuringIp_IsKept()
+    {
+        var specimen = Specimen("S-glu", EncStart.AddHours(1));
+        var glucose = new CqlFilterSimulator.ObservationContext(
+            ResourceId: "O-glu-specimen",
+            LoincCode: "2345-7",
+            CategoryCodes: ["laboratory"],
+            EffectiveStart: EncEnd.AddDays(2),
+            EffectiveEnd: EncEnd.AddDays(2))
+        {
+            Status = "final",
+            SpecimenReference = "Specimen/S-glu"
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation],
+            InputWithSpecimens([specimen], glucose));
+
+        Assert.DoesNotContain("Observation/O-glu-specimen", excluded);
+    }
+
+    [Fact]
+    public void Hypoglycemic_NonGlucose_SpecimenCollectedDuringIp_IsStillExcluded()
+    {
+        var specimen = Specimen("S-na", EncStart.AddHours(1));
+        var sodium = LabObservationWithSpecimen("O-sodium", "2951-2", specimen.ResourceId) with
+        {
+            EffectiveStart = EncEnd.AddDays(2),
+            EffectiveEnd = EncEnd.AddDays(2)
+        };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation],
+            InputWithSpecimens([specimen], sodium));
+
+        Assert.Contains("Observation/O-sodium", excluded);
+    }
 }
