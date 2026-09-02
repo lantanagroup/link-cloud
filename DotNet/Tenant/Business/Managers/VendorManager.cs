@@ -214,7 +214,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             AuditEventMessage? auditEvent =
-                Helper.UpdateVendorAuditEvent(existingVendor, previousName, previousSigningKeySecretId?.ToString());
+                Helper.UpdateVendorAuditEvent(existingVendor, previousName, previousSigningKeySecretId != null ? new string(previousSigningKeySecretId) : null);
             if (previousSigningKeySecretId != null)
             {
                 Array.Clear(previousSigningKeySecretId);

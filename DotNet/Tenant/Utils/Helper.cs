@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Tenant.Utils
                 {
                     PropertyName = nameof(VendorAuthenticationSettings.SigningKeySecretId),
                     InitialPropertyValue = existingSigningKeySecretId ?? string.Empty,
-                    NewPropertyValue = updatedSigningKeySecretId?.ToString() ?? string.Empty
+                    NewPropertyValue = updatedSigningKeySecretId != null ? new string(updatedSigningKeySecretId) : string.Empty
                 });
             }
             if(updatedSigningKeySecretId != null)

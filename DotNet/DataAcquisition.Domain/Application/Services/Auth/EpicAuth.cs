@@ -140,7 +140,7 @@ public class EpicAuth : IAuth
             ? $"{facilityId}{PemSuffix}".ToCharArray()
             : vendorSecretName;
 
-        var resolvedPem = await _secretManager.GetSecretAsync(pemName?.ToString() ?? "", CancellationToken.None);
+        var resolvedPem = await _secretManager.GetSecretAsync(new string(pemName) ?? "", CancellationToken.None);
         if(pemName != null)
         {
             Array.Clear(pemName);
