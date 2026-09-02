@@ -8,7 +8,9 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DMRP
@@ -47,7 +49,8 @@ namespace UnitTests.DMRP
             return context;
         }
 
-        private static FacilityReportingPlanLookAhead CreateLookAhead(TenantDbContext context)
+        private static FacilityReportingPlanLookAhead CreateLookAhead(TenantDbContext context,
+            IReportingPlanScheduleProjector? scheduleProjector = null)
         {
             var queries = new FacilityReportingPlanQueries(
                 new EntityRepository<FacilityReportingPlan, TenantDbContext>(context),
@@ -59,7 +62,8 @@ namespace UnitTests.DMRP
                 new EntityRepository<MeasureMapping, TenantDbContext>(context));
 
             return new FacilityReportingPlanLookAhead(queries, source,
-                new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance));
+                scheduleProjector
+                    ?? new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance));
         }
 
         private static MeasureMapping AddMapping(TenantDbContext context, string measure,
@@ -198,6 +202,99 @@ namespace UnitTests.DMRP
             // would have said HOB.
             Assert.False(december.IsProjected);
             Assert.Equal("CAUTI", Assert.Single(december.Measures).Measure);
+        }
+
+        [Fact]
+        public async Task APeriodRecordedAsFullyWithdrawn_IsNotProjectedOver()
+        {
+            using var context = CreateContext();
+            var hob = AddMapping(context, "HOB");
+
+            AddPlan(context, hob, Anchor);
+            AddPlan(context, hob, new ReportingPeriod(2026, 12), isReporting: false);
+            await context.SaveChangesAsync();
+
+            // isReporting: true is what the controller passes for an unfiltered request -- it defaults
+            // the parameter rather than leaving it null -- so it is the path this has to be tested on.
+            var page = await CreateLookAhead(context)
+                .GetAsync(FacilityId, SixMonths(), Anchor, isReporting: true);
+
+            // December has a plan on record saying the facility withdrew. Deciding the gaps from the
+            // rows the isReporting filter left behind would make that indistinguishable from a month
+            // nobody has spoken about, and the answer would be today's enrollment projected onto it --
+            // telling the facility it reports HOB in a month DMRP has recorded that it does not.
+            Assert.DoesNotContain(page.Records,
+                period => period.ReportingYear == 2026 && period.ReportingMonth == 12);
+        }
+
+        [Fact]
+        public async Task APartiallyWithdrawnPeriod_KeepsTheMeasuresItStillReports()
+        {
+            using var context = CreateContext();
+            var hob = AddMapping(context, "HOB");
+            var cauti = AddMapping(context, "CAUTI");
+            var december = new ReportingPeriod(2026, 12);
+
+            AddPlan(context, hob, Anchor);
+            AddPlan(context, cauti, december);
+            AddPlan(context, hob, december, isReporting: false);
+            await context.SaveChangesAsync();
+
+            var page = await CreateLookAhead(context)
+                .GetAsync(FacilityId, SixMonths(), Anchor, isReporting: true);
+
+            // The counterpart: filtering still happens, it just no longer decides what counts as
+            // recorded. December keeps CAUTI, drops the withdrawn HOB, and is not projected.
+            var period = page.Records.Single(p => p.ReportingYear == 2026 && p.ReportingMonth == 12);
+            Assert.False(period.IsProjected);
+            Assert.Equal("CAUTI", Assert.Single(period.Measures).Measure);
+        }
+
+        [Fact]
+        public async Task AskingForWithdrawalsOnly_StillSeesAFullyWithdrawnPeriod()
+        {
+            using var context = CreateContext();
+            var hob = AddMapping(context, "HOB");
+
+            AddPlan(context, hob, Anchor);
+            AddPlan(context, hob, new ReportingPeriod(2026, 12), isReporting: false);
+            await context.SaveChangesAsync();
+
+            var page = await CreateLookAhead(context)
+                .GetAsync(FacilityId, SixMonths(), Anchor, isReporting: false);
+
+            // Moving the filter out of the query must not lose the rows it selects for.
+            var period = Assert.Single(page.Records);
+            Assert.Equal(12, period.ReportingMonth);
+            Assert.Equal("HOB", Assert.Single(period.Measures).Measure);
+        }
+
+        [Fact]
+        public async Task ProjectingOverManyMonths_DoesNotWarnPerMonth()
+        {
+            using var context = CreateContext();
+            var logger = new Mock<ILogger<ReportingPlanScheduleProjector>>();
+
+            // A measure whose mapping carries no dQM is what the warning is about.
+            AddPlan(context, AddMapping(context, "HOB", dqm: " "), Anchor);
+            await context.SaveChangesAsync();
+
+            var lookAhead = CreateLookAhead(context,
+                new ReportingPlanScheduleProjector(logger.Object));
+
+            await lookAhead.GetAsync(FacilityId, ReportingPeriodRange.LookAhead(Anchor, 24), Anchor);
+
+            // The read projects the same enrollment over every month in the window, so warning inside
+            // the projection would emit the identical line up to 24 times for one GET. The write path
+            // that saves the enrollment is where the mapping can be fixed, and it still warns.
+            logger.Verify(
+                item => item.Log(
+                    LogLevel.Warning,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Never);
         }
 
         [Fact]

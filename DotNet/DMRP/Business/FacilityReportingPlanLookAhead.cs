@@ -70,11 +70,20 @@ namespace LantanaGroup.Link.DMRP.Business
             ReportingPeriodRange? window, ReportingPeriod anchor, bool? isReporting = null, int pageSize = 10,
             int pageNumber = 1, CancellationToken cancellationToken = default)
         {
-            var recorded = await RecordedPeriodsAsync(facilityId, window, isReporting, cancellationToken);
+            // Read unfiltered and apply isReporting below. Which periods are on record has to be
+            // decided from every row, not just the reporting ones: a period whose plans all say the
+            // facility withdrew has no reporting rows to come back, and filtering in the query would
+            // make it indistinguishable from a period nobody has spoken about -- which is exactly the
+            // thing the gap fill goes on to project over.
+            var plans = await _queries.GetForFacilityAsync(facilityId, periodRange: window,
+                cancellationToken: cancellationToken);
+
+            var recorded = RecordedPeriods(facilityId, plans, isReporting);
 
             var periods = window is null
                 ? recorded
-                : await FillGapsAsync(facilityId, window.Value, anchor, isReporting, recorded, cancellationToken);
+                : await FillGapsAsync(facilityId, window.Value, anchor, isReporting, recorded, plans,
+                    cancellationToken);
 
             var ordered = periods
                 .OrderBy(period => period.ReportingYear)
@@ -91,14 +100,23 @@ namespace LantanaGroup.Link.DMRP.Business
         /// The periods the facility has reporting plans on record for, each with the schedule those
         /// plans produce.
         /// </summary>
-        private async Task<List<FacilityReportingPlanPeriodModel>> RecordedPeriodsAsync(string facilityId,
-            ReportingPeriodRange? window, bool? isReporting, CancellationToken cancellationToken)
+        private List<FacilityReportingPlanPeriodModel> RecordedPeriods(string facilityId,
+            List<FacilityReportingPlanModel> plans, bool? isReporting)
         {
-            var plans = await _queries.GetForFacilityAsync(facilityId, isReporting: isReporting,
-                periodRange: window, cancellationToken: cancellationToken);
-
             return plans
                 .GroupBy(plan => new ReportingPeriod(plan.ReportingYear, plan.ReportingMonth))
+
+                // Applied here rather than in the query so the group above still sees every row. A
+                // period left with nothing after the filter drops out, exactly as it would have if the
+                // database had done the filtering -- but it has already been counted as recorded.
+                .Select(period => new
+                {
+                    period.Key,
+                    Plans = isReporting is null
+                        ? period.ToList()
+                        : period.Where(plan => plan.IsReporting == isReporting.Value).ToList()
+                })
+                .Where(period => period.Plans.Count > 0)
                 .Select(period => new FacilityReportingPlanPeriodModel
                 {
                     ReportingYear = period.Key.Year,
@@ -106,7 +124,7 @@ namespace LantanaGroup.Link.DMRP.Business
 
                     // Ordered by measure, then by mapping id to break the tie two mappings of the
                     // same measure would otherwise leave to the database's row order.
-                    Measures = period
+                    Measures = period.Plans
                         .OrderBy(plan => plan.Measure, StringComparer.Ordinal)
                         .ThenBy(plan => plan.MeasureMappingId, StringComparer.Ordinal)
                         .Select(ToMeasureModel)
@@ -114,9 +132,13 @@ namespace LantanaGroup.Link.DMRP.Business
 
                     // Only enrollments the facility is actually reporting schedule anything. A
                     // withdrawn measure stays in Measures as history and contributes no report.
+                    // Silent about unmapped dQMs: this is a read, and it projects one schedule per
+                    // period in the window, so warning here repeats the same line up to the whole
+                    // look-ahead. The write path that saves the enrollment warns, and that is where
+                    // the mapping can actually be fixed.
                     Schedule = _scheduleProjector.Project(
-                        period.Where(plan => plan.IsReporting).Select(ToScheduleEntry).ToList(),
-                        facilityId, period.Key),
+                        period.Plans.Where(plan => plan.IsReporting).Select(ToScheduleEntry).ToList(),
+                        facilityId, period.Key, warnOnUnmapped: false),
 
                     IsProjected = false
                 })
@@ -129,7 +151,8 @@ namespace LantanaGroup.Link.DMRP.Business
         /// </summary>
         private async Task<List<FacilityReportingPlanPeriodModel>> FillGapsAsync(string facilityId,
             ReportingPeriodRange window, ReportingPeriod anchor, bool? isReporting,
-            List<FacilityReportingPlanPeriodModel> recorded, CancellationToken cancellationToken)
+            List<FacilityReportingPlanPeriodModel> recorded, List<FacilityReportingPlanModel> plans,
+            CancellationToken cancellationToken)
         {
             // A withdrawal is a fact about a period that already happened. Carrying one forward would
             // report a facility as not reporting in months nobody has said anything about yet.
@@ -138,8 +161,15 @@ namespace LantanaGroup.Link.DMRP.Business
                 return recorded;
             }
 
+            // Taken from the plans rather than from recorded, which the isReporting filter has already
+            // been through. A period recorded entirely as withdrawn is a period DMRP has an answer for,
+            // and projecting today's enrollment onto it would answer the opposite.
+            var onRecord = plans
+                .Select(plan => new ReportingPeriod(plan.ReportingYear, plan.ReportingMonth))
+                .ToHashSet();
+
             var gaps = window.Periods()
-                .Where(period => !recorded.Any(r => r.ReportingYear == period.Year && r.ReportingMonth == period.Month))
+                .Where(period => !onRecord.Contains(period))
                 .ToList();
 
             if (gaps.Count == 0)
@@ -172,7 +202,10 @@ namespace LantanaGroup.Link.DMRP.Business
                     // The same list every projected month over: the projection is the current
                     // enrollment, and the frequency on each measure is what says it recurs.
                     Measures = measures,
-                    Schedule = _scheduleProjector.Project(current, facilityId, period),
+                    // Same list every gap over, so warning here would be the identical line once per
+                    // projected month, for the same reason as the recorded periods above.
+                    Schedule = _scheduleProjector.Project(current, facilityId, period,
+                        warnOnUnmapped: false),
                     IsProjected = true
                 });
             }

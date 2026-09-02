@@ -23,8 +23,14 @@ namespace LantanaGroup.Link.DMRP.Business
         /// <param name="entries">The facility's enrollments for one period.</param>
         /// <param name="facilityId">Only for logging, so a dropped measure can be traced.</param>
         /// <param name="period">Only for logging.</param>
+        /// <param name="warnOnUnmapped">
+        /// Whether to warn about enrollments with no dQM mapped. On by default, because the caller
+        /// that saves a facility's schedule is the one that can act on it. A caller projecting the
+        /// same enrollment over many periods to answer a read turns that into one identical line per
+        /// period, so it passes <c>false</c> and leaves the warning to the write path.
+        /// </param>
         TenantScheduledReportConfig Project(IReadOnlyList<ReportingPlanEntry> entries, string facilityId,
-            ReportingPeriod period);
+            ReportingPeriod period, bool warnOnUnmapped = true);
     }
 
     public sealed class ReportingPlanScheduleProjector : IReportingPlanScheduleProjector
@@ -37,17 +43,20 @@ namespace LantanaGroup.Link.DMRP.Business
         }
 
         public TenantScheduledReportConfig Project(IReadOnlyList<ReportingPlanEntry> entries, string facilityId,
-            ReportingPeriod period)
+            ReportingPeriod period, bool warnOnUnmapped = true)
         {
             ArgumentNullException.ThrowIfNull(entries);
 
-            foreach (var entry in entries.Where(e => string.IsNullOrWhiteSpace(e.DQM)))
+            if (warnOnUnmapped)
             {
-                // A measure DMRP returned that Link has no mapping for is recorded with a null dQM
-                // precisely so it shows up here rather than being lost.
-                _logger.LogWarning(
-                    "Facility {FacilityId} is enrolled in measure {Measure} for {Month}/{Year}, which has no dQM mapped. It is excluded from the facility's schedule.",
-                    facilityId.SanitizeForLog(), entry.Measure.SanitizeForLog(), period.Month, period.Year);
+                foreach (var entry in entries.Where(e => string.IsNullOrWhiteSpace(e.DQM)))
+                {
+                    // A measure DMRP returned that Link has no mapping for is recorded with a null dQM
+                    // precisely so it shows up here rather than being lost.
+                    _logger.LogWarning(
+                        "Facility {FacilityId} is enrolled in measure {Measure} for {Month}/{Year}, which has no dQM mapped. It is excluded from the facility's schedule.",
+                        facilityId.SanitizeForLog(), entry.Measure.SanitizeForLog(), period.Month, period.Year);
+                }
             }
 
             // Only these three produce a recurring schedule. Discharge and Adhoc enrollments are not
