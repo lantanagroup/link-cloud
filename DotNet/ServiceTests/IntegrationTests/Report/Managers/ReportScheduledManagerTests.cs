@@ -210,6 +210,49 @@ public class ReportScheduledManagerTests
 
     #endregion
 
+    #region Summary Tests
+
+    [Fact]
+    public async Task GetReportSummaries_WithMultipleReportTypes_ReturnsScheduleLevelCounts()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var report = CreateReport(facilityId, ScheduleStatus.Scheduled);
+        report.ReportTypes.Add(new ScheduleReportType { ReportType = "type-a" });
+        report.ReportTypes.Add(new ScheduleReportType { ReportType = "type-b" });
+        report.ReportEntries.Add(new ReportEntry
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            PatientId = "patient-a",
+            CreateDate = DateTime.UtcNow
+        });
+        report.ReportEntries.Add(new ReportEntry
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            PatientId = "patient-b",
+            CreateDate = DateTime.UtcNow
+        });
+        report.ReportPopulations.Add(CreateReportPopulation(facilityId, "type-a", 2));
+        report.ReportPopulations.Add(CreateReportPopulation(facilityId, "type-b", 1));
+
+        await SeedAsync(context, report);
+
+        var result = await sut.GetReportSummaries(facilityId, null, null, null, 10, 1);
+
+        var summary = Assert.Single(result.Records);
+        Assert.Equal(report.Id, Guid.Parse(summary.ReportScheduleId));
+        Assert.Equal(["type-a", "type-b"], summary.ReportTypes);
+        Assert.Equal(2, summary.PatientCount);
+        Assert.Equal(3, summary.InitialPopulationCount);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static ReportSchedule CreateReport(string facilityId, ScheduleStatus status, bool isDeleted = false)
@@ -223,6 +266,37 @@ public class ReportScheduledManagerTests
             CreateDate = DateTime.UtcNow,
             ModifyDate = null
         };
+    }
+
+    private static ReportPopulation CreateReportPopulation(string facilityId, string reportType, int initialPopulationCount)
+    {
+        var reportPopulation = new ReportPopulation
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            ReportType = reportType,
+            Measure = reportType,
+            CreateDate = DateTime.UtcNow
+        };
+
+        var initialPopulation = new GroupPopulation
+        {
+            PopulationId = "initial-population",
+            PopulationCodeJson = "{}",
+            TotalPopulationCount = initialPopulationCount
+        };
+
+        for (var populationIndex = 0; populationIndex < initialPopulationCount; populationIndex++)
+        {
+            initialPopulation.MeasureReportPopulations.Add(new MeasureReportPopulation
+            {
+                MeasureReportId = $"{reportType}-measure-report-{populationIndex}",
+                PopulationCount = 1
+            });
+        }
+
+        reportPopulation.GroupPopulations.Add(initialPopulation);
+        return reportPopulation;
     }
 
     private static async Task SeedAsync(ReportDbContext context, params ReportSchedule[] reports)
