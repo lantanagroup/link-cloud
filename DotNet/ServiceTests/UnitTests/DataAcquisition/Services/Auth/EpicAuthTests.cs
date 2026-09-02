@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -24,6 +25,7 @@ public class EpicAuthTests
 {
     private const string FacilityId = "test-facility";
     private const string KeySecretName = "test-facility-pem";
+    private const string VendorSecretName = "epic-signing-key";
     private const string ClientIdSecretName = "secret/clientid";
     private const string ResolvedClientId = "epic-client-12345";
     private const string TokenUrl = "https://epic.example/oauth2/token";
@@ -31,6 +33,7 @@ public class EpicAuthTests
     private readonly Mock<ILogger<EpicAuth>> _mockLogger;
     private readonly Mock<ICacheService> _mockCacheService;
     private readonly Mock<ISecretManager> _mockSecretManager;
+    private readonly Mock<ITenantApiService> _mockTenantApiService;
     private readonly string _testPrivateKeyPem;
     private readonly RSA _testPublicKey;
 
@@ -51,8 +54,16 @@ public class EpicAuthTests
             .Setup(x => x.GetSecretAsync(KeySecretName, CancellationToken.None))
             .ReturnsAsync(_testPrivateKeyPem);
         _mockSecretManager
+            .Setup(x => x.GetSecretAsync(VendorSecretName, CancellationToken.None))
+            .ReturnsAsync(_testPrivateKeyPem);
+        _mockSecretManager
             .Setup(x => x.GetSecretAsync(ClientIdSecretName, CancellationToken.None))
             .ReturnsAsync(ResolvedClientId);
+
+        _mockTenantApiService = new Mock<ITenantApiService>();
+        _mockTenantApiService
+            .Setup(x => x.GetVendorSigningKeySecretId(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
     }
 
     private EpicAuth BuildSut(
@@ -63,7 +74,8 @@ public class EpicAuthTests
             _mockLogger.Object,
             _mockCacheService.Object,
             _mockSecretManager.Object,
-            Options.Create(new DataSourceAuthSettings { KeySource = keySource }));
+            Options.Create(new DataSourceAuthSettings { KeySource = keySource }),
+            _mockTenantApiService.Object);
 
     private AuthenticationConfigurationModel BuildAuthSettings(
         string? clientId = ClientIdSecretName,
@@ -168,15 +180,66 @@ public class EpicAuthTests
         Assert.Equal(ResolvedClientId, token.Subject);
     }
 
-    [Fact]
-    public async Task SetAuthentication_DerivesPemSecretName_FromFacilityId()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SetAuthentication_FallsBackToPemSuffix_WhenVendorSigningKeySecretIdIsNullOrWhitespace(string? vendorSecretName)
     {
+        _mockTenantApiService
+            .Setup(x => x.GetVendorSigningKeySecretId(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(vendorSecretName);
         var sut = BuildSut(new MockHttpMessageHandler(_ => OkJsonResponse(BuildTokenResponse())));
 
         await sut.SetAuthentication(FacilityId, BuildAuthSettings());
 
         _mockSecretManager.Verify(
             x => x.GetSecretAsync($"{FacilityId}-pem", CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetAuthentication_UsesVendorSigningKeySecretId_WhenTenantServiceProvidesOne()
+    {
+        _mockTenantApiService
+            .Setup(x => x.GetVendorSigningKeySecretId(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(VendorSecretName);
+        var sut = BuildSut(new MockHttpMessageHandler(_ => OkJsonResponse(BuildTokenResponse())));
+
+        await sut.SetAuthentication(FacilityId, BuildAuthSettings());
+
+        _mockSecretManager.Verify(
+            x => x.GetSecretAsync(VendorSecretName, CancellationToken.None), Times.Once);
+        _mockSecretManager.Verify(
+            x => x.GetSecretAsync(KeySecretName, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetAuthentication_PropagatesException_WhenTenantApiServiceThrows()
+    {
+        _mockTenantApiService
+            .Setup(x => x.GetVendorSigningKeySecretId(FacilityId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Tenant service unavailable."));
+        var sut = BuildSut(new MockHttpMessageHandler(_ => OkJsonResponse(BuildTokenResponse())));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.SetAuthentication(FacilityId, BuildAuthSettings()));
+
+        _mockSecretManager.Verify(
+            x => x.GetSecretAsync(KeySecretName, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetAuthentication_DoesNotQueryTenantService_WhenKeySourceIsDatabase()
+    {
+        var sut = BuildSut(
+            new MockHttpMessageHandler(_ => OkJsonResponse(BuildTokenResponse())),
+            PemKeySource.Database);
+
+        await sut.SetAuthentication(FacilityId, BuildAuthSettings(key: _testPrivateKeyPem));
+
+        _mockTenantApiService.Verify(
+            x => x.GetVendorSigningKeySecretId(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Theory]

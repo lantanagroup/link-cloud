@@ -1,7 +1,9 @@
 ﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -37,6 +39,30 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
 
     public Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
         SendAsync<PagedConfigModel<ReportScheduleApiModel>>(() => Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(
+        string? facilityId = null,
+        ReportStatus? status = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Request("/schedules/summaries")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+
+        if (!string.IsNullOrWhiteSpace(facilityId)) request = request.SetQueryParam("facilityId", facilityId);
+        if (status.HasValue) request = request.SetQueryParam("status", status.Value);
+        if (!string.IsNullOrWhiteSpace(sortBy)) request = request.SetQueryParam("sortBy", sortBy);
+        if (sortOrder.HasValue) request = request.SetQueryParam("sortOrder", sortOrder.Value);
+
+        return SendAsync<PagedConfigModel<ReportSummaryApiModel>>(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<ReportSummaryApiModel>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportSummaryApiModel>(() => Request($"/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/schedules/{reportId}").DeleteAsync(cancellationToken: cancellationToken));
