@@ -1044,6 +1044,89 @@
         return sourcesByOperation;
     }
 
+    function refreshSuiteSequenceOptions() {
+        const sequenceSelects = Array.from(
+            document.querySelectorAll('#suiteSequencesContainer .suite-seq-select')
+        );
+
+        const standaloneOperationIds = new Set(
+            Array.from(
+                document.querySelectorAll('#suiteOpsContainer .suite-op-select')
+            )
+                .map(select => select.value)
+                .filter(Boolean)
+        );
+
+        sequenceSelects.forEach(select => {
+            const selectedSequenceIdsElsewhere = new Set(
+                sequenceSelects
+                    .filter(otherSelect => otherSelect !== select)
+                    .map(otherSelect => otherSelect.value)
+                    .filter(Boolean)
+            );
+
+            const operationIdsFromOtherSequences = new Set();
+
+            selectedSequenceIdsElsewhere.forEach(sequenceId => {
+                const sequence = allSequences.find(s => s.id === sequenceId);
+                if (!sequence) return;
+
+                (sequence.entries || []).forEach(entry => {
+                    operationIdsFromOtherSequences.add(entry.operationId);
+                });
+            });
+
+            Array.from(select.options).forEach(option => {
+                if (!option.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const sequence = allSequences.find(s => s.id === option.value);
+                if (!sequence) return;
+
+                option.textContent = sequence.name;
+
+                // Keep this row's current value available so an existing invalid
+                // suite can still be displayed and corrected.
+                if (option.value === select.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const sameSequenceSelected =
+                    selectedSequenceIdsElsewhere.has(option.value);
+
+                const sequenceOperationIds = (sequence.entries || [])
+                    .map(entry => entry.operationId);
+
+                const sharedWithAnotherSequence = sequenceOperationIds.some(
+                    operationId => operationIdsFromOtherSequences.has(operationId)
+                );
+
+                const sharedWithStandalone = sequenceOperationIds.some(
+                    operationId => standaloneOperationIds.has(operationId)
+                );
+
+                option.disabled =
+                    sameSequenceSelected ||
+                    sharedWithAnotherSequence ||
+                    sharedWithStandalone;
+
+                if (sameSequenceSelected) {
+                    option.textContent +=
+                        ' — already selected in this suite';
+                } else if (sharedWithAnotherSequence) {
+                    option.textContent +=
+                        ' — contains an operation already included by another sequence';
+                } else if (sharedWithStandalone) {
+                    option.textContent +=
+                        ' — contains an operation already selected as standalone';
+                }
+            });
+        });
+    }
+
     function refreshSuiteStandaloneOperationOptions() {
         const sequenceOperationSources = getSuiteSequenceOperationSources();
 
@@ -1087,6 +1170,11 @@
                 }
             });
         });
+    }
+
+    function refreshSuiteSelectionOptions() {
+        refreshSuiteSequenceOptions();
+        refreshSuiteStandaloneOperationOptions();
     }
 
     function getSuiteDuplicateOperationMessages() {
@@ -1140,11 +1228,12 @@
         document.getElementById('SuiteDescription').value = data?.description || '';
 
         const seqContainer = document.getElementById('suiteSequencesContainer');
-        seqContainer.innerHTML = '';
-        (data?.sequenceIds || []).forEach(sid => addSuiteSeqRow(sid));
-
         const opContainer = document.getElementById('suiteOpsContainer');
+
+        seqContainer.innerHTML = '';
         opContainer.innerHTML = '';
+
+        (data?.sequenceIds || []).forEach(sid => addSuiteSeqRow(sid));
         (data?.operationIds || []).forEach(oid => addSuiteOpRow(oid));
 
         document.getElementById('btnSuiteSave').style.display = mode === 'edit' ? '' : 'none';
@@ -1154,7 +1243,7 @@
         formErrors.style.display = 'none';
         formErrors.textContent = '';
 
-        refreshSuiteStandaloneOperationOptions();
+        refreshSuiteSelectionOptions();
 
         showSuiteModal();
     }
@@ -1186,7 +1275,7 @@
 
         sequenceSelect.addEventListener(
             'change',
-            refreshSuiteStandaloneOperationOptions
+            refreshSuiteSelectionOptions
         );
 
         const removeButton = document.createElement('button');
@@ -1196,14 +1285,14 @@
 
         removeButton.addEventListener('click', () => {
             row.remove();
-            refreshSuiteStandaloneOperationOptions();
+            refreshSuiteSelectionOptions();
         });
 
         row.appendChild(sequenceSelect);
         row.appendChild(removeButton);
         container.appendChild(row);
 
-        refreshSuiteStandaloneOperationOptions();
+        refreshSuiteSelectionOptions();
     }
 
     function addSuiteOpRow(selectedId) {
@@ -1233,7 +1322,7 @@
 
         operationSelect.addEventListener(
             'change',
-            refreshSuiteStandaloneOperationOptions
+            refreshSuiteSelectionOptions
         );
 
         const removeButton = document.createElement('button');
@@ -1243,14 +1332,14 @@
 
         removeButton.addEventListener('click', () => {
             row.remove();
-            refreshSuiteStandaloneOperationOptions();
+            refreshSuiteSelectionOptions();
         });
 
         row.appendChild(operationSelect);
         row.appendChild(removeButton);
         container.appendChild(row);
 
-        refreshSuiteStandaloneOperationOptions();
+        refreshSuiteSelectionOptions();
     }
 
     document.getElementById('btnAddSuiteSeq').addEventListener('click', () => addSuiteSeqRow(null));
@@ -1312,8 +1401,18 @@
         if (resp.ok) openSuiteEditor(await resp.json(), btn.dataset.mode);
     }));
     document.querySelectorAll('.btn-suite-clone').forEach(btn => btn.addEventListener('click', async () => {
-        await postJson('@Url.Action("CloneSuite", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        const resp = await postJson(
+            '@Url.Action("CloneSuite", "Normalizations")',
+            { id: btn.dataset.id }
+        );
+
+        if (resp.ok) {
+            location.reload();
+            return;
+        }
+
+        const err = await resp.text();
+        alert(err || 'Failed to clone normalization suite.');
     }));
     document.querySelectorAll('.btn-suite-default').forEach(btn => btn.addEventListener('click', async () => {
         await postJson('@Url.Action("SetDefaultSuite", "Normalizations")', { id: btn.dataset.id });
