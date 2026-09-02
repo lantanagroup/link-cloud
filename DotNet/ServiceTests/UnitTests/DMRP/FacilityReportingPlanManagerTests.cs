@@ -78,6 +78,42 @@ namespace UnitTests.DMRP
             _mockFacilityExistence.Verify(s => s.ExistsAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
+        [Theory]
+        [InlineData("XX")]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task CreateAsync_UnknownComponent_IsRejected(string component)
+        {
+            var plan = ValidPlan();
+            plan.Component = component;
+
+            // The component is part of the unique key and decides which DMRP operation an enrollment
+            // came from, so a value outside the known set would sit in the column describing nothing
+            // and silently occupy its own slot in the key.
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+
+            Assert.Equal($"Component must be one of: {string.Join(", ", ReportingComponents.All)}.", ex.Message);
+
+            // Rejected before anything is written, not after.
+            _mockRepository.Verify(r => r.AddAsync(It.IsAny<FacilityReportingPlan>(), It.IsAny<CancellationToken>()), Times.Never);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(ReportingComponents.Msc)]
+        [InlineData(ReportingComponents.Ps)]
+        public async Task CreateAsync_KnownComponent_IsAccepted(string component)
+        {
+            var plan = ValidPlan();
+            plan.Component = component;
+
+            // The other side of the branch: both components are real, and PS is not a special case
+            // despite its endpoint being the one named "annual".
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal(component, result.Component);
+        }
+
         [Fact]
         public async Task CreateAsync_MeasureContradictingItsMapping_IsRejected()
         {
