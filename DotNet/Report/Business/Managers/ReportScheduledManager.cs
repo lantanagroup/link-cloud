@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -41,6 +42,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
         Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<ReportSummaryApiModel>> GetReportSummaries(
+            string? facilityId, ReportStatus? status, string? sortBy, SortOrder? sortOrder,
+            int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+
+        Task<ReportSummaryApiModel?> GetReportSummary(string reportScheduleId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -499,5 +505,85 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _context.SaveChangesAsync(cancellationToken);
         }
 
+            public async Task<PagedConfigModel<ReportSummaryApiModel>> GetReportSummaries(
+                string? facilityId,
+                ReportStatus? status,
+                string? sortBy,
+                SortOrder? sortOrder,
+                int pageSize,
+                int pageNumber,
+                CancellationToken cancellationToken = default)
+        {
+                var query = CreateReportSummaryQuery();
+
+                if (!string.IsNullOrWhiteSpace(facilityId))
+                    query = query.Where(summary => summary.FacilityId == facilityId);
+
+                if (status.HasValue)
+                    query = query.Where(summary => summary.Status == status.Value);
+
+                query = sortBy?.ToLower() switch
+                {
+                    "facilityid" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.FacilityId) : query.OrderBy(summary => summary.FacilityId),
+                    "reportstartdate" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.ReportStartDate) : query.OrderBy(summary => summary.ReportStartDate),
+                    "reportenddate" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.ReportEndDate) : query.OrderBy(summary => summary.ReportEndDate),
+                    "reporttype" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.ReportTypes.FirstOrDefault()) : query.OrderBy(summary => summary.ReportTypes.FirstOrDefault()),
+                    "status" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.Status) : query.OrderBy(summary => summary.Status),
+                    "patientcount" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.PatientCount) : query.OrderBy(summary => summary.PatientCount),
+                    "initialpopulationcount" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.InitialPopulationCount) : query.OrderBy(summary => summary.InitialPopulationCount),
+                    "lastupdateddate" => sortOrder == SortOrder.Descending ? query.OrderByDescending(summary => summary.LastUpdatedDate) : query.OrderBy(summary => summary.LastUpdatedDate),
+                    _ => query.OrderByDescending(summary => summary.LastUpdatedDate)
+                };
+
+                var totalCount = await query.CountAsync(cancellationToken);
+                var results = await query
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync(cancellationToken);
+
+                return new PagedConfigModel<ReportSummaryApiModel>(
+                    results,
+                    new PaginationMetadata(pageSize, pageNumber, totalCount));
+        }
+
+        public async Task<ReportSummaryApiModel?> GetReportSummary(
+            string reportScheduleId,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Guid.TryParse(reportScheduleId, out var parsedReportScheduleId))
+                return null;
+
+            return await CreateReportSummaryQuery()
+                .FirstOrDefaultAsync(summary => summary.ReportScheduleId == parsedReportScheduleId.ToString(), cancellationToken);
+            }
+
+            private IQueryable<ReportSummaryApiModel> CreateReportSummaryQuery()
+            {
+                    return _context.ReportSchedule
+                        .Select(reportSchedule => new ReportSummaryApiModel
+                    {
+                            ReportScheduleId = reportSchedule.Id.ToString(),
+                            FacilityId = reportSchedule.FacilityId,
+                            ReportStartDate = reportSchedule.ReportStartDate,
+                            ReportEndDate = reportSchedule.ReportEndDate,
+                            ReportTypes = reportSchedule.ReportTypes.Select(reportType => reportType.ReportType).ToList(),
+                            Status = reportSchedule.IsDeleted == true
+                            ? ReportStatus.Canceled
+                                : reportSchedule.Status == ScheduleStatus.Submitted
+                                ? ReportStatus.Completed
+                                    : reportSchedule.Status == ScheduleStatus.New ||
+                                      reportSchedule.Status == ScheduleStatus.Scheduled ||
+                                      reportSchedule.Status == ScheduleStatus.EndOfPeriod
+                                    ? ReportStatus.Pending
+                                    : ReportStatus.Unknown,
+                            PatientCount = reportSchedule.ReportEntries.Count(),
+                            InitialPopulationCount = reportSchedule.ReportPopulations
+                                .SelectMany(reportPopulation => reportPopulation.GroupPopulations)
+                            .Where(groupPopulation => groupPopulation.PopulationId == "initial-population")
+                            .SelectMany(groupPopulation => groupPopulation.MeasureReportPopulations)
+                            .Count(),
+                            LastUpdatedDate = reportSchedule.ModifyDate ?? reportSchedule.CreateDate
+                    });
+        }
     }
 }
