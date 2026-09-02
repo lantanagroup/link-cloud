@@ -6,7 +6,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.AutomationUI;
 
-[Trait("Category", "UnitTests")]
+[Trait("Category", "IntegrationTests")]
 public class MongoApiHealthRunStoreTests : IAsyncLifetime
 {
     private readonly MongoClient _client;
