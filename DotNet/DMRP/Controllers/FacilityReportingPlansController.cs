@@ -202,7 +202,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting,
-                LookAheadWindow(monthsAhead), cancellationToken);
+                LookAheadWindow(monthsAhead, CurrentPeriod()), cancellationToken);
 
             return Ok(results);
         }
@@ -269,7 +269,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
 
-            var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead), CurrentPeriod(),
+            // One reading for both. The window and the period it is answered against have to agree,
+            // and taking the clock twice lets them disagree across a month rollover.
+            var anchor = CurrentPeriod();
+
+            var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead, anchor), anchor,
                 isReporting ?? true, pageSize, pageNumber, cancellationToken);
 
             return Ok(result);
@@ -595,17 +599,23 @@ namespace LantanaGroup.Link.DMRP.Controllers
         }
 
         /// <summary>
-        /// The look-ahead window, anchored on the current reporting period. Null when the caller did
+        /// The look-ahead window, anchored on the given reporting period. Null when the caller did
         /// not ask for one, which reads as "every period".
         /// </summary>
-        private ReportingPeriodRange? LookAheadWindow(int? monthsAhead)
+        /// <remarks>
+        /// The anchor is passed in rather than read here so that a caller needing both the window and
+        /// the anchor gets one clock reading for the two. Reading it twice lets a request that spans
+        /// midnight on the last of the month build a window starting one month after the anchor it is
+        /// answered against.
+        /// </remarks>
+        private static ReportingPeriodRange? LookAheadWindow(int? monthsAhead, ReportingPeriod anchor)
         {
             if (monthsAhead is null)
             {
                 return null;
             }
 
-            return ReportingPeriodRange.LookAhead(CurrentPeriod(), monthsAhead.Value);
+            return ReportingPeriodRange.LookAhead(anchor, monthsAhead.Value);
         }
 
         /// <summary>

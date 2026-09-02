@@ -343,6 +343,30 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetFacilityReportingPlanPeriods_ReadsTheClockOnceForTheWindowAndTheAnchor()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+
+        // The last moment of October, with the clock moving on every reading. Taking it twice puts the
+        // window in November and the anchor in October -- or the reverse, depending which is read
+        // first -- and the caller gets a look-ahead that starts a month after the period it was
+        // answered against, with October missing from its own six-month window.
+        _clock.SetUtcNow(new DateTimeOffset(2026, 10, 31, 23, 59, 59, TimeSpan.Zero));
+        _clock.AutoAdvanceAmount = TimeSpan.FromSeconds(2);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: 6,
+            isReporting: null, cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        // The window opens on the anchor, so the first period is the one the request was answered
+        // against and the recorded October plan is in it.
+        Assert.Equal(2026, page.Records[0].ReportingYear);
+        Assert.Equal(10, page.Records[0].ReportingMonth);
+        Assert.False(page.Records[0].IsProjected);
+    }
+
+    [Fact]
     public async Task GetFacilityReportingPlanPeriods_ResolvesTheMeasureOnEachEntry()
     {
         var plan = await CreatedPlanAsync(month: 10, year: 2026);
