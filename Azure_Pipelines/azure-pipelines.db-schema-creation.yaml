@@ -31,6 +31,10 @@ parameters:
       alias: account
       artifact: account-db
       file: accountDb.sql
+    - name: app-bff
+      alias: app-bff
+      artifact: app-bff-db
+      file: app-bffDb.sql
     - name: audit
       alias: audit
       artifact: audit-db
@@ -174,6 +178,7 @@ stages:
             # .Data project, and the previous plain pattern silently skipped Submission.
             $migrationPaths = [ordered]@{
               "Account"         = "DotNet/Account/Migrations"
+              "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
               "Audit"           = "DotNet/Audit/Migrations"
               "Census"          = "DotNet/Census/Migrations"
               "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
@@ -249,7 +254,41 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/accountDb.sql'
          ArtifactName: 'account-db'
          publishLocation: 'container'
-        displayName: Publish Account SQL Script  
+        displayName: Publish Account SQL Script
+  # App-BFF
+  - job: App-BFF
+    displayName: "Generate App-BFF Schema Script"
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd nhsn/NHSN-App-BFF
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd nhsn/NHSN-App-BFF
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+        displayName: Generate App-BFF SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
+         ArtifactName: app-bff-db'
+         publishLocation: 'container'
+        displayName: Publish App-BFF SQL Script  
   ###
   # Audit
   - job: Audit
