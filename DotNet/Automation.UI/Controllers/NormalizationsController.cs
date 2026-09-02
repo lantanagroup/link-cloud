@@ -122,25 +122,60 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSequence([FromBody] NormalizationSequenceDefinition model, CancellationToken ct)
+    public async Task<IActionResult> SaveSequence(
+    [FromBody] NormalizationSequenceDefinition model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Sequence name is required.");
+
         if (model.Entries.Count == 0)
             return BadRequest("At least one operation entry is required.");
 
-        if (model.Entries.GroupBy(e => e.OperationId).Any(g => g.Count() > 1))
+        if (model.Entries
+            .GroupBy(e => e.OperationId)
+            .Any(g => g.Count() > 1))
         {
-            return BadRequest("A sequence cannot contain the same operation more than once.");
+            return BadRequest(
+                "A sequence cannot contain the same operation more than once.");
         }
 
-        var existing = await store.GetSequenceByIdAsync(model.Id, ct);
+        var existing = await store.GetSequenceByIdAsync(
+            model.Id,
+            ct);
+
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System sequences cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System sequences cannot be modified.");
+
+        var suites = await store.GetAllSuitesAsync(ct);
+
+        var referencingSuites = suites
+            .Where(s => s.SequenceIds.Contains(model.Id))
+            .ToList();
+
+        foreach (var suite in referencingSuites)
+        {
+            var duplicateError =
+                await GetSuiteDuplicateOperationErrorAsync(
+                    suite,
+                    ct,
+                    model);
+
+            if (duplicateError is not null)
+            {
+                return BadRequest(
+                    $"Saving this sequence would make normalization suite " +
+                    $"'{suite.Name}' invalid. {duplicateError}");
+            }
+        }
 
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertSequenceAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
@@ -201,21 +236,36 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSuite([FromBody] NormalizationSuiteDefinition model, CancellationToken ct)
+    public async Task<IActionResult> SaveSuite(
+    [FromBody] NormalizationSuiteDefinition model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Suite name is required.");
 
         var existing = await store.GetSuiteByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System suites cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System suites cannot be modified.");
+
+        var duplicateError = await GetSuiteDuplicateOperationErrorAsync(
+            model,
+            ct);
+
+        if (duplicateError is not null)
+        {
+            return BadRequest(duplicateError);
+        }
 
         // Existing suites preserve their current default flag. New suites may
         // carry an explicit initial IsDefault value from the caller.
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertSuiteAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
@@ -239,27 +289,40 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CloneSuite([FromBody] IdRequest request, CancellationToken ct)
+    public async Task<IActionResult> CloneSuite(
+    [FromBody] IdRequest request,
+    CancellationToken ct)
     {
         if (!this.TryValidateIdRequest(request, out var badRequest))
             return badRequest;
 
         var source = await store.GetSuiteByIdAsync(request.Id, ct);
-        if (source == null) return NotFound();
+        if (source == null)
+            return NotFound();
 
         var clone = new NormalizationSuiteDefinition
         {
             Id = Guid.NewGuid(),
             Name = $"{source.Name} (Copy)",
             Description = source.Description,
-            OperationIds = [..source.OperationIds],
-            SequenceIds = [..source.SequenceIds],
+            OperationIds = [.. source.OperationIds],
+            SequenceIds = [.. source.SequenceIds],
             IsSystem = false,
             IsDefault = false,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        var duplicateError = await GetSuiteDuplicateOperationErrorAsync(
+            clone,
+            ct);
+
+        if (duplicateError is not null)
+        {
+            return BadRequest(duplicateError);
+        }
+
         await store.UpsertSuiteAsync(clone, ct);
+
         return Json(new { id = clone.Id });
     }
 
@@ -277,4 +340,94 @@ public class NormalizationsController(INormalizationStore store) : Controller
         return Ok();
     }
 
+    private async Task<string?> GetSuiteDuplicateOperationErrorAsync(
+    NormalizationSuiteDefinition suite,
+    CancellationToken ct,
+    NormalizationSequenceDefinition? sequenceOverride = null)
+    {
+        var sequences = await store.GetAllSequencesAsync(ct);
+        var sequencesById = sequences.ToDictionary(s => s.Id);
+
+        var operationOccurrences = new Dictionary<Guid, List<string>>();
+
+        void AddOperationOccurrence(Guid operationId, string source)
+        {
+            if (!operationOccurrences.TryGetValue(operationId, out var sources))
+            {
+                sources = [];
+                operationOccurrences[operationId] = sources;
+            }
+
+            sources.Add(source);
+        }
+
+        // Preserve every standalone occurrence, including duplicate IDs.
+        foreach (var operationId in suite.OperationIds)
+        {
+            AddOperationOccurrence(
+                operationId,
+                "Standalone Operations");
+        }
+
+        // Important: walk suite.SequenceIds directly and in order.
+        // Do not unique-ify the IDs.
+        foreach (var sequenceId in suite.SequenceIds)
+        {
+            NormalizationSequenceDefinition? sequence;
+
+            if (sequenceOverride is not null &&
+                sequenceOverride.Id == sequenceId)
+            {
+                sequence = sequenceOverride;
+            }
+            else
+            {
+                sequencesById.TryGetValue(
+                    sequenceId,
+                    out sequence);
+            }
+
+            if (sequence is null)
+                continue;
+
+            foreach (var entry in sequence.Entries)
+            {
+                AddOperationOccurrence(
+                    entry.OperationId,
+                    $"sequence '{sequence.Name}'");
+            }
+        }
+
+        var duplicateOperationIds = operationOccurrences
+            .Where(x => x.Value.Count > 1)
+            .Select(x => x.Key)
+            .ToList();
+
+        if (duplicateOperationIds.Count == 0)
+            return null;
+
+        var operations = await store.GetAllOperationsAsync(ct);
+
+        var operationNames = operations
+            .ToDictionary(o => o.Id, o => o.Name);
+
+        var duplicateMessages = duplicateOperationIds.Select(id =>
+        {
+            var name = operationNames.TryGetValue(
+                id,
+                out var operationName)
+                    ? operationName
+                    : id.ToString();
+
+            var sources = string.Join(
+                " and ",
+                operationOccurrences[id].Distinct());
+
+            return $"'{name}' ({sources})";
+        });
+
+        return
+            "Normalization suite cannot contain the same operation more than once. " +
+            $"Duplicate operation(s): {string.Join(", ", duplicateMessages)}.";
+    }
 }
