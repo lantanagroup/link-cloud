@@ -297,7 +297,7 @@ public class MongoApiHealthRunStoreTests : IAsyncLifetime
     public async Task GetHistoryAsync_ReturnsResultsInDescendingOrderWithPaging()
     {
         // Arrange
-        const string endpointKey = "Tenant.Info";
+        var endpointKey = $"Tenant.Info.History.{Guid.NewGuid():N}";
 
         var oldestRunId = Guid.NewGuid();
         var middleRunId = Guid.NewGuid();
