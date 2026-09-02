@@ -166,47 +166,65 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
     IEnumerable<string> endpointKeys,
     CancellationToken ct = default)
     {
-        var keys = endpointKeys.ToHashSet(StringComparer.Ordinal);
+        var keys = endpointKeys
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         if (keys.Count == 0)
             return new();
 
-        var resultDocs = await _resultCollection
-            .Find(d => keys.Contains(d.EndpointKey))
+        // api_health_runs remains the lightweight source of run/service metadata.
+        // Select only the latest run for each service in Mongo rather than loading
+        // every historical endpoint result into memory.
+        var latestRunDocs = await _collection
+            .Aggregate()
+            .SortByDescending(d => d.StartedAt)
+            .Group(
+                d => d.ServiceName,
+                g => g.First())
             .ToListAsync(ct);
 
-        var newResults = resultDocs
-            .GroupBy(d => d.ServiceName, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(serviceGroup =>
-            {
-                var latestRunId = serviceGroup
-                    .OrderByDescending(d => d.StartedAt)
-                    .First()
-                    .RunId;
+        if (latestRunDocs.Count == 0)
+            return new();
 
-                return serviceGroup
-                    .Where(d => d.RunId == latestRunId)
-                    .Select(d => d.Result);
-            })
+        var latestRunFilters = latestRunDocs
+            .Select(d =>
+                Builders<ApiHealthRunResultDocument>.Filter.And(
+                    Builders<ApiHealthRunResultDocument>.Filter.Eq(
+                        r => r.RunId,
+                        d.RunId),
+                    Builders<ApiHealthRunResultDocument>.Filter.Eq(
+                        r => r.ServiceName,
+                        d.ServiceName)))
             .ToList();
 
-        var legacyDocs = await _collection
-            .Find(d => d.EndpointResults.Any(r => keys.Contains(r.EndpointKey)))
+        var resultFilter =
+            Builders<ApiHealthRunResultDocument>.Filter.And(
+                Builders<ApiHealthRunResultDocument>.Filter.In(
+                    r => r.EndpointKey,
+                    keys),
+                Builders<ApiHealthRunResultDocument>.Filter.Or(
+                    latestRunFilters));
+
+        var resultDocs = await _resultCollection
+            .Find(resultFilter)
             .ToListAsync(ct);
 
-        var legacyResults = legacyDocs
-            .GroupBy(d => d.ServiceName, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(serviceGroup =>
-            {
-                var latestDoc = serviceGroup
-                    .OrderByDescending(d => d.StartedAt)
-                    .First();
+        var results = resultDocs
+            .Select(d => d.Result)
+            .ToList();
 
-                return latestDoc.EndpointResults
-                    .Where(r => keys.Contains(r.EndpointKey));
-            });
+        // The latest service run may still be a legacy document created before
+        // endpoint results were moved to api_health_run_results.
+        results.AddRange(
+            latestRunDocs
+                .SelectMany(d => d.EndpointResults)
+                .Where(r => keys.Contains(
+                    r.EndpointKey,
+                    StringComparer.Ordinal)));
 
-        return newResults
-            .Concat(legacyResults)
+        return results
             .GroupBy(r => r.EndpointKey, StringComparer.Ordinal)
             .ToDictionary(
                 g => g.Key,
@@ -257,23 +275,56 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
     int pageSize,
     CancellationToken ct = default)
     {
-        // New separately persisted results.
-        var resultDocs = await _resultCollection
-            .Find(d => d.EndpointKey == endpointKey)
-            .ToListAsync(ct);
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Max(1, pageSize);
 
-        var newResults = resultDocs
-            .Select(d => d.Result);
+        var skip = (pageNumber - 1) * pageSize;
+        var requiredCount = skip + pageSize;
 
-        // Legacy embedded results.
+        var resultFilter =
+            Builders<ApiHealthRunResultDocument>.Filter.Eq(
+                d => d.EndpointKey,
+                endpointKey);
+
         var legacyFilter =
             Builders<ApiHealthRunDocument>.Filter.ElemMatch(
                 d => d.EndpointResults,
                 r => r.EndpointKey == endpointKey);
 
+        // Retrieve only RunIds for the total count so full request/response
+        // payloads are not loaded just to calculate pagination metadata.
+        var newRunIds = await _resultCollection
+            .Find(resultFilter)
+            .Project(d => d.RunId)
+            .ToListAsync(ct);
+
+        var legacyRunIds = await _collection
+            .Find(legacyFilter)
+            .Project(d => d.RunId)
+            .ToListAsync(ct);
+
+        var totalCount = newRunIds
+            .Concat(legacyRunIds)
+            .Distinct()
+            .Count();
+
+        // Mongo performs the indexed filter/sort and bounds the number of
+        // full result documents returned. We fetch at most enough from each
+        // source to construct the requested combined page.
+        var resultDocs = await _resultCollection
+            .Find(resultFilter)
+            .SortByDescending(d => d.StartedAt)
+            .Limit(requiredCount)
+            .ToListAsync(ct);
+
         var legacyDocs = await _collection
             .Find(legacyFilter)
+            .SortByDescending(d => d.StartedAt)
+            .Limit(requiredCount)
             .ToListAsync(ct);
+
+        var newResults = resultDocs
+            .Select(d => d.Result);
 
         var legacyResults = legacyDocs
             .SelectMany(d => d.EndpointResults)
@@ -282,17 +333,14 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
                 endpointKey,
                 StringComparison.Ordinal));
 
-        var allResults = newResults
+        var pagedRuns = newResults
             .Concat(legacyResults)
             .GroupBy(r => r.RunId)
             .Select(g => g
                 .OrderByDescending(r => r.ExecutedAt)
                 .First())
             .OrderByDescending(r => r.ExecutedAt)
-            .ToList();
-
-        var pagedRuns = allResults
-            .Skip((pageNumber - 1) * pageSize)
+            .Skip(skip)
             .Take(pageSize)
             .ToList();
 
@@ -302,7 +350,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
             Runs = pagedRuns,
             PageNumber = pageNumber,
             PageSize = pageSize,
-            TotalCount = allResults.Count
+            TotalCount = totalCount
         };
     }
 
