@@ -32,14 +32,15 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     public Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> GetAll(
         bool? unmapped,
         int pageSize = 10,
-        int pageNumber = 1)
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
         return SearchInternal(new FacilityLocationLocalCodeMappingSearchModel
         {
             Unmapped = unmapped,
             PageSize = pageSize,
             PageNumber = pageNumber
-        });
+        }, cancellationToken);
     }
 
     [HttpGet("{mappingId}")]
@@ -47,7 +48,7 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FacilityLocationLocalCodeMappingModel>> Get(string mappingId)
+    public async Task<ActionResult<FacilityLocationLocalCodeMappingModel>> Get(string mappingId, CancellationToken cancellationToken = default)
     {
         mappingId = mappingId.Sanitize();
         if (string.IsNullOrWhiteSpace(mappingId))
@@ -57,10 +58,14 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
         try
         {
-            var mapping = await _mappingQueries.Get(mappingId);
+            var mapping = await _mappingQueries.Get(mappingId, cancellationToken);
             return mapping == null
                 ? Problem(detail: "The requested mapping does not exist.", statusCode: StatusCodes.Status404NotFound)
                 : Ok(mapping);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -76,14 +81,15 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         string facilityId,
         bool? unmapped,
         int pageSize = 10,
-        int pageNumber = 1)
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
             Unmapped = unmapped,
             PageSize = pageSize,
             PageNumber = pageNumber
-        });
+        }, cancellationToken);
     }
 
     [HttpGet("facilities/{facilityId}/locations/{locationId}")]
@@ -95,7 +101,8 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         string locationId,
         bool? unmapped,
         int pageSize = 10,
-        int pageNumber = 1)
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
@@ -103,7 +110,7 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
             Unmapped = unmapped,
             PageSize = pageSize,
             PageNumber = pageNumber
-        });
+        }, cancellationToken);
     }
 
     [HttpGet("facilities/{facilityId}/local-codes/{localCode}")]
@@ -115,7 +122,8 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         string localCode,
         bool? unmapped,
         int pageSize = 10,
-        int pageNumber = 1)
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
@@ -123,16 +131,17 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
             Unmapped = unmapped,
             PageSize = pageSize,
             PageNumber = pageNumber
-        });
+        }, cancellationToken);
     }
 
     [HttpGet("search")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> Search(
-        [FromQuery] FacilityLocationLocalCodeMappingSearchModel model)
+        [FromQuery] FacilityLocationLocalCodeMappingSearchModel model,
+        CancellationToken cancellationToken = default)
     {
-        return SearchInternal(model);
+        return SearchInternal(model, cancellationToken);
     }
 
     [HttpPost("facilities/{facilityId}")]
@@ -144,7 +153,8 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FacilityLocationLocalCodeMappingModel>> Post(
         string facilityId,
-        FacilityLocationLocalCodeMappingPostModel model)
+        FacilityLocationLocalCodeMappingPostModel model,
+        CancellationToken cancellationToken = default)
     {
         facilityId = facilityId.Sanitize();
         var sanitizedModel = Sanitize(model);
@@ -156,8 +166,12 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
         try
         {
-            var mapping = await _mappingManager.Create(facilityId, sanitizedModel);
+            var mapping = await _mappingManager.Create(facilityId, sanitizedModel, cancellationToken);
             return CreatedAtAction(nameof(Get), new { mappingId = mapping.Id }, mapping);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (KeyNotFoundException exception)
         {
@@ -186,7 +200,8 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FacilityLocationLocalCodeMappingModel>> Put(
         string mappingId,
-        FacilityLocationLocalCodeMappingPutModel model)
+        FacilityLocationLocalCodeMappingPutModel model,
+        CancellationToken cancellationToken = default)
     {
         mappingId = mappingId.Sanitize();
         var sanitizedModel = Sanitize(model);
@@ -198,10 +213,14 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
         try
         {
-            var mapping = await _mappingManager.Update(mappingId, sanitizedModel);
+            var mapping = await _mappingManager.Update(mappingId, sanitizedModel, cancellationToken);
             return mapping == null
                 ? Problem(detail: "The requested mapping does not exist.", statusCode: StatusCodes.Status404NotFound)
                 : AcceptedAtAction(nameof(Get), new { mappingId }, mapping);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (ArgumentException exception)
         {
@@ -222,7 +241,7 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Delete(string mappingId)
+    public async Task<IActionResult> Delete(string mappingId, CancellationToken cancellationToken = default)
     {
         mappingId = mappingId.Sanitize();
         if (string.IsNullOrWhiteSpace(mappingId))
@@ -232,8 +251,12 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
         try
         {
-            await _mappingManager.Delete(mappingId);
+            await _mappingManager.Delete(mappingId, cancellationToken);
             return NoContent();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -246,7 +269,7 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteForFacility(string facilityId)
+    public async Task<IActionResult> DeleteForFacility(string facilityId, CancellationToken cancellationToken = default)
     {
         facilityId = facilityId.Sanitize();
         if (string.IsNullOrWhiteSpace(facilityId))
@@ -256,8 +279,12 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
         try
         {
-            await _mappingManager.DeleteForFacility(facilityId);
+            await _mappingManager.DeleteForFacility(facilityId, cancellationToken);
             return NoContent();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -267,7 +294,8 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
 
     private async Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> SearchForFacilityInternal(
         string facilityId,
-        FacilityLocationLocalCodeMappingSearchModel model)
+        FacilityLocationLocalCodeMappingSearchModel model,
+        CancellationToken cancellationToken)
     {
         model.FacilityId = facilityId;
         model = Sanitize(model);
@@ -287,16 +315,21 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
             return Problem(detail: "A local code must be provided.", statusCode: StatusCodes.Status400BadRequest);
         }
 
-        return await SearchInternal(model);
+        return await SearchInternal(model, cancellationToken);
     }
 
     private async Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> SearchInternal(
-        FacilityLocationLocalCodeMappingSearchModel model)
+        FacilityLocationLocalCodeMappingSearchModel model,
+        CancellationToken cancellationToken)
     {
         model = Sanitize(model);
         try
         {
-            return Ok(await _mappingQueries.Search(model));
+            return Ok(await _mappingQueries.Search(model, cancellationToken));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

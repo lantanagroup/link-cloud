@@ -8,10 +8,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers;
 
 public interface IFacilityLocationLocalCodeMappingManager
 {
-    Task<FacilityLocationLocalCodeMappingModel> Create(string facilityId, FacilityLocationLocalCodeMappingPostModel model);
-    Task<FacilityLocationLocalCodeMappingModel?> Update(string id, FacilityLocationLocalCodeMappingPutModel model);
-    Task Delete(string id);
-    Task DeleteForFacility(string facilityId);
+    Task<FacilityLocationLocalCodeMappingModel> Create(string facilityId, FacilityLocationLocalCodeMappingPostModel model, CancellationToken cancellationToken = default);
+    Task<FacilityLocationLocalCodeMappingModel?> Update(string id, FacilityLocationLocalCodeMappingPutModel model, CancellationToken cancellationToken = default);
+    Task Delete(string id, CancellationToken cancellationToken = default);
+    Task DeleteForFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCodeMappingManager
@@ -29,14 +29,15 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
 
     public async Task<FacilityLocationLocalCodeMappingModel> Create(
         string facilityId,
-        FacilityLocationLocalCodeMappingPostModel model)
+        FacilityLocationLocalCodeMappingPostModel model,
+        CancellationToken cancellationToken = default)
     {
         var facilityLocation = await _dbContext.FacilityLocations.SingleOrDefaultAsync(location =>
-            location.FacilityId == facilityId && location.LocationId == model.LocationId)
+            location.FacilityId == facilityId && location.LocationId == model.LocationId, cancellationToken)
             ?? throw new KeyNotFoundException("The requested facility location does not exist.");
 
-        await ValidateHSLOCAsync(model.HSLOCId);
-        await EnsureMappingIsUniqueAsync(facilityLocation.Id, model.LocalCodeSystem, model.LocalCode);
+        await ValidateHSLOCAsync(model.HSLOCId, cancellationToken);
+        await EnsureMappingIsUniqueAsync(facilityLocation.Id, model.LocalCodeSystem, model.LocalCode, cancellationToken: cancellationToken);
 
         var mapping = new FacilityLocationLocalCodeMapping
         {
@@ -48,41 +49,42 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         };
 
         _dbContext.FacilityLocationLocalCodeMappings.Add(mapping);
-        await SaveChangesAsync();
+        await SaveChangesAsync(cancellationToken);
 
-        return (await _mappingQueries.Get(mapping.Id))!;
+        return (await _mappingQueries.Get(mapping.Id, cancellationToken))!;
     }
 
     public async Task<FacilityLocationLocalCodeMappingModel?> Update(
         string id,
-        FacilityLocationLocalCodeMappingPutModel model)
+        FacilityLocationLocalCodeMappingPutModel model,
+        CancellationToken cancellationToken = default)
     {
-        var mapping = await _dbContext.FacilityLocationLocalCodeMappings.SingleOrDefaultAsync(candidate => candidate.Id == id);
+        var mapping = await _dbContext.FacilityLocationLocalCodeMappings.SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
         if (mapping == null)
         {
             return null;
         }
 
-        await ValidateHSLOCAsync(model.HSLOCId);
-        await EnsureMappingIsUniqueAsync(mapping.FacilityLocationId, model.LocalCodeSystem, model.LocalCode, mapping.Id);
+        await ValidateHSLOCAsync(model.HSLOCId, cancellationToken);
+        await EnsureMappingIsUniqueAsync(mapping.FacilityLocationId, model.LocalCodeSystem, model.LocalCode, mapping.Id, cancellationToken);
 
         mapping.LocalCodeSystem = model.LocalCodeSystem;
         mapping.LocalCode = model.LocalCode;
         mapping.HSLOCId = model.HSLOCId;
         mapping.ModifyDate = DateTime.UtcNow;
 
-        await SaveChangesAsync();
-        return await _mappingQueries.Get(mapping.Id);
+        await SaveChangesAsync(cancellationToken);
+        return await _mappingQueries.Get(mapping.Id, cancellationToken);
     }
 
-    public async Task Delete(string id)
+    public async Task Delete(string id, CancellationToken cancellationToken = default)
     {
         await _dbContext.FacilityLocationLocalCodeMappings
             .Where(mapping => mapping.Id == id)
-            .ExecuteDeleteAsync();
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task DeleteForFacility(string facilityId)
+    public async Task DeleteForFacility(string facilityId, CancellationToken cancellationToken = default)
     {
         var facilityLocationIds = _dbContext.FacilityLocations
             .Where(location => location.FacilityId == facilityId)
@@ -90,12 +92,12 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
 
         await _dbContext.FacilityLocationLocalCodeMappings
             .Where(mapping => facilityLocationIds.Contains(mapping.FacilityLocationId))
-            .ExecuteDeleteAsync();
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
-    private async Task ValidateHSLOCAsync(Guid? hslocId)
+    private async Task ValidateHSLOCAsync(Guid? hslocId, CancellationToken cancellationToken)
     {
-        if (hslocId.HasValue && !await _dbContext.HSLOCS.AnyAsync(hsloc => hsloc.Id == hslocId.Value))
+        if (hslocId.HasValue && !await _dbContext.HSLOCS.AnyAsync(hsloc => hsloc.Id == hslocId.Value, cancellationToken))
         {
             throw new ArgumentException("The requested HSLOC does not exist.", nameof(hslocId));
         }
@@ -105,13 +107,14 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         string facilityLocationId,
         string localCodeSystem,
         string localCode,
-        string? excludedMappingId = null)
+        string? excludedMappingId = null,
+        CancellationToken cancellationToken = default)
     {
         var duplicateExists = await _dbContext.FacilityLocationLocalCodeMappings.AnyAsync(mapping =>
             mapping.FacilityLocationId == facilityLocationId &&
             mapping.LocalCodeSystem == localCodeSystem &&
             mapping.LocalCode == localCode &&
-            mapping.Id != excludedMappingId);
+            mapping.Id != excludedMappingId, cancellationToken);
 
         if (duplicateExists)
         {
@@ -119,11 +122,11 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         }
     }
 
-    private async Task SaveChangesAsync()
+    private async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await _dbContext.SaveChangesAsync();
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
         {

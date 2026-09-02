@@ -7,8 +7,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries;
 
 public interface IFacilityLocationLocalCodeMappingQueries
 {
-    Task<FacilityLocationLocalCodeMappingModel?> Get(string id);
-    Task<PagedConfigModel<FacilityLocationLocalCodeMappingModel>> Search(FacilityLocationLocalCodeMappingSearchModel model);
+    Task<FacilityLocationLocalCodeMappingModel?> Get(string id, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<FacilityLocationLocalCodeMappingModel>> Search(FacilityLocationLocalCodeMappingSearchModel model, CancellationToken cancellationToken = default);
 }
 
 public class FacilityLocationLocalCodeMappingQueries : IFacilityLocationLocalCodeMappingQueries
@@ -20,16 +20,16 @@ public class FacilityLocationLocalCodeMappingQueries : IFacilityLocationLocalCod
         _dbContext = dbContext;
     }
 
-    public async Task<FacilityLocationLocalCodeMappingModel?> Get(string id)
+    public async Task<FacilityLocationLocalCodeMappingModel?> Get(string id, CancellationToken cancellationToken = default)
     {
         return (await Search(new FacilityLocationLocalCodeMappingSearchModel
         {
             Id = id,
             PageSize = 1
-        })).Records.SingleOrDefault();
+        }, cancellationToken)).Records.SingleOrDefault();
     }
 
-    public async Task<PagedConfigModel<FacilityLocationLocalCodeMappingModel>> Search(FacilityLocationLocalCodeMappingSearchModel model)
+    public async Task<PagedConfigModel<FacilityLocationLocalCodeMappingModel>> Search(FacilityLocationLocalCodeMappingSearchModel model, CancellationToken cancellationToken = default)
     {
         var mappings = _dbContext.FacilityLocationLocalCodeMappings
             .AsNoTracking()
@@ -74,7 +74,7 @@ public class FacilityLocationLocalCodeMappingQueries : IFacilityLocationLocalCod
 
         var pageSize = Math.Clamp(model.PageSize ?? 10, 1, 100);
         var pageNumber = Math.Max(model.PageNumber ?? 1, 1);
-        var count = await mappings.CountAsync();
+        var count = await mappings.CountAsync(cancellationToken);
 
         var records = await mappings
             .OrderBy(mapping => mapping.Id)
@@ -95,7 +95,7 @@ public class FacilityLocationLocalCodeMappingQueries : IFacilityLocationLocalCod
                 CreateDate = mapping.CreateDate,
                 ModifyDate = mapping.ModifyDate
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return new PagedConfigModel<FacilityLocationLocalCodeMappingModel>(
             records,
