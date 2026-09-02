@@ -402,7 +402,7 @@ export class MockApiClient implements ApiClient {
 
   getJwksInstructionsUrl(vendor: string): string {
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
-    return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
+    return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
   }
 
   private buildReport(request: C.ReportRequest): C.ReportSummary {

@@ -249,7 +249,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 <a
                   className="download-link"
                   href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
-                  download={`${vendorProfile.vendor}_JWKS_Instructions.pdf`}>
+                  target="_blank"
+                  rel="noopener">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 3v12" />
                     <path d="M7 10l5 5 5-5" />
@@ -268,6 +269,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsTooltip')}
               required
+              min={1}
               step={1}
               value={maxConcurrentRequests}
               error={maxConcurrentRequestsError ?? undefined}
@@ -278,6 +280,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxRetriesTooltip')}
               required
+              min={0}
+              max={10}
               step={1}
               value={maxRetries}
               error={maxRetriesError ?? undefined}
@@ -322,6 +326,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 id="lagDays"
                 label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
                 required
+                min={0}
                 step={1}
                 value={lagDays}
                 error={lagDaysError ?? undefined}
@@ -331,6 +336,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 id="lagHours"
                 label={t('onboarding:fhirServerInfo.fields.lagHoursLabel')}
                 required
+                min={0}
+                max={23}
                 step={1}
                 value={lagHours}
                 error={lagHoursError ?? undefined}
@@ -340,6 +347,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 id="lagMinutes"
                 label={t('onboarding:fhirServerInfo.fields.lagMinutesLabel')}
                 required
+                min={0}
+                max={59}
                 step={1}
                 value={lagMinutes}
                 error={lagMinutesError ?? undefined}
@@ -368,8 +377,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
           )}
         </div>
 
-        <StepActions>
-          <Button variant="secondary" onClick={onBack}>
+        <StepActions saving={saving}>
+          <Button variant="secondary" onClick={onBack} disabled={saving}>
             {t('common:actions.back')}
           </Button>
           <Button onClick={handleTestConnection} disabled={testing}>

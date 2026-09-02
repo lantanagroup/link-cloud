@@ -70,6 +70,7 @@
     "loading": "Loading…"
   },
   "errors": {
-    "unexpected": "Something went wrong. Please try again."
+    "unexpected": "Something went wrong. Please try again.",
+    "saveFailed": "Unable to save your changes. Please try again."
   }
 }

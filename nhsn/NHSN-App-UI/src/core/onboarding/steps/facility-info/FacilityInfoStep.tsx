@@ -105,8 +105,8 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
         </p>
       )}
 
-      <StepActions>
-        <Button variant="secondary" onClick={onBack}>
+      <StepActions saving={saving}>
+        <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
         <Button onClick={handleNext} disabled={saving}>

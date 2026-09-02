@@ -20,8 +20,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
       <PageHeader title={t('onboarding:hsloc.title')} />
       <p className="nhsn-link__subtitle">{t('onboarding:messages.stepNotImplemented')}</p>
 
-      <StepActions>
-        <Button variant="secondary" onClick={onBack}>
+      <StepActions saving={saving}>
+        <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
         <Button onClick={onNext} disabled={saving}>
