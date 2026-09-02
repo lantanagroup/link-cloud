@@ -1843,21 +1843,80 @@
             clearErrors();
             var model = collectModel();
             var valid = true;
-            if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
-            if (!(model.nhsnOrganizationId || '').trim()) { markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.'); valid = false; }
-            if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
+
+            if (!(model.name || '').trim()) {
+                markFieldError('ScenarioName', 'Name is required.');
+                valid = false;
+            }
+
+            if (!(model.nhsnOrganizationId || '').trim()) {
+                markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.');
+                valid = false;
+            }
+
+            if (!model.selectedMeasures.length) {
+                showError('At least one measure must be selected.');
+                valid = false;
+            }
+
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
-            if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
-            if (hasImported) {
-                if (!model.reportPeriodStart) { markFieldError('ReportPeriodStart', 'Report Period Start is required when imported patients are used.'); valid = false; }
-                if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
+
+            if (!model.patientCohorts.length && !hasImported) {
+                showError('At least one cohort with patients > 0 (or one imported patient) is required.');
+                valid = false;
             }
+
+            var invalidClinicalProfileCohort = Array.prototype.findIndex.call(
+                cohortRows.children,
+                function (row) {
+                    var patientCount = parseInt(
+                        row.querySelector('.cohort-count').value || '0',
+                        10);
+
+                    if (patientCount <= 0) return false;
+
+                    return !row.querySelector(
+                        '.cohort-scenario-option:checked:not(:disabled)');
+                });
+
+            if (invalidClinicalProfileCohort >= 0) {
+                showError(
+                    'Cohort ' + (invalidClinicalProfileCohort + 1) +
+                    ' must have at least one Clinical Profile selected.');
+                valid = false;
+            }
+
+            if (hasImported) {
+                if (!model.reportPeriodStart) {
+                    markFieldError(
+                        'ReportPeriodStart',
+                        'Report Period Start is required when imported patients are used.');
+                    valid = false;
+                }
+
+                if (!model.reportPeriodEnd) {
+                    markFieldError(
+                        'ReportPeriodEnd',
+                        'Report Period End is required when imported patients are used.');
+                    valid = false;
+                }
+            }
+
             // Imported-by-ID rows must have a non-empty patient id.
-            var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
-            if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
+            var badId = (model.importedPatientIds || []).find(function (p) {
+                return !(p.patientId || '').trim();
+            });
+
+            if (badId) {
+                showError('Every imported-by-ID row must have a Patient ID.');
+                valid = false;
+            }
+
             if (!valid) return;
+
             model.id = idInput.value || crypto.randomUUID();
+
             try {
                 await postJson(saveUrl, model);
                 closeModal();
