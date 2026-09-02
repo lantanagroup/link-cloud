@@ -15,7 +15,7 @@ public class FacilityLocationsControllerTests
     public async Task Post_ValidFacilityLocation_ReturnsCreatedAndPassesSanitizedModelToManager()
     {
         var manager = new Mock<IFacilityLocationManager>();
-        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationPostModel>()))
+        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationPostModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFacilityLocation());
         var controller = new FacilityLocationsController(manager.Object);
 
@@ -25,7 +25,7 @@ public class FacilityLocationsControllerTests
             PartOfId = " parent-location ",
             LocationName = " Main location ",
             LocationAlias = " main "
-        });
+        }, CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result.Result);
         Assert.Equal(nameof(FacilityLocationsController.Get), created.ActionName);
@@ -33,7 +33,7 @@ public class FacilityLocationsControllerTests
             model.LocationId == "location-1" &&
             model.PartOfId == "parent-location" &&
             model.LocationName == " Main location " &&
-            model.LocationAlias == " main ")), Times.Once);
+            model.LocationAlias == " main "), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -42,21 +42,21 @@ public class FacilityLocationsControllerTests
         var manager = new Mock<IFacilityLocationManager>();
         var controller = new FacilityLocationsController(manager.Object);
 
-        var result = await controller.Post("facility-1", new FacilityLocationPostModel());
+        var result = await controller.Post("facility-1", new FacilityLocationPostModel(), CancellationToken.None);
 
         AssertProblem(result.Result!, HttpStatusCode.BadRequest);
-        manager.Verify(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationPostModel>()), Times.Never);
+        manager.Verify(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationPostModel>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Post_DuplicateFacilityLocation_ReturnsConflict()
     {
         var manager = new Mock<IFacilityLocationManager>();
-        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationPostModel>()))
+        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationPostModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("A facility location with the supplied location identifier already exists."));
         var controller = new FacilityLocationsController(manager.Object);
 
-        var result = await controller.Post("facility-1", new FacilityLocationPostModel { LocationId = "location-1" });
+        var result = await controller.Post("facility-1", new FacilityLocationPostModel { LocationId = "location-1" }, CancellationToken.None);
 
         AssertProblem(result.Result!, HttpStatusCode.Conflict);
     }
