@@ -18,7 +18,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()))
+        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
@@ -26,7 +26,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
-            model.Unmapped == true && model.PageSize == 25 && model.PageNumber == 2)), Times.Once);
+            model.Unmapped == true && model.PageSize == 25 && model.PageNumber == 2), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Get("mapping-id")).ReturnsAsync((FacilityLocationLocalCodeMappingModel?)null);
+        queries.Setup(query => query.Get("mapping-id", It.IsAny<CancellationToken>())).ReturnsAsync((FacilityLocationLocalCodeMappingModel?)null);
         var controller = CreateController(manager, queries);
 
         var result = await controller.Get("mapping-id");
@@ -47,7 +47,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()))
+        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
@@ -55,7 +55,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
-            model.FacilityId == "facility-1" && model.Unmapped == false)), Times.Once);
+            model.FacilityId == "facility-1" && model.Unmapped == false), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()))
+        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
@@ -71,7 +71,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
-            model.FacilityId == "facility-1" && model.LocationId == "location-1" && model.Unmapped == true)), Times.Once);
+            model.FacilityId == "facility-1" && model.LocationId == "location-1" && model.Unmapped == true), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var result = await controller.GetForLocation("facility-1", " ", null, 10, 1);
 
         AssertProblem(result.Result!, HttpStatusCode.BadRequest);
-        queries.Verify(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()), Times.Never);
+        queries.Verify(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()))
+        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
@@ -100,7 +100,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
-            model.FacilityId == "facility-1" && model.LocalCode == "local-code" && model.Unmapped == true)), Times.Once);
+            model.FacilityId == "facility-1" && model.LocalCode == "local-code" && model.Unmapped == true), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>()))
+        queries.Setup(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
         var hslocId = Guid.NewGuid();
@@ -134,7 +134,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
             model.HSLOCId == hslocId &&
             model.Unmapped == false &&
             model.PageSize == 20 &&
-            model.PageNumber == 3)), Times.Once);
+            model.PageNumber == 3), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
         var mapping = CreateMapping();
-        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationLocalCodeMappingPostModel>()))
+        manager.Setup(service => service.Create("facility-1", It.IsAny<FacilityLocationLocalCodeMappingPostModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(mapping);
         var controller = CreateController(manager, queries);
 
@@ -158,7 +158,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var created = Assert.IsType<CreatedAtActionResult>(result.Result);
         Assert.Equal(nameof(FacilityLocationLocalCodeMappingsController.Get), created.ActionName);
         manager.Verify(service => service.Create("facility-1", It.Is<FacilityLocationLocalCodeMappingPostModel>(model =>
-            model.LocationId == "location-1" && model.LocalCodeSystem == "urn:oid:1.2.3" && model.LocalCode == "local-code")), Times.Once);
+            model.LocationId == "location-1" && model.LocalCodeSystem == "urn:oid:1.2.3" && model.LocalCode == "local-code"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         });
 
         AssertProblem(result.Result!, HttpStatusCode.BadRequest);
-        manager.Verify(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>()), Times.Never);
+        manager.Verify(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        manager.Setup(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>()))
+        manager.Setup(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateMapping());
         var controller = CreateController(manager, queries);
 
@@ -194,7 +194,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         });
 
         Assert.IsType<AcceptedAtActionResult>(result.Result);
-        manager.Verify(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>()), Times.Once);
+        manager.Verify(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        manager.Setup(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>()))
+        manager.Setup(service => service.Update("mapping-id", It.IsAny<FacilityLocationLocalCodeMappingPutModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((FacilityLocationLocalCodeMappingModel?)null);
         var controller = CreateController(manager, queries);
 
@@ -225,7 +225,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var result = await controller.Delete("mapping-id");
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(service => service.Delete("mapping-id"), Times.Once);
+        manager.Verify(service => service.Delete("mapping-id", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var result = await controller.DeleteForFacility("facility-1");
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(service => service.DeleteForFacility("facility-1"), Times.Once);
+        manager.Verify(service => service.DeleteForFacility("facility-1", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -246,7 +246,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
     {
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        manager.Setup(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>()))
+        manager.Setup(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException("The requested facility location does not exist."));
         var controller = CreateController(manager, queries);
 
@@ -267,7 +267,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         const string errorMessage = "A mapping already exists for this facility location and local code.";
         var manager = new Mock<IFacilityLocationLocalCodeMappingManager>();
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
-        manager.Setup(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>()))
+        manager.Setup(service => service.Create(It.IsAny<string>(), It.IsAny<FacilityLocationLocalCodeMappingPostModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException(errorMessage));
         var controller = CreateController(manager, queries);
 
