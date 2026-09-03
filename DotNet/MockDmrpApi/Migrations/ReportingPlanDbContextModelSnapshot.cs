@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("ReportingMonth")
+                    b.Property<int>("ReportingMonth")
                         .HasColumnType("int");
 
                     b.Property<int>("ReportingYear")

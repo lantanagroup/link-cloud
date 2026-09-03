@@ -23,11 +23,11 @@ namespace IntegrationTests.MockDmrpApi;
 /// the unique index actually rejecting a duplicate. SQLite enforces unique indexes, so the
 /// constraint tests are meaningful.
 /// <para>
-/// One constraint does <b>not</b> carry over. SQL Server treats NULL as a single value in a
-/// unique index and rejects a second row with the same key; SQLite follows the standard,
-/// where NULLs are distinct. So the index alone does not stop two annual entries sharing a
-/// key here, though it does in every deployed environment. What holds on both providers is
-/// the service's own pre-check, and that is what the tests assert.
+/// Every column in the natural key is non-nullable, so the two providers agree about it:
+/// there is no NULL for SQL Server to treat as a value and SQLite to treat as distinct. That
+/// divergence mattered while the patient-safety month was nullable and no longer applies.
+/// The tests still assert the service's own pre-check, because that is what turns a clash
+/// into a 409 rather than letting the database surface it as a 500.
 /// </para>
 /// <para>
 /// Note this uses EnsureCreated rather than Migrate, so the EF migration itself is not
