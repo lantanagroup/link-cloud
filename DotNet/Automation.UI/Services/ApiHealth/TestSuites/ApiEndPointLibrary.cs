@@ -220,7 +220,30 @@ public static class ApiEndPointLibrary
     private static IReadOnlyDictionary<string, EndpointMeta> BuildNormalizationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [NormalizationSteps.InfoGet200] = new EndpointMeta("Returns Normalization service information.", "GET /api/Normalization/info"),
-        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health")
+        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health"),
+        [NormalizationSteps.LocationPost201] = new EndpointMeta("Creates a facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationPost400EmptyLocationId] = new EndpointMeta("Rejects a facility location with an empty location id.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationGet200] = new EndpointMeta("Returns a facility location including LocationName and LocationAlias.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.LocationGet400EmptyLocationId] = new EndpointMeta("Rejects a facility-location get with an empty location id.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.LocationGet404] = new EndpointMeta("Returns 404 for a facility location that does not exist.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.MappingPost201] = new EndpointMeta("Creates an HSLOC mapping including LocalCodeSystem.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost400EmptyLocalCode] = new EndpointMeta("Rejects an HSLOC mapping with an empty local code.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost404UnknownLocation] = new EndpointMeta("Returns 404 when the facility location does not exist.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost409Duplicate] = new EndpointMeta("Rejects a duplicate HSLOC mapping.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingGet200] = new EndpointMeta("Returns an HSLOC mapping including LocalCodeSystem.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingGet400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping get with an empty id.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingGet404] = new EndpointMeta("Returns 404 for an HSLOC mapping that does not exist.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingSearch200HasResults] = new EndpointMeta("Searches HSLOC mappings and returns the created row.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.MappingSearch200Empty] = new EndpointMeta("Searches HSLOC mappings and returns an empty page.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.MappingPut202] = new EndpointMeta("Updates an HSLOC mapping.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut400EmptyLocalCode] = new EndpointMeta("Rejects an HSLOC mapping update with an empty local code.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut404] = new EndpointMeta("Returns 404 when updating an HSLOC mapping that does not exist.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut409Duplicate] = new EndpointMeta("Rejects an HSLOC mapping update that collides with an existing local code.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDelete204] = new EndpointMeta("Deletes an HSLOC mapping by id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDelete400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping delete with an empty id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDeleteFacility204] = new EndpointMeta("Deletes HSLOC mappings for a facility.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -471,6 +494,29 @@ public static class ApiEndPointLibrary
         public const string SequencesDelete204 = "SEQUENCES DELETE → 204";
         public const string SequencesDelete404 = "SEQUENCES DELETE → 404";
         public const string SequencesDelete400EmptyFacility = "SEQUENCES DELETE → 400 (empty facility)";
+        public const string LocationPost201 = "LOCATION POST → 201";
+        public const string LocationPost400EmptyLocationId = "LOCATION POST → 400 (empty locationId)";
+        public const string LocationPost409Duplicate = "LOCATION POST → 409 (duplicate)";
+        public const string LocationGet200 = "LOCATION GET → 200";
+        public const string LocationGet400EmptyLocationId = "LOCATION GET → 400 (empty locationId)";
+        public const string LocationGet404 = "LOCATION GET → 404";
+        public const string MappingPost201 = "MAPPING POST → 201";
+        public const string MappingPost400EmptyLocalCode = "MAPPING POST → 400 (empty localCode)";
+        public const string MappingPost404UnknownLocation = "MAPPING POST → 404 (unknown location)";
+        public const string MappingPost409Duplicate = "MAPPING POST → 409 (duplicate)";
+        public const string MappingGet200 = "MAPPING GET → 200";
+        public const string MappingGet400EmptyId = "MAPPING GET → 400 (empty id)";
+        public const string MappingGet404 = "MAPPING GET → 404";
+        public const string MappingSearch200HasResults = "MAPPING SEARCH → 200 (has results)";
+        public const string MappingSearch200Empty = "MAPPING SEARCH → 200 (empty)";
+        public const string MappingPut202 = "MAPPING PUT → 202";
+        public const string MappingPut400EmptyLocalCode = "MAPPING PUT → 400 (empty localCode)";
+        public const string MappingPut404 = "MAPPING PUT → 404";
+        public const string MappingPut409Duplicate = "MAPPING PUT → 409 (duplicate)";
+        public const string MappingDelete204 = "MAPPING DELETE → 204";
+        public const string MappingDelete400EmptyId = "MAPPING DELETE → 400 (empty id)";
+        public const string MappingDeleteFacility204 = "MAPPING DELETE FACILITY → 204";
+        public const string MappingDeleteFacility400EmptyFacility = "MAPPING DELETE FACILITY → 400 (empty facility)";
     }
 
     public static class QueryDispatchSteps
