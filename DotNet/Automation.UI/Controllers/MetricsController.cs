@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
 
-public class MetricsController(MetricsRunPresenter presenter) : Controller
+public class MetricsController(
+    MetricsRunPresenter presenter,
+    ILiveProcessUtilizationService liveUtilization) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(
@@ -43,6 +45,14 @@ public class MetricsController(MetricsRunPresenter presenter) : Controller
             return NotFound();
 
         return View(compare);
+    }
+
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> LiveUtilization(CancellationToken cancellationToken)
+    {
+        var snapshot = await liveUtilization.GetAsync(cancellationToken);
+        return Json(snapshot);
     }
 
     [HttpPost]

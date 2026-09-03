@@ -11,6 +11,25 @@ namespace UnitTests.AutomationUI;
 public class PrometheusHistogramClientTests
 {
     [Fact]
+    public async Task QueryVector_reads_exported_job_samples()
+    {
+        var json = """
+            {"status":"success","data":{"resultType":"vector","result":[
+              {"metric":{"exported_job":"DataAcquisition"},"value":[1,"721055744"]},
+              {"metric":{"exported_job":"Normalization"},"value":[1,"536870912"]}
+            ]}}
+            """;
+        var client = CreateClient((_, _) => Json(json));
+
+        var samples = await client.QueryVectorAsync("sum by (exported_job) (process_memory_usage_bytes)");
+
+        samples.Should().HaveCount(2);
+        samples[0].ExportedJob.Should().Be("DataAcquisition");
+        samples[0].Value.Should().Be(721055744);
+        samples[1].ExportedJob.Should().Be("Normalization");
+    }
+
+    [Fact]
     public async Task QueryScalar_reads_prometheus_vector_value()
     {
         var json = """

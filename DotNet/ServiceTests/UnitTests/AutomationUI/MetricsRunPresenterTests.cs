@@ -50,6 +50,60 @@ public class MetricsRunPresenterTests
     }
 
     [Fact]
+    public void ToDetail_copies_process_utilization()
+    {
+        var doc = Document();
+        doc.ProcessUtilization["acquisition"] = new ProcessUtilizationSnapshot
+        {
+            Unavailable = false,
+            AvgCpuCores = 0.4,
+            PeakCpuCores = 1.2,
+            AvgMemoryBytes = 500_000_000,
+            PeakMemoryBytes = 800_000_000
+        };
+
+        var detail = MetricsRunPresenter.ToDetail(doc);
+        var acquisition = detail.ProcessUtilization.Should().ContainSingle(p => p.Key == "acquisition").Subject;
+
+        acquisition.Unavailable.Should().BeFalse();
+        acquisition.PeakMemoryBytes.Should().Be(800_000_000);
+        acquisition.AvgCpuCores.Should().Be(0.4);
+        acquisition.Name.Should().Be("Data Acquisition");
+    }
+
+    [Fact]
+    public void ToDetail_copies_api_latency_and_slowest_routes()
+    {
+        var doc = Document();
+        doc.ApiLatency["acquisition"] = new ApiLatencySnapshot
+        {
+            Unavailable = false,
+            Count = 40,
+            P50Ms = 40,
+            P95Ms = 175,
+            P99Ms = 300,
+            ErrorCount = 2
+        };
+        doc.SlowestApiRoutes =
+        [
+            new ApiRouteLatencySnapshot
+            {
+                Service = "Data Acquisition",
+                Method = "GET",
+                Route = "api/data/{facilityId}/QueryPlan",
+                P95Ms = 220,
+                Count = 12
+            }
+        ];
+
+        var detail = MetricsRunPresenter.ToDetail(doc);
+        var api = detail.ApiLatency.Should().ContainSingle(a => a.Key == "acquisition").Subject;
+        api.P95Ms.Should().Be(175);
+        api.ErrorCount.Should().Be(2);
+        detail.SlowestApiRoutes.Should().ContainSingle(r => r.Route.Contains("QueryPlan"));
+    }
+
+    [Fact]
     public async Task GetDetail_returns_null_when_run_and_snapshot_are_missing()
     {
         var presenter = CreatePresenter(run: null, snapshot: null);

@@ -11,6 +11,20 @@
         "submission" => "Submission",
         _ => key
     };
+    string FormatRam(double? bytes)
+    {
+        if (bytes is null || bytes.Value <= 0) return "—";
+        if (bytes.Value >= 1024L * 1024 * 1024)
+            return $"{bytes.Value / (1024.0 * 1024 * 1024):0.00} GB";
+        return $"{bytes.Value / (1024.0 * 1024):0} MB";
+    }
+    string FormatPercent(double? percent)
+    {
+        if (percent is null) return "—";
+        if (percent.Value < 0.1) return "< 0.1%";
+        if (percent.Value < 10) return $"{percent.Value:0.0}%";
+        return $"{percent.Value:0}%";
+    }
     string FormatDuration(double seconds)
     {
         if (seconds <= 0) return "—";
@@ -41,6 +55,13 @@
         var change = (right.Value - left.Value) / left.Value * 100;
         if (Math.Abs(change) < 1) return "about the same";
         return change > 0 ? $"{change:0}% slower" : $"{Math.Abs(change):0}% faster";
+    }
+    string DeltaAmount(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value * 100;
+        if (Math.Abs(change) < 1) return "about the same";
+        return change > 0 ? $"{change:0}% more" : $"{Math.Abs(change):0}% less";
     }
 }
 
@@ -120,6 +141,46 @@
                                 <td>@(rightStage.Unavailable ? "—" : FormatMs(rightStage.P95Ms))</td>
                                 <td class="@DeltaClass(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)">
                                     @DeltaText(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var key in (Model.Left.ProcessUtilization.Select(p => p.Key).Concat(Model.Right.ProcessUtilization.Select(p => p.Key))).Distinct())
+                        {
+                            var leftProc = Model.Left.ProcessUtilization.FirstOrDefault(p => p.Key == key)
+                                ?? new ProcessUtilizationItemView { Unavailable = true };
+                            var rightProc = Model.Right.ProcessUtilization.FirstOrDefault(p => p.Key == key)
+                                ?? new ProcessUtilizationItemView { Unavailable = true };
+                            var name = string.IsNullOrWhiteSpace(leftProc.Name) ? rightProc.Name : leftProc.Name;
+                            <tr>
+                                <td>@name (peak RAM)</td>
+                                <td>@(leftProc.Unavailable ? "—" : FormatRam(leftProc.PeakMemoryBytes))</td>
+                                <td>@(rightProc.Unavailable ? "—" : FormatRam(rightProc.PeakMemoryBytes))</td>
+                                <td class="@DeltaClass(leftProc.Unavailable ? null : leftProc.PeakMemoryBytes, rightProc.Unavailable ? null : rightProc.PeakMemoryBytes)">
+                                    @DeltaAmount(leftProc.Unavailable ? null : leftProc.PeakMemoryBytes, rightProc.Unavailable ? null : rightProc.PeakMemoryBytes)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>@name (avg CPU)</td>
+                                <td>@(leftProc.Unavailable ? "—" : FormatPercent(leftProc.AvgCpuPercent))</td>
+                                <td>@(rightProc.Unavailable ? "—" : FormatPercent(rightProc.AvgCpuPercent))</td>
+                                <td class="@DeltaClass(leftProc.Unavailable ? null : leftProc.AvgCpuPercent, rightProc.Unavailable ? null : rightProc.AvgCpuPercent)">
+                                    @DeltaAmount(leftProc.Unavailable ? null : leftProc.AvgCpuPercent, rightProc.Unavailable ? null : rightProc.AvgCpuPercent)
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var apiKey in (Model.Left.ApiLatency.Select(a => a.Key).Concat(Model.Right.ApiLatency.Select(a => a.Key))).Distinct())
+                        {
+                            var leftApi = Model.Left.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
+                                ?? new ApiLatencyItemView { Unavailable = true };
+                            var rightApi = Model.Right.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
+                                ?? new ApiLatencyItemView { Unavailable = true };
+                            var apiName = string.IsNullOrWhiteSpace(leftApi.Name) ? rightApi.Name : leftApi.Name;
+                            <tr>
+                                <td>@apiName (API slow)</td>
+                                <td>@(leftApi.Unavailable ? "—" : FormatMs(leftApi.P95Ms))</td>
+                                <td>@(rightApi.Unavailable ? "—" : FormatMs(rightApi.P95Ms))</td>
+                                <td class="@DeltaClass(leftApi.Unavailable ? null : leftApi.P95Ms, rightApi.Unavailable ? null : rightApi.P95Ms)">
+                                    @DeltaText(leftApi.Unavailable ? null : leftApi.P95Ms, rightApi.Unavailable ? null : rightApi.P95Ms)
                                 </td>
                             </tr>
                         }

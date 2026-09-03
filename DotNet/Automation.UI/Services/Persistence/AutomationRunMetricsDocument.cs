@@ -37,6 +37,9 @@ public sealed class AutomationRunMetricsDocument
     public ThetisRevisionSnapshot Thetis { get; set; } = new();
     public long PrometheusWaitMs { get; set; }
     public Dictionary<string, StageLatencySnapshot> Stages { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, ProcessUtilizationSnapshot> ProcessUtilization { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, ApiLatencySnapshot> ApiLatency { get; set; } = new(StringComparer.Ordinal);
+    public List<ApiRouteLatencySnapshot> SlowestApiRoutes { get; set; } = [];
     public ThroughputSnapshot Throughput { get; set; } = new();
     public double E2eDurationSeconds { get; set; }
     public List<ValidatorOutcomeSnapshot> Validators { get; set; } = [];
@@ -62,6 +65,36 @@ public sealed class StageLatencySnapshot
     public double P95Ms { get; set; }
     public double P99Ms { get; set; }
     public double ErrorCount { get; set; }
+}
+
+public sealed class ProcessUtilizationSnapshot
+{
+    public bool Unavailable { get; set; } = true;
+    public double AvgCpuCores { get; set; }
+    public double PeakCpuCores { get; set; }
+    public double AvgCpuPercent { get; set; }
+    public double PeakCpuPercent { get; set; }
+    public double AvgMemoryBytes { get; set; }
+    public double PeakMemoryBytes { get; set; }
+}
+
+public sealed class ApiLatencySnapshot
+{
+    public bool Unavailable { get; set; } = true;
+    public double Count { get; set; }
+    public double P50Ms { get; set; }
+    public double P95Ms { get; set; }
+    public double P99Ms { get; set; }
+    public double ErrorCount { get; set; }
+}
+
+public sealed class ApiRouteLatencySnapshot
+{
+    public string Service { get; set; } = "";
+    public string Method { get; set; } = "";
+    public string Route { get; set; } = "";
+    public double P95Ms { get; set; }
+    public double Count { get; set; }
 }
 
 public sealed class ThroughputSnapshot

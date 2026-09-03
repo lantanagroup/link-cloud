@@ -68,6 +68,167 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public void Utilization_lookback_is_at_least_30_seconds()
+    {
+        RunMetricsSnapshotService.ResolveUtilizationLookbackSeconds(12).Should().Be(30);
+        RunMetricsSnapshotService.ResolveUtilizationLookbackSeconds(101.4).Should().Be(102);
+    }
+
+    [Fact]
+    public void DotNet_utilization_queries_use_exported_job_and_window()
+    {
+        RunMetricsSnapshotService.DotNetPeakMemoryQuery("DataAcquisition", 90)
+            .Should().Be("max(max_over_time(process_memory_usage_bytes{exported_job=\"DataAcquisition\"}[90s]))");
+        RunMetricsSnapshotService.DotNetAvgCpuCoresQuery("Normalization", 90)
+            .Should().Be("sum(increase(process_cpu_time_seconds_total{exported_job=\"Normalization\"}[90s])) / 90");
+        RunMetricsSnapshotService.JvmPeakHeapQuery("measureeval", 90)
+            .Should().Contain("jvm_memory_used_bytes{exported_job=\"measureeval\",jvm_memory_type=\"heap\"}");
+    }
+
+    [Fact]
+    public async Task Capture_records_process_cpu_and_memory_from_prometheus()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (query.Contains("process_memory_usage_bytes", StringComparison.Ordinal))
+                    return query.Contains("max_over_time", StringComparison.Ordinal) ? 800_000_000 : 500_000_000;
+                if (query.Contains("http_server_request_duration_seconds", StringComparison.Ordinal))
+                    return null;
+                if (query.Contains("process_cpu_count", StringComparison.Ordinal))
+                    return 24;
+                if (query.Contains("process_cpu_time_seconds_total", StringComparison.Ordinal))
+                    return query.Contains("max_over_time", StringComparison.Ordinal) ? 1.5 : 0.4;
+                if (query.Contains("jvm_memory_used_bytes", StringComparison.Ordinal))
+                    return 300_000_000;
+                if (query.Contains("jvm_cpu_count", StringComparison.Ordinal))
+                    return 24;
+                if (query.Contains("jvm_cpu_recent_utilization_ratio", StringComparison.Ordinal))
+                    return 0.02;
+                if (query.Contains("_count{", StringComparison.Ordinal))
+                    return 8;
+                if (query.Contains("histogram_quantile(0.95", StringComparison.Ordinal))
+                    return 1234;
+                if (query.Contains("histogram_quantile(0.50", StringComparison.Ordinal))
+                    return 100;
+                if (query.Contains("histogram_quantile(0.99", StringComparison.Ordinal))
+                    return 2000;
+                return null;
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://localhost:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true, startedAt: DateTimeOffset.UtcNow.AddSeconds(-90)));
+
+        saved.Should().NotBeNull();
+        saved!.ProcessUtilization["acquisition"].Unavailable.Should().BeFalse();
+        saved.ProcessUtilization["acquisition"].PeakMemoryBytes.Should().Be(800_000_000);
+        saved.ProcessUtilization["acquisition"].AvgMemoryBytes.Should().Be(500_000_000);
+        saved.ProcessUtilization["acquisition"].AvgCpuCores.Should().Be(0.4);
+        saved.ProcessUtilization["acquisition"].AvgCpuPercent.Should().BeApproximately(100.0 * 0.4 / 24, 0.001);
+        saved.ProcessUtilization["measureeval"].Unavailable.Should().BeFalse();
+        saved.ProcessUtilization["measureeval"].AvgCpuCores.Should().BeApproximately(0.48, 0.001);
+        saved.ProcessUtilization["measureeval"].AvgCpuPercent.Should().BeApproximately(2.0, 0.001);
+    }
+
+    [Fact]
+    public void Http_api_queries_exclude_health_and_use_increase_over_the_window()
+    {
+        RunMetricsSnapshotService.HttpCountQuery("DataAcquisition", 90)
+            .Should().Contain("http_server_request_duration_seconds_count")
+            .And.Contain("exported_job=\"DataAcquisition\"")
+            .And.Contain("increase(")
+            .And.Contain("/health");
+        RunMetricsSnapshotService.HttpQuantileQuery("Report", 90, "0.95")
+            .Should().Contain("histogram_quantile(0.95")
+            .And.Contain("[90s]");
+    }
+
+    [Fact]
+    public async Task Capture_records_inbound_api_latency_from_prometheus()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (query.Contains("http_server_request_duration_seconds_count", StringComparison.Ordinal)
+                    && query.Contains("5..", StringComparison.Ordinal))
+                    return 2;
+                if (query.Contains("http_server_request_duration_seconds_count", StringComparison.Ordinal))
+                    return 40;
+                if (query.Contains("histogram_quantile(0.95", StringComparison.Ordinal)
+                    && query.Contains("http_server_request_duration_seconds_bucket", StringComparison.Ordinal))
+                    return 0.175;
+                if (query.Contains("histogram_quantile(0.50", StringComparison.Ordinal)
+                    && query.Contains("http_server_request_duration_seconds_bucket", StringComparison.Ordinal))
+                    return 0.04;
+                if (query.Contains("histogram_quantile(0.99", StringComparison.Ordinal)
+                    && query.Contains("http_server_request_duration_seconds_bucket", StringComparison.Ordinal))
+                    return 0.3;
+                return null;
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset? _, CancellationToken _) =>
+            {
+                if (query.Contains("http_route", StringComparison.Ordinal) && query.Contains("histogram_quantile", StringComparison.Ordinal))
+                    return
+                    [
+                        new PromSample("DataAcquisition", 0.22, new Dictionary<string, string>
+                        {
+                            ["exported_job"] = "DataAcquisition",
+                            ["http_request_method"] = "GET",
+                            ["http_route"] = "api/data/{facilityId}/QueryPlan"
+                        })
+                    ];
+                if (query.Contains("http_route", StringComparison.Ordinal))
+                    return
+                    [
+                        new PromSample("DataAcquisition", 12, new Dictionary<string, string>
+                        {
+                            ["exported_job"] = "DataAcquisition",
+                            ["http_request_method"] = "GET",
+                            ["http_route"] = "api/data/{facilityId}/QueryPlan"
+                        })
+                    ];
+                return [];
+            });
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://localhost:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true, startedAt: DateTimeOffset.UtcNow.AddSeconds(-90)));
+
+        saved.Should().NotBeNull();
+        saved!.ApiLatency["acquisition"].Unavailable.Should().BeFalse();
+        saved.ApiLatency["acquisition"].Count.Should().Be(40);
+        saved.ApiLatency["acquisition"].P95Ms.Should().Be(175);
+        saved.ApiLatency["acquisition"].ErrorCount.Should().Be(2);
+        saved.SlowestApiRoutes.Should().ContainSingle(r => r.Route.Contains("QueryPlan") && r.P95Ms == 220);
+    }
+
+    [Fact]
     public void Stage_histograms_omit_query_dispatch()
     {
         RunMetricsSnapshotService.StageHistograms.Select(s => s.Stage)
@@ -133,6 +294,10 @@ public class RunMetricsSnapshotServiceTests
         saved.E2eDurationSeconds.Should().BeGreaterThan(0);
         saved.Stages.Should().NotBeEmpty();
         saved.Stages.Values.Should().OnlyContain(s => s.Unavailable);
+        saved.ProcessUtilization.Should().NotBeEmpty();
+        saved.ProcessUtilization.Values.Should().OnlyContain(s => s.Unavailable);
+        saved.ApiLatency.Should().NotBeEmpty();
+        saved.ApiLatency.Values.Should().OnlyContain(s => s.Unavailable);
         saved.Thetis.Generator.Should().Be("thetis");
         saved.Thetis.Seed.Should().Be(20260329);
         saved.Benchmark.Pass.Should().BeTrue();
@@ -173,6 +338,8 @@ public class RunMetricsSnapshotServiceTests
                 : query.Contains("histogram_quantile(0.99", StringComparison.Ordinal) ? 2000
                 : query.Contains("_count{", StringComparison.Ordinal) ? 8
                 : null);
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         var metrics = new Mock<IAutomationUiMetrics>();
         var service = CreateService(
             store.Object,
@@ -193,7 +360,8 @@ public class RunMetricsSnapshotServiceTests
         saved.Thetis.DurationMs.Should().Be(0);
         metrics.Verify(m => m.IncrementSnapshotMissing(), Times.Never);
         prom.Verify(p => p.QueryScalarAsync(
-            It.Is<string>(q => q.Contains("increase(", StringComparison.Ordinal)),
+            It.Is<string>(q => q.Contains("increase(", StringComparison.Ordinal)
+                && q.Contains("duration_milliseconds_count", StringComparison.Ordinal)),
             It.IsAny<DateTimeOffset>(),
             It.IsAny<CancellationToken>()), Times.Never);
         prom.Verify(p => p.QueryScalarAsync(
@@ -219,6 +387,8 @@ public class RunMetricsSnapshotServiceTests
         prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         var service = CreateService(
             store.Object,
             new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
@@ -236,12 +406,25 @@ public class RunMetricsSnapshotServiceTests
     public async Task Capture_queries_prometheus_after_the_wait_not_at_finish_time()
     {
         var finishedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        DateTimeOffset? queriedAt = null;
+        var histogramTimes = new List<DateTimeOffset>();
+        var utilizationTimes = new List<DateTimeOffset>();
         var prom = new Mock<IPrometheusHistogramClient>();
         prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .Callback<string, DateTimeOffset, CancellationToken>((_, time, _) => queriedAt = time)
+            .Callback<string, DateTimeOffset, CancellationToken>((query, time, _) =>
+            {
+                if (query.Contains("process_memory_usage_bytes", StringComparison.Ordinal)
+                    || query.Contains("process_cpu_time_seconds_total", StringComparison.Ordinal)
+                    || query.Contains("process_cpu_count", StringComparison.Ordinal)
+                    || query.Contains("jvm_", StringComparison.Ordinal)
+                    || query.Contains("http_server_request_duration_seconds", StringComparison.Ordinal))
+                    utilizationTimes.Add(time);
+                else
+                    histogramTimes.Add(time);
+            })
             .ReturnsAsync(1);
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         var store = new Mock<IRunMetricsStore>();
         store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -255,8 +438,10 @@ public class RunMetricsSnapshotServiceTests
 
         await service.CaptureAsync(Input(isMetricsRun: true, startedAt: finishedAt.AddMinutes(-2), finishedAt: finishedAt));
 
-        queriedAt.Should().NotBeNull();
-        queriedAt!.Value.Should().BeAfter(finishedAt);
+        histogramTimes.Should().NotBeEmpty();
+        histogramTimes.Should().OnlyContain(t => t > finishedAt);
+        utilizationTimes.Should().NotBeEmpty();
+        utilizationTimes.Should().OnlyContain(t => t == finishedAt);
     }
 
     [Fact]

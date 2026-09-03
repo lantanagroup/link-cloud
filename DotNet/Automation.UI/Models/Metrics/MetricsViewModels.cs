@@ -33,6 +33,9 @@ public sealed class MetricsRunDetailViewModel : MetricsRunListItem
     public long GenerationDurationMs { get; set; }
     public string? ScenarioFingerprint { get; set; }
     public Dictionary<string, StageSnapshot> Stages { get; set; } = new(StringComparer.Ordinal);
+    public IReadOnlyList<ProcessUtilizationItemView> ProcessUtilization { get; set; } = [];
+    public IReadOnlyList<ApiLatencyItemView> ApiLatency { get; set; } = [];
+    public IReadOnlyList<ApiRouteLatencyItemView> SlowestApiRoutes { get; set; } = [];
     public IReadOnlyList<string> BenchmarkViolations { get; set; } = [];
     public IReadOnlyList<string> RegressionFlags { get; set; } = [];
     public Guid? PreviousRunId { get; set; }
@@ -47,6 +50,41 @@ public sealed class StageSnapshot
     public double? P95Ms { get; set; }
     public double? P99Ms { get; set; }
     public long ErrorCount { get; set; }
+}
+
+public sealed class ProcessUtilizationItemView
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Hint { get; set; } = "";
+    public bool Unavailable { get; set; }
+    public double? AvgCpuCores { get; set; }
+    public double? PeakCpuCores { get; set; }
+    public double? AvgCpuPercent { get; set; }
+    public double? PeakCpuPercent { get; set; }
+    public double? AvgMemoryBytes { get; set; }
+    public double? PeakMemoryBytes { get; set; }
+}
+
+public sealed class ApiLatencyItemView
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public bool Unavailable { get; set; }
+    public long Count { get; set; }
+    public double? P50Ms { get; set; }
+    public double? P95Ms { get; set; }
+    public double? P99Ms { get; set; }
+    public long ErrorCount { get; set; }
+}
+
+public sealed class ApiRouteLatencyItemView
+{
+    public string Service { get; set; } = "";
+    public string Method { get; set; } = "";
+    public string Route { get; set; } = "";
+    public double P95Ms { get; set; }
+    public double Count { get; set; }
 }
 
 public sealed class ValidatorOutcomeSnapshotView

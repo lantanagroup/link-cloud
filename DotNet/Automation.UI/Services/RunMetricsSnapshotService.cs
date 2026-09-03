@@ -56,6 +56,32 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         string? ErrorCounter,
         string? ErrorOutcome);
 
+    internal enum ProcessRuntimeKind
+    {
+        DotNet,
+        Jvm
+    }
+
+    internal readonly record struct ProcessUtilizationQuery(
+        string Key,
+        string Name,
+        string Hint,
+        string ExportedJob,
+        ProcessRuntimeKind Runtime);
+
+    // Process RSS/CPU is not facility-scoped. The lookback is the pipeline window
+    // (report created → ABS submit), which is accurate when one metrics run is in flight.
+    internal static readonly ProcessUtilizationQuery[] ProcessUtilizationQueries =
+    [
+        new("acquisition", "Data Acquisition", "API process", "DataAcquisition", ProcessRuntimeKind.DotNet),
+        new("acquisition-worker", "Data Acquisition worker", "FHIR query worker", "DataAcquisitionWorker", ProcessRuntimeKind.DotNet),
+        new("normalization", "Normalization", "Cleaning and reshaping FHIR", "Normalization", ProcessRuntimeKind.DotNet),
+        new("report", "Report", "Report store and schedule", "Report", ProcessRuntimeKind.DotNet),
+        new("measureeval", "Measure Evaluation", "Running the measure", "measureeval", ProcessRuntimeKind.Jvm),
+        new("validation", "Validation", "Checking the measure report", "ValidationService", ProcessRuntimeKind.Jvm),
+        new("submission", "Submission", "Uploading the report package", "Submission", ProcessRuntimeKind.DotNet)
+    ];
+
     private readonly IRunMetricsStore _store;
     private readonly IMetricsBenchmarkStore _benchmarks;
     private readonly IPrometheusHistogramClient _prometheus;
@@ -96,6 +122,15 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             s => s.Stage,
             _ => new StageLatencySnapshot { Unavailable = true },
             StringComparer.Ordinal);
+        var utilization = ProcessUtilizationQueries.ToDictionary(
+            s => s.Key,
+            _ => new ProcessUtilizationSnapshot { Unavailable = true },
+            StringComparer.Ordinal);
+        var apiLatency = ProcessUtilizationQueries.ToDictionary(
+            s => s.Key,
+            _ => new ApiLatencySnapshot { Unavailable = true },
+            StringComparer.Ordinal);
+        List<ApiRouteLatencySnapshot> slowestRoutes = [];
 
         if (!string.IsNullOrWhiteSpace(endpoint))
         {
@@ -132,6 +167,26 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                             input.RunId,
                             input.FacilityId);
                     }
+
+                    var lookbackSeconds = ResolveUtilizationLookbackSeconds(e2eSeconds);
+                    foreach (var processQuery in ProcessUtilizationQueries)
+                    {
+                        utilization[processQuery.Key] = await QueryProcessUtilizationAsync(
+                            processQuery,
+                            lookbackSeconds,
+                            window.FinishedAt,
+                            cancellationToken);
+                        apiLatency[processQuery.Key] = await QueryApiLatencyAsync(
+                            processQuery,
+                            lookbackSeconds,
+                            window.FinishedAt,
+                            cancellationToken);
+                    }
+
+                    slowestRoutes = await QuerySlowestApiRoutesAsync(
+                        lookbackSeconds,
+                        window.FinishedAt,
+                        cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -179,6 +234,9 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             },
             PrometheusWaitMs = (long)wait.TotalMilliseconds,
             Stages = stages,
+            ProcessUtilization = utilization,
+            ApiLatency = apiLatency,
+            SlowestApiRoutes = slowestRoutes,
             Throughput = new ThroughputSnapshot
             {
                 PatientsPerMinute = e2eSeconds > 0 ? input.PatientCount / (e2eSeconds / 60.0) : 0,
@@ -324,6 +382,203 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 
         const int scrapeMs = 10_000;
         return TimeSpan.FromMilliseconds(exportMs + scrapeMs + 1_000);
+    }
+
+    internal static int ResolveUtilizationLookbackSeconds(double e2eSeconds) =>
+        Math.Max(30, (int)Math.Ceiling(Math.Max(0, e2eSeconds)));
+
+    internal static string DotNetPeakMemoryQuery(string exportedJob, int windowSeconds) =>
+        $"max(max_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";
+
+    internal static string DotNetAvgMemoryQuery(string exportedJob, int windowSeconds) =>
+        $"avg(avg_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";
+
+    internal static string DotNetAvgCpuCoresQuery(string exportedJob, int windowSeconds) =>
+        $"sum(increase(process_cpu_time_seconds_total{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s])) / {windowSeconds}";
+
+    internal static string DotNetPeakCpuCoresQuery(string exportedJob, int windowSeconds) =>
+        $"max_over_time(sum(rate(process_cpu_time_seconds_total{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[30s]))[{windowSeconds}s:10s])";
+
+    internal static string DotNetCpuCountQuery(string exportedJob) =>
+        $"avg(process_cpu_count{{exported_job=\"{EscapePromLabel(exportedJob)}\"}})";
+
+    internal static string JvmPeakHeapQuery(string exportedJob, int windowSeconds) =>
+        $"sum(max_over_time(jvm_memory_used_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\",jvm_memory_type=\"heap\"}}[{windowSeconds}s]))";
+
+    internal static string JvmAvgHeapQuery(string exportedJob, int windowSeconds) =>
+        $"sum(avg_over_time(jvm_memory_used_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\",jvm_memory_type=\"heap\"}}[{windowSeconds}s]))";
+
+    internal static string JvmAvgCpuRatioQuery(string exportedJob, int windowSeconds) =>
+        $"avg_over_time(jvm_cpu_recent_utilization_ratio{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s])";
+
+    internal static string JvmPeakCpuRatioQuery(string exportedJob, int windowSeconds) =>
+        $"max_over_time(jvm_cpu_recent_utilization_ratio{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s])";
+
+    internal static string JvmCpuCountQuery(string exportedJob) =>
+        $"avg(jvm_cpu_count{{exported_job=\"{EscapePromLabel(exportedJob)}\"}})";
+
+    internal const string HttpRouteExclude = "/health|/api/health|/hubs/.*";
+
+    internal static string HttpCountQuery(string exportedJob, int windowSeconds) =>
+        $"sum(increase(http_server_request_duration_seconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",http_route!~\"{HttpRouteExclude}\"}}[{windowSeconds}s]))";
+
+    internal static string HttpErrorCountQuery(string exportedJob, int windowSeconds) =>
+        $"sum(increase(http_server_request_duration_seconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",http_response_status_code=~\"5..\"}}[{windowSeconds}s]))";
+
+    internal static string HttpQuantileQuery(string exportedJob, int windowSeconds, string quantile) =>
+        $"histogram_quantile({quantile}, sum by (le) (increase(http_server_request_duration_seconds_bucket{{exported_job=\"{EscapePromLabel(exportedJob)}\",http_route!~\"{HttpRouteExclude}\"}}[{windowSeconds}s])))";
+
+    internal static string HttpSlowestRoutesQuery(int windowSeconds) =>
+        $"histogram_quantile(0.95, sum by (le, exported_job, http_route, http_request_method) (increase(http_server_request_duration_seconds_bucket{{http_route!~\"{HttpRouteExclude}\"}}[{windowSeconds}s])))";
+
+    internal static string HttpRouteCountQuery(int windowSeconds) =>
+        $"sum by (exported_job, http_route, http_request_method) (increase(http_server_request_duration_seconds_count{{http_route!~\"{HttpRouteExclude}\"}}[{windowSeconds}s]))";
+
+    private async Task<ApiLatencySnapshot> QueryApiLatencyAsync(
+        ProcessUtilizationQuery process,
+        int windowSeconds,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        var count = await _prometheus.QueryScalarAsync(
+            HttpCountQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken);
+        if (count is null or <= 0)
+            return new ApiLatencySnapshot { Unavailable = true };
+
+        var p50Sec = await _prometheus.QueryScalarAsync(
+            HttpQuantileQuery(process.ExportedJob, windowSeconds, "0.50"), evaluationTime, cancellationToken);
+        var p95Sec = await _prometheus.QueryScalarAsync(
+            HttpQuantileQuery(process.ExportedJob, windowSeconds, "0.95"), evaluationTime, cancellationToken);
+        var p99Sec = await _prometheus.QueryScalarAsync(
+            HttpQuantileQuery(process.ExportedJob, windowSeconds, "0.99"), evaluationTime, cancellationToken);
+        var errors = await _prometheus.QueryScalarAsync(
+            HttpErrorCountQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken) ?? 0;
+
+        return new ApiLatencySnapshot
+        {
+            Unavailable = p50Sec is null && p95Sec is null && p99Sec is null,
+            Count = count.Value,
+            P50Ms = SecondsToMs(p50Sec),
+            P95Ms = SecondsToMs(p95Sec),
+            P99Ms = SecondsToMs(p99Sec),
+            ErrorCount = Math.Max(0, errors)
+        };
+    }
+
+    private async Task<List<ApiRouteLatencySnapshot>> QuerySlowestApiRoutesAsync(
+        int windowSeconds,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        var p95 = await _prometheus.QueryVectorAsync(
+            HttpSlowestRoutesQuery(windowSeconds), evaluationTime, cancellationToken);
+        var counts = await _prometheus.QueryVectorAsync(
+            HttpRouteCountQuery(windowSeconds), evaluationTime, cancellationToken);
+        var countByKey = counts.ToDictionary(RouteKey, s => s.Value, StringComparer.Ordinal);
+
+        return p95
+            .Where(s => s.Value > 0 && !string.IsNullOrWhiteSpace(ReadLabel(s, "http_route")))
+            .Select(s => new ApiRouteLatencySnapshot
+            {
+                Service = DisplayNameForJob(s.ExportedJob),
+                Method = ReadLabel(s, "http_request_method"),
+                Route = ReadLabel(s, "http_route"),
+                P95Ms = SecondsToMs(s.Value),
+                Count = countByKey.TryGetValue(RouteKey(s), out var n) ? n : 0
+            })
+            .OrderByDescending(r => r.P95Ms)
+            .Take(8)
+            .ToList();
+    }
+
+    private static string RouteKey(PromSample sample) =>
+        $"{sample.ExportedJob}\0{ReadLabel(sample, "http_request_method")}\0{ReadLabel(sample, "http_route")}";
+
+    private static string ReadLabel(PromSample sample, string name) =>
+        sample.Labels is not null && sample.Labels.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : "";
+
+    private static string DisplayNameForJob(string exportedJob)
+    {
+        var match = ProcessUtilizationQueries.FirstOrDefault(q =>
+            string.Equals(q.ExportedJob, exportedJob, StringComparison.Ordinal));
+        return string.IsNullOrWhiteSpace(match.Name)
+            ? LiveProcessUtilizationService.DisplayName(exportedJob)
+            : match.Name;
+    }
+
+    private static double SecondsToMs(double? seconds) =>
+        seconds is null ? 0 : Math.Max(0, seconds.Value * 1000.0);
+
+    private async Task<ProcessUtilizationSnapshot> QueryProcessUtilizationAsync(
+        ProcessUtilizationQuery process,
+        int windowSeconds,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        if (process.Runtime == ProcessRuntimeKind.Jvm)
+            return await QueryJvmUtilizationAsync(process.ExportedJob, windowSeconds, evaluationTime, cancellationToken);
+
+        var peakMemory = await _prometheus.QueryScalarAsync(
+            DotNetPeakMemoryQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var avgMemory = await _prometheus.QueryScalarAsync(
+            DotNetAvgMemoryQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var avgCpu = await _prometheus.QueryScalarAsync(
+            DotNetAvgCpuCoresQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var peakCpu = await _prometheus.QueryScalarAsync(
+            DotNetPeakCpuCoresQuery(process.ExportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var cpuCount = await _prometheus.QueryScalarAsync(
+            DotNetCpuCountQuery(process.ExportedJob), evaluationTime, cancellationToken);
+
+        return ToUtilizationSnapshot(avgCpu, peakCpu, avgMemory, peakMemory, cpuCount);
+    }
+
+    private async Task<ProcessUtilizationSnapshot> QueryJvmUtilizationAsync(
+        string exportedJob,
+        int windowSeconds,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        var peakMemory = await _prometheus.QueryScalarAsync(
+            JvmPeakHeapQuery(exportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var avgMemory = await _prometheus.QueryScalarAsync(
+            JvmAvgHeapQuery(exportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var cpuCount = await _prometheus.QueryScalarAsync(
+            JvmCpuCountQuery(exportedJob), evaluationTime, cancellationToken) ?? 0;
+        var avgRatio = await _prometheus.QueryScalarAsync(
+            JvmAvgCpuRatioQuery(exportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var peakRatio = await _prometheus.QueryScalarAsync(
+            JvmPeakCpuRatioQuery(exportedJob, windowSeconds), evaluationTime, cancellationToken);
+        var avgCpu = avgRatio is null || cpuCount <= 0 ? (double?)null : avgRatio.Value * cpuCount;
+        var peakCpu = peakRatio is null || cpuCount <= 0 ? (double?)null : peakRatio.Value * cpuCount;
+
+        return ToUtilizationSnapshot(avgCpu, peakCpu, avgMemory, peakMemory, cpuCount);
+    }
+
+    private static ProcessUtilizationSnapshot ToUtilizationSnapshot(
+        double? avgCpu,
+        double? peakCpu,
+        double? avgMemory,
+        double? peakMemory,
+        double? cpuCount)
+    {
+        if ((avgMemory is null or <= 0) && (peakMemory is null or <= 0)
+            && (avgCpu is null or <= 0) && (peakCpu is null or <= 0))
+            return new ProcessUtilizationSnapshot { Unavailable = true };
+
+        var avgCores = Math.Max(0, avgCpu ?? 0);
+        var peakCores = Math.Max(0, peakCpu ?? avgCpu ?? 0);
+        return new ProcessUtilizationSnapshot
+        {
+            Unavailable = false,
+            AvgCpuCores = avgCores,
+            PeakCpuCores = peakCores,
+            AvgCpuPercent = LiveProcessUtilizationService.ToTaskManagerPercent(avgCores, cpuCount ?? 0),
+            PeakCpuPercent = LiveProcessUtilizationService.ToTaskManagerPercent(peakCores, cpuCount ?? 0),
+            AvgMemoryBytes = Math.Max(0, avgMemory ?? 0),
+            PeakMemoryBytes = Math.Max(0, peakMemory ?? avgMemory ?? 0)
+        };
     }
 
     private async Task<StageLatencySnapshot> QueryStageAsync(

@@ -368,6 +368,7 @@ builder.Services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramCl
 });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotService>();
+builder.Services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();

@@ -38,6 +38,27 @@
         if (value is null) return "—";
         return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
     }
+    string FormatPercent(double? percent)
+    {
+        if (percent is null) return "—";
+        if (percent.Value < 0.1) return "< 0.1%";
+        if (percent.Value < 10) return $"{percent.Value:0.0}%";
+        return $"{percent.Value:0}%";
+    }
+    string FormatRam(double? bytes)
+    {
+        if (bytes is null || bytes.Value <= 0) return "—";
+        if (bytes.Value >= 1024L * 1024 * 1024)
+            return $"{bytes.Value / (1024.0 * 1024 * 1024):0.00} GB";
+        return $"{bytes.Value / (1024.0 * 1024):0} MB";
+    }
+    var utilization = Model.ProcessUtilization ?? [];
+    var anyUtilization = utilization.Any(u => !u.Unavailable);
+    var apiLatency = Model.ApiLatency ?? [];
+    var anyApi = apiLatency.Any(a => !a.Unavailable);
+    var slowestRoutes = Model.SlowestApiRoutes ?? [];
+    var maxApiP95 = apiLatency.Where(a => !a.Unavailable && a.P95Ms is > 0).Select(a => a.P95Ms!.Value).DefaultIfEmpty(0).Max();
+    var maxPeakRam = utilization.Where(u => !u.Unavailable && u.PeakMemoryBytes is > 0).Select(u => u.PeakMemoryBytes!.Value).DefaultIfEmpty(0).Max();
     var availableSlow = Model.Stages.Values.Where(s => !s.Unavailable && s.P95Ms is > 0).Select(s => s.P95Ms!.Value).ToList();
     var maxSlow = availableSlow.Count > 0 ? availableSlow.Max() : 0;
 }
@@ -124,6 +145,118 @@
             <summary class="small text-muted" style="cursor:pointer;">What is an operation?</summary>
             <p class="small text-muted mb-0 mt-2">One timing sample for that step — for example one FHIR query, one patient normalized, or one upload. Compare Slow times across runs of the same scenario; a jump usually means that step got heavier.</p>
         </details>
+    </div>
+</div>
+
+<div class="au-card">
+    <div class="card-header"><i class="bi bi-cpu me-2"></i>CPU and RAM during this run</div>
+    <div class="card-body">
+        <p class="small text-muted mb-3">
+            Process CPU and memory over the same window as total time (report created through ABS upload).
+            CPU is percent of this machine (like Task Manager). These are the service processes, not one facility. Peak RAM is the number to watch when a scenario gets bigger.
+        </p>
+        @if (!anyUtilization)
+        {
+            <p class="text-muted mb-0">CPU and RAM were not recorded for this run.</p>
+        }
+        else
+        {
+            @foreach (var proc in utilization)
+            {
+                var ramWidth = !proc.Unavailable && maxPeakRam > 0 && proc.PeakMemoryBytes is > 0
+                    ? Math.Clamp(proc.PeakMemoryBytes.Value / maxPeakRam * 100, 4, 100)
+                    : 0;
+                <div class="mb-3">
+                    <div>
+                        <span class="fw-semibold">@proc.Name</span>
+                        <span class="small text-muted ms-1">@proc.Hint</span>
+                    </div>
+                    @if (proc.Unavailable)
+                    {
+                        <div class="small text-warning mt-1">Not recorded for this run.</div>
+                    }
+                    else
+                    {
+                        <div class="progress au-metrics-waterfall mt-1" role="img" aria-label="@proc.Name peak RAM">
+                            <div class="progress-bar" style="width:@ramWidth.ToString("0.0")%">Peak RAM @FormatRam(proc.PeakMemoryBytes)</div>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            Typical RAM @FormatRam(proc.AvgMemoryBytes)
+                            · CPU @FormatPercent(proc.AvgCpuPercent) avg
+                            · @FormatPercent(proc.PeakCpuPercent) peak
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div class="au-card">
+    <div class="card-header"><i class="bi bi-hdd-network me-2"></i>API response time</div>
+    <div class="card-body">
+        <p class="small text-muted mb-3">
+            Inbound HTTP to each Link service during this run, excluding health checks.
+            <strong>Slow</strong> is p95. These are the service APIs the pipeline and poller actually called.
+        </p>
+        @if (!anyApi)
+        {
+            <p class="text-muted mb-0">API timings were not recorded for this run.</p>
+        }
+        else
+        {
+            @foreach (var api in apiLatency)
+            {
+                var width = !api.Unavailable && maxApiP95 > 0 && api.P95Ms is > 0
+                    ? Math.Clamp(api.P95Ms.Value / maxApiP95 * 100, 4, 100)
+                    : 0;
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-baseline gap-2">
+                        <span class="fw-semibold">@api.Name</span>
+                        @if (!api.Unavailable && api.ErrorCount > 0)
+                        {
+                            <span class="badge au-badge-danger">@api.ErrorCount HTTP 5xx</span>
+                        }
+                    </div>
+                    @if (api.Unavailable)
+                    {
+                        <div class="small text-warning mt-1">No API calls recorded for this service.</div>
+                    }
+                    else
+                    {
+                        <div class="progress au-metrics-waterfall mt-1" role="img" aria-label="@api.Name API slow time">
+                            <div class="progress-bar" style="width:@width.ToString("0.0")%">Slow @FormatMs(api.P95Ms)</div>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            Typical @FormatMs(api.P50Ms)
+                            · Slowest @FormatMs(api.P99Ms)
+                            · @api.Count calls
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @if (slowestRoutes.Count > 0)
+        {
+            <div class="mt-3">
+                <div class="fw-semibold small mb-2">Slowest endpoints this run</div>
+                <table class="table au-table mb-0">
+                    <thead><tr><th>Service</th><th>Call</th><th>Slow</th><th>Calls</th></tr></thead>
+                    <tbody>
+                    @foreach (var route in slowestRoutes)
+                    {
+                        <tr>
+                            <td>@route.Service</td>
+                            <td><code>@route.Method @route.Route</code></td>
+                            <td>@FormatMs(route.P95Ms)</td>
+                            <td>@route.Count.ToString("0")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
 

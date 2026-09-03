@@ -241,6 +241,9 @@ public sealed class MetricsRunPresenter
             GenerationDurationMs = document.Thetis.DurationMs,
             ScenarioFingerprint = document.ScenarioFingerprint,
             Stages = ToStages(document),
+            ProcessUtilization = ToProcessUtilization(document),
+            ApiLatency = ToApiLatency(document),
+            SlowestApiRoutes = ToSlowestApiRoutes(document),
             BenchmarkViolations = document.Benchmark.Violations,
             RegressionFlags = document.Regression.Flags,
             PreviousRunId = document.Regression.PreviousRunId,
@@ -269,6 +272,9 @@ public sealed class MetricsRunPresenter
             PatientCount = run.PatientCount,
             Seed = run.Seed,
             Stages = EmptyUnavailableStages(),
+            ProcessUtilization = EmptyUnavailableProcessUtilization(),
+            ApiLatency = EmptyUnavailableApiLatency(),
+            SlowestApiRoutes = [],
             BenchmarkViolations = [],
             RegressionFlags = []
         };
@@ -316,6 +322,75 @@ public sealed class MetricsRunPresenter
             _ => new StageSnapshot { Unavailable = true },
             StringComparer.Ordinal);
     }
+
+    internal static IReadOnlyList<ProcessUtilizationItemView> ToProcessUtilization(AutomationRunMetricsDocument document)
+    {
+        return RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query =>
+        {
+            document.ProcessUtilization.TryGetValue(query.Key, out var snapshot);
+            snapshot ??= new ProcessUtilizationSnapshot { Unavailable = true };
+            return new ProcessUtilizationItemView
+            {
+                Key = query.Key,
+                Name = query.Name,
+                Hint = query.Hint,
+                Unavailable = snapshot.Unavailable,
+                AvgCpuCores = snapshot.Unavailable ? null : snapshot.AvgCpuCores,
+                PeakCpuCores = snapshot.Unavailable ? null : snapshot.PeakCpuCores,
+                AvgCpuPercent = snapshot.Unavailable ? null : snapshot.AvgCpuPercent,
+                PeakCpuPercent = snapshot.Unavailable ? null : snapshot.PeakCpuPercent,
+                AvgMemoryBytes = snapshot.Unavailable ? null : snapshot.AvgMemoryBytes,
+                PeakMemoryBytes = snapshot.Unavailable ? null : snapshot.PeakMemoryBytes
+            };
+        }).ToList();
+    }
+
+    internal static IReadOnlyList<ProcessUtilizationItemView> EmptyUnavailableProcessUtilization() =>
+        RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query => new ProcessUtilizationItemView
+        {
+            Key = query.Key,
+            Name = query.Name,
+            Hint = query.Hint,
+            Unavailable = true
+        }).ToList();
+
+    internal static IReadOnlyList<ApiLatencyItemView> ToApiLatency(AutomationRunMetricsDocument document)
+    {
+        return RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query =>
+        {
+            document.ApiLatency.TryGetValue(query.Key, out var snapshot);
+            snapshot ??= new ApiLatencySnapshot { Unavailable = true };
+            return new ApiLatencyItemView
+            {
+                Key = query.Key,
+                Name = query.Name,
+                Unavailable = snapshot.Unavailable,
+                Count = (long)Math.Round(snapshot.Count),
+                P50Ms = snapshot.Unavailable ? null : snapshot.P50Ms,
+                P95Ms = snapshot.Unavailable ? null : snapshot.P95Ms,
+                P99Ms = snapshot.Unavailable ? null : snapshot.P99Ms,
+                ErrorCount = (long)Math.Round(snapshot.ErrorCount)
+            };
+        }).ToList();
+    }
+
+    internal static IReadOnlyList<ApiLatencyItemView> EmptyUnavailableApiLatency() =>
+        RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query => new ApiLatencyItemView
+        {
+            Key = query.Key,
+            Name = query.Name,
+            Unavailable = true
+        }).ToList();
+
+    internal static IReadOnlyList<ApiRouteLatencyItemView> ToSlowestApiRoutes(AutomationRunMetricsDocument document) =>
+        (document.SlowestApiRoutes ?? []).Select(r => new ApiRouteLatencyItemView
+        {
+            Service = r.Service,
+            Method = r.Method,
+            Route = r.Route,
+            P95Ms = r.P95Ms,
+            Count = r.Count
+        }).ToList();
 
     private static MetricsDurationPoint ToPoint(AutomationRunMetricsDocument d) => new()
     {

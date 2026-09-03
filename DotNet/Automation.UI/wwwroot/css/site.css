@@ -673,6 +673,74 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   color: var(--au-muted);
 }
 
+.au-live-gauge-card {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .85rem .7rem .7rem;
+  height: 100%;
+  border: 1px solid transparent;
+}
+.au-live-gauge-pipeline {
+  background: #fff;
+  border-color: rgba(77,163,255,.28);
+  box-shadow: var(--au-card-shadow);
+}
+.au-live-gauge-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: .35rem;
+}
+.au-live-gauge-row {
+  display: flex;
+  justify-content: space-around;
+  gap: .4rem;
+}
+.au-gauge {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+.au-gauge-svg {
+  width: 100%;
+  max-width: 108px;
+  height: auto;
+  display: block;
+  margin: 0 auto -0.35rem;
+}
+.au-gauge-track {
+  stroke: #e6e8ee;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.au-gauge-arc {
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .6s ease, stroke .6s ease;
+}
+.au-gauge-readout {
+  font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: .1rem;
+}
+.au-gauge-unit {
+  font-size: .68rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.au-live-api {
+  font-size: .72rem;
+  color: var(--au-muted);
+  text-align: center;
+  margin-top: .45rem;
+  font-weight: 600;
+}
+
 a.au-scenario-card {
   display: block;
   background: #fff;
