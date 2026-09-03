@@ -59,6 +59,15 @@ public enum SubmissionStatus
     NotEligable
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ReportStatus
+{
+    Unknown,
+    Canceled,
+    Completed,
+    Pending
+}
+
 public class EntryMeasureReportApiModel
 {
     public string? MeasureReportId { get; set; }
@@ -110,4 +119,17 @@ public class MeasureReportPopulationApiModel
     public int GroupPopulationId { get; set; }
     public string MeasureReportId { get; set; } = string.Empty;
     public int PopulationCount { get; set; }
+}
+
+public class ReportSummaryApiModel
+{
+    public string ReportScheduleId { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
+    public DateTimeOffset ReportStartDate { get; set; }
+    public DateTimeOffset ReportEndDate { get; set; }
+    public List<string> ReportTypes { get; set; } = [];
+    public ReportStatus Status { get; set; }
+    public int PatientCount { get; set; }
+    public int InitialPopulationCount { get; set; }
+    public DateTime? LastUpdatedDate { get; set; }
 }
