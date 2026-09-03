@@ -140,6 +140,7 @@ public static class GeneralStartupExtensions
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
         services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
         services.Configure<DataSourceAuthSettings>(configuration.GetSection(DataSourceAuthSettings.SectionName));
+        services.Configure<FhirSearchSettings>(configuration.GetSection(FhirSearchSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);

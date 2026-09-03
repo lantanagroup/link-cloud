@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,33 +497,33 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-auditableeventoccurred.html">Auditable Event Occurred [event]</a>, <a href="event-patientcensusscheduled.html">Patient Census Scheduled [event]</a>, <a href="event-patientevent.html">Patient Event [event]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-patientlistsacquired.html">Patient Lists Acquired [event]</a>, <a href="event-cernerpatientsacquired.html">Cerner Patients Acquired [event]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Census service is primarily responsible for maintaining a tenants admit and discharge patient information needed to determine when a patient is ready for reporting. To accomplish this, the Census service has functionality in place to request an updated FHIR List of recently admitted patients. The frequency that the request is made is based on a Tenant configuration made in the Census service.</p>
 <p>The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nCensusService_1BD4C8F8["Service: Census Service"]
-  nCensusService_1BD4C8F8 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nCensusService_1BD4C8F8 -->|produces| nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"]
-  nCensusService_1BD4C8F8 -->|produces| nPatientEvent_34D33665["Event: PatientEvent"]
-  nPatientListsAcquired_4681892E["Event: PatientListsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
-  nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
+nCensusService_676D2042["Service: Census Service"]
+  nCensusService_676D2042 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nCensusService_676D2042 -->|produces| nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"]
+  nCensusService_676D2042 -->|produces| nPatientEvent_630CFEC8["Event: PatientEvent"]
+  nPatientListsAcquired_2B002DF["Event: PatientListsAcquired"] -->|consumed by| nCensusService_676D2042
+  nCernerPatientsAcquired_4A156AEE["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_676D2042
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_3467767F
-    nPatientListsAcquired_4681892E
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_4A156AEE
+    nPatientListsAcquired_2B002DF
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nPatientCensusScheduled_2383C0C6
-    nPatientEvent_34D33665
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nPatientCensusScheduled_3CE52530
+    nPatientEvent_630CFEC8
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nCensusService_1BD4C8F8
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nCensusService_676D2042
   end
 </pre></div>
-<h2 id="event-sourcing-workflow" class="content-heading">Event Sourcing Workflow <a id="event-sourcing-workflow" href="#event-sourcing-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Sourcing Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="event-sourcing-workflow" class="content-heading">Event Sourcing Workflow <a href="#event-sourcing-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Sourcing Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Census service consumes <code>PatientListsAcquired</code> and <code>CernerPatientsAcquired</code> events from Kafka. When a new event is received, the <code>PatientListsAcquiredListener</code> processes the payload, updating census records for the specified facility. This enables downstream reporting and data acquisition.</p>
 <p><strong>Workflow Steps:</strong></p>
 <ol>
@@ -530,8 +532,8 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><strong>Event Production:</strong> Upon successful acquisition, a <code>PatientListsAcquired</code> or <code>CernerPatientsAcquired</code> event is produced, containing the list of admitted and discharged patients.</li>
 <li><strong>Census Update:</strong> The Census service consumes the event and updates its records accordingly.</li>
 </ol>
-<h2 id="event-payload-structures" class="content-heading">Event Payload Structures <a id="event-payload-structures" href="#event-payload-structures" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Payload Structures"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="fhirlistadmitpayload-event" class="content-heading">FHIRListAdmitPayload Event <a id="fhirlistadmitpayload-event" href="#fhirlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="event-payload-structures" class="content-heading">Event Payload Structures <a href="#event-payload-structures" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Payload Structures"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="fhirlistadmitpayload-event" class="content-heading">FHIRListAdmitPayload Event <a href="#fhirlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;patientId&quot;: &quot;string&quot;,
   &quot;admitDate&quot;: &quot;string (ISO 8601 datetime)&quot;
@@ -543,7 +545,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><strong>payloadType</strong>: Automatically set to &quot;FHIRListAdmit&quot; (not included in JSON).</li>
 </ul>
 <p>This event is used to track patient admissions detected through FHIR list processing. When processed, it creates a new PatientEncounter record in the system with the admission date and patient identifier.</p>
-<h3 id="fhirlistdischargepayload-event" class="content-heading">FHIRListDischargePayload Event <a id="fhirlistdischargepayload-event" href="#fhirlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="fhirlistdischargepayload-event" class="content-heading">FHIRListDischargePayload Event <a href="#fhirlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIRListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;patientId&quot;: &quot;string&quot;,
   &quot;dischargeDate&quot;: &quot;string (ISO 8601 datetime)&quot;
@@ -556,7 +558,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 </ul>
 <p>This event is used to track patient discharges detected through FHIR list processing. When processed, it updates an existing PatientEncounter record with the discharge date, indicating the patient's encounter has concluded.</p>
 <p>Both FHIR list payloads are critical components of the patient census tracking system, enabling the service to maintain accurate patient encounter records as patients enter and exit the healthcare facility. These events, along with other event types, help build a complete picture of patient movement for reporting purposes.</p>
-<h3 id="cernerlistadmitpayload-event" class="content-heading">CernerListAdmitPayload Event <a id="cernerlistadmitpayload-event" href="#cernerlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="cernerlistadmitpayload-event" class="content-heading">CernerListAdmitPayload Event <a href="#cernerlistadmitpayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListAdmitPayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;patientId&quot;: &quot;string&quot;,
   &quot;admitDate&quot;: &quot;string (ISO 8601 datetime)&quot;,
@@ -578,7 +580,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><strong>payloadType</strong>: Automatically set to &quot;CernerListAdmit&quot; (not included in JSON).</li>
 </ul>
 <p>This event is used to track patient admissions that are sourced from the Cerner SFTP acquisitions. When processed, it creates a new PatientEncounter record in the system with the admission date and patient identifier.</p>
-<h3 id="cernerlistdischargepayload-event" class="content-heading">CernerListDischargePayload Event <a id="cernerlistdischargepayload-event" href="#cernerlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="cernerlistdischargepayload-event" class="content-heading">CernerListDischargePayload Event <a href="#cernerlistdischargepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListDischargePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;patientId&quot;: &quot;string&quot;,
   &quot;dischargeDate&quot;: &quot;string (ISO 8601 datetime)&quot;
@@ -590,7 +592,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><strong>payloadType</strong>: Automatically set to &quot;CernerListDischarge&quot; (not included in JSON).</li>
 </ul>
 <p>This event is used to track patient discharges that are sourced from the Cerner SFTP acquisitions. When a patient is admitted in Link, but no longer is in the latest Cerner acquired file, Link will generate a discharge event for the patient.</p>
-<h3 id="cernerlistupdatepayload-event" class="content-heading">CernerListUpdatePayload Event <a id="cernerlistupdatepayload-event" href="#cernerlistupdatepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListUpdatePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="cernerlistupdatepayload-event" class="content-heading">CernerListUpdatePayload Event <a href="#cernerlistupdatepayload-event" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CernerListUpdatePayload Event"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;patientId&quot;: &quot;string&quot;,
   &quot;encounterId&quot;: &quot;string&quot;,
@@ -610,10 +612,10 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><strong>payloadType</strong>: Automatically set to &quot;CernerListUpdate&quot; (not included in JSON).</li>
 </ul>
 <p>This event is used to track patient updates to current admitted patients. When a patient is admitted in Link, but an update to one of the values have been made in the latest Cerner acquired file, Link will generate an update event for the patient.</p>
-<h2 id="api-documentation" class="content-heading">API Documentation <a id="api-documentation" href="#api-documentation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: API Documentation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="census-configuration-controller" class="content-heading">Census Configuration Controller <a id="census-configuration-controller" href="#census-configuration-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Configuration Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="api-documentation" class="content-heading">API Documentation <a href="#api-documentation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: API Documentation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="census-configuration-controller" class="content-heading">Census Configuration Controller <a href="#census-configuration-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Configuration Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Census service exposes REST endpoints to manage tenant-specific census configuration.</p>
-<h4 id="get-censusconfigfacilityid" class="content-heading">GET /census/config/{facilityId} <a id="get-census-config-facilityid" href="#get-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="get-census-config-facilityid" class="content-heading">GET /census/config/{facilityId} <a href="#get-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Retrieves the census configuration for a specific facility.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -631,7 +633,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
   &quot;enabled&quot;: boolean
 }
 </code></pre>
-<h4 id="post-censusconfig" class="content-heading">POST /census/config <a id="post-census-config" href="#post-census-config" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /census/config"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="post-census-config" class="content-heading">POST /census/config <a href="#post-census-config" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /census/config"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Creates a new census configuration.</p>
 <p><strong>Request Body:</strong></p>
 <pre><code class="language-json">{
@@ -655,7 +657,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
   &quot;id&quot;: &quot;string&quot;
 }
 </code></pre>
-<h4 id="put-censusconfigfacilityid" class="content-heading">PUT /census/config/{facilityId} <a id="put-census-config-facilityid" href="#put-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PUT /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="put-census-config-facilityid" class="content-heading">PUT /census/config/{facilityId} <a href="#put-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PUT /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Updates an existing census configuration.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -673,7 +675,7 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><code>200 OK</code>: Configuration updated successfully.</li>
 <li><code>404 Not Found</code>: If no configuration exists for the specified facilityId.</li>
 </ul>
-<h4 id="delete-censusconfigfacilityid" class="content-heading">DELETE /census/config/{facilityId} <a id="delete-census-config-facilityid" href="#delete-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="delete-census-config-facilityid" class="content-heading">DELETE /census/config/{facilityId} <a href="#delete-census-config-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /census/config/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Deletes a census configuration.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -684,9 +686,9 @@ nCensusService_1BD4C8F8["Service: Census Service"]
 <li><code>200 OK</code>: Configuration deleted successfully.</li>
 <li><code>404 Not Found</code>: If no configuration exists for the specified facilityId.</li>
 </ul>
-<h3 id="census-controller" class="content-heading">Census Controller <a id="census-controller" href="#census-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="census-controller" class="content-heading">Census Controller <a href="#census-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Endpoints for retrieving patient census data and patient lists.</p>
-<h4 id="get-apicensusfacilityidhistoryadmitted" class="content-heading">GET /api/census/{facilityId}/history/admitted <a id="get-api-census-facilityid-history-admitted" href="#get-api-census-facilityid-history-admitted" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/{facilityId}/history/admitted"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="get-api-census-facilityid-history-admitted" class="content-heading">GET /api/census/{facilityId}/history/admitted <a href="#get-api-census-facilityid-history-admitted" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/{facilityId}/history/admitted"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Gets the admitted patients for a facility within a date range. Returns a FHIR List resource containing patient references.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -709,9 +711,9 @@ Returns a FHIR List resource with the following structure:</p>
 <li><code>extension</code>: Contains applicable period with start and end dates</li>
 <li><code>entry[]</code>: Array of patient references in format &quot;Patient/{patientId}&quot;</li>
 </ul>
-<h3 id="patient-encounters-controller" class="content-heading">Patient Encounters Controller <a id="patient-encounters-controller" href="#patient-encounters-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Encounters Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="patient-encounters-controller" class="content-heading">Patient Encounters Controller <a href="#patient-encounters-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Encounters Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Endpoints for managing and retrieving patient encounter materialized views.</p>
-<h4 id="get-apicensuspatient-encounterscurrent" class="content-heading">GET /api/census/patient-encounters/current <a id="get-api-census-patient-encounters-current" href="#get-api-census-patient-encounters-current" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/current"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="get-api-census-patient-encounters-current" class="content-heading">GET /api/census/patient-encounters/current <a href="#get-api-census-patient-encounters-current" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/current"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Returns the current materialized view state for patient encounters for a given facility.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -752,7 +754,7 @@ Returns a FHIR List resource with the following structure:</p>
   &quot;totalCount&quot;: 100
 }
 </code></pre>
-<h4 id="get-apicensuspatient-encountershistorical" class="content-heading">GET /api/census/patient-encounters/historical <a id="get-api-census-patient-encounters-historical" href="#get-api-census-patient-encounters-historical" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/historical"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="get-api-census-patient-encounters-historical" class="content-heading">GET /api/census/patient-encounters/historical <a href="#get-api-census-patient-encounters-historical" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-encounters/historical"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Returns an ad hoc generated materialized view state for patient encounters for a given facility as of a specific date.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -771,7 +773,7 @@ Returns a FHIR List resource with the following structure:</p>
 <li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
 </ul>
 <p><strong>Response Model:</strong> Same as current patient encounters endpoint.</p>
-<h4 id="post-apicensuspatient-encountersrebuild" class="content-heading">POST /api/census/patient-encounters/rebuild <a id="post-api-census-patient-encounters-rebuild" href="#post-api-census-patient-encounters-rebuild" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /api/census/patient-encounters/rebuild"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="post-api-census-patient-encounters-rebuild" class="content-heading">POST /api/census/patient-encounters/rebuild <a href="#post-api-census-patient-encounters-rebuild" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: POST /api/census/patient-encounters/rebuild"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Deletes and rebuilds the materialized view records for a given facility.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -784,9 +786,9 @@ Returns a FHIR List resource with the following structure:</p>
 <li><code>400 Bad Request</code>: If facilityId is not provided.</li>
 <li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
 </ul>
-<h3 id="patient-events-controller" class="content-heading">Patient Events Controller <a id="patient-events-controller" href="#patient-events-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Events Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="patient-events-controller" class="content-heading">Patient Events Controller <a href="#patient-events-controller" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Events Controller"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Endpoints for managing and retrieving patient events.</p>
-<h4 id="get-apicensuspatient-events" class="content-heading">GET /api/census/patient-events <a id="get-api-census-patient-events" href="#get-api-census-patient-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="get-api-census-patient-events" class="content-heading">GET /api/census/patient-events <a href="#get-api-census-patient-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: GET /api/census/patient-events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Returns all events stored in the patient events data store for the given facility.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -826,7 +828,7 @@ Returns a FHIR List resource with the following structure:</p>
   &quot;totalCount&quot;: 100
 }
 </code></pre>
-<h4 id="delete-apicensuspatient-eventsid" class="content-heading">DELETE /api/census/patient-events/{id} <a id="delete-api-census-patient-events-id" href="#delete-api-census-patient-events-id" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/{id}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="delete-api-census-patient-events-id" class="content-heading">DELETE /api/census/patient-events/{id} <a href="#delete-api-census-patient-events-id" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/{id}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Soft deletes a patient event and rebuilds the materialized view for the related correlation id.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -838,7 +840,7 @@ Returns a FHIR List resource with the following structure:</p>
 <li><code>400 Bad Request</code>: If patient event ID is not provided.</li>
 <li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
 </ul>
-<h4 id="delete-apicensuspatient-eventsvisitcorrelationid" class="content-heading">DELETE /api/census/patient-events/visit/{correlationId} <a id="delete-api-census-patient-events-visit-correlationid" href="#delete-api-census-patient-events-visit-correlationid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/visit/{correlationId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="delete-api-census-patient-events-visit-correlationid" class="content-heading">DELETE /api/census/patient-events/visit/{correlationId} <a href="#delete-api-census-patient-events-visit-correlationid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/census/patient-events/visit/{correlationId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -850,9 +852,9 @@ Returns a FHIR List resource with the following structure:</p>
 <li><code>400 Bad Request</code>: If correlation ID is not provided.</li>
 <li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
 </ul>
-<h2 id="technical-implementation" class="content-heading">Technical Implementation <a id="technical-implementation" href="#technical-implementation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Technical Implementation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="technical-implementation" class="content-heading">Technical Implementation <a href="#technical-implementation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Technical Implementation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Census service is implemented as a .NET 8.0 web application with the following key components:</p>
-<h3 id="core-technologies" class="content-heading">Core Technologies <a id="core-technologies" href="#core-technologies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Technologies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="core-technologies" class="content-heading">Core Technologies <a href="#core-technologies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Technologies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Framework</strong>: .NET 8.0</li>
 <li><strong>Database</strong>: Microsoft SQL Server via Entity Framework Core 8.0.3</li>
@@ -861,7 +863,7 @@ Returns a FHIR List resource with the following structure:</p>
 <li><strong>API Documentation</strong>: Swagger/OpenAPI</li>
 <li><strong>Logging</strong>: Serilog with Grafana Loki integration</li>
 </ul>
-<h3 id="database-schema" class="content-heading">Database Schema <a id="database-schema" href="#database-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Database Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="database-schema" class="content-heading">Database Schema <a href="#database-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Database Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Census service uses Entity Framework Core with SQL Server for data persistence. The database schema includes:</p>
 <ol>
 <li><p><strong>CensusConfiguration</strong>: Stores facility-specific census configurations</p>
@@ -882,7 +884,7 @@ Returns a FHIR List resource with the following structure:</p>
 </ul>
 </li>
 </ol>
-<h3 id="scheduled-jobs" class="content-heading">Scheduled Jobs <a id="scheduled-jobs" href="#scheduled-jobs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduled Jobs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="scheduled-jobs" class="content-heading">Scheduled Jobs <a href="#scheduled-jobs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduled Jobs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Census service uses Quartz.NET with ADO Job Stores for scheduling the census acquisition jobs based on tenant configurations. Each job:</p>
 <ol>
 <li>Reads the facility-specific configuration</li>
@@ -890,9 +892,9 @@ Returns a FHIR List resource with the following structure:</p>
 <li>Emits the appropriate events</li>
 <li>Updates the database with the results</li>
 </ol>
-<h3 id="event-processing" class="content-heading">Event Processing <a id="event-processing" href="#event-processing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Processing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="event-processing" class="content-heading">Event Processing <a href="#event-processing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Processing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Census service processes incoming Kafka events via dedicated listeners and produces events when census data is acquired or scheduled.</p>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -904,7 +906,7 @@ Returns a FHIR List resource with the following structure:</p>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
 </ul>
-<h2 id="application-settings" class="content-heading">Application Settings <a id="application-settings" href="#application-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Application Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="application-settings" class="content-heading">Application Settings <a href="#application-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Application Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Census service uses the following configuration settings:</p>
 <pre><code class="language-json">{
   &quot;ServiceInformation&quot;: {
@@ -972,11 +974,11 @@ Returns a FHIR List resource with the following structure:</p>
   }
 }
 </code></pre>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Link includes a <strong>Census Management</strong> module designed to acquire, evaluate, and maintain a real-time census of patients actively or recently treated within a hospital system. This module supports the submission of required patient data to governing bodies (such as NHSN) per established reporting criteria.</p>
 <p>The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.</p>
-<h3 id="census-data-acquisition-methods" class="content-heading">Census Data Acquisition Methods <a id="census-data-acquisition-methods" href="#census-data-acquisition-methods" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Data Acquisition Methods"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<h4 id="fhir-standard-list-resource" class="content-heading">1. FHIR Standard - List Resource <a id="1-fhir-standard-list-resource" href="#1-fhir-standard-list-resource" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. FHIR Standard - List Resource"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h3 id="census-data-acquisition-methods" class="content-heading">Census Data Acquisition Methods <a href="#census-data-acquisition-methods" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Data Acquisition Methods"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h4 id="1-fhir-standard-list-resource" class="content-heading">1. FHIR Standard - List Resource <a href="#1-fhir-standard-list-resource" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. FHIR Standard - List Resource"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The <strong>FHIR List Resource</strong> method is one of the primary approaches for acquiring patient lists from hospital EHR systems. In systems like Epic, patient lists are generated through proprietary queries within the EHR, associated with the FHIR List resource for access through FHIR integrations.</p>
 <ul>
 <li><strong>Endpoint</strong>: <code>GET /List/&lt;listId&gt;</code></li>
@@ -991,7 +993,7 @@ Returns a FHIR List resource with the following structure:</p>
 </ul>
 </li>
 </ul>
-<h4 id="fhir-standard-bulk-fhir-implementation-guide" class="content-heading">2. FHIR Standard - Bulk FHIR Implementation Guide <a id="2-fhir-standard-bulk-fhir-implementation-guide" href="#2-fhir-standard-bulk-fhir-implementation-guide" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 2. FHIR Standard - Bulk FHIR Implementation Guide"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="2-fhir-standard-bulk-fhir-implementation-guide" class="content-heading">2. FHIR Standard - Bulk FHIR Implementation Guide <a href="#2-fhir-standard-bulk-fhir-implementation-guide" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 2. FHIR Standard - Bulk FHIR Implementation Guide"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The <strong>Bulk FHIR</strong> method allows Link to acquire patient data via batch processing, useful for large patient groups in systems that support flexible querying.</p>
 <ul>
 <li><strong>Endpoint</strong>: Bulk FHIR <code>$export</code> request with <code>groupId</code></li>
@@ -1004,16 +1006,16 @@ Returns a FHIR List resource with the following structure:</p>
 </li>
 <li><strong>Tenant Configurability</strong>: Each tenant configures a unique <code>groupId</code> corresponding to their desired patient group.</li>
 </ul>
-<h4 id="adt-feeds-under-exploration" class="content-heading">3. ADT Feeds (Under Exploration) <a id="3-adt-feeds-under-exploration" href="#3-adt-feeds-under-exploration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 3. ADT Feeds (Under Exploration)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="3-adt-feeds-under-exploration" class="content-heading">3. ADT Feeds (Under Exploration) <a href="#3-adt-feeds-under-exploration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 3. ADT Feeds (Under Exploration)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Link is evaluating the feasibility of using <strong>ADT feeds</strong>—specifically for admission, discharge, and cancellation events—to dynamically manage census data. This approach would offer real-time census updates and potentially enhance the accuracy and responsiveness of the census.</p>
-<h3 id="scheduling-and-frequency" class="content-heading">Scheduling and Frequency <a id="scheduling-and-frequency" href="#scheduling-and-frequency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduling and Frequency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="scheduling-and-frequency" class="content-heading">Scheduling and Frequency <a href="#scheduling-and-frequency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduling and Frequency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Both the FHIR List and Bulk FHIR methods utilize a configurable scheduling system, allowing each tenant to define query intervals. The scheduling system is based on CRON patterns, ensuring Link can automatically query the EHR at specified times to maintain an updated census.</p>
 <p>Census uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for scheduling Patient List retrieval and Retry events.</p>
-<h3 id="data-persistence-and-tracking" class="content-heading">Data Persistence and Tracking <a id="data-persistence-and-tracking" href="#data-persistence-and-tracking" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Persistence and Tracking"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="data-persistence-and-tracking" class="content-heading">Data Persistence and Tracking <a href="#data-persistence-and-tracking" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Persistence and Tracking"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Currently, Link persists only the <strong>FHIR ID</strong> of each patient. This identifier allows Link to accurately track patients across census updates without storing additional demographic information.</p>
-<h4 id="future-considerations" class="content-heading">Future Considerations <a id="future-considerations" href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="future-considerations" class="content-heading">Future Considerations <a href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>In the interest of enhancing the user interface, Link is considering storing additional data elements, such as the <strong>patient name</strong> associated with each FHIR ID. This would provide users with meaningful patient identifiers, facilitating easier navigation and record management within the Link UI.</p>
-<h2 id="build-and-deployment" class="content-heading">Build and Deployment <a id="build-and-deployment" href="#build-and-deployment" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Build and Deployment"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="build-and-deployment" class="content-heading">Build and Deployment <a href="#build-and-deployment" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Build and Deployment"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Census service is containerized using Docker with Linux as the target OS. It is designed to be deployed as part of a larger microservices architecture, with dependencies on other Link services for complete functionality.</p>
 
         
@@ -1399,25 +1401,25 @@ Returns a FHIR List resource with the following structure:</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nCensusService_1BD4C8F8["Service: Census Service"]
-  nCensusService_1BD4C8F8 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nCensusService_1BD4C8F8 -->|produces| nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"]
-  nCensusService_1BD4C8F8 -->|produces| nPatientEvent_34D33665["Event: PatientEvent"]
-  nPatientListsAcquired_4681892E["Event: PatientListsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
-  nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_1BD4C8F8
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
+nCensusService_676D2042["Service: Census Service"]
+  nCensusService_676D2042 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nCensusService_676D2042 -->|produces| nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"]
+  nCensusService_676D2042 -->|produces| nPatientEvent_630CFEC8["Event: PatientEvent"]
+  nPatientListsAcquired_2B002DF["Event: PatientListsAcquired"] -->|consumed by| nCensusService_676D2042
+  nCernerPatientsAcquired_4A156AEE["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_676D2042
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_3467767F
-    nPatientListsAcquired_4681892E
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_4A156AEE
+    nPatientListsAcquired_2B002DF
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nPatientCensusScheduled_2383C0C6
-    nPatientEvent_34D33665
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nPatientCensusScheduled_3CE52530
+    nPatientEvent_630CFEC8
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nCensusService_1BD4C8F8
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nCensusService_676D2042
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

@@ -573,6 +573,11 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Component")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
@@ -584,8 +589,12 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<bool>("IsReporting")
                         .HasColumnType("bit");
 
-                    b.Property<string>("MeasureMappingId")
+                    b.Property<string>("Measure")
                         .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("MeasureMappingId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
@@ -605,7 +614,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.HasIndex("FacilityId", "ReportingYear", "ReportingMonth")
                         .HasDatabaseName("IX_FacilityReportingPlans_Facility_Period");
 
-                    b.HasIndex("FacilityId", "MeasureMappingId", "ReportingMonth", "ReportingYear")
+                    b.HasIndex("FacilityId", "Component", "Measure", "ReportingYear", "ReportingMonth")
                         .IsUnique()
                         .HasDatabaseName("IX_FacilityReportingPlans_Facility_Mapping_Period");
 
@@ -785,8 +794,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.HasOne("LantanaGroup.Link.DMRP.Data.Entities.MeasureMapping", "MeasureMapping")
                         .WithMany()
                         .HasForeignKey("MeasureMappingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("MeasureMapping");
                 });

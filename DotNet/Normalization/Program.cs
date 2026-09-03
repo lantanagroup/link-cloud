@@ -206,6 +206,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
     builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
     builder.Services.AddScoped<IHSLOCManager, HSLOCManager>();
+    builder.Services.AddScoped<IFacilityLocationManager, FacilityLocationManager>();
+    builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
+    builder.Services.AddScoped<IFacilityLocationLocalCodeMappingManager, FacilityLocationLocalCodeMappingManager>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>

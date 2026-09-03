@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,9 +497,9 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> None</div><div class="mb-3"><strong>Consumes:</strong> None</div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Admin UI is an Angular-based front-end application that provides a comprehensive interface for managing the Link platform, configuring tenants, and monitoring report generation and submission workflows.</p>
-<h3 id="system-wide-functionality" class="content-heading">System-wide Functionality <a id="system-wide-functionality" href="#system-wide-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: System-wide Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="system-wide-functionality" class="content-heading">System-wide Functionality <a href="#system-wide-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: System-wide Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>User Management</strong>: Allows administrators to manage user accounts, including creation, editing, and deletion. Currently, the system supports a single &quot;admin&quot; role for platform-wide access.</li>
 <li><strong>Measure Management</strong>: Upload and manage FHIR-based measure definitions. Administrators can upload measure bundles in JSON format and explore related artifacts.</li>
@@ -505,7 +507,7 @@
 <li><strong>Terminology Management</strong>: Allows for viewing and filtering terminology resources, such as CodeSystems and ValueSets, that are utilized by the platform's terminology service.</li>
 <li><strong>Integration Testing Support</strong>: Offers tools to initiate and track integration tests, enabling administrators to validate service connectivity and workflow correctness within the environment.</li>
 </ul>
-<h3 id="tenant-configuration" class="content-heading">Tenant Configuration <a id="tenant-configuration" href="#tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="tenant-configuration" class="content-heading">Tenant Configuration <a href="#tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Basic Configuration</strong>: Administrators can define tenant-specific settings, including Facility IDs, names, and timezones.</li>
 <li><strong>Census Scheduling and Acquisition Methods</strong>: Supports configuring how patient census data is acquired, including defining schedules and enabling/disabling automated census retrieval.</li>
@@ -519,7 +521,7 @@
 </li>
 <li><strong>Normalization Operations</strong>: Configuration of transformation rules and operations applied to data during the normalization phase.</li>
 </ul>
-<h3 id="tenant-report-viewing" class="content-heading">Tenant &amp; Report Viewing <a id="tenant-amp-report-viewing" href="#tenant-amp-report-viewing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant &amp;amp; Report Viewing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="tenant-amp-report-viewing" class="content-heading">Tenant &amp; Report Viewing <a href="#tenant-amp-report-viewing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant &amp;amp; Report Viewing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Tenant Dashboard</strong>: Provides a high-level view of a tenant's configuration and a list of all reports generated for that tenant.</li>
 <li><strong>Report Details</strong>:
@@ -531,18 +533,169 @@
 </li>
 <li><strong>Report Downloading</strong>: Enables download of generated report packages for manual delivery, archival, or verification once a report has been submitted.</li>
 </ul>
-<h3 id="data-acquisition-log-analysis" class="content-heading">Data Acquisition Log Analysis <a id="data-acquisition-log-analysis" href="#data-acquisition-log-analysis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Log Analysis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="data-acquisition-log-analysis" class="content-heading">Data Acquisition Log Analysis <a href="#data-acquisition-log-analysis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Log Analysis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Log Access</strong>: Integration with data acquisition logs allows administrators to analyze acquisition statistics and troubleshoot data retrieval issues directly from the report view.</li>
 <li><strong>Analysis Tools</strong>: Provides insights into the success and failure rates of data acquisition steps for a given report.</li>
 </ul>
-<h3 id="generating-adhoc-reports" class="content-heading">Generating Adhoc Reports <a id="generating-adhoc-reports" href="#generating-adhoc-reports" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Generating Adhoc Reports"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="location-mapping" class="content-heading">Location Mapping <a href="#location-mapping" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Location Mapping"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The UI is embedded in the existing facility pages rather than new top-level routes: configuration lives with the facility's Data Acquisition settings (Facility Edit), and observed mappings live with the facility's operational data (Facility View).</p>
+<p>It gives administrators answers to three operational questions:</p>
+<ol>
+<li><em>How does Link decide which locations belong to my facility?</em> → the <strong>Reporting Organization</strong> configuration (per facility, with an Active flag).</li>
+<li><em>Which locations has Link actually seen, and did they map to my organization?</em> → the <strong>Locations</strong> tab.</li>
+<li><em>Why was this patient's encounter excluded from my report?</em> → the <strong>Encounters</strong> tab, with drill-down to the specific location mapping that produced the outcome.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>UI surface</th>
+<th>Purpose</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Facility Edit → Data Acquisition → <strong>Reporting Organization</strong> tab + dialog</td>
+<td>Define and activate the location-matching rule</td>
+<td>LNK-4238</td>
+</tr>
+<tr>
+<td>Facility View → <strong>Locations</strong> tab</td>
+<td>Inspect acquired location mappings and their org/active status</td>
+<td>LNK-4239</td>
+</tr>
+<tr>
+<td>Facility View → <strong>Encounters</strong> tab</td>
+<td>Inspect encounter mappings and each encounter's org-resolution outcome</td>
+<td>LNK-4239</td>
+</tr>
+<tr>
+<td><strong>Location Details</strong> dialog</td>
+<td>Drill into a single location mapping from an encounter row</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Normalization → <strong>Copy Location Alias to Type Iteratively</strong></td>
+<td>Normalize <code>Location.alias</code> (incl. <code>partOf</code> parents) into <code>Location.type</code></td>
+<td>Cerner alias→type normalization</td>
+</tr>
+</tbody>
+</table>
+<br>
+<h3 id="reporting-organization-configuration" class="content-heading">Reporting Organization Configuration <a href="#reporting-organization-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Organization Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Located on Facility Edit → <em>Data Acquisition Configuration</em> → <strong>Reporting Organization</strong> tab. The tab is <strong>disabled until the facility has an EHR vendor</strong>, because the reliable &quot;this location belongs to my organization&quot; signal differs per vendor (see <em>How to Match a Reporting Organization to a Location Resource</em> above): Epic encodes it in <code>Location.identifier</code> on the EAF/Hospital node; Cerner facilities are identified via <code>Location.managingOrganization</code> or a <code>Location.type</code> code (<code>783</code>) optionally combined with <code>Location.alias</code>.</p>
+<p>The tab renders the current configuration read-only, with <strong>Add</strong> (no config yet), <strong>Edit</strong>, and <strong>Delete</strong> (confirmation-gated) actions opening a dialog containing:</p>
+<ul>
+<li><strong>Facility Id</strong> (read-only), <strong>Description</strong> (optional), <strong>Active</strong> (slide toggle, default on).</li>
+<li><strong>Method</strong> (vendor-specific): Epic — <em>Identifier</em> (default) or <em>Custom FHIRPath</em>; Cerner — <em>Managing Organization</em> (default), <em>Location Type</em>, or <em>Custom FHIRPath</em>.</li>
+<li><strong>Matches</strong> — one or more OR-combined match cards (&quot;a location is included if it matches <em>any</em> of the following&quot;), supporting organizations represented by multiple identifiers.</li>
+</ul>
+<p>Each builder method generates a FHIRPath fragment, previewed live in a read-only <strong>Generated FHIRPath</strong> box:</p>
+<ul>
+<li>Epic Identifier → <code>Location.identifier.exists(system = '&lt;system&gt;' and value = '&lt;code&gt;')</code></li>
+<li>Cerner Managing Organization → <code>Location.managingOrganization.reference = 'Organization/&lt;id&gt;'</code></li>
+<li>Cerner Location Type → <code>Location.type.coding.exists(code = '&lt;code&gt;')</code> plus optional <code>and Location.alias = '&lt;alias&gt;'</code></li>
+<li>Custom FHIRPath → free-form boolean expression for sites that fit neither vendor pattern.</li>
+</ul>
+<p>Guardrails:</p>
+<ul>
+<li><strong>Server-side FHIRPath validation</strong> (Custom mode): expressions are validated via MeasureEval's <code>POST /measureeval/fhir-path/$validate</code> (debounced); errors block saving, warnings are advisory.</li>
+<li><strong>Activation gating:</strong> the <strong>Active</strong> toggle cannot be saved as on unless every frequency query plan (Discharge, Daily, Weekly, Monthly, Adhoc) includes both an <strong>Encounter</strong> and a <strong>Location</strong> query among its initial queries. A non-compliant plan blocks saving with a message naming the plan. Rationale: with resolution active, an Encounter whose Locations were never queried could never map to the organization, silently excluding every patient. The backend enforces the same rule; the form check fails fast with an actionable message.</li>
+<li><strong>Vendor mismatch detection:</strong> a stored rule that reverse-parses to the other vendor's method drops the form into Custom FHIRPath mode with a warning; nothing is auto-deleted. Legacy <code>where(...)</code> expressions are recognized alongside the current <code>exists(...)</code> form.</li>
+<li><strong>Duplicate prevention:</strong> create-vs-update is keyed on the stored <code>configId</code>, and the backend enforces a single active configuration per facility.</li>
+</ul>
+<p>The configuration persists as a single condition row holding the combined expression (<code>{ fhirPath, priority: 1 }</code>).</p>
+<h3 id="locations-tab" class="content-heading">Locations tab <a href="#locations-tab" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Locations tab"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Facility View → <strong>Locations</strong>: a read-only, paged (5/10/20), sortable view of the Location Tree Table — every <code>Location</code> queried for the facility with the outcome of its organization check.</p>
+<p>Columns: <strong>Mapping ID</strong> (copy-to-clipboard), <strong>Location ID</strong>, <strong>Location Name</strong>, <strong>Location Alias</strong>, <strong>Part Of Value</strong> / <strong>Part Of ID</strong> (the <code>Location.partOf</code> parent the resolver walked), <strong>Is Org Location</strong> (Yes/No), <strong>Is Active</strong> (Yes/No), <strong>Created</strong>, <strong>Modified</strong>.</p>
+<p>Filters: partial-match text on Location ID / Name / Alias / Part Of Value; tri-state <strong>Org Location</strong> (Any/Yes/No); <strong>Show inactive locations</strong> checkbox — the default view is active mappings only. Typical use: after go-live, filter <em>Is Org Location = No</em> and confirm those locations genuinely belong to other facilities in the network.</p>
+<h3 id="encounters-tab" class="content-heading">Encounters tab <a href="#encounters-tab" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Encounters tab"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Facility View → <strong>Encounters</strong>: the patient-facing side — for each acquired Encounter, did it resolve to the reporting organization? This is the screen for &quot;why is patient X missing from the report?&quot;</p>
+<p>Columns: <strong>Mapping ID</strong> (copy), <strong>Encounter ID</strong>, <strong>Patient ID</strong>, <strong>Location ID</strong>, <strong>Mapped To Org</strong> (Yes/No), <strong>Created</strong>, <strong>Modified</strong>. Filters: Encounter ID, Patient ID, tri-state <strong>Mapped To Org</strong>.</p>
+<p>Two diagnostic behaviors:</p>
+<ul>
+<li><strong>Location ID is a drill-down</strong>: each encounter location renders as a link opening the <strong>Location Details</strong> dialog for the exact mapping row the resolver used — the chain <em>encounter → its locations → the mapping decision</em> is walkable in place.</li>
+<li><strong>Unmapped encounters explain themselves</strong>: when <em>Mapped To Org</em> is No, a tooltip states the probable cause, distinguishing: no locations on the encounter; locations with no matching <em>active</em> organization mapping; or locations checked and found to belong to another organization.</li>
+</ul>
+<p>The <strong>Location Details</strong> dialog shows the full mapping record; when the mapping is inactive it warns: <em>&quot;This location mapping is inactive. Encounters referencing it will not map to the organization.&quot;</em></p>
+<h3 id="normalization-operation" class="content-heading">Normalization operation <a href="#normalization-operation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization operation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p><strong>Copy Location Alias to Type Iteratively</strong> (Facility Edit → <em>Normalization Configuration</em>) copies <code>Location.alias</code> values into <code>Location.type</code> as CodeableConcepts, and does the same for every parent up the <code>partOf</code> hierarchy, bounded by <strong>Max Iterations</strong> (default 15). This implements the Cerner alias→type normalization that the <em>Location Type</em> matching method depends on. Scoped per facility or per vendor; options include Resource Types, Split On Comma, and Enabled.</p>
+<h3 id="implemented-api-surface" class="content-heading">Implemented API surface <a href="#implemented-api-surface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Implemented API surface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The UI consumes the following routes via the BFF gateway. <strong>These supersede the routes previously listed in the API Interface table above</strong> (<code>/location-org-configs</code>, <code>/location-mappings</code>); the earlier table should be treated as superseded by the as-built routes:</p>
+<table>
+<thead>
+<tr>
+<th>Purpose</th>
+<th>Method</th>
+<th>Route</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Get facility's org configs</td>
+<td>GET</td>
+<td><code>/data/location-config/facility/{facilityId}</code></td>
+</tr>
+<tr>
+<td>Create org config</td>
+<td>POST</td>
+<td><code>/data/location-config/facility/{facilityId}</code></td>
+</tr>
+<tr>
+<td>Update org config</td>
+<td>PUT</td>
+<td><code>/data/location-config/{configId}</code></td>
+</tr>
+<tr>
+<td>Delete org config</td>
+<td>DELETE</td>
+<td><code>/data/location-config/{configId}</code></td>
+</tr>
+<tr>
+<td>Search location mappings</td>
+<td>GET</td>
+<td><code>/data/location-mappings/facility/{facilityId}/search</code></td>
+</tr>
+<tr>
+<td>Get one location mapping</td>
+<td>GET</td>
+<td><code>/data/location-mappings/{id}</code></td>
+</tr>
+<tr>
+<td>Search encounter mappings</td>
+<td>GET</td>
+<td><code>/data/encounter-mappings/facilities/{facilityId}/search</code></td>
+</tr>
+<tr>
+<td>Validate FHIRPath</td>
+<td>POST</td>
+<td><code>/measureeval/fhir-path/$validate</code></td>
+</tr>
+<tr>
+<td>Query plans (activation gate)</td>
+<td>GET</td>
+<td><code>/data/{facilityId}/QueryPlan?type={type}</code></td>
+</tr>
+</tbody>
+</table>
+<br>
+Search endpoints take 1-based `pageNumber`, `pageSize`, per-column filters (`LocationId`, `LocationName`, `LocationAlias`, `PartOfValue`, `IsOrgLocation`, `IsActive`; `EncounterId`, `PatientId`, `MappedToOrg`), `sortBy`, and `sortOrder` (0 = ascending, 1 = descending). The proposed `/location-mappings/hierarchies` endpoint has no UI consumer yet.
+<br></br>
+<h3 id="flag-semantics" class="content-heading">Flag semantics <a href="#flag-semantics" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Flag semantics"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Three separately named booleans participate in org resolution:</p>
+<ul>
+<li><strong>Configuration <code>isActive</code></strong> — is location resolution enforced for this facility at all? Gated by query-plan compliance.</li>
+<li><strong>Location mapping <code>isActive</code></strong> — does this individual mapping row count? Inactive rows are ignored by the resolver, hidden by default on the Locations tab, and flagged in the details dialog.</li>
+<li><strong>Encounter <code>mappedToOrg</code></strong> — the per-encounter resolution outcome shown on the Encounters tab.</li>
+</ul>
+<h3 id="generating-adhoc-reports" class="content-heading">Generating Adhoc Reports <a href="#generating-adhoc-reports" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Generating Adhoc Reports"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>On-demand Generation</strong>: Allows administrators to manually trigger report generation for a specific facility, reporting period, and set of measures.</li>
 <li><strong>Patient Scoping</strong>: Supports restricting adhoc reports to a specific cohort by manually entering patient IDs or uploading a CSV file of patient identifiers.</li>
 <li><strong>Submission Control</strong>: Includes an option to bypass automatic submission, enabling administrators to generate and review reports before they are sent to external entities.</li>
 </ul>
-<h2 id="volumes" class="content-heading">Volumes <a id="volumes" href="#volumes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Volumes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="volumes" class="content-heading">Volumes <a href="#volumes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Volumes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -559,7 +712,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>An <code>app.config.local.json</code> file is used to configure the Admin UI service at deployment time, overriding the defaults in <code>app.config.json</code>.</p>
 <pre><code class="language-json">{
   &quot;baseApiUrl&quot;: &quot;&lt;ADMIN-BFF-BASE-URL&gt;/api&quot;,
@@ -574,13 +727,13 @@
 }
 </code></pre>
 <p>This configuration file can be customized at deployment time and mounted in the <code>/assets</code> folder, or it can be overridden by ENV variables in a docker deployment.</p>
-<h3 id="authentication" class="content-heading">Authentication <a id="authentication" href="#authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="authentication" class="content-heading">Authentication <a href="#authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Admin UI supports authentication using:</p>
 <ul>
 <li>OAuth2 via an identity provider (e.g., Azure AD, Keycloak), enabling secure login with centralized identity and access management.</li>
 <li>Token Generation via AdminBFF /api/login, which provides session tokens for downstream API access when deployed in a simplified or standalone context.</li>
 </ul>
-<h2 id="environment-variables" class="content-heading">Environment Variables <a id="environment-variables" href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="environment-variables" class="content-heading">Environment Variables <a href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -657,7 +810,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="local-development-with-proxy-configuration" class="content-heading">Local Development with Proxy Configuration <a id="local-development-with-proxy-configuration" href="#local-development-with-proxy-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Local Development with Proxy Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<br/>
+<h2 id="local-development-with-proxy-configuration" class="content-heading">Local Development with Proxy Configuration <a href="#local-development-with-proxy-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Local Development with Proxy Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To facilitate local development and testing, the Admin UI can be configured to proxy API requests to a local or remote instance of the Admin BFF service. This is achieved by setting up a proxy configuration file.</p>
 <pre><code class="language-json">{
     &quot;/api&quot;: {
@@ -678,7 +832,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nAdminUI_22956967["Service: Admin UI (front-end)"]</pre>
+nAdminUI_3AAE6EF3["Service: Admin UI (front-end)"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

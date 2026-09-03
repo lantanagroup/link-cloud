@@ -2130,6 +2130,7 @@
         "type": "Project",
         "dependencies": {
           "LinkSdk": "[1.0.0, )",
+          "LinqKit.Core": "[1.2.11, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
@@ -2294,6 +2295,12 @@
           "AngleSharp": "[0.17.1]",
           "AngleSharp.Css": "[0.17.0]"
         }
+      },
+      "LinqKit.Core": {
+        "type": "CentralTransitive",
+        "requested": "[1.2.11, )",
+        "resolved": "1.2.11",
+        "contentHash": "jQXu7G9Ik6BDcS5506RV1CI184pG5eHwvqzrB5zEivciW7KiZ9iHM8ZTyu5o/TGt55woagJGUVsJYw4aBjRfEQ=="
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
         "type": "CentralTransitive",
