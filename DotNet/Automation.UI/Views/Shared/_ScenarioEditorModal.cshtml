@@ -170,7 +170,7 @@
                             <div class="au-cohort-card mt-1">
                                 <div class="card-body">
                                     <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i>Cohorts</span>
-                                    <div class="table-responsive au-table-wrap mt-2 mb-2">
+                                    <div class="table-responsive au-table-wrap au-cohort-table-wrap mt-2 mb-2">
                                         <table class="table table-sm table-bordered au-table au-cohort-table mb-0" id="cohortTable">
                                             <thead>
                                                 <tr>
@@ -283,6 +283,12 @@
         </div>
     </div>
 </div>
+
+<style>
+    .au-cohort-table-wrap {
+        overflow: visible;
+    }
+</style>
 
 <script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
@@ -847,13 +853,35 @@
                 return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
             }).join('');
         }
+
         function buildScenarioSelect(ids) {
-            var set = new Set((ids || []).map(sid)); var all = set.size === 0;
+            var set = new Set((ids || []).map(sid));
+            var all = set.size === 0;
+
             var opts = clinicalScenarioCatalog.map(function (sc) {
-                var id = sid(sc.scenarioId), lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
-                return '<div class="form-check mb-1 cohort-scenario-item"><label class="form-check-label small"><input class="form-check-input cohort-scenario-option me-1" type="checkbox" value="' + id + '" ' + ((all || set.has(id)) ? 'checked' : '') + ' />' + esc(lbl) + '</label></div>';
+                var id = sid(sc.scenarioId),
+                    lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
+
+                return '<div class="form-check mb-1 cohort-scenario-item">' +
+                    '<label class="form-check-label small">' +
+                    '<input class="form-check-input cohort-scenario-option me-1" ' +
+                    'type="checkbox" value="' + id + '" ' +
+                    ((all || set.has(id)) ? 'checked' : '') + ' />' +
+                    esc(lbl) +
+                    '</label></div>';
             }).join('');
-            return '<div class="dropdown cohort-scenarios-dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button><div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' + opts + '</div></div>';
+
+            return '<div class="dropdown cohort-scenarios-dropdown">' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" ' +
+                'data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button>' +
+                '<div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' +
+                    '<div class="d-flex gap-2 mb-2">' +
+                        '<button type="button" class="btn btn-sm btn-outline-secondary cohort-scenarios-select-all">Select All</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-secondary cohort-scenarios-deselect-all">Deselect All</button>' +
+                    '</div>' +
+                    opts +
+                '</div>' +
+            '</div>';
         }
 
         function addCohortRow(count, elig, scenarios, rMin, rMax, scheduledPattern, cohortQualification) {
@@ -942,14 +970,25 @@
                 dd.querySelectorAll('.cohort-scenario-option:not(:disabled)').forEach(function (o) { o.checked = true; });
             updateSummary(row);
         }
+
         function updateSummary(row) {
-            var dd = row.querySelector('.cohort-scenarios-dropdown'); if (!dd) return;
+            var dd = row.querySelector('.cohort-scenarios-dropdown');
+            if (!dd) return;
+
             var toggle = dd.querySelector('.cohort-scenarios-toggle');
             var all = dd.querySelectorAll('.cohort-scenario-option:not(:disabled)');
             var sel = dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
-            toggle.textContent = !all.length ? 'None' : sel.length === all.length ? 'All' : sel.length + ' selected';
+
+            toggle.textContent =
+                !all.length || !sel.length
+                    ? 'None'
+                    : sel.length === all.length
+                        ? 'All'
+                        : sel.length + ' selected';
         }
+
         function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
+        
         function syncCount() {
             var t = getCohorts().reduce(function (s, c) { return s + (c.patientCount || 0); }, 0);
             var importedCount = importedRows ? importedRows.children.length : 0;
@@ -976,7 +1015,38 @@
         // ---- Cohort event handlers ----
         document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true, 50, 100); });
         document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false, 50, 100); });
-        cohortRows.addEventListener('click', function (e) { if (e.target.closest('.btn-remove-cohort')) { e.target.closest('tr').remove(); reindex(); syncCount(); } });
+
+        cohortRows.addEventListener('click', function (e) {
+            var row = e.target.closest('tr');
+            if (!row) return;
+
+            if (e.target.closest('.btn-remove-cohort')) {
+                row.remove();
+                reindex();
+                syncCount();
+                return;
+            }
+
+            if (e.target.closest('.cohort-scenarios-select-all')) {
+                row.querySelectorAll('.cohort-scenario-option:not(:disabled)')
+                    .forEach(function (cb) {
+                        cb.checked = true;
+                    });
+
+                updateSummary(row);
+                return;
+            }
+
+            if (e.target.closest('.cohort-scenarios-deselect-all')) {
+                row.querySelectorAll('.cohort-scenario-option:not(:disabled)')
+                    .forEach(function (cb) {
+                        cb.checked = false;
+                    });
+
+                updateSummary(row);
+            }
+        });
+        
         cohortRows.addEventListener('change', function (e) {
             if (e.target.classList.contains('cohort-measure-eligibility')) {
                 var r1 = e.target.closest('tr');
@@ -1773,21 +1843,80 @@
             clearErrors();
             var model = collectModel();
             var valid = true;
-            if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
-            if (!(model.nhsnOrganizationId || '').trim()) { markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.'); valid = false; }
-            if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
+
+            if (!(model.name || '').trim()) {
+                markFieldError('ScenarioName', 'Name is required.');
+                valid = false;
+            }
+
+            if (!(model.nhsnOrganizationId || '').trim()) {
+                markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.');
+                valid = false;
+            }
+
+            if (!model.selectedMeasures.length) {
+                showError('At least one measure must be selected.');
+                valid = false;
+            }
+
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
-            if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
-            if (hasImported) {
-                if (!model.reportPeriodStart) { markFieldError('ReportPeriodStart', 'Report Period Start is required when imported patients are used.'); valid = false; }
-                if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
+
+            if (!model.patientCohorts.length && !hasImported) {
+                showError('At least one cohort with patients > 0 (or one imported patient) is required.');
+                valid = false;
             }
+
+            var invalidClinicalProfileCohort = Array.prototype.findIndex.call(
+                cohortRows.children,
+                function (row) {
+                    var patientCount = parseInt(
+                        row.querySelector('.cohort-count').value || '0',
+                        10);
+
+                    if (patientCount <= 0) return false;
+
+                    return !row.querySelector(
+                        '.cohort-scenario-option:checked:not(:disabled)');
+                });
+
+            if (invalidClinicalProfileCohort >= 0) {
+                showError(
+                    'Cohort ' + (invalidClinicalProfileCohort + 1) +
+                    ' must have at least one Clinical Profile selected.');
+                valid = false;
+            }
+
+            if (hasImported) {
+                if (!model.reportPeriodStart) {
+                    markFieldError(
+                        'ReportPeriodStart',
+                        'Report Period Start is required when imported patients are used.');
+                    valid = false;
+                }
+
+                if (!model.reportPeriodEnd) {
+                    markFieldError(
+                        'ReportPeriodEnd',
+                        'Report Period End is required when imported patients are used.');
+                    valid = false;
+                }
+            }
+
             // Imported-by-ID rows must have a non-empty patient id.
-            var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
-            if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
+            var badId = (model.importedPatientIds || []).find(function (p) {
+                return !(p.patientId || '').trim();
+            });
+
+            if (badId) {
+                showError('Every imported-by-ID row must have a Patient ID.');
+                valid = false;
+            }
+
             if (!valid) return;
+
             model.id = idInput.value || crypto.randomUUID();
+
             try {
                 await postJson(saveUrl, model);
                 closeModal();

@@ -568,6 +568,87 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("QRTZ_TRIGGERS", "quartz");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocation", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(450)")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("LocationAlias")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LocationId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("LocationName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ParentFacilityLocationId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("PartOfId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentFacilityLocationId");
+
+                    b.HasIndex("FacilityId", "LocationId")
+                        .IsUnique();
+
+                    b.ToTable("FacilityLocations");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocationLocalCodeMapping", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(450)")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FacilityLocationId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid?>("HSLOCId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LocalCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("LocalCodeSystem")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HSLOCId");
+
+                    b.HasIndex("FacilityLocationId", "LocalCodeSystem", "LocalCode")
+                        .IsUnique();
+
+                    b.ToTable("FacilityLocationLocalCodeMappings");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.HSLOC", b =>
                 {
                     b.Property<Guid>("Id")
@@ -815,6 +896,35 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Navigation("JobDetail");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocation", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocation", "ParentFacilityLocation")
+                        .WithMany()
+                        .HasForeignKey("ParentFacilityLocationId")
+                        .HasConstraintName("FK_FacilityLocation_ParentFacilityLocation");
+
+                    b.Navigation("ParentFacilityLocation");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocationLocalCodeMapping", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocation", "FacilityLocation")
+                        .WithMany("FacilityLocationLocalCodeMappings")
+                        .HasForeignKey("FacilityLocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_FacilityLocationLocalCodeMapping_FacilityLocation");
+
+                    b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.HSLOC", "HSLOC")
+                        .WithMany()
+                        .HasForeignKey("HSLOCId")
+                        .HasConstraintName("FK_FacilityLocationLocalCodeMapping_HSLOC");
+
+                    b.Navigation("FacilityLocation");
+
+                    b.Navigation("HSLOC");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.OperationResourceType", b =>
                 {
                     b.HasOne("LantanaGroup.Link.Normalization.Domain.Entities.Operation", "Operation")
@@ -873,6 +983,11 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Navigation("SimplePropertyTriggers");
 
                     b.Navigation("SimpleTriggers");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.FacilityLocation", b =>
+                {
+                    b.Navigation("FacilityLocationLocalCodeMappings");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>

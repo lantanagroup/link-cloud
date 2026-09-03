@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 
 public class FacilityReportingPlanModel
@@ -136,19 +137,24 @@ public class FacilityReportingPlanMeasureModel
     public bool IsReporting { get; set; }
 }
 
+[DataContract]
 public class MeasureMappingModel
 {
+    [DataMember]
     public string? Id { get; set; }
 
     [Required]
     [StringLength(255)]
+    [DataMember]
     public string? Measure { get; set; }
 
     [Required]
     [StringLength(255)]
+    [DataMember]
     public string? DQM { get; set; }
 
     [Required]
     [EnumDataType(typeof(Frequency))]
+    [DataMember]
     public Frequency? Frequency { get; set; }
 }
