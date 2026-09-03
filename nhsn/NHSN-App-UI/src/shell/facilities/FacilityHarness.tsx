@@ -70,7 +70,7 @@ export function FacilityHarness() {
   const [profiles, setProfiles] = useState<TestUserProfile[]>(() => loadProfiles());
   const [activeId, setActiveId] = useState<string | null>(() => loadActiveProfileId());
   const [editor, setEditor] = useState<EditorState>(() => createEmptyEditor());
-  const [mode, setMode] = useState<HarnessMode>('mock');
+  const [mode, setMode] = useState<HarnessMode>('bff');
   const [collapsed, setCollapsed] = useState(true);
 
   const activeProfile = useMemo(() => profiles.find(profile => profile.id === activeId) ?? null, [profiles, activeId]);
@@ -193,8 +193,8 @@ export function FacilityHarness() {
                 id="harnessMode"
                 value={mode}
                 onChange={event => setMode(event.target.value as HarnessMode)}>
-                <option value="mock">{t('shell.modeMock')}</option>
                 <option value="bff">{t('shell.modeBff')}</option>
+                <option value="mock">{t('shell.modeMock')}</option>
               </select>
             </div>
             <small>{mode === 'mock' ? t('shell.modeMockHint') : t('shell.modeBffHint')}</small>
