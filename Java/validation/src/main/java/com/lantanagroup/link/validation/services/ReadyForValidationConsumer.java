@@ -90,7 +90,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             RubricExecutionService rubricExecutionService,
             LegacyResultMapper legacyResultMapper,
             ObjectMapper objectMapper,
-            KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate,
+            @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate,
             @Value("${vaas.bridge.enabled:false}") boolean bridgeEnabled,
             // ADR-0003 M1: the MeasureReport submission path always evaluates this rubric; see "Rubric selection".
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,

@@ -21,6 +21,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
             LegacyShadowResultPersister legacyShadowResultPersister,
             ShadowComparator shadowComparator,
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
-            ConsumerRecordRecoverer recoverer) {
+            @Qualifier("deadLetterPublishingRecoverer")  ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
