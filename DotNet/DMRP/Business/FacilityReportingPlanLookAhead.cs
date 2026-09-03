@@ -217,6 +217,7 @@ namespace LantanaGroup.Link.DMRP.Business
         {
             MeasureMappingId = plan.MeasureMappingId,
             Measure = plan.Measure,
+            Component = plan.Component,
             DQM = plan.DQM,
             Frequency = plan.Frequency,
             IsReporting = plan.IsReporting
@@ -235,6 +236,6 @@ namespace LantanaGroup.Link.DMRP.Business
         };
 
         private static ReportingPlanEntry ToScheduleEntry(FacilityReportingPlanModel plan) =>
-            new(plan.Measure ?? string.Empty, plan.DQM ?? string.Empty, plan.Frequency ?? Frequency.Adhoc);
+            new(plan.Measure ?? string.Empty, plan.DQM ?? string.Empty, plan.Frequency);
     }
 }

@@ -85,13 +85,22 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             // DbBackedReportingPlanSource uses (the shared repository has no Include).
             if (entities.Count > 0)
             {
-                var mappingIds = entities.Select(p => p.MeasureMappingId).Distinct().ToList();
+                // Only the mapped rows have anything to stitch. An enrollment DMRP returned for a
+                // measure Link has no mapping for is stored with a null id on purpose, and a null key
+                // is not a miss on a dictionary -- it throws.
+                var mappingIds = entities
+                    .Select(p => p.MeasureMappingId)
+                    .Where(id => id is not null)
+                    .Select(id => id!)
+                    .Distinct()
+                    .ToList();
+
                 var mappings = await _measureMappings.FindAsync(m => mappingIds.Contains(m.Id), cancellationToken);
                 var mappingsById = mappings.ToDictionary(m => m.Id);
 
-                foreach (var plan in entities)
+                foreach (var plan in entities.Where(p => p.MeasureMappingId is not null))
                 {
-                    plan.MeasureMapping = mappingsById.GetValueOrDefault(plan.MeasureMappingId);
+                    plan.MeasureMapping = mappingsById.GetValueOrDefault(plan.MeasureMappingId!);
                 }
             }
 

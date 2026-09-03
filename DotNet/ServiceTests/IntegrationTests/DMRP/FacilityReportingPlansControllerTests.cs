@@ -174,26 +174,47 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var request = await ValidRequestAsync();
 
+        // The message names the component and measure the unique index is keyed on, not the mapping.
+        // The request leaves both implicit, so they come from the default and from the mapping.
+        var measure = (await _mappingRepository.GetAsync(request.MeasureMappingId!)).Measure;
+
         await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
         var secondResult = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(secondResult, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {request.FacilityId}, measure mapping " +
-            $"{request.MeasureMappingId} and period {request.ReportingMonth}/{request.ReportingYear}.",
+            $"A reporting plan already exists for facility {request.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {request.ReportingMonth}/{request.ReportingYear}.",
             problem.Detail);
     }
 
     [Fact]
-    public async Task CreateFacilityReportingPlan_NullMeasureMappingId_ReturnsBadRequest()
+    public async Task CreateFacilityReportingPlan_NoMappingAndNoMeasure_ReturnsBadRequest()
     {
         var request = await ValidRequestAsync();
         request.MeasureMappingId = null;
+        request.Measure = null;
 
         var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
-        Assert.Equal("MeasureMappingId is required.", problem.Detail);
+        Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task CreateFacilityReportingPlan_NoMappingButAMeasure_RecordsTheEnrollmentUnmapped()
+    {
+        // DMRP returns measures Link may have no mapping for. The enrollment is recorded anyway,
+        // so it is visible to the admin who will map it rather than dropped on the way in.
+        var request = await ValidRequestAsync();
+        request.MeasureMappingId = null;
+        request.Measure = "UNMAPPED-MEASURE";
+
+        var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
+
+        var created = Assert.IsType<FacilityReportingPlanModel>(Assert.IsType<CreatedResult>(result).Value);
+        Assert.Null(created.MeasureMappingId);
+        Assert.Equal("UNMAPPED-MEASURE", created.Measure);
     }
 
     [Fact]
@@ -557,6 +578,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var first = await CreatedPlanAsync(month: 5);
         var second = await CreatedPlanAsync(month: 6);
 
+        var measure = (await _mappingRepository.GetAsync(first.MeasureMappingId!)).Measure;
+
         var result = await _controller.UpdateFacilityReportingPlan(second.Id!, new FacilityReportingPlanUpdateRequest
         {
             Id = second.Id,
@@ -569,8 +592,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var problem = AssertProblem(result, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {first.FacilityId}, measure mapping " +
-            $"{first.MeasureMappingId} and period {first.ReportingMonth}/{first.ReportingYear}.",
+            $"A reporting plan already exists for facility {first.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {first.ReportingMonth}/{first.ReportingYear}.",
             problem.Detail);
     }
 

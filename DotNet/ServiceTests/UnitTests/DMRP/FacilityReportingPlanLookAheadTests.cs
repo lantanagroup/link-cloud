@@ -86,12 +86,91 @@ namespace UnitTests.DMRP
             {
                 FacilityId = FacilityId,
                 MeasureMappingId = mapping.Id,
+                Measure = mapping.Measure,
                 ReportingMonth = period.Month,
                 ReportingYear = period.Year,
                 IsReporting = isReporting
             });
 
+        /// <summary>
+        /// An enrollment recorded before anyone mapped its measure: a measure name, no mapping.
+        /// </summary>
+        private static void AddUnmappedPlan(TenantDbContext context, string measure, ReportingPeriod period) =>
+            context.FacilityReportingPlans.Add(new FacilityReportingPlan
+            {
+                FacilityId = FacilityId,
+                MeasureMappingId = null,
+                Measure = measure,
+                ReportingMonth = period.Month,
+                ReportingYear = period.Year,
+                IsReporting = true
+            });
+
         private static ReportingPeriodRange SixMonths() => ReportingPeriodRange.LookAhead(Anchor, 6);
+
+        [Fact]
+        public async Task UnmappedEnrollment_IsListedWithoutADqmRatherThanFailingTheRead()
+        {
+            using var context = CreateContext();
+            AddUnmappedPlan(context, "NEWMEASURE", Anchor);
+            await context.SaveChangesAsync();
+
+            var page = await CreateLookAhead(context).GetAsync(FacilityId, SixMonths(), Anchor);
+
+            // Storing an enrollment Link has no mapping for is the point of the schema change, so
+            // reading one back has to work. Both reads stitch mappings on by dictionary lookup, and a
+            // null key throws rather than missing -- this row used to make the endpoint 500.
+            var recorded = page.Records.Single(period => !period.IsProjected);
+            var measure = Assert.Single(recorded.Measures);
+
+            Assert.Equal("NEWMEASURE", measure.Measure);
+            Assert.Null(measure.MeasureMappingId);
+            Assert.True(string.IsNullOrEmpty(measure.DQM));
+
+            // No dQM means nothing for Link to run, so it schedules nothing -- but the enrollment is
+            // still reported, which is what tells an admin there is a mapping to go and create.
+            Assert.Empty(recorded.Schedule.Monthly);
+            Assert.Empty(recorded.Schedule.Daily);
+            Assert.Empty(recorded.Schedule.Weekly);
+        }
+
+        [Fact]
+        public async Task UnmappedEnrollment_ProjectsForwardWithNoCadence()
+        {
+            using var context = CreateContext();
+            AddUnmappedPlan(context, "NEWMEASURE", Anchor);
+            await context.SaveChangesAsync();
+
+            var page = await CreateLookAhead(context).GetAsync(FacilityId, SixMonths(), Anchor);
+
+            // The projection reads the anchor period through DbBackedReportingPlanSource, the second
+            // of the two dictionary lookups. Frequency comes off the mapping, so an enrollment with no
+            // mapping has no cadence -- naming one would put a schedule nobody chose in front of the
+            // facility for every month in the window.
+            var projected = page.Records.First(period => period.IsProjected);
+            var measure = Assert.Single(projected.Measures);
+
+            Assert.Equal("NEWMEASURE", measure.Measure);
+            Assert.Null(measure.Frequency);
+            Assert.Empty(projected.Schedule.Monthly);
+        }
+
+        [Fact]
+        public async Task RecordedMeasure_CarriesTheComponentItCameFrom()
+        {
+            using var context = CreateContext();
+            var hob = AddMapping(context, "HOB");
+
+            AddPlan(context, hob, Anchor);
+            await context.SaveChangesAsync();
+
+            var page = await CreateLookAhead(context).GetAsync(FacilityId, SixMonths(), Anchor);
+
+            // Per measure, not per period: one month can carry enrollments from both components, so a
+            // single value on the period would have to pick one and misdescribe the others.
+            var recorded = page.Records.Single(period => !period.IsProjected);
+            Assert.Equal(ReportingComponents.Msc, Assert.Single(recorded.Measures).Component);
+        }
 
         [Fact]
         public async Task RecordedPeriod_CarriesItsMeasuresAndTheScheduleTheyProduce()
@@ -372,8 +451,8 @@ namespace UnitTests.DMRP
             var page = await CreateLookAhead(context).GetAsync(FacilityId, null, Anchor);
 
             var measure = Assert.Single(Assert.Single(page.Records).Measures);
-            Assert.Null(measure.Measure);
-            Assert.Equal(mapping.Id, measure.MeasureMappingId);
+            Assert.Equal("HOB", measure.Measure);
+            Assert.Null(measure.DQM);
         }
 
         [Fact]
