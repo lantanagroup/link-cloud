@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Normalization.Application.Error;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -97,6 +98,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
+    builder.Services.AddSingleton<IResourceCachePurger, ResourceCachePurger>();
+
+    // A closed-type registration takes precedence over the open generic above regardless of the order
+    // the two appear in, so this wins for IDeadLetterExceptionHandler<RetryListener, string, string>:
+    // when RetryListener exhausts the retry count for a ResourcesAcquired message, the dead letter also
+    // releases the resource cache. See ResourcesAcquiredRetryDeadLetterHandler.
+    builder.Services.AddSingleton<IDeadLetterExceptionHandler<RetryListener, string, string>, ResourcesAcquiredRetryDeadLetterHandler>();
+
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     builder.Services.AddControllers()
@@ -190,11 +199,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IVendorVersionOperationPresetQueries, VendorVersionOperationPresetQueries>();
     builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
+    builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+    builder.Services.AddScoped<IHSLOCManager, HSLOCManager>();
 
     builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 

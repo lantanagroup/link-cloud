@@ -150,12 +150,9 @@ There is no tolerant `actual >= expected` mode. Pipeline-derived types (`Patient
 strict mode holds.
 
 Prediction is intentionally narrower than "generated and acquired". The manifest also applies
-CQL type reachability and resource-level SDE filtering from `Automation.CqlFilterSimulator`.
-This includes patient-context retrieval checks for referenced resources. For example, an
-acquired `Specimen` is only expected in ABS when the selected measure's SDE logic would return
-it for the evaluated patient: ACH Monthly requires patient-owned specimen collection overlap
-with IP, ACH Daily requires a qualifying respiratory-pathogen lab observation reference, and
-Hypoglycemic requires patient-owned collection fully during IP.
+CQL type reachability and resource-level SDE filtering from `Automation.CqlFilterSimulator`,
+which derives instance filters from the selected measure's embedded bundle CQL (not from a
+frozen measure-family profile).
 
 ### 5.2 Validators
 
@@ -169,11 +166,11 @@ Hypoglycemic requires patient-owned collection fully during IP.
   per-resource SDE profiles; a mismatch usually means either the simulator is missing a CQL
   predicate/reference rule or the pipeline omitted a resource the CQL should have returned.
 
-  Before running, it reads `ReportEntry.ReportingStatus` rows via `PipelineDataReader` and
-  populates `manifest.ExpectedOperationOutcomeCountByPatient[pid] = 1` for every patient whose
-  status is `FailedValidation`. This matches the Report service's behavior:
-  `ValidationCompleteListener.ProcessMessageAsync` appends exactly one OperationOutcome to the
-  patient ABS blob when `ValidationComplete.IsValid == false`.
+  Generation does not predict `OperationOutcome`. Before comparing ABS counts, this
+  validator overwrites `manifest.ExpectedOperationOutcomeCountByPatient` from
+  `ReportEntry.ReportingStatus`: one OO per `FailedValidation` patient when Validation's
+  `pre-qualification.write-pre-qual-operation-outcome` flag is on. Passing patients are
+  not required to have one; extras on those patients are ignored.
 
 - **`ReportDatabaseValidator`** -- validates schedule, report entries, report types,
   populations, and report resource persistence. Uses

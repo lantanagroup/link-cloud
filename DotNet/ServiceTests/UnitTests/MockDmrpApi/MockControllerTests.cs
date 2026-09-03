@@ -157,7 +157,6 @@ public class MockControllerTests : IAsyncLifetime
     [InlineData("GET", "/api/mock-dmrp/facilities/F1/entries")]
     [InlineData("GET", "/api/mock-dmrp/entries/11111111-1111-1111-1111-111111111111")]
     [InlineData("POST", "/api/mock-dmrp/entries")]
-    [InlineData("POST", "/api/mock-dmrp/oauth2/token")]
     [InlineData("PUT", "/api/mock-dmrp/entries/11111111-1111-1111-1111-111111111111")]
     [InlineData("GET", "/api/mock-dmrp/delay")]
     [InlineData("PUT", "/api/mock-dmrp/delay")]
@@ -169,7 +168,8 @@ public class MockControllerTests : IAsyncLifetime
     {
         // The surface can seed, mutate and wipe the store, so no operation on it may be
         // reachable anonymously. Enumerated rather than spot-checked because a new endpoint
-        // that forgets the class-level policy would otherwise ship unnoticed.
+        // that forgets the class-level policy would otherwise ship unnoticed. The token
+        // endpoint is the one deliberate exception and is covered on its own below.
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
         if (method is "POST" or "PUT")
         {
@@ -192,6 +192,44 @@ public class MockControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         response.Headers.WwwAuthenticate.Should().BeEmpty(
             "the rejection comes from the controller, not from Link's authentication handler");
+    }
+
+    [Fact]
+    public async Task TheTokenEndpointIsReachableWithoutALinkCredential()
+    {
+        // It stands in for the third party's authorization server, where the client
+        // credentials are the whole of the admission check. A caller integrating against the
+        // real service acquires its token the same way, holding one credential rather than two.
+        var response = await _anonymousClient.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
+        {
+            grant_type = "client_credentials",
+            client_id = ClientId,
+            client_secret = ClientSecret,
+            scope = "dmrp.read"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var token = await response.Content.ReadFromJsonAsync<MockTokenResponse>();
+        token!.Access_token.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task TheTokenEndpointStillRefusesAnUnknownClient()
+    {
+        // Anonymous is not open. Dropping the Link credential moves the whole of the check
+        // onto the client secret, so this is the assertion that keeps it a check at all.
+        var response = await _anonymousClient.PostAsJsonAsync("/api/mock-dmrp/oauth2/token", new
+        {
+            grant_type = "client_credentials",
+            client_id = ClientId,
+            client_secret = "not-the-configured-secret",
+            scope = (string?)null
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("error").GetString().Should().Be("invalid_client");
     }
 
     // -------------------------------------------------------------- get by id

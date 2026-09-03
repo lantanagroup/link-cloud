@@ -1,7 +1,9 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -72,14 +74,18 @@ public class TailMessageRecoveryJob : IJob
                     break;
                 }
 
+                TailCompletionResult? tailResult = null;
                 try
                 {
-                    var tailResult = await dataAcquisitionLogManager.TryCompleteTailAsync(logId, context.CancellationToken);
+                    tailResult = await dataAcquisitionLogManager.TryCompleteTailAsync(logId, context.CancellationToken);
                     if (tailResult == null)
                     {
                         processed++;
                         continue;
                     }
+
+                    var tailFinalizer = scope.ServiceProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+                    await tailFinalizer.FinalizeAsync(tailResult, context.CancellationToken);
 
                     var headers = new Headers
                     {
@@ -106,6 +112,12 @@ public class TailMessageRecoveryJob : IJob
                         },
                         context.CancellationToken);
 
+                    await dataAcquisitionLogManager.MarkTailSentAsync(
+                        tailResult.FacilityId,
+                        tailResult.CorrelationId,
+                        tailResult.QueryPhase,
+                        context.CancellationToken);
+
                     _logger.LogInformation(
                         "TailMessageRecoveryJob recovered tail for FacilityId={FacilityId}, PatientId={PatientId}",
                         tailResult.FacilityId.SanitizeForLog(),
@@ -119,6 +131,25 @@ public class TailMessageRecoveryJob : IJob
                 }
                 catch (Exception ex)
                 {
+                    if (tailResult != null)
+                    {
+                        try
+                        {
+                            await dataAcquisitionLogManager.RevertTailSentAsync(
+                                tailResult.FacilityId,
+                                tailResult.CorrelationId,
+                                tailResult.QueryPhase,
+                                CancellationToken.None);
+                        }
+                        catch (Exception revertEx)
+                        {
+                            _logger.LogError(
+                                revertEx,
+                                "Failed to revert tail claim after recovery failure for LogId {LogId}. Stale claim will be reclaimed after the lease.",
+                                logId);
+                        }
+                    }
+
                     _logger.LogError(ex, "TailMessageRecoveryJob failed recovering orphaned tail for LogId {LogId}.", logId);
                     processed++;
                 }
