@@ -1,3 +1,4 @@
+﻿using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -23,8 +25,15 @@ public class FacilityReportingPlansControllerTests : IDisposable
     private const string FacilityId = "100";
     private const string OtherFacilityId = "200";
 
+    /// <summary>
+    /// The clock every look-ahead in this class is anchored on: October 2026, chosen so a six-month
+    /// window crosses into the following year.
+    /// </summary>
+    private static readonly DateTimeOffset Now = new(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
+
     private readonly DmrpIntegrationTestFixture _fixture;
     private readonly IServiceScope _scope;
+    private readonly FakeTimeProvider _clock;
     private readonly FacilityReportingPlansController _controller;
     private readonly IEntityRepository<MeasureMapping> _mappingRepository;
     private readonly IEntityRepository<FacilityReportingPlan> _planRepository;
@@ -38,11 +47,16 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var logger = sp.GetRequiredService<ILogger<FacilityReportingPlansController>>();
         var manager = sp.GetRequiredService<IFacilityReportingPlanManager>();
         var queries = sp.GetRequiredService<IFacilityReportingPlanQueries>();
+        var lookAhead = sp.GetRequiredService<IFacilityReportingPlanLookAhead>();
 
         _mappingRepository = sp.GetRequiredService<IEntityRepository<MeasureMapping>>();
         _planRepository = sp.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
 
-        _controller = new FacilityReportingPlansController(logger, manager, queries)
+        // A fixed clock: the look-ahead is anchored on "now", so a real one would make the window
+        // these tests assert on depend on the day they run.
+        _clock = new FakeTimeProvider(Now);
+
+        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -227,7 +241,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync();
         await CreatedPlanAsync(facilityId: OtherFacilityId);
 
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, CancellationToken.None);
 
         var plans = Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Single(plans);
@@ -240,8 +254,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync(month: 5, year: 2026, isReporting: true);
         await CreatedPlanAsync(month: 6, year: 2026, isReporting: false);
 
-        var may = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, CancellationToken.None);
-        var notReporting = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, false, CancellationToken.None);
+        var may = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, null, CancellationToken.None);
+        var notReporting = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, false, null, CancellationToken.None);
 
         Assert.Single(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(may).Value));
 
@@ -253,7 +267,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task GetFacilityReportingPlansForFacility_NoPlans_ReturnsEmptyList()
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility("no-such-facility", null, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility("no-such-facility", null, null, null, null, CancellationToken.None);
 
         Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value));
     }
@@ -261,7 +275,204 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task GetFacilityReportingPlansForFacility_MonthOutOfRange_ReturnsBadRequest()
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 0, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 0, null, null, null, CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_MonthsAheadNarrowsToTheWindow()
+    {
+        // The clock says October 2026, so a three-month look-ahead is October, November, December.
+        await CreatedPlanAsync(month: 9, year: 2026);
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 12, year: 2026);
+        await CreatedPlanAsync(month: 1, year: 2027);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, 3,
+            CancellationToken.None);
+
+        var plans = Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.Equal(2, plans.Count);
+        Assert.DoesNotContain(plans, p => p.ReportingMonth == 9);
+        Assert.DoesNotContain(plans, p => p.ReportingYear == 2027);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(25)]
+    public async Task GetFacilityReportingPlansForFacility_MonthsAheadOutOfRange_ReturnsBadRequest(int monthsAhead)
+    {
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, monthsAhead,
+            CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_MonthsAheadWithAnExactPeriod_ReturnsBadRequest()
+    {
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, 6,
+            CancellationToken.None);
+
+        var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
+        Assert.Contains("monthsAhead", problem.Detail);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_GroupsMeasuresByPeriodInChronologicalOrder()
+    {
+        await CreatedPlanAsync(month: 11, year: 2026);
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 10, year: 2026);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null,
+            cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        Assert.Equal(2, page.Records.Count);
+        Assert.Equal(2, page.Metadata.TotalCount);
+
+        // Oldest first, and the two measures filed for October arrive as one period rather than two.
+        Assert.Equal(10, page.Records[0].ReportingMonth);
+        Assert.Equal(2, page.Records[0].Measures.Count);
+        Assert.Equal(11, page.Records[1].ReportingMonth);
+        Assert.Single(page.Records[1].Measures);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_ReadsTheClockOnceForTheWindowAndTheAnchor()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+
+        // The last moment of October, with the clock moving on every reading. Taking it twice puts the
+        // window in November and the anchor in October -- or the reverse, depending which is read
+        // first -- and the caller gets a look-ahead that starts a month after the period it was
+        // answered against, with October missing from its own six-month window.
+        _clock.SetUtcNow(new DateTimeOffset(2026, 10, 31, 23, 59, 59, TimeSpan.Zero));
+        _clock.AutoAdvanceAmount = TimeSpan.FromSeconds(2);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: 6,
+            isReporting: null, cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        // The window opens on the anchor, so the first period is the one the request was answered
+        // against and the recorded October plan is in it.
+        Assert.Equal(2026, page.Records[0].ReportingYear);
+        Assert.Equal(10, page.Records[0].ReportingMonth);
+        Assert.False(page.Records[0].IsProjected);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_ResolvesTheMeasureOnEachEntry()
+    {
+        var plan = await CreatedPlanAsync(month: 10, year: 2026);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null,
+            cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+        var measure = Assert.Single(page.Records[0].Measures);
+
+        Assert.Equal(plan.MeasureMappingId, measure.MeasureMappingId);
+        Assert.False(string.IsNullOrWhiteSpace(measure.Measure));
+        Assert.Equal(Frequency.Monthly, measure.Frequency);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_LooksAheadFromTheCurrentPeriodInclusive()
+    {
+        // October is the anchor, so a six-month window runs October 2026 through March 2027.
+        await CreatedPlanAsync(month: 9, year: 2026);
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 3, year: 2027);
+        await CreatedPlanAsync(month: 4, year: 2027);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null,
+            cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        // Every month in the window is answered for: October and March from their own plans, the four
+        // between them projected from October's enrollment. September and April are outside it.
+        Assert.Equal(6, page.Records.Count);
+        Assert.Equal((2026, 10), (page.Records[0].ReportingYear, page.Records[0].ReportingMonth));
+        Assert.Equal((2027, 3), (page.Records[5].ReportingYear, page.Records[5].ReportingMonth));
+
+        Assert.False(page.Records[0].IsProjected);
+        Assert.False(page.Records[5].IsProjected);
+        Assert.True(page.Records[1].IsProjected);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_ExcludesWithdrawnMeasuresByDefault()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026, isReporting: true);
+        await CreatedPlanAsync(month: 11, year: 2026, isReporting: false);
+
+        var current = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null,
+            cancellationToken: CancellationToken.None);
+        var withdrawn = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, false,
+            cancellationToken: CancellationToken.None);
+
+        var currentPage = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(current).Value);
+        var withdrawnPage = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(withdrawn).Value);
+
+        // Default is the facility's current obligations; a withdrawal is kept as history and has to
+        // be asked for.
+        Assert.Equal(10, Assert.Single(currentPage.Records).ReportingMonth);
+        Assert.Equal(11, Assert.Single(withdrawnPage.Records).ReportingMonth);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_PagesOverPeriods()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        await CreatedPlanAsync(month: 12, year: 2026);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null, pageSize: 2,
+            pageNumber: 2, cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        Assert.Equal(12, Assert.Single(page.Records).ReportingMonth);
+        Assert.Equal(3, page.Metadata.TotalCount);
+        Assert.Equal(2, page.Metadata.TotalPages);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_NoPlans_ReturnsAnEmptyPage()
+    {
+        var result = await _controller.GetFacilityReportingPlanPeriods("no-such-facility", 6, null,
+            cancellationToken: CancellationToken.None);
+
+        var page = Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value);
+
+        // An empty records array, not a 404: a facility that is enrolled in nothing is an answer.
+        Assert.Empty(page.Records);
+        Assert.Equal(0, page.Metadata.TotalCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(25)]
+    public async Task GetFacilityReportingPlanPeriods_MonthsAheadOutOfRange_ReturnsBadRequest(int monthsAhead)
+    {
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead, null,
+            cancellationToken: CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_PagingOutOfRange_ReturnsBadRequest()
+    {
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null, pageNumber: 0,
+            cancellationToken: CancellationToken.None);
 
         AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
@@ -442,7 +653,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.DeleteFacilityReportingPlansForFacility(FacilityId, CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
 
-        var cleared = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, CancellationToken.None);
+        var cleared = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, CancellationToken.None);
         Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(cleared).Value));
         Assert.IsType<OkObjectResult>(
             await _controller.GetFacilityReportingPlan(survivor.Id!, CancellationToken.None));
