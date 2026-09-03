@@ -19,6 +19,8 @@ public class ScenariosController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
+    IMeasureTemplateStore measureTemplateStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
@@ -36,6 +38,8 @@ public class ScenariosController(
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
+        ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -87,6 +91,14 @@ public class ScenariosController(
             : model.NhsnOrganizationId.Trim();
         
         model.UpdatedAt = DateTimeOffset.UtcNow;
+        if (model.SelectedMeasureIds.Count > 0)
+        {
+            var templates = await measureTemplateStore.GetByIdsAsync(model.SelectedMeasureIds, ct);
+            if (templates.Count != model.SelectedMeasureIds.Distinct().Count())
+                return BadRequest("One or more selected measures were not found.");
+            model.SelectedMeasures = templates.Select(t => t.GenerationFamily).Distinct().ToList();
+        }
+        model.NormalizeMeasureSelection();
 
         await scenarioStore.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
@@ -600,6 +612,7 @@ public class ScenariosController(
             IsSystemScenario = false,
             ReportMethod = source.ReportMethod,
             SelectedMeasures = [.. source.SelectedMeasures],
+            SelectedMeasureIds = [.. source.SelectedMeasureIds],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
             NhsnOrganizationId = source.NhsnOrganizationId,
@@ -612,7 +625,9 @@ public class ScenariosController(
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
                     ResourcesPerPatientMax = c.ResourcesPerPatientMax,
-                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern,
+                    PatientConfigurationId = c.PatientConfigurationId,
+                    Intent = PatientGenerationIntent.Clone(c.Intent)
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,

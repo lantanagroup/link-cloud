@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
@@ -15,7 +16,9 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -232,12 +235,16 @@ builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBund
 builder.Services.AddSingleton<ISnapshotPayloadStore, AzureBlobSnapshotPayloadStore>();
 builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
 builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
+builder.Services.AddSingleton<IGeneratedTemplateCacheVersionLookup>(sp => sp.GetRequiredService<GeneratedTemplateCacheVersionStore>());
+builder.Services.AddSingleton<GeneratedPatientBundleReplayService>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<IMeasureTemplateStore, MongoMeasureTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddSingleton<IPatientConfigurationStore, MongoPatientConfigurationStore>();
 builder.Services.AddNormalizationEngine();
 builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
@@ -289,9 +296,11 @@ builder.Services.AddScoped<PipelineDataReader>();
 
 // -- Seed system scenarios and query plan templates --
 builder.Services.AddHostedService<ScenarioSeedService>();
+builder.Services.AddHostedService<MeasureTemplateSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
+builder.Services.AddHostedService<PatientConfigurationSeedService>();
 
 // Allow large imported-patient bundle uploads in the Automation UI.
 builder.Services.Configure<FormOptions>(options =>
@@ -314,11 +323,57 @@ builder.Services.AddControllersWithViews()
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+    };
+});
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Automation.UI API",
+        Version = "v1",
+        Description = "Service-to-service automation run APIs. Metrics endpoints read Mongo snapshots and do not query Prometheus."
+    });
+});
 builder.Services.AddSignalR();
+
+var assemblyVersion = Assembly.GetExecutingAssembly()
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+    ?? "0.0.0";
+builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+{
+    options.Environment = builder.Environment;
+    options.ServiceName = builder.Configuration["ServiceInformation:ServiceConfigName"] ?? "AutomationUI";
+    options.ServiceVersion = assemblyVersion;
+});
+builder.Services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
+builder.Services.AddSingleton<IRunMetricsStore, MongoRunMetricsStore>();
+builder.Services.AddSingleton<IMetricsBenchmarkStore, MongoMetricsBenchmarkStore>();
+builder.Services.PostConfigure<TelemetrySettings>(settings =>
+{
+    settings.PrometheusQueryEndpoint = PrometheusHistogramClient.ResolveQueryEndpoint(settings.PrometheusQueryEndpoint);
+});
+builder.Services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramClient>((sp, client) =>
+{
+    var endpoint = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value.PrometheusQueryEndpoint;
+    if (!string.IsNullOrWhiteSpace(endpoint))
+        client.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotService>();
+builder.Services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<MetricsRunPresenter>();
 builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
@@ -365,9 +420,15 @@ else
 }
 
 // -- Middleware --
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api"),
+    api => api.UseExceptionHandler());
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Runs/Index");
+    app.UseWhen(
+        ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+        mvc => mvc.UseExceptionHandler("/Runs/Index"));
     app.UseHsts();
     app.UseHttpsRedirection();
 }
@@ -375,6 +436,12 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Automation.UI API v1");
+});
 
 app.UseAuthentication();
 

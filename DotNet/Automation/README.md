@@ -68,7 +68,7 @@ Automation (no Link dependencies)
 +-- Helpers/             output abstractions, retry, monitoring, diagnostics
 +-- Configuration/       base config classes for host extension
 +-- ExtractCqlTypes/     tiny utility app for extracting CQL retrieve types from measure bundles
-+-- measures/            embedded measure definition bundles (JSON)
++-- measures/            system measure definition bundles (ACH Daily/Monthly = Validation 2.0)
 ```
 
 ---
@@ -117,7 +117,7 @@ logic in a streaming pipeline that:
    from in-memory FHIR objects before serialization.
 4. **Runs `QueryPlanAcquisitionSimulator` per-patient** (when configured) before discarding
    FHIR data.
-5. **Runs `CqlFilterSimulator` per-patient** over the qualifying measures' embedded bundle CQL
+5. **Runs `CqlFilterSimulator` per-patient** over the qualifying measures' actual bundle CQL
    so instance-level ABS prediction follows the measure being evaluated, not a frozen family
    profile. Non-qualifying measures do not constrain prediction.
 6. **Retains no serialized JSON after upload** -- memory stays proportional to
@@ -503,22 +503,24 @@ appends it directly to the ABS blob, bypassing `PatientAggregator`'s aggregation
 Instance-level ABS prediction is derived from the **measure bundle CQL that this run
 will evaluate**, not from a handwritten measure-family profile.
 
-`CqlFilterSimulator.ComputeFilteredKeys(measures, input)` loads each qualifying
-measure's embedded FHIR bundle (`ProfiledMeasureCatalog.ReadBundleJson`), strips CQL
-comments, and turns reachable SDE `define` bodies into inclusion rules (category,
-status, valueset codes, IP/date relations, encounter linkage, specimen-from-observation).
-Resources of a type that the bundle's SDE produces, but that match none of those rules,
-are excluded.
+`CqlFilterSimulator.ComputeFilteredKeys(measureBundleJsons, input)` analyzes each
+bundle's Measure population/SDE roots, strips CQL comments, and turns reachable
+`define` bodies into inclusion rules (category, status, valueset codes, IP/date
+relations, encounter linkage, specimen-from-observation). Resources of a type that
+the bundle's SDE produces, but that match none of those rules, are excluded.
 
-The result is the **intersection** of exclusions across measures **per resource type**,
+The result is the **intersection** of exclusions across bundles **per resource type**,
 because MeasureEval writes one `.mr` file per measure and `PatientAggregator` unions
 contained resources. A resource is absent from ABS only when every applicable measure
 for that type excludes it.
 
-`FhirGenerationPipeline` passes only the patient's qualifying measures. Non-qualifying
-measures do not contribute contained resources and must not influence the intersection.
+`FhirGenerationPipeline` passes the run's uploaded/edited measure JSON when present
+(only the patient's qualifying measures). If no bundle JSON is supplied, it falls
+back to the embedded system bundles for the qualifying `ProfiledMeasureType` values.
+Non-qualifying measures do not contribute contained resources and must not influence
+the intersection.
 
-This is why updating the ACH Monthly/Daily CQL bundles does not require recoding a
+This is why uploading a new version of ACH Monthly does not require recoding a
 family profile: comment-stripping and SDE analysis read the CQL that MeasureEval
 runs. Known remaining gaps (not a full CQL engine): encounter-type and
 encounter-location IP qualification, Hypoglycemic antidiabetic-drug IP membership,

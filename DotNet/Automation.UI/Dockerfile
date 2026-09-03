@@ -5,7 +5,7 @@ FROM lantanagroup/aspnet8-run AS base
 WORKDIR /app
 EXPOSE 5257
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_XMLDOC_MODE=skip
@@ -18,6 +18,11 @@ COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/Automation.Link/Automation.Link.csproj", "DotNet/Automation.Link/"]
 COPY ["DotNet/Normalization.Engine/Normalization.Engine.csproj", "DotNet/Normalization.Engine/"]
 COPY ["DotNet/Automation.UI/Automation.UI.csproj", "DotNet/Automation.UI/"]
+# PoC: Automation ProjectReferences sibling C:\repos\thetis. Compose passes
+# additional_contexts.thetis; path /thetis matches Automation.csproj default
+# ..\..\..\thetis from /src/DotNet/Automation.
+COPY --from=thetis ["Thetis.Generation.Abstractions/Thetis.Generation.Abstractions.csproj", "/thetis/Thetis.Generation.Abstractions/"]
+COPY --from=thetis ["Thetis.Generation.Engine/Thetis.Generation.Engine.csproj", "/thetis/Thetis.Generation.Engine/"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     dotnet restore "DotNet/Automation.UI/Automation.UI.csproj" /p:RestorePackagesWithLockFile=false
 
@@ -28,6 +33,8 @@ COPY ["DotNet/Automation/", "DotNet/Automation/"]
 COPY ["DotNet/Automation.Link/", "DotNet/Automation.Link/"]
 COPY ["DotNet/Normalization.Engine/", "DotNet/Normalization.Engine/"]
 COPY ["DotNet/Automation.UI/", "DotNet/Automation.UI/"]
+COPY --from=thetis ["Thetis.Generation.Abstractions/", "/thetis/Thetis.Generation.Abstractions/"]
+COPY --from=thetis ["Thetis.Generation.Engine/", "/thetis/Thetis.Generation.Engine/"]
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

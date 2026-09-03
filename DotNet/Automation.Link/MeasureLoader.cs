@@ -4,7 +4,6 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using Task = System.Threading.Tasks.Task;
 
@@ -16,8 +15,7 @@ public class MeasureLoader
     private readonly IValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
-    private readonly Assembly? _resourceAssembly;
-    private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
+    private readonly FhirJsonDeserializer _parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
 
     public string? MeasureId { get; private set; }
 
@@ -35,42 +33,29 @@ public class MeasureLoader
         IMeasureEvalServiceClient measureEvalClient,
         IValidationServiceClient validationClient,
         IAutomationOutput output,
-        TestScenarioConfig config,
-        Assembly? resourceAssembly = null)
+        TestScenarioConfig config)
     {
         _measureEvalClient = measureEvalClient;
         _validationClient = validationClient;
         _output = output;
         _config = config;
-        _resourceAssembly = resourceAssembly;
     }
+
+    private string? _inlineBundleJson;
 
     private async Task<string> GetMeasureBundleJsonAsync()
     {
+        if (!string.IsNullOrWhiteSpace(_inlineBundleJson))
+            return _inlineBundleJson;
+
         if (_config.MeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
             var filePath = _config.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
             return await File.ReadAllTextAsync(filePath);
         }
-        else if (_config.MeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
-        {
-            var resourceName = _config.MeasureBundleLocation
-                .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
 
-            // Resolve the assembly that contains the embedded resource.
-            // The Automation project owns the measure bundles; use its assembly
-            // (via ProfiledMeasureCatalog as an anchor type) by default.
-            var assembly = _resourceAssembly ?? typeof(ProfiledMeasureCatalog).Assembly;
-            await using var stream = assembly.GetManifestResourceStream(resourceName);
-
-            if (stream == null)
-                throw new FileNotFoundException($"Embedded resource '{resourceName}' not found in assembly '{assembly.GetName().Name}'.");
-
-            using var reader = new StreamReader(stream);
-            return await reader.ReadToEndAsync();
-        }
-        else if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             using var client = new HttpClient();
             return await client.GetStringAsync(_config.MeasureBundleLocation);
@@ -139,7 +124,7 @@ public class MeasureLoader
             {
                 var resource = validationEntry.Resource!;
                 var artifactId = $"{resource.TypeName}-{resource.Id}";
-                await _validationClient.UpsertResourceArtifactAsync(artifactId, await resource.ToJsonAsync());
+                await _validationClient.UpsertResourceArtifactAsync(artifactId, new FhirJsonSerializer().SerializeToString(resource));
             });
 
             await Task.WhenAll(validationTasks);
@@ -282,6 +267,28 @@ public class MeasureLoader
     /// </summary>
     public async Task LoadAllAsync()
     {
+        if (_config.MeasureBundleJsons.Count > 0)
+        {
+            foreach (var json in _config.MeasureBundleJsons)
+            {
+                if (string.IsNullOrWhiteSpace(json))
+                    continue;
+
+                _inlineBundleJson = json;
+                _output.WriteLine($"Loading inline measure bundle [{MeasureIds.Count + 1}/{_config.MeasureBundleJsons.Count}]");
+                await LoadAsync();
+                if (MeasureId != null && !MeasureIds.Contains(MeasureId))
+                    MeasureIds.Add(MeasureId);
+            }
+
+            _inlineBundleJson = null;
+            MeasureId = MeasureIds.Count > 0 ? MeasureIds[0] : null;
+            if (MeasureIds.Count == 0)
+                throw new InvalidOperationException("No measure bundles configured.");
+            _output.WriteLine($"Loaded {MeasureIds.Count} measure(s): [{string.Join(", ", MeasureIds)}]");
+            return;
+        }
+
         var locations = _config.AllMeasureBundleLocations;
         if (locations.Count == 0)
             throw new InvalidOperationException("No measure bundle locations configured.");

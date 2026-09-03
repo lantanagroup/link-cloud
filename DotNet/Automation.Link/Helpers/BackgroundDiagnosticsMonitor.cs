@@ -97,7 +97,8 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         TimeSpan? pollInterval = null,
         bool forwardInternalLogsToOutput = true,
         PipelineDataReader? pipelineReader = null,
-        bool expectsDataAcquisition = true)
+        bool expectsDataAcquisition = true,
+        bool scrapeNormalizationResourceTypes = true)
     {
         _output = output;
         _lokiScraper = lokiScraper;
@@ -118,7 +119,13 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             eventingOutput,
             config,
             kafkaConnection);
-        var progressMonitor = new ProgressMonitor(eventingOutput, expectedPatientCount, lokiScraper, reader, expectsDataAcquisition);
+        var progressMonitor = new ProgressMonitor(
+            eventingOutput,
+            expectedPatientCount,
+            lokiScraper,
+            reader,
+            expectsDataAcquisition,
+            scrapeNormalizationResourceTypes);
         _milestoneOrchestrator = new MilestoneValidationOrchestrator(eventingOutput, reader, expectedPatientCount, expectsDataAcquisition);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);
 
@@ -210,14 +217,15 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         // Scope the stop-time Kafka summary to errors keyed to THIS test's facility, so
         // it lines up with what KafkaErrorProbe was actually counting during the run.
         // Errors with a different key are noise from sibling tests on the shared stack.
-        var scopedKafkaErrorCount = _kafkaMonitor.GetErrorCountForFacility(_monitor.State.CorrelationId1);
-        var kafkaMessage = scopedKafkaErrorCount > 0
-            ? $"{scopedKafkaErrorCount} Kafka error/retry message(s) detected during test"
+        var scopedDeadLetters = _kafkaMonitor.GetDeadLetterCountForFacility(_monitor.State.CorrelationId1);
+        var scopedRetries = _kafkaMonitor.GetRetryCountForFacility(_monitor.State.CorrelationId1);
+        var kafkaMessage = scopedDeadLetters + scopedRetries > 0
+            ? $"{scopedDeadLetters} Kafka dead-letter and {scopedRetries} retry message(s) detected during test"
             : "No Kafka error messages detected";
 
         await PublishEventAsync(
             AutomationMonitorEventType.LogMessage,
-            scopedKafkaErrorCount > 0 ? MonitorIssueSeverity.Warning : MonitorIssueSeverity.Info,
+            scopedDeadLetters > 0 ? MonitorIssueSeverity.Warning : MonitorIssueSeverity.Info,
             "Kafka",
             kafkaMessage);
 

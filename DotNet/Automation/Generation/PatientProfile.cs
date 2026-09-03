@@ -27,7 +27,8 @@ public record PatientProfile(
     string? ClinicalScenarioId = null,
     int? ResourcesPerPatient = null,
     ScheduledInpatientPattern? ScheduledInpatientPattern = null,
-    MeasureEligibility CohortQualification = MeasureEligibility.Qualifying)
+    MeasureEligibility CohortQualification = MeasureEligibility.Qualifying,
+    PatientGenerationIntent? Intent = null)
 {
     /// <summary>
     /// Returns true when this profile qualifies for the given measure.

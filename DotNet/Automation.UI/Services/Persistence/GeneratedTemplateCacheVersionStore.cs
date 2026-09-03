@@ -27,7 +27,12 @@ public sealed class GeneratedTemplateCacheVersionDocument
 
 public sealed record GeneratedTemplateCacheVersionBinding(Guid VersionId, int VersionNumber, string ScenarioKey, string TemplateSetHash);
 
-public sealed class GeneratedTemplateCacheVersionStore
+public interface IGeneratedTemplateCacheVersionLookup
+{
+    Task<GeneratedTemplateCacheVersionBinding?> GetLatestAsync(string? scenarioKey, CancellationToken ct = default);
+}
+
+public sealed class GeneratedTemplateCacheVersionStore : IGeneratedTemplateCacheVersionLookup
 {
     private readonly IMongoCollection<GeneratedTemplateCacheVersionDocument> _versions;
     private const string ScenarioHashUniqueIndexName = "ux_generated_template_versions_scenario_hash";
@@ -229,6 +234,28 @@ public sealed class GeneratedTemplateCacheVersionStore
             return $"name:{scenarioName.Trim()}";
 
         return $"adhoc:{ComputeTemplateSetHash(templateKeys)}";
+    }
+
+    public async Task<GeneratedTemplateCacheVersionBinding?> GetLatestAsync(
+        string? scenarioKey,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(scenarioKey))
+            return null;
+
+        var latest = await _versions
+            .Find(version => version.ScenarioKey == scenarioKey)
+            .SortByDescending(version => version.VersionNumber)
+            .FirstOrDefaultAsync(ct);
+
+        if (latest == null)
+            return null;
+
+        return new GeneratedTemplateCacheVersionBinding(
+            latest.Id,
+            latest.VersionNumber,
+            latest.ScenarioKey,
+            latest.TemplateSetHash);
     }
 
     private static string ComputeTemplateSetHash(IReadOnlyList<string> templateKeys)

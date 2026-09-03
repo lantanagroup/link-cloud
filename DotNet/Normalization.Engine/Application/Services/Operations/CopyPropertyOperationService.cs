@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (!result.IsValid)
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {result.ErrorMessage}", resource);
 
-            var scopedNode = resource.ToTypedElement();
+            var scopedNode = resource.ToPocoNode();
             var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, sourceFhirPath, Logger);
             object sourceValue = sourceValueResult.Success
                 ? sourceValueResult.Value

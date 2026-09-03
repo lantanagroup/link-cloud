@@ -84,10 +84,9 @@ A typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed throu
   timeouts, download submission ZIP artifacts.
 - **`FacilitySetupHelper`** -- idempotent setup/teardown of tenant + facility +
   acquisition + normalization + query-dispatch configuration.
-- **`MeasureLoader`** -- load measure resources from `file://`, `resource://`, or
-  `http(s)://` sources. Splits resources by consumer (MeasureEval vs Validation) and tracks
-  `MeasureIds` for multi-measure runs. **Preserves `Measure.supplementalData` as authored** so
-  MeasureEval executes measure-authored SDE logic.
+- **`MeasureLoader`** -- load measure bundles from inline JSON (`MeasureBundleJsons`) or
+  from an explicit `file://` / `http(s)://` location. Splits resources by consumer
+  (MeasureEval vs Validation) and tracks `MeasureIds` for multi-measure runs.
 - **`QueryPlanBuilder`** -- converts `QueryPlanInput` into DataAcquisition wire format;
   delegates canonical defaults and acquired-type extraction to `Automation.QueryPlanDefaults`.
 - **`IAdminBffIntegrationClient` (`LinkSdk`)** -- typed client for Admin BFF `/api/*` calls
@@ -151,7 +150,7 @@ strict mode holds.
 
 Prediction is intentionally narrower than "generated and acquired". The manifest also applies
 CQL type reachability and resource-level SDE filtering from `Automation.CqlFilterSimulator`,
-which derives instance filters from the selected measure's embedded bundle CQL (not from a
+which derives instance filters from the measure bundle CQL used for the run (not from a
 frozen measure-family profile).
 
 ### 5.2 Validators

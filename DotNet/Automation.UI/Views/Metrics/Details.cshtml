@@ -1,0 +1,68 @@
+@model MetricsRunDetailViewModel
+@{
+    ViewData["Title"] = "Performance results";
+    string FormatWhen(DateTimeOffset? value)
+    {
+        if (value is null) return "—";
+        return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+    }
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="fw-bold mb-0">@Model.ScenarioName</h3>
+            <div class="small text-muted">
+                Finished @FormatWhen(Model.FinishedAt)
+                @if (Model.ScenarioVersion > 1)
+                {
+                    <span class="ms-2">Setup v@Model.ScenarioVersion</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.SetupSummary))
+                {
+                    <span class="ms-2">@Model.SetupSummary</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.BenchmarkKey))
+                {
+                    <span class="ms-2">Saved limits: <code>@Model.BenchmarkKey</code></span>
+                }
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            @if (Model.RunAvailable)
+            {
+                <a asp-controller="Runs" asp-action="Details" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-action">
+                    <i class="bi bi-clipboard-data me-1"></i>Open full run
+                </a>
+            }
+            else
+            {
+                <span class="small text-muted align-self-center">Run log was deleted. Performance results below are still from this run.</span>
+            }
+            @if (Model.PreviousRunId is Guid previous && Model.ScenarioId is Guid)
+            {
+                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" class="btn btn-sm btn-outline-secondary">
+                    Compare with previous
+                </a>
+            }
+            @if (Model.ScenarioId is Guid scenarioId)
+            {
+                <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-outline-secondary">
+                    History of this use case
+                </a>
+            }
+            <form asp-action="Delete" asp-route-id="@Model.RunId" method="post" class="d-inline"
+                  onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash me-1"></i>Remove from history
+                </button>
+            </form>
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>All use cases
+            </a>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_AdvancedPerformance", Model)
+</div>

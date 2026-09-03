@@ -24,6 +24,8 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly IPatientConfigurationStore _patientConfigurationStore;
+    private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -40,7 +42,9 @@ public class AutomationRunManager : IAutomationRunManager
         ImportedBundleExecutionResolver importedBundleResolver,
         LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
-        ILivePatientEventInjector liveInjector)
+        ILivePatientEventInjector liveInjector,
+        IPatientConfigurationStore patientConfigurationStore,
+        IMeasureTemplateStore measureTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -53,6 +57,8 @@ public class AutomationRunManager : IAutomationRunManager
         _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _liveInjector = liveInjector;
+        _patientConfigurationStore = patientConfigurationStore;
+        _measureTemplateStore = measureTemplateStore;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -72,7 +78,12 @@ public class AutomationRunManager : IAutomationRunManager
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
-        var options = StartScenarioRequestResolver.Resolve(request);
+        var resolved = StartScenarioRequestResolver.Resolve(request);
+        resolved = await MeasureTemplateRunBinder.AttachBundlesAsync(resolved, _measureTemplateStore, cancellationToken);
+        var options = await PatientConfigurationHydrator.HydrateAsync(
+            resolved,
+            _patientConfigurationStore,
+            cancellationToken);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
@@ -373,7 +384,7 @@ public class AutomationRunManager : IAutomationRunManager
             return null;
         }
 
-        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
+        var isFinal = status.IsTerminal();
 
         try
         {
@@ -384,6 +395,7 @@ public class AutomationRunManager : IAutomationRunManager
                 var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
                 var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
+                var acquisitionLogs = await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
@@ -403,6 +415,7 @@ public class AutomationRunManager : IAutomationRunManager
                     Entries = entries,
                     Populations = populations,
                     AcquisitionSummary = acquisitionSummary,
+                    AcquisitionLogs = acquisitionLogs,
                     MeasureEvalResourceCounts = measureResources,
                     ValidatorResults = validatorResults
                 };
@@ -686,6 +699,7 @@ public class AutomationRunManager : IAutomationRunManager
                     + state.Options.ImportedPatientBundles.Count,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
+                IsMetricsRun = state.Options.IsMetricsRun,
                 RunConfigurationJson = state.RunConfigurationJson,
                 Status = state.Status,
                 CreatedAt = state.CreatedAt,

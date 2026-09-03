@@ -231,6 +231,15 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 /* ===================================================================
    Details — run summary grid
    =================================================================== */
+.au-metrics-waterfall {
+  height: 1.25rem;
+}
+.au-metrics-waterfall .progress-bar {
+  background: var(--au-accent);
+  font-size: .7rem;
+  overflow: visible;
+}
+
 .au-summary-item {
   display: flex;
   flex-direction: column;
@@ -351,6 +360,91 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   transition: opacity .15s;
 }
 .au-info-icon:hover { opacity: 1; color: var(--au-accent); }
+
+.au-info-toggle {
+  border: 0;
+  background: none;
+  padding: 0 .2rem;
+  margin: 0;
+  color: var(--au-muted);
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  opacity: .75;
+}
+.au-info-toggle:hover,
+.au-info-toggle[aria-expanded="true"] {
+  color: var(--au-accent);
+  opacity: 1;
+}
+.au-info-toggle:focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.au-info-toggle-on-dark {
+  color: rgba(255, 255, 255, .85);
+  opacity: 1;
+}
+.au-info-toggle-on-dark:hover,
+.au-info-toggle-on-dark[aria-expanded="true"] {
+  color: #fff;
+}
+.btn.au-info-toggle {
+  padding: .15rem .4rem;
+  opacity: 1;
+}
+.pc-section-reset { flex-shrink: 0; }
+.au-help-text {
+  font-size: .78rem;
+  line-height: 1.4;
+  color: #3d4753;
+  background: #f3f7fc;
+  border-left: 3px solid var(--au-accent);
+  padding: .45rem .7rem;
+  margin: .35rem 0 .1rem;
+  border-radius: 0 var(--au-radius) var(--au-radius) 0;
+}
+.au-help-text p { margin: 0 0 .4rem; }
+.au-help-text p:last-child,
+.au-help-text ul:last-child { margin-bottom: 0; }
+.au-help-text ul {
+  margin: .2rem 0 0;
+  padding-left: 1.1rem;
+}
+.au-help-text li { margin-bottom: .15rem; }
+.au-help-panel {
+  background: #f7f9fc;
+  border: 1px solid #e3e8ef;
+  border-radius: var(--au-radius);
+  padding: .6rem .85rem;
+  margin-bottom: 1rem;
+}
+.au-help-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #2f3a46;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.au-help-panel > summary::-webkit-details-marker { display: none; }
+.au-help-panel > summary .bi { color: var(--au-accent); }
+.au-help-panel[open] > summary { margin-bottom: .5rem; }
+.au-help-panel .au-help-body {
+  font-size: .82rem;
+  color: #3d4753;
+  line-height: 1.45;
+}
+.au-help-panel .au-help-body p { margin: 0 0 .5rem; }
+.au-help-panel .au-help-body p:last-child,
+.au-help-panel .au-help-body ul:last-child { margin-bottom: 0; }
+.au-help-panel .au-help-body ul {
+  margin: 0 0 .5rem;
+  padding-left: 1.15rem;
+}
+.au-help-panel .au-help-body li { margin-bottom: .2rem; }
 
 /* ===================================================================
    Responsive helpers
@@ -553,4 +647,175 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   text-transform: uppercase;
   letter-spacing: .04em;
   margin-top: .3rem;
+}
+
+.au-service-chip {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .75rem .8rem;
+  height: 100%;
+}
+.au-service-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.au-service-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: .15rem 0;
+}
+.au-service-hint {
+  font-size: .72rem;
+  color: var(--au-muted);
+}
+
+.au-live-gauge-card {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .85rem .7rem .7rem;
+  height: 100%;
+  border: 1px solid transparent;
+}
+.au-live-gauge-pipeline {
+  background: #fff;
+  border-color: rgba(77,163,255,.28);
+  box-shadow: var(--au-card-shadow);
+}
+.au-live-gauge-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: .35rem;
+}
+.au-live-gauge-row {
+  display: flex;
+  justify-content: space-around;
+  gap: .4rem;
+}
+.au-gauge {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+.au-gauge-svg {
+  width: 100%;
+  max-width: 108px;
+  height: auto;
+  display: block;
+  margin: 0 auto -0.35rem;
+}
+.au-gauge-track {
+  stroke: #e6e8ee;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.au-gauge-arc {
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .6s ease, stroke .6s ease;
+}
+.au-gauge-readout {
+  font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: .1rem;
+}
+.au-gauge-unit {
+  font-size: .68rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.au-live-api {
+  font-size: .72rem;
+  color: var(--au-muted);
+  text-align: center;
+  margin-top: .45rem;
+  font-weight: 600;
+}
+
+a.au-scenario-card {
+  display: block;
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1rem 1.1rem;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+  border: 1px solid transparent;
+}
+a.au-scenario-card:hover {
+  border-color: rgba(77,163,255,.45);
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  color: inherit;
+}
+.au-scenario-card-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.au-scenario-card-metric {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-sparkline {
+  color: var(--au-accent);
+  flex-shrink: 0;
+}
+
+/* ===================================================================
+   Patient configuration editor
+   =================================================================== */
+.pc-picker {
+  position: relative;
+}
+.pc-picker-toggle {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-picker-menu {
+  min-width: 100%;
+  max-width: 420px;
+}
+.pc-picker-list {
+  max-height: 220px;
+  overflow: auto;
+}
+.pc-picker-item {
+  display: flex;
+  gap: .4rem;
+  align-items: flex-start;
+  padding: .2rem .15rem;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.pc-picker-item:hover {
+  background: #f4f6f8;
+}
+.pc-section-badge {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border-radius: 999px;
+  padding: .15rem .5rem;
+}
+.pc-cohort-only { display: none; }
+.pc-cohort-config-cell {
+  min-width: 240px;
+}
+.pc-cohort-config-cell .form-select {
+  min-width: 150px;
+}
+.au-cohort-table {
+  min-width: 1280px;
 }

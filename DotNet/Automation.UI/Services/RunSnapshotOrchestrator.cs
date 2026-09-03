@@ -18,16 +18,18 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly ILogger<RunSnapshotOrchestrator> _logger;
     private readonly ConcurrentDictionary<Guid, RunPollerHandle> _activePollers = new();
 
-    private static readonly TimeSpan OrchestrationInterval = TimeSpan.FromSeconds(2);
+    private readonly IAutomationUiMetrics? _metrics;
 
     public RunSnapshotOrchestrator(
         ISnapshotStore store,
         IServiceProvider services,
-        ILogger<RunSnapshotOrchestrator> logger)
+        ILogger<RunSnapshotOrchestrator> logger,
+        IAutomationUiMetrics? metrics = null)
     {
         _store = store;
         _services = services;
         _logger = logger;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -51,7 +53,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
             try
             {
-                await Task.Delay(OrchestrationInterval, stoppingToken);
+                await Task.Delay(await NextOrchestrationDelayAsync(stoppingToken), stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -68,7 +70,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// Registers a new run so the orchestrator will start polling for it.
     /// Called by <see cref="AutomationRunManager"/> when facility + report are known.
     /// </summary>
-    public async Task RegisterRunAsync(Guid runId, string facilityId, string reportId)
+    public async Task RegisterRunAsync(Guid runId, string facilityId, string reportId, bool isMetricsRun = false)
     {
         var meta = new RunSnapshotMeta
         {
@@ -76,10 +78,12 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             FacilityId = facilityId,
             ReportId = reportId,
             StartedAt = DateTimeOffset.UtcNow,
-            IsActive = true
+            IsActive = true,
+            IsMetricsRun = isMetricsRun
         };
 
         await _store.RegisterRunAsync(runId, meta);
+        StartPoller(meta, CancellationToken.None);
         _logger.LogInformation("Registered run {RunId} for snapshot polling", runId);
     }
 
@@ -92,25 +96,30 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         // 1. Stop the existing poller FIRST so it cannot write stale domain data
         //    after we clear snapshots. StopAsync awaits the current poll cycle, so
         //    after this returns the old poller is guaranteed idle.
+        var isMetricsRun = false;
         if (_activePollers.TryRemove(runId, out var existingHandle))
         {
+            isMetricsRun = existingHandle.IsMetricsRun;
             await existingHandle.StopAsync();
             _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
-        // 2. Now safe to update meta and clear stale domain snapshots � no writer
+        // 2. Now safe to update meta and clear stale domain snapshots - no writer
         //    can re-populate them with old-report data.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
         // 3. Immediately start a new poller bound to the regenerated report so the
         //    UI doesn't have to wait up to 2s for the next reconciliation cycle.
+        if (!isMetricsRun)
+            isMetricsRun = (await _store.GetRunMetaAsync(runId, ct))?.IsMetricsRun ?? false;
         var meta = new RunSnapshotMeta
         {
             RunId = runId,
             FacilityId = facilityId,
             ReportId = reportId,
             StartedAt = DateTimeOffset.UtcNow,
-            IsActive = true
+            IsActive = true,
+            IsMetricsRun = isMetricsRun
         };
         StartPoller(meta, ct);
 
@@ -239,7 +248,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         // Build a scoped service provider for the poller's API clients
         var scope = _services.CreateScope();
         var reader = scope.ServiceProvider.GetRequiredService<PipelineDataReader>();
-        var poller = new StoreBackedServicePoller(_store, reader, meta, _logger);
+        var poller = new StoreBackedServicePoller(_store, reader, meta, _logger, _metrics);
 
         var task = poller.RunAsync(cts.Token);
         var handle = new RunPollerHandle(cts, task, scope, poller);
@@ -276,6 +285,26 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
     }
 
+    private async Task<TimeSpan> NextOrchestrationDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            var activeRuns = await _store.GetActiveRunsAsync(ct);
+            var anyMetrics = activeRuns.Any(r => r.IsMetricsRun)
+                || _activePollers.Values.Any(h => h.IsMetricsRun);
+            return AutomationRunPollingPolicy.OrchestratorInterval(anyMetrics);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Falling back to lightweight orchestrator interval");
+            return AutomationRunPollingPolicy.LightweightOrchestratorInterval;
+        }
+    }
+
     private async Task StopAllPollersAsync()
     {
         var tasks = new List<Task>();
@@ -296,6 +325,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     {
         public string FacilityId => poller.FacilityId;
         public string ReportId => poller.ReportId;
+        public bool IsMetricsRun => poller.IsMetricsRun;
         public bool IsCompleted => pollerTask.IsCompleted;
 
         public Task FinalPollAsync() => poller.FinalPollAsync();

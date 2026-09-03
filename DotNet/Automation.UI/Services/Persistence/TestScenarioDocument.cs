@@ -24,6 +24,12 @@ public sealed class TestScenarioDocument
     public string ReportMethod { get; set; } = "Adhoc";
     public List<string> SelectedMeasures { get; set; } = [];
 
+    /// <summary>
+    /// Measure template ids as strings (Cosmos-safe; same representation as other Guid keys).
+    /// Empty on documents written before measure templates existed.
+    /// </summary>
+    public List<string> SelectedMeasureIds { get; set; } = [];
+
     public int Seed { get; set; }
     public int PatientCount { get; set; }
     public int ResourcesPerPatientMin { get; set; }
@@ -54,6 +60,12 @@ public sealed class TestScenarioDocument
 
     public bool IsLiveSimulation { get; set; }
     public int ReportingWindowMinutes { get; set; } = 10;
+
+    public bool IsMetricsRun { get; set; }
+    public string? BenchmarkKey { get; set; }
+    public int? TargetDurationSeconds { get; set; }
+    public int? Concurrency { get; set; }
+    public bool FailRunOnBenchmark { get; set; }
 
     /// <summary>Serialized List&lt;ImportedPatientInput&gt; for ID-based imported patients.</summary>
     public string ImportedPatientIdsJson { get; set; } = "[]";

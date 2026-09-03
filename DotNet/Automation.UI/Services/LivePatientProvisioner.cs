@@ -22,16 +22,27 @@ internal sealed class LivePatientProvisioner(
     FhirGenerationConfig? generationConfig,
     GenerationRequirementsPlan? generationRequirementsPlan,
     FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
-    ISnapshotStore snapshotStore) : ILivePatientProvisioner
+    ISnapshotStore snapshotStore,
+    IGeneratedPatientTemplateCache? generatedTemplateCache = null,
+    PatientProfile? shapeTemplate = null,
+    IReadOnlyList<string>? measureBundleJsons = null) : ILivePatientProvisioner
 {
     public async Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var eligibilities = selectedMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
+        // Mid-window generate is always "admit now and remain inpatient." Copy story + Intent
+        // from the run's qualifying cohort so the extra patient matches that test's shape
+        // instead of a blank ACH qualifier. Pattern is not copied — census for this patient
+        // is the live inject, not the original cohort timing.
         var profile = new PatientProfile(
             eligibilities,
             SeedOffset: manifest.PatientIds.Count + 10_000,
-            ScheduledInpatientPattern: ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+            ClinicalScenarioId: shapeTemplate?.ClinicalScenarioId,
+            ResourcesPerPatient: shapeTemplate?.ResourcesPerPatient ?? resourcesPerPatient,
+            ScheduledInpatientPattern: ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod,
+            CohortQualification: MeasureEligibility.Qualifying,
+            Intent: PatientGenerationIntent.Clone(shapeTemplate?.Intent));
 
         var (patientId, effectiveProfile) = await FhirGenerationPipeline.GenerateAndAppendPatientAsync(
             output,
@@ -43,7 +54,9 @@ internal sealed class LivePatientProvisioner(
             generationSeed,
             generationConfig,
             generationRequirementsPlan,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            generatedTemplateCache: generatedTemplateCache,
+            measureBundleJsons: measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
@@ -62,7 +75,8 @@ internal sealed class LivePatientProvisioner(
             manifest,
             imported,
             selectedMeasures,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
@@ -86,7 +100,8 @@ internal sealed class LivePatientProvisioner(
             manifest,
             imported,
             selectedMeasures,
-            acquisitionSimulation);
+            acquisitionSimulation,
+            measureBundleJsons);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(id, effectiveProfile);

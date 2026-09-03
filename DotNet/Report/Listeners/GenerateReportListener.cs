@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -160,6 +161,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     return;
                 }
 
+                using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
@@ -167,6 +169,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
+                var inboundMetricsMode = KafkaHeaderHelper.GetMetricsMode(result.Message.Headers);
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var reportTypes = value.ReportTypes;
@@ -333,10 +336,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         PatientId = entry.PatientId,
                                         ReportTrackingId = reportSchedule.Id.ToString(),
                                     },
-                                    Headers = new Headers
-                                        {
-                                            { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                                        }
+                                    Headers = CreateEvaluationRequestedHeaders(inboundMetricsMode)
                                 },
                                 deliveryReport =>
                                 {
@@ -370,7 +370,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
                 else
                 {
-                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken);
+                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken, inboundMetricsMode);
                 }
             }
             catch (DeadLetterException ex)
@@ -427,6 +427,20 @@ namespace LantanaGroup.Link.Report.Listeners
             admittedPatients = JsonSerializer.Deserialize<List>(censusContent, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
+        }
+
+        private static Headers CreateEvaluationRequestedHeaders(string? metricsMode)
+        {
+            var headers = new Headers
+            {
+                { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+            };
+            if (!string.IsNullOrWhiteSpace(metricsMode))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, metricsMode);
+            }
+
+            return headers;
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

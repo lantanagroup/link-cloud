@@ -28,8 +28,27 @@ public class TestScenarioDefinition
     /// <summary>How the report is triggered.</summary>
     public ReportMethod ReportMethod { get; set; } = ReportMethod.Adhoc;
 
-    /// <summary>Selected measures for the run.</summary>
+    /// <summary>
+    /// Generation families selected for the run (ACH Monthly / Daily / Hypoglycemic).
+    /// Derived from <see cref="SelectedMeasureIds"/> when templates are resolved.
+    /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
+
+    /// <summary>
+    /// Measure template ids selected in the scenario editor. Empty on legacy documents;
+    /// <see cref="NormalizeMeasureSelection"/> maps families onto the system template ids.
+    /// </summary>
+    public List<Guid> SelectedMeasureIds { get; set; } = [];
+
+    /// <summary>
+    /// Fills <see cref="SelectedMeasureIds"/> from <see cref="SelectedMeasures"/> when the
+    /// saved document predates templates (enum-only selection).
+    /// </summary>
+    public void NormalizeMeasureSelection()
+    {
+        if (SelectedMeasureIds.Count == 0 && SelectedMeasures.Count > 0)
+            SelectedMeasureIds = MeasureTemplateCatalog.SystemIdsFor(SelectedMeasures);
+    }
 
     // ----- Patient Pool -----
 
@@ -119,6 +138,26 @@ public class TestScenarioDefinition
     /// Live reporting window length in minutes (typically 5, 10, or 15).
     /// </summary>
     public int ReportingWindowMinutes { get; set; } = 10;
+
+    // ----- Metrics run -----
+
+    /// <summary>
+    /// When true, Automation mints X-Metrics-Mode=performance on the ad-hoc report origin.
+    /// Lightweight (default) otherwise.
+    /// </summary>
+    public bool IsMetricsRun { get; set; }
+
+    /// <summary>Optional key used later to compare against stored benchmarks.</summary>
+    public string? BenchmarkKey { get; set; }
+
+    /// <summary>Pass/fail SLO in seconds (not a soak). Null = no duration SLO.</summary>
+    public int? TargetDurationSeconds { get; set; }
+
+    /// <summary>1–8 inclusive. Maps to DA MaxConcurrentRequests later; stored now for the editor.</summary>
+    public int? Concurrency { get; set; }
+
+    /// <summary>When true, a benchmark miss fails the Automation run. Default false.</summary>
+    public bool FailRunOnBenchmark { get; set; }
 
     // ----- Imported Patients (supplemental, separate from cohorts/random pool) -----
 

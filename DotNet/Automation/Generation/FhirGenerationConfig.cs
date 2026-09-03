@@ -50,4 +50,5 @@ public class FhirGenerationConfig
     /// patient/encounter queryability (e.g., Provenance.target, ImagingStudy.basedOn).
     /// </summary>
     public bool IncludeLowValueOptionalReferences { get; set; } = true;
+
 }

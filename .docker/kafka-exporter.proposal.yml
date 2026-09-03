@@ -1,0 +1,24 @@
+# INFRA PROPOSAL — not included in docker-compose.yml and not shown on the
+# Automation Metrics page. Kafka lag stays a Grafana/ops signal until ops
+# confirms they want an exporter. Topics that would matter:
+#   ResourcesAcquired, ResourcesNormalized, ReadyForValidation,
+#   ReadyToAcquire, SubmitPayload, ReportScheduled
+#
+# To try locally: docker compose -f docker-compose.yml -f .docker/kafka-exporter.proposal.yml up -d kafka-exporter
+services:
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    container_name: kafka-exporter
+    profiles: ["infra-proposal"]
+    command:
+      - "--kafka.server=kafka_b:9092"
+      - "--sasl.enabled"
+      - "--sasl.mechanism=plain"
+      - "--sasl.username=${KAFKA_SASL_CLIENT_USER}"
+      - "--sasl.password=${KAFKA_SASL_CLIENT_PASSWORD}"
+      - "--web.listen-address=:9308"
+    ports:
+      - "9308:9308"
+    depends_on:
+      kafka_b:
+        condition: service_started

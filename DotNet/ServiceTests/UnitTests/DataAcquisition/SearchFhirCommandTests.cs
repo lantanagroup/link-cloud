@@ -8,7 +8,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -235,6 +237,35 @@ public class SearchFhirCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ResourceAcquiredCounter_OmitsUnboundedIdentityLabels()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        List<KeyValuePair<string, object?>>? capturedTags = null;
+        metrics
+            .Setup(m => m.IncrementResourceAcquiredCounter(It.IsAny<List<KeyValuePair<string, object?>>>()))
+            .Callback<List<KeyValuePair<string, object?>>>(tags => capturedTags = tags);
+
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        Assert.NotNull(capturedTags);
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.FacilityId && (tag.Value?.ToString() ?? "") == "test-facility");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.ResourceType && (tag.Value?.ToString() ?? "") == "Patient");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.Phase);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ResourceId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ReportTrackingId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.PatientId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.CorrelationId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "patient_id");
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "correlation_id");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ContinueAsyncReceives429_ThrowsTooManyRequestsExceptionWithParsedRetryAfter()
     {
         var stub = new StubHttpMessageHandler();
@@ -351,5 +382,38 @@ public class SearchFhirCommandTests
         var captured = Assert.Single(stub.CapturedRequests);
         Assert.Equal(HttpMethod.Post, captured.Method);
         Assert.EndsWith("_search", captured.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotRecordSemaphoreWaitWhenLightweight()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration(It.IsAny<string>(), It.IsAny<double>()),
+            Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RecordsSemaphoreWaitWhenPerformanceMode()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        using var scope = MetricsModeScope.Begin(true);
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration("test-facility", It.Is<double>(d => d >= 0)),
+            Times.Once());
     }
 }

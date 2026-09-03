@@ -266,6 +266,8 @@ services:
     networks:
       - link-nw
       
+  # Kafka lag exporter is an infra proposal only (.docker/kafka-exporter.proposal.yml).
+  # It is not part of this compose file and is not shown on the Automation Metrics page.
   otel-collector:
     image: otel/opentelemetry-collector:0.88.0
     container_name: open-telemetry-collector
@@ -717,6 +719,9 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Telemetry__EnableTelemetry: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -724,6 +729,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Automation.UI/Dockerfile
+      additional_contexts:
+        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
     networks:
@@ -1012,6 +1019,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/MockFhirServer/Dockerfile
+      additional_contexts:
+        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
     networks:

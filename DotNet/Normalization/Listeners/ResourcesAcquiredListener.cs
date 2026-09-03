@@ -14,10 +14,12 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
@@ -45,6 +47,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
+    private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -63,7 +66,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache,
-        IResourceCachePurger resourceCachePurger)
+        IResourceCachePurger resourceCachePurger,
+        IOptionsMonitor<TelemetrySettings> telemetrySettings)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -91,6 +95,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
+        _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -212,6 +217,12 @@ public class ResourcesAcquiredListener : BackgroundService
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
+        using var duration = _metrics.MeasureNormalizationDuration(
+        [
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(result.Message.Value.QueryType))
+        ]);
+
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
@@ -290,13 +301,9 @@ public class ResourcesAcquiredListener : BackgroundService
 
                                 if (operationResult.SuccessCode == OperationStatus.Success)
                                 {
-                                    _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
-                                                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
-                                                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-                                                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
-                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
-                                                    new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
-                                                        operationResult.SuccessCode == OperationStatus.Success);
+                                    _metrics.IncrementResourceChangedCounter(
+                                        BuildResourceChangedTags(result.Message.Key.FacilityId, correlationId, result.Message.Key.PatientId, resource.TypeName, operation.OperationType.ToString()),
+                                        operationResult.SuccessCode == OperationStatus.Success);
                                 }
                             }
                             else
@@ -381,12 +388,36 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
+    private List<KeyValuePair<string, object?>> BuildResourceChangedTags(
+        string facilityId,
+        string correlationId,
+        string? patientId,
+        string resourceType,
+        string operationType)
+    {
+        var tags = new List<KeyValuePair<string, object?>>
+        {
+            new(DiagnosticNames.FacilityId, facilityId),
+            new(DiagnosticNames.ResourceType, resourceType),
+            new(DiagnosticNames.OperationType, operationType)
+        };
+
+        if (_telemetrySettings.CurrentValue.PatientTags)
+        {
+            tags.Add(new(DiagnosticNames.PatientId, patientId));
+            tags.Add(new(DiagnosticNames.CorrelationId, correlationId));
+        }
+
+        return tags;
+    }
+
     private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
         };
+        KafkaHeaderHelper.CopyMetricsMode(message?.Message?.Headers, headers);
 
         var resourceNormalizedMessage = new ResourcesNormalizedValue
         {

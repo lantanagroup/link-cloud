@@ -28,6 +28,16 @@ public class MeasureReportGeneratedProducer {
             String measureReportId,
             String payloadUri,
             String blobName) {
+        produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, payloadUri, blobName, null);
+    }
+
+    public void produceMeasureReportGeneratedRecord (
+            PatientReportingEvaluationStatus patientStatus,
+            PatientReportingEvaluationStatus.Report report,
+            String measureReportId,
+            String payloadUri,
+            String blobName,
+            org.apache.kafka.common.header.Headers inboundHeaders) {
 
         if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReportId == null) {
             throw new IllegalArgumentException("All parameters are required");
@@ -58,6 +68,7 @@ public class MeasureReportGeneratedProducer {
 
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
+        Headers.copyMetricsMode(inboundHeaders, headers);
 
         try {
             resourceEvaluatedTemplate.send(new ProducerRecord<>(

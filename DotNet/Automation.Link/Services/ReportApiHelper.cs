@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
 using System.IO.Compression;
@@ -64,7 +65,8 @@ public class ReportApiHelper
             StartDate = DateTime.Parse(config.StartDate),
             EndDate = DateTime.Parse(config.EndDate),
             ReportTypes = measureIds,
-            PatientIds = config.PatientIds
+            PatientIds = config.PatientIds,
+            MetricsMode = config.IsMetricsRun ? "performance" : null
         };
 
         var response = await _facilityClient.GenerateAdhocReportAsync(facilityId, body);
@@ -79,14 +81,15 @@ public class ReportApiHelper
     /// Triggers a regeneration of an existing submitted report.
     /// Returns the new report ID created by the regeneration.
     /// </summary>
-    public async Task<string> RegenerateReportAsync(string facilityId, string existingReportId)
+    public async Task<string> RegenerateReportAsync(string facilityId, string existingReportId, bool isMetricsRun = false)
     {
         _output.WriteLine($"Regenerating report (facilityId={facilityId}, existingReportId={existingReportId})...");
 
         var request = new RegenerateReportRequest
         {
             ReportId = existingReportId,
-            BypassSubmission = false
+            BypassSubmission = false,
+            MetricsMode = isMetricsRun ? "performance" : null
         };
 
         var response = await _facilityClient.RegenerateReportAsync(facilityId, request);
@@ -105,7 +108,8 @@ public class ReportApiHelper
         DateTimeOffset startDateUtc,
         TimeSpan reportDuration,
         Frequency frequency,
-        string? reportTrackingId = null)
+        string? reportTrackingId = null,
+        bool isMetricsRun = false)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("facilityId is required.", nameof(facilityId));
@@ -150,10 +154,7 @@ public class ReportApiHelper
             {
                 Key = facilityId,
                 Value = value,
-                Headers = new Headers
-                {
-                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
-                }
+                Headers = CreateScheduledReportHeaders(trackingId, isMetricsRun)
             });
 
         producer.Flush(TimeSpan.FromSeconds(5));
@@ -162,6 +163,20 @@ public class ReportApiHelper
             $"Scheduled report event produced via Kafka: reportTrackingId={trackingId}, " +
             $"start={startDateUtc:O}, end={endDateUtc:O}, durationMinutes={reportDuration.TotalMinutes:F0}");
         return trackingId;
+    }
+
+    private static Headers CreateScheduledReportHeaders(string trackingId, bool isMetricsRun)
+    {
+        var headers = new Headers
+        {
+            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
+        };
+        if (isMetricsRun)
+        {
+            KafkaHeaderHelper.SetMetricsMode(headers, "performance");
+        }
+
+        return headers;
     }
 
     /// <summary>

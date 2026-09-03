@@ -50,6 +50,9 @@ public class StartScenarioRequest : IValidatableObject
     /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
+    /// <summary>Measure template ids. Empty on legacy payloads; families then map to system templates.</summary>
+    public List<Guid> SelectedMeasureIds { get; set; } = [];
+
     public List<PatientCohortDefinition>? PatientCohorts { get; set; }
 
     /// <summary>
@@ -106,6 +109,14 @@ public class StartScenarioRequest : IValidatableObject
     [Range(1, 60)]
     public int? ReportingWindowMinutes { get; set; }
 
+    public bool IsMetricsRun { get; set; }
+    public string? BenchmarkKey { get; set; }
+    [Range(1, int.MaxValue)]
+    public int? TargetDurationSeconds { get; set; }
+    [Range(1, 8)]
+    public int? Concurrency { get; set; }
+    public bool FailRunOnBenchmark { get; set; }
+
     /// <summary>
     /// Cross-field validation. Rejects inverted report windows
     /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
@@ -126,6 +137,7 @@ public class StartScenarioRequest : IValidatableObject
     public static StartScenarioRequest FromScenario(TestScenarioDefinition scenario) => new()
     {
         Scenario = AutomationScenarioKind.Custom,
+        ScenarioId = scenario.Id,
         ScenarioName = scenario.Name,
         RunConfigurationJson = SerializeScenarioConfiguration(scenario),
         ReportMethod = scenario.ReportMethod,
@@ -134,6 +146,7 @@ public class StartScenarioRequest : IValidatableObject
         CleanupServiceData = scenario.CleanupServiceData,
         CleanupFhirData = scenario.CleanupFhirData,
         SelectedMeasures = scenario.SelectedMeasures,
+        SelectedMeasureIds = [.. scenario.SelectedMeasureIds],
         PatientCohorts = scenario.PatientCohorts,
         ImportedPatientIds = scenario.ImportedPatientIds,
         ImportedPatientBundles = scenario.ImportedPatientBundles,
@@ -145,6 +158,11 @@ public class StartScenarioRequest : IValidatableObject
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
         IsLiveSimulation = scenario.IsLiveSimulation,
         ReportingWindowMinutes = scenario.ReportingWindowMinutes,
+        IsMetricsRun = scenario.IsMetricsRun,
+        BenchmarkKey = scenario.BenchmarkKey,
+        TargetDurationSeconds = scenario.TargetDurationSeconds,
+        Concurrency = scenario.Concurrency,
+        FailRunOnBenchmark = scenario.FailRunOnBenchmark,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

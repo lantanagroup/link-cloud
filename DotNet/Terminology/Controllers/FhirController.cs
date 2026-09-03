@@ -2,6 +2,8 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Terminology.Application.Formatters;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +40,14 @@ public class FhirController(FhirService fhirService) : Controller
     /// content. The emptied value must not be passed on: an empty display disables the display check
     /// entirely, so the request would be answered with result=true instead of being rejected.
     /// </exception>
+    private bool IsPerformanceModeRequest()
+    {
+        if (Request?.Headers.TryGetValue(KafkaConstants.HeaderConstants.MetricsMode, out var values) != true)
+            return false;
+
+        return string.Equals(values.ToString(), "performance", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string? SanitizeTerminologyValue(string? value, string parameterName)
     {
         if (value is null)
@@ -259,6 +269,7 @@ public class FhirController(FhirService fhirService) : Controller
     public ActionResult<Parameters> ValidateCodeInCodeSystem([FromQuery] string? url, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? display, [FromBody] Parameters? parameters)
     {
+        using var metricsMode = MetricsModeScope.Begin(IsPerformanceModeRequest());
         try
         {
             return Ok(fhirService.ValidateCodeInCodeSystem(
@@ -380,6 +391,7 @@ public class FhirController(FhirService fhirService) : Controller
         [FromQuery][PreserveEmptyString] string? system, [FromQuery] string? code, [FromQuery] string? display,
         [FromBody] Parameters? parameters)
     {
+        using var metricsMode = MetricsModeScope.Begin(IsPerformanceModeRequest());
         try
         {
             return Ok(fhirService.ValidateCodeInValueSet(

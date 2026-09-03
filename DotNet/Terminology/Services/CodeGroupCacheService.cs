@@ -292,7 +292,8 @@ public class CodeGroupCacheService(
 
         // Read the JSON file and parse it as a FHIR resource
         var jsonContent = await ReadAllTextAsync(jsonFilePath);
-        codeGroup.Resource = new FhirJsonParser().Parse<Resource>(jsonContent);
+        codeGroup.Resource = new FhirJsonDeserializer(new DeserializerSettings().UsingMode(DeserializationMode.Ostrich))
+            .Deserialize<Resource>(jsonContent);
 
         if (codeGroup.Resource is CodeSystem codeSystem)
         {

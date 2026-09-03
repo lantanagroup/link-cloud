@@ -1,6 +1,8 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,6 +23,7 @@ namespace Automation.UI.Controllers.Api;
 public sealed class AutomationRunsApiController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
+    MetricsRunPresenter metricsPresenter,
     ILogger<AutomationRunsApiController> logger) : ControllerBase
 {
     /// <summary>
@@ -48,7 +51,7 @@ public sealed class AutomationRunsApiController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to start scenario {ScenarioId} via API.", request.ScenarioId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
         }
 
         return Accepted(new
@@ -58,6 +61,93 @@ public sealed class AutomationRunsApiController(
             scenarioName = scenario.Name,
             source = request.Source,
         });
+    }
+
+    /// <summary>
+    /// Lists Metrics-run snapshots from Mongo. Does not query Prometheus.
+    /// </summary>
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListMetrics(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var (records, metadata) = await metricsPresenter.ListAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    /// <summary>
+    /// Lists stored Metrics benchmarks.
+    /// </summary>
+    [HttpGet("metrics/benchmarks")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListBenchmarks(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var (records, metadata) = await metricsPresenter.ListBenchmarksAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    [HttpGet("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBenchmark(string key, CancellationToken cancellationToken)
+    {
+        var document = await metricsPresenter.GetBenchmarkAsync(key, cancellationToken);
+        if (document == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Benchmark not found",
+                detail: $"Benchmark '{key}' was not found.");
+        }
+
+        return Ok(document);
+    }
+
+    [HttpPut("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PutBenchmark(
+        string key,
+        [FromBody] AutomationMetricsBenchmarkDocument body,
+        CancellationToken cancellationToken)
+    {
+        if (body == null || string.IsNullOrWhiteSpace(key)
+            || !string.Equals(body.Key, key, StringComparison.Ordinal))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Benchmark key mismatch",
+                detail: "The route key must match the body key.");
+        }
+
+        if (body.RegressionPercent <= 0)
+            body.RegressionPercent = 10;
+
+        await metricsPresenter.UpsertBenchmarkAsync(body, cancellationToken);
+        return Accepted(body);
+    }
+
+    /// <summary>
+    /// Returns the persisted Metrics snapshot for a run. 404 only when both the
+    /// operational run and the metrics snapshot are missing. A deleted run still
+    /// returns 200 when <c>automation_run_metrics</c> has a row. When the snapshot
+    /// row is missing but the run exists, returns wall-clock fields with stages
+    /// marked unavailable. Does not query Prometheus.
+    /// </summary>
+    [HttpGet("{runId:guid}/metrics")]
+    [ProducesResponseType(typeof(MetricsRunDetailViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMetrics(Guid runId, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetDetailAsync(runId, cancellationToken);
+        if (detail == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Run not found",
+                detail: $"Run {runId} not found.");
+        }
+
+        return Ok(detail);
     }
 
     /// <summary>

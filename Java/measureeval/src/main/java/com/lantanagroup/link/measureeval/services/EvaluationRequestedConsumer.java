@@ -83,16 +83,14 @@ public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, E
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        var reportTrackingId = record.value().getReportTrackingId();
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_TRACKING_ID), reportTrackingId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-
         String facilityId = record.key();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), facilityId).build();
+        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
         var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
-            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle);
+            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle, record.headers());
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
             throw new IllegalStateException("Patient status not found for previous report ID");
@@ -100,6 +98,10 @@ public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, E
     }
 
     private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+        evaluateMeasures(correlationId, value, patientStatus, bundle, null);
+    }
+
+    private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, org.apache.kafka.common.header.Headers inboundHeaders) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
@@ -138,10 +140,10 @@ public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, E
             boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
             r.setReportable(reportable);
             if (reportable) {
-                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport);
+                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport, inboundHeaders);
             } else {
                 String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null);
+                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null, inboundHeaders);
             }
         }
 
@@ -153,9 +155,7 @@ public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, E
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+        Attributes attributes = MeasureEvalMetrics.buildPatientOutcomeAttributes(null, patientStatus);
             measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportablePatient);
 
     }

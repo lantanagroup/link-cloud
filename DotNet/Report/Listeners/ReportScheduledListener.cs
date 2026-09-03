@@ -129,6 +129,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("ReportScheduled event is null.");
                 }
 
+                using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
                 var key = result.Message.Key;
                 var value = result.Message.Value;
 

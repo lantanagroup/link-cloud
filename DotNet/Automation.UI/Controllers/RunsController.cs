@@ -1,9 +1,11 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace Automation.UI.Controllers;
 
@@ -14,8 +16,12 @@ public class RunsController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
+    IMeasureTemplateStore measureTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
+    GeneratedTemplateCacheVersionStore templateCacheVersionStore,
+    MetricsRunPresenter metricsPresenter,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -41,6 +47,8 @@ public class RunsController(
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -131,9 +139,9 @@ public class RunsController(
 
             // Build the run request from the complete persisted scenario rather than
             // relying on the default hidden values submitted by the Quick Launch form.
-            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+            var runId = await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
 
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Details), new { id = runId });
         }
 
         if (!ModelState.IsValid)
@@ -150,18 +158,34 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Index));
+        var startedRunId = await runManager.StartAsync(request, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id = startedRunId });
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(
+        Guid id,
+        CancellationToken cancellationToken)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
         if (run == null)
             return NotFound();
 
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        if (run.IsMetricsRun)
+            ViewBag.Performance = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
         return View(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PerformancePanel(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
+        if (detail == null)
+            return NoContent();
+
+        return PartialView("~/Views/Metrics/_AdvancedPerformance.cshtml", detail);
     }
 
     [HttpGet]
@@ -177,6 +201,11 @@ public class RunsController(
 
         ViewBag.Run = run;
         ViewBag.RunId = id;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.LatestTemplateCacheVersionNumber = await GetLatestTemplateCacheVersionAsync(
+            run.GeneratedTemplateCacheScenarioKey,
+            cancellationToken);
         return View("Manifest", manifest);
     }
 
@@ -194,6 +223,42 @@ public class RunsController(
         var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
         if (abs == null) return NoContent();
         return Json(abs);
+    }
+
+    /// <summary>
+    /// Replays a patient's generated FHIR collection from the ABS template cache
+    /// (the same templates used during the run), substituting this run's resource IDs.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> DownloadGeneratedBundle(
+        Guid id,
+        string patientId,
+        [FromServices] GeneratedPatientBundleReplayService replayService,
+        CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(patientId))
+            return BadRequest("Patient ID is required.");
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        var result = await replayService.ReplayAsync(run, manifest, patientId.Trim(), cancellationToken);
+        if (!result.Found || string.IsNullOrWhiteSpace(result.BundleJson))
+            return NotFound(result.Error ?? "Generated bundle is not available for this patient.");
+
+        if (result.RunCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Version"] = result.RunCacheVersion.Value.ToString();
+        if (result.LatestCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Latest"] = result.LatestCacheVersion.Value.ToString();
+        if (result.GenerationChanged)
+            Response.Headers["X-Generation-Template-Stale"] = "true";
+
+        return File(
+            Encoding.UTF8.GetBytes(result.BundleJson),
+            "application/fhir+json",
+            result.FileName);
     }
 
     [HttpGet]
@@ -654,5 +719,11 @@ public class RunsController(
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
             .ToList();
+    }
+
+    private async Task<int?> GetLatestTemplateCacheVersionAsync(string? scenarioKey, CancellationToken cancellationToken)
+    {
+        var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
+        return latest?.VersionNumber;
     }
 }

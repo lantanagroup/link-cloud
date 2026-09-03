@@ -5,8 +5,8 @@
 /// encounter for the Initial Population (IP) of each NHSN measure family.
 ///
 /// <para>
-/// Aligned with the CQL retrieves bundled in the canonical NHSN measure libraries
-/// shipped under <c>DotNet/Automation/measures/*.json</c> (decoded base64 CQL):
+/// Aligned with the CQL retrieves in the system measure libraries
+/// (<c>DotNet/Automation/measures/*.json</c>, decoded base64 CQL):
 /// </para>
 /// <list type="bullet">
 ///   <item>

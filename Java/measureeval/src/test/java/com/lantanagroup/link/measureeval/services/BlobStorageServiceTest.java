@@ -29,6 +29,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 class BlobStorageServiceTest {
@@ -113,7 +114,7 @@ class BlobStorageServiceTest {
         String expectedBlobName = "root/patient-patient1-type1.mr";
         verify(containerClient).getBlobClient(expectedBlobName);
         verify(blobClient).upload(any(BinaryData.class), eq(true));
-        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(eq(status), eq(report), eq(measureReport.getIdPart()), anyString(), eq(expectedBlobName));
+        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(eq(status), eq(report), eq(measureReport.getIdPart()), anyString(), eq(expectedBlobName), isNull());
     }
 
     @Test

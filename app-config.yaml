@@ -187,6 +187,10 @@ global:
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "Telemetry:PrometheusQueryEndpoint"
+    description: "Prometheus HTTP query base URL used by Automation.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
+    required: false
+    consumers: ["AutomationUI"]
     
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and

@@ -88,9 +88,32 @@ public class RunExecutorGenerationBranchTests
         request.SelectedMeasures.Should().BeSameAs(selectedMeasures);
         request.ImportedPatients.Should().BeNull();
         request.GeneratedTemplateCache.Should().BeNull();
+
+        var cache = new Mock<IGeneratedPatientTemplateCache>(MockBehavior.Strict).Object;
+        var withCache = RunExecutor.BuildNonProfileGenerationRequest(
+            selectedMeasures,
+            patientCount: 4,
+            resourcesPerPatient: 123,
+            seed: 20260812,
+            cache);
+        withCache.GeneratedTemplateCache.Should().BeSameAs(cache);
         request.Profiles.Should().HaveCount(4);
         request.Profiles.Should().OnlyContain(profile =>
             selectedMeasures.All(profile.QualifiesFor)
             && profile.ResourcesPerPatient == 123);
+    }
+
+    [Theory]
+    [InlineData(ReportMethod.Adhoc, false, false)]
+    [InlineData(ReportMethod.Adhoc, true, false)]
+    [InlineData(ReportMethod.ScheduledReport, false, true)]
+    [InlineData(ReportMethod.ScheduledReport, true, true)]
+    [InlineData(ReportMethod.RegenerateReport, false, true)]
+    public void Census_schedule_kickoff_is_scheduled_or_regenerate_prerequisite(ReportMethod method, bool live, bool expected)
+    {
+        ReportExecution.UsesCensusScheduleKickoff(method).Should().Be(expected);
+        ReportExecution.IsScheduledLike(method, live).Should().Be(expected);
+        ReportExecution.IsLiveAllowed(method).Should().Be(method == ReportMethod.ScheduledReport);
+        ReportExecution.NonLiveScheduledCloseMinutes.Should().Be(2);
     }
 }

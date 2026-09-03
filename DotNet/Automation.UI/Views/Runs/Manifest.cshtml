@@ -97,6 +97,7 @@
 
     <!-- ════════════════════ PATIENTS TAB ════════════════════ -->
     <div class="tab-pane fade" id="tab-patients">
+        <div id="generationTemplateBanner" class="mb-3"></div>
         <div class="au-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-people me-2"></i>Per-Patient Resource Breakdown</span>
@@ -136,9 +137,15 @@
 
     const runId = '@runId';
     const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(run.RunConfigurationJson ?? string.Empty));
+    const patientConfigurationCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        ((List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? []).Select(c => new { c.Id, c.Name }),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     const manifestDataUrl = '@Url.Action("ManifestData", "Runs")';
     const absDataUrl = '@Url.Action("AbsUploadData", "Runs")';
+    const downloadBundleUrl = '@Url.Action("DownloadGeneratedBundle", "Runs")';
     const isComplete = @(isComplete ? "true" : "false");
+    const cacheVersion = @(ViewBag.TemplateCacheVersionNumber as int? ?? 0);
+    const latestCacheVersion = @(ViewBag.LatestTemplateCacheVersionNumber as int? ?? 0);
 
     const measureShortNames = {
         NhsnAcuteCareHospitalMonthlyInitialPopulation: 'ACH Monthly',
@@ -166,6 +173,47 @@
         const d = document.createElement('div');
         d.appendChild(document.createTextNode(s));
         return d.innerHTML;
+    }
+
+    function generatedBundleDownloadLink(patientId) {
+        const hasTemplate = !!(manifestData?.templateCacheKeyByPatient?.[patientId]);
+        if (!hasTemplate) {
+            return `<span class="text-muted" title="Imported patients have no generated template to replay.">&ndash;</span>`;
+        }
+
+        const stale = latestCacheVersion > cacheVersion && cacheVersion > 0;
+        const title = stale
+            ? `Download generated FHIR bundle. This run used generation template v${cacheVersion}; latest is v${latestCacheVersion} (the generator has changed since this run). Replay uses the template stored for this run.`
+            : 'Download generated FHIR bundle (replayed from this run\'s generation template)';
+        const href = `${downloadBundleUrl}?id=${encodeURIComponent(runId)}&patientId=${encodeURIComponent(patientId)}`;
+        const staleClass = stale ? ' btn-outline-warning' : ' btn-outline-secondary';
+        return `<a href="${href}" class="btn btn-sm${staleClass} py-0 px-1" title="${escapeHtml(title)}" download>
+            <i class="bi bi-download"></i><span class="visually-hidden">Download bundle</span>
+        </a>`;
+    }
+
+    function renderGenerationTemplateBanner() {
+        const banner = document.getElementById('generationTemplateBanner');
+        if (!banner) return;
+        if (!cacheVersion) {
+            banner.innerHTML = '';
+            return;
+        }
+
+        if (latestCacheVersion > cacheVersion) {
+            banner.innerHTML = `<div class="alert alert-warning py-2 small mb-0">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                This run used <strong>generation templates v${cacheVersion}</strong>.
+                Latest for this scenario is <strong>v${latestCacheVersion}</strong> — the generator has changed since this run.
+                Downloads replay the templates stored for <em>this</em> run, not the latest generator.
+            </div>`;
+            return;
+        }
+
+        banner.innerHTML = `<div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Patient bundles are replayed from <strong>generation templates v${cacheVersion}</strong> (the same ABS templates used to generate this run).
+        </div>`;
     }
 
     function formatScheduledPattern(value) {
@@ -418,6 +466,7 @@
         fallbackInpatientPatternByPatient =
             buildFallbackInpatientPatternMap(m);
 
+        renderGenerationTemplateBanner();
         renderPatientBreakdown();
 
         const searchInput = document.getElementById('patientSearch');
@@ -529,8 +578,10 @@
                         </button>
                     </th>
                 <th>Inpatient Pattern</th>
+                <th>Patient config</th>
                 <th class="text-end">Total</th>
                 <th>Resource Types</th>
+                <th class="text-end">Bundle</th>
             </tr>
         </thead>
         <tbody>`;
@@ -545,8 +596,10 @@
             html += `<tr>
                 <td><code>${escapeHtml(pid)}</code></td>
                 <td>${formatScheduledPattern(inpatientPattern)}</td>
+                <td>${escapeHtml(patientConfigLabelForId(pid))}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
                 <td style="max-width:500px;">${types}</td>
+                <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -604,6 +657,30 @@
         }
 
         return map;
+    }
+
+    function patientConfigLabelForId(patientId) {
+        try {
+            const cfg = runConfigurationJson ? JSON.parse(runConfigurationJson) : null;
+            const cohorts = Array.isArray(cfg?.patientCohorts) ? cfg.patientCohorts : [];
+            if (!cohorts.length || !manifestData?.patientIds) return 'Quick setup';
+            const index = manifestData.patientIds.indexOf(patientId);
+            if (index < 0) return 'Quick setup';
+            let cursor = 0;
+            for (const c of cohorts) {
+                const count = Number.parseInt(String(c?.patientCount ?? 0), 10);
+                const safe = Number.isFinite(count) && count > 0 ? count : 0;
+                if (index < cursor + safe) {
+                    const id = c?.patientConfigurationId;
+                    if (!id) return c?.intent ? 'Quick setup (customized)' : 'Quick setup';
+                    const hit = (patientConfigurationCatalog || []).find(x => x.id === id);
+                    const name = hit ? hit.name : String(id).slice(0, 8);
+                    return c?.intent ? name + ' + overlays' : name;
+                }
+                cursor += safe;
+            }
+        } catch { /* ignore */ }
+        return 'Quick setup';
     }
 
     // ─── COMPARISON TAB ────────────────────────────────────────────
@@ -763,6 +840,7 @@
                 <th class="text-end">Actual ABS</th>
                 <th class="text-end">Δ</th>
                 <th>Verdict</th>
+                <th class="text-end">Bundle</th>
                 <th></th>
             </tr></thead><tbody>`;
 
@@ -810,9 +888,10 @@
                     <td class="text-end">${aTotal > 0 ? aTotal.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
                     <td class="text-end fw-semibold">${d !== 0 ? dSign + d.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
                     <td>${verdict}</td>
+                    <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
                     <td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="this.closest('tr').nextElementSibling.classList.toggle('d-none');this.querySelector('i').classList.toggle('bi-chevron-down');this.querySelector('i').classList.toggle('bi-chevron-up');"><i class="bi bi-chevron-down"></i></button></td>
                 </tr>
-                <tr class="d-none"><td colspan="7" class="p-0">${detailHtml}</td></tr>`;
+                <tr class="d-none"><td colspan="8" class="p-0">${detailHtml}</td></tr>`;
             });
             html += '</tbody></table></div></div></div>';
         }

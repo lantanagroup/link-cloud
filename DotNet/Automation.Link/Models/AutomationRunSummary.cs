@@ -9,6 +9,10 @@ public class AutomationRunSummary
     public int PatientCount { get; set; }
     public int ResourcesPerPatient { get; set; }
     public int Seed { get; set; }
+    /// <summary>
+    /// When true, this Automation run minted X-Metrics-Mode=performance at the report origin.
+    /// </summary>
+    public bool IsMetricsRun { get; set; }
     public AutomationRunStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }

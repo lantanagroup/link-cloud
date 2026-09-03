@@ -172,9 +172,11 @@ class EvaluateMeasureServiceTest {
 
         io.opentelemetry.api.common.Attributes attributes = attributesCaptor.getValue();
         assertEquals("facility-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.FACILITY_ID)));
-        assertEquals("patient-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PATIENT_ID)));
-        assertEquals("09234u2384772344", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TRACKING_ID)));
         assertEquals("Test-query", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PHASE)));
-        assertEquals("correlation-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.CORRELATION_ID)));
+        assertEquals("measure-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey("report.type")));
+        assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PATIENT_ID)));
+        assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TRACKING_ID)));
+        assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.CORRELATION_ID)));
+        assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.RESOURCE_COUNT)));
     }
 }

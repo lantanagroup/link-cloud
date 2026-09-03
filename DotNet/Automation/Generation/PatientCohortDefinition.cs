@@ -39,6 +39,18 @@ public class PatientCohortDefinition
     public int ResourcesPerPatientMax { get; set; } = 100;
 
     /// <summary>
+    /// Optional saved Patient Configuration this cohort uses. Live reference:
+    /// editing the configuration updates runs that point at it.
+    /// </summary>
+    public Guid? PatientConfigurationId { get; set; }
+
+    /// <summary>
+    /// Inline generation overlays. Applied after a referenced configuration.
+    /// Null / empty fields inherit the clinical-scenario pack.
+    /// </summary>
+    public PatientGenerationIntent? Intent { get; set; }
+
+    /// <summary>
     /// Returns the eligibility for a specific measure.
     /// Measures not in the map are treated as non-qualifying.
     /// </summary>
@@ -87,7 +99,8 @@ public class PatientCohortDefinition
                     scenarioId,
                     resources,
                     cohort.ScheduledInpatientPattern,
-                    cohort.CohortQualification));
+                    cohort.CohortQualification,
+                    PatientGenerationIntent.Clone(cohort.Intent)));
                 seedCursor++;
             }
 

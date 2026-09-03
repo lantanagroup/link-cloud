@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -26,6 +25,7 @@ public class PipelineSummarySnapshotBuilder
         public IReadOnlyList<PipelineDataReader.ReportEntryInfo> Entries { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.ReportPopulationInfo> Populations { get; init; } = [];
         public PipelineDataReader.AcquisitionSummaryInfo? AcquisitionSummary { get; init; }
+        public IReadOnlyList<PipelineDataReader.AcquisitionLogInfo> AcquisitionLogs { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> MeasureEvalResourceCounts { get; init; } = [];
 
         /// <summary>
@@ -97,6 +97,8 @@ public class PipelineSummarySnapshotBuilder
         public double CompletionRatePerSecond { get; set; }
         public int ResourceCount { get; set; }
         public double AverageResourcesPerSecond { get; set; }
+        /// <summary>Wall-clock seconds the stage was actually active, not end-to-end run time.</summary>
+        public double? ActiveDurationSeconds { get; set; }
         public List<CategoryCountSnapshot> StatusCounts { get; set; } = [];
         public List<CategoryCountSnapshot> ResourceTypeCounts { get; set; } = [];
         public List<ThroughputBucketSnapshot> ThroughputBuckets { get; set; } = [];
@@ -108,6 +110,8 @@ public class PipelineSummarySnapshotBuilder
         public double CompletionRatePerSecond { get; set; }
         public int ResourceCount { get; set; }
         public double AverageResourcesPerSecond { get; set; }
+        /// <summary>Wall-clock seconds the stage was actually active, not end-to-end run time.</summary>
+        public double? ActiveDurationSeconds { get; set; }
         public List<CategoryCountSnapshot> StatusCounts { get; set; } = [];
         public List<CategoryCountSnapshot> FunnelCounts { get; set; } = [];
         public List<CategoryCountSnapshot> ResourceTypeCounts { get; set; } = [];
@@ -142,20 +146,7 @@ public class PipelineSummarySnapshotBuilder
             ReportId = reportId
         };
 
-        var measureLines = FilterLines(logs, "measure", "measureeval", "subject-list", "evaluate");
-        var validationLines = FilterLines(logs, "validation", "operationoutcome", "failedvalidation", "report internal abs manifest validation");
-        var dataAcquisitionLines = FilterLines(logs, "data acquisition", "dataacq", "query plan", "fhir query", "resourceacquired", "acquisition");
-        var normalizationLines = FilterLines(logs, "normalization", "resourcenormalized", "normalizing");
         var lokiErrors = ParseLokiErrorEntries(logs);
-
-        snapshot.MeasureEval.CompletionRatePerSecond = ComputeEventRatePerSecond(measureLines);
-        snapshot.Validation.CompletionRatePerSecond = ComputeEventRatePerSecond(validationLines);
-        snapshot.DataAcquisition.CompletionRatePerSecond = ComputeEventRatePerSecond(dataAcquisitionLines);
-        snapshot.Normalization.CompletionRatePerSecond = ComputeEventRatePerSecond(normalizationLines);
-        snapshot.MeasureEval.ThroughputBuckets = BuildThroughputBuckets(measureLines);
-        snapshot.Validation.ThroughputBuckets = BuildThroughputBuckets(validationLines);
-        snapshot.DataAcquisition.ThroughputBuckets = BuildThroughputBuckets(dataAcquisitionLines);
-        snapshot.Normalization.ThroughputBuckets = BuildThroughputBuckets(normalizationLines);
 
         snapshot.MeasureEval.Errors = GetServiceLokiErrors(lokiErrors, "Measure Eval");
         snapshot.Validation.Errors = GetServiceLokiErrors(lokiErrors, "Validation");
@@ -170,6 +161,7 @@ public class PipelineSummarySnapshotBuilder
             [
                 new MilestoneSnapshot { Name = "Report Scheduled", Completed = false },
                 new MilestoneSnapshot { Name = "Data Acquired", Completed = false },
+                new MilestoneSnapshot { Name = "Normalized", Completed = false },
                 new MilestoneSnapshot { Name = "Measure Evaluated", Completed = false },
                 new MilestoneSnapshot { Name = "Validation", Completed = false },
                 new MilestoneSnapshot { Name = "Submitted", Completed = false },
@@ -188,6 +180,7 @@ public class PipelineSummarySnapshotBuilder
         IReadOnlyList<PipelineDataReader.ReportEntryInfo> entries;
         IReadOnlyList<PipelineDataReader.ReportPopulationInfo> populations;
         PipelineDataReader.AcquisitionSummaryInfo? acquisitionSummary;
+        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo> acquisitionLogs;
         IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> measureEvalResourceCounts;
 
         var data = await _domainDataProvider(scheduleId, facilityId);
@@ -195,6 +188,7 @@ public class PipelineSummarySnapshotBuilder
         entries = data.Entries;
         populations = data.Populations;
         acquisitionSummary = data.AcquisitionSummary;
+        acquisitionLogs = data.AcquisitionLogs;
         measureEvalResourceCounts = data.MeasureEvalResourceCounts;
 
         snapshot.Report.Schedule = schedule == null
@@ -235,7 +229,6 @@ public class PipelineSummarySnapshotBuilder
 
         var dataAcqResources = acquisitionSummary?.TotalResourcesAcquired ?? 0;
         snapshot.DataAcquisition.ResourceCount = dataAcqResources;
-        snapshot.DataAcquisition.AverageResourcesPerSecond = ComputeResourcesPerSecond(dataAcqResources, dataAcquisitionLines);
         snapshot.DataAcquisition.ResourceTypeCounts = (acquisitionSummary?.ResourceTypeCounts ?? [])
             .Select(r => new CategoryCountSnapshot { Status = r.ResourceType, Count = r.Count })
             .OrderByDescending(x => x.Count)
@@ -246,19 +239,20 @@ public class PipelineSummarySnapshotBuilder
 
         // Normalization processes every resource acquired by DataAcquisition, so its
         // resource count mirrors DataAcquisition output. Resource type breakdown is the same.
+        // Rates stay 0 unless an independent Normalization window exists — do not reuse DA's clock.
         var normalizationResources = acquisitionSummary?.TotalResourcesAcquired ?? 0;
         snapshot.Normalization.ResourceCount = normalizationResources;
-        snapshot.Normalization.AverageResourcesPerSecond = ComputeResourcesPerSecond(normalizationResources, normalizationLines);
         snapshot.Normalization.ResourceTypeCounts = snapshot.DataAcquisition.ResourceTypeCounts.ToList();
 
         snapshot.MeasureEval.ResourceCount = measureResources;
-        snapshot.MeasureEval.AverageResourcesPerSecond = ComputeResourcesPerSecond(measureResources, measureLines);
 
         // Validation operates in a per-patient context -- its 'resource count' is the
         // number of patients whose validation reached a terminal status. The per-status
         // breakdown is supplied below via FunnelCounts.
         snapshot.Validation.ResourceCount = entries.Count;
-        snapshot.Validation.AverageResourcesPerSecond = ComputeResourcesPerSecond(entries.Count, validationLines);
+
+        ApplyAcquisitionWindowRates(snapshot.DataAcquisition, acquisitionLogs, dataAcqResources, snapshot.GeneratedAt);
+        ApplyValidationWindowRates(snapshot.Validation, entries);
 
         snapshot.MeasureEval.ResourceTypeCounts = measureEvalResourceCounts
             .GroupBy(x => x.ResourceType)
@@ -316,7 +310,18 @@ public class PipelineSummarySnapshotBuilder
         var dataAcqExplicitlyComplete = dataAcqTotalLogs > 0 && dataAcqTerminalLogs == dataAcqTotalLogs;
         var dataAcqImplicitlyComplete = dataAcqTotalLogs == 0 && entries.Any(e => e.MeasureReports.Count > 0);
         var dataAcqComplete = dataAcqExplicitlyComplete || dataAcqImplicitlyComplete;
-        var measureComplete = measureResources > 0;
+
+        // Normalization has produced output once MeasureEval has resources or measure reports.
+        // Require DA complete so the pill cannot light before acquisition finishes.
+        var normalizedComplete = dataAcqComplete
+            && (measureResources > 0 || entries.Any(e => e.MeasureReports.Count > 0));
+
+        var measureComplete = normalizedComplete
+            && entries.Count > 0
+            && entries.All(e =>
+                e.MeasureReports.Any(mr =>
+                    string.Equals(mr.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(mr.Status, "NotReportable", StringComparison.OrdinalIgnoreCase)));
 
         // Validation is complete when report entries exist and every entry has
         // reached a terminal reporting status (PassedValidation, FailedValidation,
@@ -354,6 +359,7 @@ public class PipelineSummarySnapshotBuilder
         [
             new MilestoneSnapshot { Name = "Report Scheduled", Completed = schedule != null },
             new MilestoneSnapshot { Name = "Data Acquired", Completed = dataAcqComplete },
+            new MilestoneSnapshot { Name = "Normalized", Completed = normalizedComplete },
             new MilestoneSnapshot { Name = "Measure Evaluated", Completed = measureComplete },
             new MilestoneSnapshot { Name = "Validation", Completed = validationComplete },
             new MilestoneSnapshot { Name = "Submitted", Completed = submitted },
@@ -385,43 +391,7 @@ public class PipelineSummarySnapshotBuilder
         return $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s";
     }
 
-    private static List<string> FilterLines(IEnumerable<string> lines, params string[] terms)
-    {
-        return lines
-            .Where(l => terms.Any(t => l.Contains(t, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-    }
-
-    private static List<string> ExtractErrorLines(IEnumerable<string> lines, Func<string, bool> serviceFilter)
-    {
-        return lines
-            .Where(l =>
-                IsErrorLike(l) && serviceFilter(l))
-            .TakeLast(50)
-            .ToList();
-    }
-
-    private static bool IsErrorLike(string line)
-    {
-        if (string.IsNullOrWhiteSpace(line))
-            return false;
-
-        // Diagnostic rollup lines are telemetry, not errors.
-        if (line.Contains("[DIAG]", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        // Aggregate counters like ERROR=140 are summaries, not individual error events.
-        if (Regex.IsMatch(line, @"\b(ERROR|WARNING|INFO|FATAL)=\d+\b", RegexOptions.IgnoreCase))
-            return false;
-
-        // User intent: only actual exception logging from Loki should drive these views.
-        return line.Contains("exception", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("unhandled", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("stacktrace", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("caused by", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("System.", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("java.", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsErrorLike(string line) => LokiLogLineParser.IsErrorLike(line);
 
     private static List<LokiErrorEntry> ParseLokiErrorEntries(IReadOnlyList<string> logs)
     {
@@ -481,7 +451,8 @@ public class PipelineSummarySnapshotBuilder
     private static string MapServiceName(string component)
     {
         if (string.Equals(component, LokiScraper.Components.DataAcquisition, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorker, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorker, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(component, LokiScraper.Components.DataAcquisitionWorkerDev, StringComparison.OrdinalIgnoreCase))
             return "Data Acquisition";
 
         if (string.Equals(component, LokiScraper.Components.MeasureEval, StringComparison.OrdinalIgnoreCase))
@@ -504,6 +475,9 @@ public class PipelineSummarySnapshotBuilder
 
         if (string.Equals(component, LokiScraper.Components.Tenant, StringComparison.OrdinalIgnoreCase))
             return "Tenant";
+
+        if (string.Equals(component, LokiScraper.Components.Census, StringComparison.OrdinalIgnoreCase))
+            return "Census";
 
         return component;
     }
@@ -555,72 +529,116 @@ public class PipelineSummarySnapshotBuilder
 
     private sealed record LokiErrorEntry(string Component, string Message);
 
-    private static double ComputeEventRatePerSecond(IReadOnlyList<string> lines)
+    private static void ApplyAcquisitionWindowRates(
+        DataAcquisitionSnapshot target,
+        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo> logs,
+        int resourceCount,
+        DateTimeOffset generatedAt)
     {
-        if (lines.Count == 0)
-            return 0;
+        var spans = new List<(DateTimeOffset Start, DateTimeOffset End)>();
+        var eventTimes = new List<DateTimeOffset>();
+        var inFlight = false;
 
-        var times = lines
-            .Select(TryParseLineTime)
-            .Where(t => t.HasValue)
-            .Select(t => t!.Value)
+        foreach (var log in logs)
+        {
+            var start = FirstUsableTimestamp(log.ExecutionDate, log.CreateDate)
+                ?? EstimatedStart(log.CompletionDate, log.CompletionTimeMilliseconds);
+            var end = FirstUsableTimestamp(log.CompletionDate, log.ExecutionDate, log.CreateDate);
+            if (start is null && end is null)
+                continue;
+
+            var resolvedEnd = end ?? start!.Value;
+            var resolvedStart = start ?? resolvedEnd;
+            if (resolvedStart > resolvedEnd)
+                resolvedStart = resolvedEnd;
+
+            spans.Add((resolvedStart, resolvedEnd));
+
+            if (log.CompletionDate is DateTime completion && IsUsable(completion))
+                eventTimes.Add(AsUtc(completion));
+            else
+                inFlight = true;
+        }
+
+        if (spans.Count == 0)
+            return;
+
+        var windowStart = spans.Min(s => s.Start);
+        var windowEnd = spans.Max(s => s.End);
+        if (inFlight && generatedAt > windowEnd)
+            windowEnd = generatedAt;
+
+        ApplyWindow(target, eventTimes.Count > 0 ? eventTimes.Count : spans.Count, resourceCount, windowStart, windowEnd, eventTimes);
+    }
+
+    private static void ApplyValidationWindowRates(
+        ServiceSnapshot target,
+        IReadOnlyList<PipelineDataReader.ReportEntryInfo> entries)
+    {
+        var validated = entries
+            .Where(e =>
+                string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (times.Count < 2)
-            return lines.Count;
-
-        var durationSeconds = Math.Max(1, (times[^1] - times[0]).TotalSeconds);
-        return Math.Round(lines.Count / durationSeconds, 2);
-    }
-
-    private static double ComputeResourcesPerSecond(int resources, IReadOnlyList<string> lines)
-    {
-        if (resources <= 0)
-            return 0;
-
-        var times = lines
-            .Select(TryParseLineTime)
-            .Where(t => t.HasValue)
-            .Select(t => t!.Value)
-            .ToList();
-
-        if (times.Count < 2)
-            return resources;
-
-        var durationSeconds = Math.Max(1, (times[^1] - times[0]).TotalSeconds);
-        return Math.Round(resources / durationSeconds, 2);
-    }
-
-    private static TimeSpan? TryParseLineTime(string line)
-    {
-        if (string.IsNullOrWhiteSpace(line) || line.Length < 10 || line[0] != '[')
-            return null;
-
-        var closing = line.IndexOf(']');
-        if (closing <= 1)
-            return null;
-
-        var token = line[1..closing];
-        if (TimeSpan.TryParseExact(token, "hh\\:mm\\:ss", CultureInfo.InvariantCulture, out var value))
-            return value;
-
-        return null;
-    }
-
-    private static List<ThroughputBucketSnapshot> BuildThroughputBuckets(IReadOnlyList<string> lines, int bucketSeconds = 10)
-    {
-        var times = lines
-            .Select(TryParseLineTime)
-            .Where(t => t.HasValue)
-            .Select(t => t!.Value)
+        var times = validated
+            .Select(e => e.ModifyDate ?? e.CreateDate)
+            .Where(t => t is DateTime dt && IsUsable(dt))
+            .Select(t => AsUtc(t!.Value))
             .ToList();
 
         if (times.Count == 0)
+            return;
+
+        ApplyWindow(target, validated.Count, validated.Count, times.Min(), times.Max(), times);
+    }
+
+    private static void ApplyWindow(
+        DataAcquisitionSnapshot target,
+        int eventCount,
+        int resourceCount,
+        DateTimeOffset start,
+        DateTimeOffset end,
+        IReadOnlyList<DateTimeOffset> eventTimes)
+    {
+        var seconds = Math.Max(0, (end - start).TotalSeconds);
+        if (seconds < 0.001)
+            seconds = 0.001;
+
+        target.ActiveDurationSeconds = Math.Round(seconds, 2);
+        target.CompletionRatePerSecond = Math.Round(eventCount / seconds, 2);
+        target.AverageResourcesPerSecond = resourceCount > 0 ? Math.Round(resourceCount / seconds, 2) : 0;
+        target.ThroughputBuckets = BuildThroughputBucketsFromTimes(eventTimes, start);
+    }
+
+    private static void ApplyWindow(
+        ServiceSnapshot target,
+        int eventCount,
+        int resourceCount,
+        DateTimeOffset start,
+        DateTimeOffset end,
+        IReadOnlyList<DateTimeOffset> eventTimes)
+    {
+        var seconds = Math.Max(0, (end - start).TotalSeconds);
+        if (seconds < 0.001)
+            seconds = 0.001;
+
+        target.ActiveDurationSeconds = Math.Round(seconds, 2);
+        target.CompletionRatePerSecond = Math.Round(eventCount / seconds, 2);
+        target.AverageResourcesPerSecond = resourceCount > 0 ? Math.Round(resourceCount / seconds, 2) : 0;
+        target.ThroughputBuckets = BuildThroughputBucketsFromTimes(eventTimes, start);
+    }
+
+    private static List<ThroughputBucketSnapshot> BuildThroughputBucketsFromTimes(
+        IReadOnlyList<DateTimeOffset> times,
+        DateTimeOffset origin,
+        int bucketSeconds = 10)
+    {
+        if (times.Count == 0)
             return [];
 
-        var origin = times[0];
         return times
-            .GroupBy(t => (int)Math.Floor((t - origin).TotalSeconds / bucketSeconds))
+            .GroupBy(t => (int)Math.Floor(Math.Max(0, (t - origin).TotalSeconds) / bucketSeconds))
             .OrderBy(g => g.Key)
             .Select(g => new ThroughputBucketSnapshot
             {
@@ -630,16 +648,40 @@ public class PipelineSummarySnapshotBuilder
             .ToList();
     }
 
-    private static bool IsActiveAcquisitionStatus(string? status)
+    private static DateTimeOffset? EstimatedStart(DateTime? completionDate, long? completionTimeMilliseconds)
     {
-        if (string.IsNullOrWhiteSpace(status))
-            return false;
+        if (completionDate is not DateTime completion || !IsUsable(completion))
+            return null;
 
-        return string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "Processing", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "InProgress", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "Queued", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "Running", StringComparison.OrdinalIgnoreCase);
+        var end = AsUtc(completion);
+        if (completionTimeMilliseconds is long ms && ms > 0)
+            return end - TimeSpan.FromMilliseconds(ms);
+
+        return end;
+    }
+
+    private static DateTimeOffset? FirstUsableTimestamp(params DateTime?[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (candidate is DateTime value && IsUsable(value))
+                return AsUtc(value);
+        }
+
+        return null;
+    }
+
+    private static bool IsUsable(DateTime value)
+        => value.Year >= 2000;
+
+    private static DateTimeOffset AsUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => new DateTimeOffset(value),
+            DateTimeKind.Local => new DateTimeOffset(value).ToUniversalTime(),
+            _ => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc))
+        };
     }
 }
 

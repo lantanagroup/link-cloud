@@ -13,8 +13,11 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text;
@@ -237,6 +240,9 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
+        var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        telemetrySettings.SetupGet(x => x.CurrentValue).Returns(new TelemetrySettings { PatientTags = false });
+
         return new ResourcesAcquiredListener(
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
             new ServiceInformation { ServiceConfigName = "Normalization" },
@@ -254,7 +260,8 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
-            Mock.Of<IResourceCachePurger>());
+            Mock.Of<IResourceCachePurger>(),
+            telemetrySettings.Object);
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)

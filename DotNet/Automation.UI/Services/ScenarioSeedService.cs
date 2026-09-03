@@ -47,14 +47,14 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly List<string> DefaultNonQualifyingScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.NonQualifying)];
 
+    private static readonly List<string> DailyAchEligibleScenarioIds =
+        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DailyAchMeasures, MeasureEligibility.Qualifying)];
+
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultQualifyingEligibilities =
         DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultNonQualifyingEligibilities =
         DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying);
-
-    private static readonly List<string> DailyAchEligibleScenarioIds =
-        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DailyAchMeasures, MeasureEligibility.Qualifying)];
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DailyAchQualifyingEligibilities =
         DailyAchMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
@@ -71,6 +71,7 @@ public sealed class ScenarioSeedService : IHostedService
 
         foreach (var scenario in systemScenarios)
         {
+            scenario.NormalizeMeasureSelection();
             var existing = await _store.GetByIdAsync(scenario.Id, cancellationToken);
             if (existing == null)
             {
@@ -91,12 +92,12 @@ public sealed class ScenarioSeedService : IHostedService
 
     private static List<TestScenarioDefinition> BuildSystemScenarios() =>
     [
-        // --- Adhoc Report Test (ad-hoc, 1 patient, 1000 resources) ---
+        // --- Adhoc Report Test (ad-hoc, ACH Monthly, 1 patient, 1000 resources) ---
         new TestScenarioDefinition
         {
             Id = AdhocReportTestId,
             Name = "Adhoc Report Test",
-            Description = "Single patient ad-hoc report. Mirrors the AdhocReportTest backend E2E test.",
+            Description = "Single patient ad-hoc report against ACH Monthly. Mirrors the AdhocReportTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
@@ -135,6 +136,8 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
             ResourcesPerPatientMax = 1000,
+            // Daily ACH is a one-day measure. A year-long ad-hoc window (the Monthly default)
+            // is not the protocol period and has produced empty Initial Population results.
             ReportPeriodStart = new DateTimeOffset(2023, 1, 15, 0, 0, 0, TimeSpan.Zero),
             ReportPeriodEnd = new DateTimeOffset(2023, 1, 15, 23, 59, 59, TimeSpan.Zero),
             PatientCohorts =

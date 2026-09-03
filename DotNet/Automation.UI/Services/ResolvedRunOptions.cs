@@ -54,4 +54,18 @@ public record ResolvedRunOptions(
     /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
     public int ReportingWindowMinutes { get; init; } = 10;
 
+    public bool IsMetricsRun { get; init; }
+    public string? BenchmarkKey { get; init; }
+    public int? TargetDurationSeconds { get; init; }
+    public int? Concurrency { get; init; }
+    public bool FailRunOnBenchmark { get; init; }
+
+    /// <summary>Measure template ids selected for this run (empty = use system templates for SelectedMeasures).</summary>
+    public List<Guid> SelectedMeasureIds { get; init; } = [];
+
+    /// <summary>
+    /// FHIR measure-bundle JSON, one per selected template, in load order.
+    /// System templates are seeded from <see cref="ProfiledMeasureCatalog.ReadBundleJson"/>.
+    /// </summary>
+    public List<string> MeasureBundleJsons { get; init; } = [];
 }

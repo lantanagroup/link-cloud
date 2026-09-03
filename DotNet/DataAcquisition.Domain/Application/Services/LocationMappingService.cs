@@ -855,14 +855,14 @@ public class LocationMappingService(
             return false;
         }
 
-        var element = location.ToTypedElement();
+        var node = location.ToPocoNode();
 
         // A location is an org location if it matches
         // ANY active condition. Priority is not decisive — it only affects evaluation order, so we
         // stop at the first match.
         foreach (var condition in conditions)
         {
-            if (!EvaluatesTrue(element, condition.FhirPath!))
+            if (!EvaluatesTrue(node, condition.FhirPath!))
             {
                 continue;
             }
@@ -902,27 +902,12 @@ public class LocationMappingService(
         return conditions;
     }
 
-    private bool EvaluatesTrue(ITypedElement element, string fhirPath)
+    private bool EvaluatesTrue(PocoNode node, string fhirPath)
     {
         try
         {
             var compiled = CompiledFhirPaths.GetOrAdd(fhirPath, fp => new FhirPathCompiler().Compile(fp));
-            var results = compiled(element, new EvaluationContext()).ToList();
-
-            if (results.Count == 0)
-            {
-                // empty result → no match
-                return false; 
-            }
-
-            // Boolean predicate (e.g. "...exists()"): honor the returned boolean.
-            if (results.Count == 1 && results[0].Value is bool isMatch)
-            {
-                return isMatch;
-            }
-
-            // Node-selecting expression (e.g. "identifier.where(system=...)"): non-empty → match.
-            return true;
+            return compiled.IsTrue(node, new EvaluationContext());
         }
         catch (Exception exception)
         {
