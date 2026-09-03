@@ -26,7 +26,7 @@ public static class EntryMapper
     /// <param name="nhsnOrgId">The facility the plan belongs to.</param>
     /// <param name="reportingMonth">
     /// The month the result was narrowed to, echoed from the request, or <c>null</c> when none
-    /// was supplied. Always null on an annual plan, where a month has no meaning.
+    /// was supplied.
     /// </param>
     /// <param name="reportingYear">
     /// The year the result was narrowed to, or <c>null</c> when none was supplied -- in which
@@ -77,8 +77,8 @@ public static class EntryMapper
                 {
                     Name = e.Measure,
                     Nhsnorgid = nhsnOrgId,
-                    Month = e.ReportingMonth?.ToString(CultureInfo.InvariantCulture),
-                    Year = e.ReportingYear.ToString(CultureInfo.InvariantCulture),
+                    Month = e.ReportingMonth,
+                    Year = e.ReportingYear,
                     Reporting = e.IsReporting,
                     RptSeq = 0
                 })
