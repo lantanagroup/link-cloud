@@ -21,16 +21,37 @@ namespace UnitTests.DMRP
         };
 
         private static FacilityReportingPlanRequest Request(string? component = null,
-            string? measureMappingId = "22222222-2222-2222-2222-222222222222") => new()
+            string? measureMappingId = "22222222-2222-2222-2222-222222222222",
+            string? measure = "HOB") => new()
         {
             FacilityId = "F1",
             MeasureMappingId = measureMappingId,
-            Measure = "HOB",
+            Measure = measure,
             Component = component,
             ReportingMonth = 5,
             ReportingYear = 2026,
             IsReporting = true
         };
+
+        [Theory]
+        [InlineData(" HOB")]
+        [InlineData("HOB ")]
+        [InlineData("  HOB  ")]
+        public void ToEntity_PaddedMeasure_IsTrimmed(string supplied)
+        {
+            // The measure is part of the unique key. SQL Server ignores a trailing blank when it
+            // compares but not a leading one, so an untrimmed " HOB" would be stored as an enrollment
+            // separate from "HOB" that the index would not recognise as a duplicate.
+            Assert.Equal("HOB", FacilityReportingPlanMapper.ToEntity(Request(measure: supplied)).Measure);
+        }
+
+        [Fact]
+        public void ToEntity_NoMeasureSupplied_IsEmptyRatherThanNull()
+        {
+            // Null is not a value the column can hold, and the manager takes the measure from the
+            // mapping when one is supplied. Trimming must not turn the absent case into a throw.
+            Assert.Equal(string.Empty, FacilityReportingPlanMapper.ToEntity(Request(measure: null)).Measure);
+        }
 
         [Fact]
         public void ToEntity_NoComponentSupplied_DefaultsToMsc()

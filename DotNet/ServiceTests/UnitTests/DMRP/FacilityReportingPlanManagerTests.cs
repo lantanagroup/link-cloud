@@ -329,6 +329,29 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
+        public async Task CreateAsync_DuplicateOfAnUnmappedEnrollment_NamesWhatItConflictedOn()
+        {
+            // The unique index is keyed on component and measure, and the mapping is optional. A
+            // message built from the mapping would name a field the conflict had nothing to do with,
+            // and would leave a blank where the reason belongs for exactly the unmapped enrollment
+            // this branch now exists to allow.
+            var plan = ValidPlan();
+            plan.MeasureMappingId = null;
+            plan.Component = ReportingComponents.Ps;
+
+            _mockRepository
+                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new DbUpdateException("save failed",
+                    new Exception($"Violation of UNIQUE KEY constraint '{FacilityReportingPlanConfigMap.UniquePeriodIndexName}'.")));
+
+            var ex = await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(plan));
+
+            Assert.Contains(ReportingComponents.Ps, ex.Message);
+            Assert.Contains(plan.Measure, ex.Message);
+            Assert.DoesNotContain("measure mapping", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public async Task CreateAsync_UniqueIndexViolation_IsRecognisedWithoutQueryingAgain()
         {
             _mockRepository

@@ -174,13 +174,17 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var request = await ValidRequestAsync();
 
+        // The message names the component and measure the unique index is keyed on, not the mapping.
+        // The request leaves both implicit, so they come from the default and from the mapping.
+        var measure = (await _mappingRepository.GetAsync(request.MeasureMappingId!)).Measure;
+
         await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
         var secondResult = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(secondResult, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {request.FacilityId}, measure mapping " +
-            $"{request.MeasureMappingId} and period {request.ReportingMonth}/{request.ReportingYear}.",
+            $"A reporting plan already exists for facility {request.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {request.ReportingMonth}/{request.ReportingYear}.",
             problem.Detail);
     }
 
@@ -574,6 +578,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var first = await CreatedPlanAsync(month: 5);
         var second = await CreatedPlanAsync(month: 6);
 
+        var measure = (await _mappingRepository.GetAsync(first.MeasureMappingId!)).Measure;
+
         var result = await _controller.UpdateFacilityReportingPlan(second.Id!, new FacilityReportingPlanUpdateRequest
         {
             Id = second.Id,
@@ -586,8 +592,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var problem = AssertProblem(result, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {first.FacilityId}, measure mapping " +
-            $"{first.MeasureMappingId} and period {first.ReportingMonth}/{first.ReportingYear}.",
+            $"A reporting plan already exists for facility {first.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {first.ReportingMonth}/{first.ReportingYear}.",
             problem.Detail);
     }
 

@@ -46,7 +46,12 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             // an enrollment nobody has mapped yet, and an empty foreign key is not a value the
             // column can hold.
             MeasureMappingId = NullIfBlank(request.MeasureMappingId?.Sanitize()),
-            Measure = request.Measure?.Sanitize() ?? string.Empty,
+            // Trimmed because the measure is part of the unique key and Sanitize leaves padding
+            // alone. SQL Server ignores a trailing blank when it compares, but not a leading one, so
+            // " HOB" would be stored as an enrollment separate from "HOB" that the index would not
+            // recognise as a duplicate. Component needs no equivalent: it is checked against a closed
+            // set, and " MSC" is not in it.
+            Measure = request.Measure?.Sanitize().Trim() ?? string.Empty,
 
             // Defaulted rather than required: every enrollment recorded before components existed
             // came from the medicine operation, and a caller that does not know about components

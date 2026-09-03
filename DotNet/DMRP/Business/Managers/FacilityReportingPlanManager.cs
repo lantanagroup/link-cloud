@@ -275,7 +275,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 _logger.LogWarning(ex, "Reporting plan for facility {FacilityId} lost a race for the unique period index",
                     plan.FacilityId.SanitizeForLog());
 
-                return new DuplicateReportingPlanException(plan.FacilityId, plan.MeasureMappingId,
+                return new DuplicateReportingPlanException(plan.FacilityId, plan.Component, plan.Measure,
                     plan.ReportingMonth, plan.ReportingYear);
             }
 
