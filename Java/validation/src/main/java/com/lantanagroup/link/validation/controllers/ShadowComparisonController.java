@@ -45,8 +45,8 @@ public class ShadowComparisonController {
 
     @Operation(summary = "Fetch shadow comparison results for a rubric request id, alongside the rubric and "
             + "legacy engine results they were diffed from (temporary, ADR-0003 shadow-run)")
-    @GetMapping()
-    public ResponseEntity<ShadowComparisonDetailDto> getByRequestId(@RequestParam("requestId") UUID requestId) {
+    @GetMapping("/{requestId}")
+    public ResponseEntity<ShadowComparisonDetailDto> getByRequestId(@PathVariable UUID requestId) {
         List<ShadowComparisonResultDto> comparisons = shadowComparisonQueryService.findByRequestId(requestId);
         if (comparisons.isEmpty()) {
             return ResponseEntity.notFound().build();
