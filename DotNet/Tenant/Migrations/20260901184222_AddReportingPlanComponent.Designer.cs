@@ -4,6 +4,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Tenant.Migrations
 {
     [DbContext(typeof(TenantDbContext))]
-    partial class TenantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901184222_AddReportingPlanComponent")]
+    partial class AddReportingPlanComponent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -589,12 +592,8 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<bool>("IsReporting")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Measure")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<string>("MeasureMappingId")
+                        .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
@@ -614,7 +613,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.HasIndex("FacilityId", "ReportingYear", "ReportingMonth")
                         .HasDatabaseName("IX_FacilityReportingPlans_Facility_Period");
 
-                    b.HasIndex("FacilityId", "Component", "Measure", "ReportingYear", "ReportingMonth")
+                    b.HasIndex("FacilityId", "MeasureMappingId", "ReportingMonth", "ReportingYear")
                         .IsUnique()
                         .HasDatabaseName("IX_FacilityReportingPlans_Facility_Mapping_Period");
 
@@ -794,7 +793,8 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.HasOne("LantanaGroup.Link.DMRP.Data.Entities.MeasureMapping", "MeasureMapping")
                         .WithMany()
                         .HasForeignKey("MeasureMappingId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("MeasureMapping");
                 });
