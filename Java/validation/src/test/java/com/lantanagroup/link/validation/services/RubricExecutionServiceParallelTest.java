@@ -145,12 +145,12 @@ class RubricExecutionServiceParallelTest {
         ValidationResultEnvelope envelope = service.evaluate(RUBRIC_ID, null, request(), false, "test-correlation-id");
 
         assertEquals(List.of("check-00", "check-01", "check-03"), checkIdsOf(envelope));
-        Map<String, Long> durations = envelope.getTrace().getCheckDurationsMs();
+        Map<String, Double> durations = envelope.getTrace().getCheckDurationsMs();
         assertEquals(Set.of("check-00", "check-01", "check-03"), durations.keySet());
         assertFalse(executor.executed().contains("check-02"), "disabled check must not be executed");
 
-        long summed = durations.values().stream().mapToLong(Long::longValue).sum();
-        assertEquals(summed, envelope.getTrace().getCheckWorkMs().longValue());
+        double summed = Math.round(durations.values().stream().mapToDouble(Double::doubleValue).sum() * 100) / 100.0;
+        assertEquals(summed, envelope.getTrace().getCheckWorkMs());
     }
 
     @Test

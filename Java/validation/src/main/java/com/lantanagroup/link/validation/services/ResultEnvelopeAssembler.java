@@ -32,13 +32,14 @@ public class ResultEnvelopeAssembler {
             RubricVersion version,
             List<EvaluatedFinding> evaluated,
             List<CheckExecutionResult> checkResults,
-            Map<String, Long> checkDurationsMs,
+            Map<String, Double> checkDurationsMs,
             OffsetDateTime completedAt) {
 
         long durationMs = completedAt.toInstant().toEpochMilli() - ctx.getRequestedAt().toInstant().toEpochMilli();
 
-        long checkWorkMs = checkDurationsMs == null ? 0L
-                : checkDurationsMs.values().stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+        double checkWorkMs = checkDurationsMs == null ? 0.0
+                : Math.round(checkDurationsMs.values().stream().filter(Objects::nonNull)
+                        .mapToDouble(Double::doubleValue).sum() * 100) / 100.0;
 
         ScoringPolicyDto scoringPolicy = scoringPolicyResolver.resolve(version.getScoringPolicyJson());
         ScoreCardDto score = scoreAggregator.aggregate(checkResults, scoringPolicy);

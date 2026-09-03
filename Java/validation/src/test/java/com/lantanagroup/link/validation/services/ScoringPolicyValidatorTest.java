@@ -75,11 +75,18 @@ class ScoringPolicyValidatorTest {
                 .anyMatch(e -> e.contains("scoringPolicy.rollup") && e.contains("worst-of"));
     }
 
-    @Test
-    @DisplayName("missing rollup rejected (rollup is required when scoringPolicy present)")
-    void missingRollup() {
-        assertThat(validate("{\"type\":\"piqi-pass-fail\"}"))
+    @ParameterizedTest
+    @ValueSource(strings = {"piqi-dimension-scorecard", "piqi-check-scorecard"})
+    @DisplayName("missing rollup rejected for scorecard types (they roll a collection of statuses up)")
+    void missingRollupRejectedForScorecardTypes(String type) {
+        assertThat(validate("{\"type\":\"" + type + "\"}"))
                 .anyMatch(e -> e.contains("scoringPolicy.rollup: is required"));
+    }
+
+    @Test
+    @DisplayName("missing rollup accepted for piqi-pass-fail (ScoreAggregator.aggregatePassFail never reads it)")
+    void missingRollupAcceptedForPassFail() {
+        assertThat(validate("{\"type\":\"piqi-pass-fail\"}")).isEmpty();
     }
 
     @Test

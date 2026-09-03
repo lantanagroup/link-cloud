@@ -18,10 +18,10 @@ import java.util.UUID;
  * Cached form of a rubric version + its live checks, so one cache hit covers everything the
  * evaluate path reads. The entities themselves can't be cached: their lazy associations
  * don't survive serialization. Only columns the evaluate path never reads are left out
- * (definition/dimensions/applicable-context LOBs, dry-run and audit fields) — scoringPolicyJson
- * IS carried because the assembler scores with it; dropping a field the evaluate path reads
- * silently falls back to defaults (see ResultEnvelopeAssembler). No dry-run fields means
- * recordDryRun doesn't have to evict.
+ * (definition/dimensions LOBs, dry-run and audit fields) — scoringPolicyJson IS carried because
+ * the assembler scores with it; dropping it would silently fall back to the default
+ * dimension/worst-of policy (see ResultEnvelopeAssembler). No dry-run fields means recordDryRun
+ * doesn't have to evict.
  *
  * Has to stay a plain non-final class (same for CheckSnapshot) — the redis serializer uses
  * NON_FINAL default typing, so a record would come back as a LinkedHashMap.
