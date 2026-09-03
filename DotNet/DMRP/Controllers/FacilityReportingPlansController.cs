@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Mapping;
 using LantanaGroup.Link.DMRP.Business.Queries;
@@ -43,14 +44,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private readonly IFacilityReportingPlanManager _manager;
         private readonly IFacilityReportingPlanQueries _queries;
         private readonly IFacilityReportingPlanLookAhead _lookAhead;
+        private readonly IFacilityExistence _facilityExistence;
+        private readonly IDmrpReportingPlanSync _sync;
         private readonly TimeProvider _timeProvider;
 
-        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, TimeProvider timeProvider)
+        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, IDmrpReportingPlanSync sync, IFacilityExistence facilityExistence, TimeProvider timeProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
             _lookAhead = lookAhead ?? throw new ArgumentNullException(nameof(lookAhead));
+            _facilityExistence = facilityExistence ?? throw new ArgumentNullException(nameof(facilityExistence));
+            _sync = sync ?? throw new ArgumentNullException(nameof(sync));
             _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
 
@@ -174,22 +179,38 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// combined with month or year - a request that supplies both is refused rather than resolved
         /// by a precedence rule the caller would have to know.
         /// </param>
+        /// <param name="refresh">
+        /// Asks DMRP for the facility's plan before answering, so the response reflects what DMRP
+        /// says now rather than what Link last recorded. Refreshes the period the request is about -
+        /// month and year when given, otherwise the current one.
+        /// </param>
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="200">
         /// The matching reporting plans. A facility with none, or one that does not exist, returns an
-        /// empty list rather than a 404 - absence of enrollment is a meaningful answer here.
+        /// empty list rather than a 404 - absence of enrollment is a meaningful answer here. Asking
+        /// for refresh is the exception, because it writes rather than reads; see 404.
         /// </response>
         /// <response code="400">
         /// month or year is outside its range, monthsAhead is outside 1 to 24, or monthsAhead was
         /// combined with month or year.
         /// </response>
+        /// <response code="404">
+        /// refresh was asked for and the facility is not one Link knows. Only the refresh needs it to
+        /// exist: a refresh writes rows keyed on the id, where a plain read only answers about it.
+        /// </response>
+        /// <response code="502">
+        /// refresh was asked for and DMRP could not be read. Nothing stale is served in its place:
+        /// a caller that asked for current data is told it did not get any.
+        /// </response>
         /// <response code="500">The reporting plans could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityReportingPlanModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}")]
         public async Task<IActionResult> GetFacilityReportingPlansForFacility(string facilityId, int? month, int? year,
-            bool? isReporting, int? monthsAhead, CancellationToken cancellationToken)
+            bool? isReporting, int? monthsAhead, bool refresh, CancellationToken cancellationToken)
         {
             facilityId = facilityId.Sanitize();
 
@@ -199,10 +220,22 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequestProblem(periodError);
             }
 
+            // The period the request is about. An exact month or year names it; without one the
+            // current period is the only thing the request can mean.
+            var current = CurrentPeriod();
+
+            var refreshFailure = await RefreshAsync(refresh, facilityId,
+                new ReportingPeriod(year ?? current.Year, month ?? current.Month), cancellationToken);
+
+            if (refreshFailure is not null)
+            {
+                return refreshFailure;
+            }
+
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting,
-                LookAheadWindow(monthsAhead, CurrentPeriod()), cancellationToken);
+                LookAheadWindow(monthsAhead, current), cancellationToken);
 
             return Ok(results);
         }
@@ -234,24 +267,41 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// report. Pass false for the measures it has withdrawn from, which are kept rather than
         /// deleted.
         /// </param>
+        /// <param name="refresh">
+        /// Asks DMRP for the facility's plan before answering. Refreshes the current period, which is
+        /// the enrollment every projected month in the window is derived from - so one refresh makes
+        /// the whole look-ahead current, rather than one call per month in it.
+        /// </param>
         /// <param name="pageSize">Periods per page, 1 to 100. Defaults to 10.</param>
         /// <param name="pageNumber">One-based page number. Defaults to 1.</param>
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="200">
         /// A page of reporting periods in chronological order, oldest first, with paging metadata that
         /// counts periods rather than plan rows. A facility with no plans, or one that does not exist,
-        /// returns an empty records array rather than a 404.
+        /// returns an empty records array rather than a 404. Asking for refresh is the exception,
+        /// because it writes rather than reads; see 404.
         /// </response>
         /// <response code="400">
         /// monthsAhead is outside 1 to 24, or a paging argument is out of range.
         /// </response>
+        /// <response code="404">
+        /// refresh was asked for and the facility is not one Link knows. Only the refresh needs it to
+        /// exist: a refresh writes rows keyed on the id, where a plain read only answers about it.
+        /// </response>
+        /// <response code="502">
+        /// refresh was asked for and DMRP could not be read. Nothing stale is served in its place:
+        /// a caller that asked for current data is told it did not get any.
+        /// </response>
         /// <response code="500">The reporting plan could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanPeriodDto))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}/periods", Name = "GetFacilityReportingPlanPeriods")]
         public async Task<IActionResult> GetFacilityReportingPlanPeriods(string facilityId, int? monthsAhead,
-            bool? isReporting, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+            bool? isReporting, bool refresh = false, int pageSize = 10, int pageNumber = 1,
+            CancellationToken cancellationToken = default)
         {
             facilityId = facilityId.Sanitize();
 
@@ -267,11 +317,19 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequestProblem(pagingError);
             }
 
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
-
-            // One reading for both. The window and the period it is answered against have to agree,
-            // and taking the clock twice lets them disagree across a month rollover.
+            // One reading for the whole request. The refresh, the window and the period the answer is
+            // anchored on all have to mean the same month, and taking the clock more than once lets a
+            // request that spans midnight on the last of the month disagree with itself.
             var anchor = CurrentPeriod();
+
+            var refreshFailure = await RefreshAsync(refresh, facilityId, anchor, cancellationToken);
+
+            if (refreshFailure is not null)
+            {
+                return refreshFailure;
+            }
+
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
 
             var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead, anchor), anchor,
                 isReporting ?? true, pageSize, pageNumber, cancellationToken);
@@ -616,6 +674,67 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             return ReportingPeriodRange.LookAhead(anchor, monthsAhead.Value);
+        }
+
+        /// <summary>
+        /// Brings the facility's plan for a period up to date from DMRP before it is read.
+        /// </summary>
+        /// <remarks>
+        /// Returns null when there is nothing to report and the read should go ahead, or the result
+        /// to answer with when the refresh failed.
+        /// <para>
+        /// A failed refresh fails the request rather than falling back to what Link already had.
+        /// Serving stale rows to a caller that asked for current ones, with nothing in the response
+        /// to say so, is the one outcome this parameter exists to prevent - and a caller that would
+        /// rather have stale data than none can simply not ask for a refresh.
+        /// </para>
+        /// </remarks>
+        private async Task<IActionResult?> RefreshAsync(bool refresh, string facilityId, ReportingPeriod period,
+            CancellationToken cancellationToken)
+        {
+            if (!refresh)
+            {
+                return null;
+            }
+
+            // The reads themselves answer for an unknown facility with an empty list, because absence
+            // of enrollment is a meaningful answer. A refresh is not a read: it writes reporting plan
+            // rows keyed on this id, and the sync documents that the facility was already known when
+            // it was asked for -- nothing else establishes that. Without this, a mistyped id whose
+            // value DMRP happens to recognise silently creates rows for a facility Link has no record
+            // of, and only an explicit delete would ever remove them.
+            if (!await _facilityExistence.ExistsAsync(facilityId, cancellationToken))
+            {
+                return Problem(
+                    $"Facility {facilityId} was not found, so its reporting plan cannot be refreshed.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Not Found");
+            }
+
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Refresh Facility Reporting Plan");
+
+            try
+            {
+                await _sync.SyncAsync(facilityId, period.Month, period.Year, cancellationToken);
+
+                return null;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (DmrpApiException ex)
+            {
+                _logger.LogError(ex,
+                    "Refreshing the reporting plan for facility {FacilityId} from DMRP failed",
+                    facilityId.SanitizeForLog());
+
+                return Problem(
+                    "The reporting plan could not be refreshed from DMRP. Ask again without refresh to read "
+                    + "what Link last recorded.",
+                    statusCode: StatusCodes.Status502BadGateway,
+                    title: "Bad Gateway");
+            }
         }
 
         /// <summary>

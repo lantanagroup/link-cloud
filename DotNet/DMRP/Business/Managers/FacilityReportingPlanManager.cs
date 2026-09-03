@@ -270,7 +270,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         {
             // The exception says so outright on SQL Server, which saves asking the database a second
             // time. Providers that do not report it recognisably fall back to the query.
-            if (IsUniquePeriodViolation(ex) || await IsDuplicateAsync(plan, currentId, cancellationToken))
+            if (UniquePeriodViolation.Matches(ex) || await IsDuplicateAsync(plan, currentId, cancellationToken))
             {
                 _logger.LogWarning(ex, "Reporting plan for facility {FacilityId} lost a race for the unique period index",
                     plan.FacilityId.SanitizeForLog());
@@ -282,25 +282,5 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             return null;
         }
 
-        // SQL Server: 2627 = unique constraint, 2601 = unique index. EF wraps the provider exception,
-        // sometimes several levels deep, so walk the chain.
-        private static bool IsUniquePeriodViolation(Exception exception)
-        {
-            for (Exception? current = exception; current is not null; current = current.InnerException)
-            {
-                if (current is SqlException { Number: 2601 or 2627 })
-                {
-                    return true;
-                }
-
-                if (current.Message.Contains(FacilityReportingPlanConfigMap.UniquePeriodIndexName,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }
