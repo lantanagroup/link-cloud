@@ -782,9 +782,8 @@ services:
       description: "Kafka bootstrap servers for the validation service."
       required: true
     - key: "spring.data.redis.host"
-      description: "The Redis host for the validation service."
+      description: "The Redis host for the validation service. Not marked sensitive: a hostname is not a credential, and this one is already carried in the clear by ConnectionStrings:Redis and ResourceCache:Redis:ConnectionString, which address the same instance from the .NET services. The credential is spring.data.redis.password, which stays a Key Vault reference."
       required: true
-      sensitive: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
       required: true
