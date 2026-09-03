@@ -83,7 +83,7 @@ public static class QueryPlanDefaults
             VariableParam("patient", 0),
             VariableParam("date", 1, "ge{0}"),
             VariableParam("date", 3, "le{0}"),
-            LiteralParam("category", "imaging,laboratory,social-history,vital-signs")),
+            LiteralParam("category", "imaging,laboratory,social-history,survey,vital-signs")),
         ParameterQuery("Procedure",
             VariableParam("patient", 0),
             VariableParam("date", 1, "ge{0}"),

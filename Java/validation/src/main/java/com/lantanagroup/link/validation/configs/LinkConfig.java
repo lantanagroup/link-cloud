@@ -11,6 +11,9 @@ import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
 @ConfigurationProperties("link")
@@ -38,4 +41,27 @@ public class LinkConfig {
 
     @Getter @Setter
     private List<String> whiteListValueSetRegex = new ArrayList<>();
+
+    /**
+     * Configured validation-result rules whose matches should be dropped before categorization,
+     * persistence, and downstream validity calculations.
+     */
+    @Getter @Setter
+    private List<ValidationResultIgnoreRuleConfig> validationResultIgnoreRules = new ArrayList<>();
+
+    /**
+     * How many bundle entries HAPI validates at once. Passed to
+     * {@code FhirValidator.setExecutorService} with concurrent bundle validation enabled,
+     * so only this many InstanceValidator runs are in flight.
+     */
+    @Getter @Setter
+    private int bundleValidationParallelism = 4;
+
+    @Bean(name = "bundleValidationExecutor", destroyMethod = "shutdown")
+    public ExecutorService bundleValidationExecutor() {
+        int parallelism = Math.max(1, bundleValidationParallelism);
+        AtomicInteger threadIndex = new AtomicInteger();
+        return Executors.newFixedThreadPool(parallelism, runnable ->
+                new Thread(runnable, "hapi-bundle-validation-" + threadIndex.incrementAndGet()));
+    }
 }

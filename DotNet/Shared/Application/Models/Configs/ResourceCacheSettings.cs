@@ -28,7 +28,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
 
         /// <summary>
         /// The number of days Redis resource-cache entries remain after their most recent write.
-        /// Defaults to 7.
+        /// Defaults to 7. HybridResourceCache also uses this as the sliding lifetime of its
+        /// in-process Redis-vs-ABS memo so that mapping cannot outlive the cache entries it describes.
         /// </summary>
         public int CacheEntryTtlDays { get; set; } = 7;
 

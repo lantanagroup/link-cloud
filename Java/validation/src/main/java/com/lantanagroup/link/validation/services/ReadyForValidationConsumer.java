@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.services.ReportClient;
@@ -36,9 +36,12 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -47,7 +50,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation.Key, ReadyForValidation> {
+public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
     private final Logger _logger = LoggerFactory.getLogger(ReadyForValidationConsumer.class);
     private final FhirContext fhirContext;
     private final ReportClient reportClient;
@@ -79,7 +82,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
-            KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
+            @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
             PreQualificationConfig preQualificationConfig,
@@ -93,7 +96,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
             // ADR-0003 shadow-run: independent of bridgeEnabled -- works in either direction.
             @Value("${vaas.bridge.shadow-enabled:false}") boolean shadowEnabled,
-            ConsumerRecordRecoverer recoverer) {
+            @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
@@ -114,6 +117,13 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         this.rubricId = rubricId;
     }
 
+    @KafkaListener(topics = Topics.READY_FOR_VALIDATION, containerFactory = "manualAckListenerContainerFactory")
+    public void consume(
+            ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record,
+            Acknowledgment acknowledgment) {
+        doConsume(record, acknowledgment);
+    }
+
     @Override
     protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
@@ -130,6 +140,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
+        _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
         // requestId is only ever non-null on the rubric-engine branch (the id already minted for its
         // rubric_result row); the legacy engine has no such id. Only used below, to let a subsequent
         // shadow-run legacy comparison share it -- never persisted by this consumer itself.
@@ -212,8 +223,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         // failure after this append - producing ValidationComplete, say - sends the record to the retry
         // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
         // pre-qual OperationOutcome already present in it means we appended one previously and must not
-        // append a second. Keyed on the oo-total extension, which only this writer emits: the Report
-        // service's legacy flat OperationOutcome does not carry it and is correctly ignored here.
+        // append a second. Keyed on the oo-total extension, which only this writer emits. An unrelated
+        // OperationOutcome without that extension is ignored here.
         //
         // This narrows the window rather than closing it, and the remaining gaps are tracked in
         // LEGLINK-800: the REST fallback supplies a bundle with no previously appended OperationOutcome

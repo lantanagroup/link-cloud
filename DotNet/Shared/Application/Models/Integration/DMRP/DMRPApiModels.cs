@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 
 public class FacilityReportingPlanModel
@@ -27,24 +28,45 @@ public class FacilityReportingPlanModel
     /// </summary>
     public bool IsReporting { get; set; }
 
+    /// <summary>
+    /// The NHSN measure of the mapping this plan reports against. Populated by reads that resolve
+    /// the mapping (the per-facility view); null elsewhere.
+    /// </summary>
+    public string? Measure { get; set; }
+
+    /// <summary>
+    /// The digital quality measure the mapping evaluates. Populated alongside <see cref="Measure"/>.
+    /// </summary>
+    public string? DQM { get; set; }
+
+    /// <summary>
+    /// The reporting cadence the mapping carries. Populated alongside <see cref="Measure"/>.
+    /// </summary>
+    public Frequency? Frequency { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
 }
 
+[DataContract]
 public class MeasureMappingModel
 {
+    [DataMember]
     public string? Id { get; set; }
 
     [Required]
     [StringLength(255)]
+    [DataMember]
     public string? Measure { get; set; }
 
     [Required]
     [StringLength(255)]
+    [DataMember]
     public string? DQM { get; set; }
 
     [Required]
     [EnumDataType(typeof(Frequency))]
+    [DataMember]
     public Frequency? Frequency { get; set; }
 }

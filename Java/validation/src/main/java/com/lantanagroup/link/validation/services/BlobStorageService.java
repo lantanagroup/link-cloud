@@ -6,6 +6,7 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.specialized.AppendBlobClient;
+import com.azure.storage.common.policy.RequestRetryOptions;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -13,9 +14,10 @@ import java.nio.charset.StandardCharsets;
 public class BlobStorageService {
     private final BlobContainerClient containerClient;
 
-    public BlobStorageService(String connectionString, String blobContainerName) {
+    public BlobStorageService(String connectionString, String blobContainerName, RequestRetryOptions retryOptions) {
         BlobServiceClient serviceClient = new BlobServiceClientBuilder()
                 .connectionString(connectionString)
+                .retryOptions(retryOptions)
                 .buildClient();
         containerClient = serviceClient.getBlobContainerClient(blobContainerName);
     }
@@ -50,8 +52,7 @@ public class BlobStorageService {
      * does not call {@code create()}.
      * <p>
      * A trailing newline is written so the appended resource always terminates its own line. Without it,
-     * any subsequent appender (e.g. the Report service's legacy OperationOutcome write, which is only
-     * retired once LEGLINK-466's flag is set) concatenates onto this line and produces malformed NDJSON.
+     * a later append concatenates onto this line and produces malformed NDJSON.
      */
     public void appendResource(String blobName, String ndjsonLine) {
         AppendBlobClient client = containerClient.getBlobClient(blobName).getAppendBlobClient();

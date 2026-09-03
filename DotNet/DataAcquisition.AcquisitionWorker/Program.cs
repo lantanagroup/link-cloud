@@ -38,6 +38,18 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
+// Add Link Security
+bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+builder.Services.AddLinkBearerServiceAuthentication(options =>
+{
+    options.Environment = builder.Environment;
+    options.AllowAnonymous = allowAnonymousAccess;
+    options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+    options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+    options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+    options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+});
+
 //Add CORS
 builder.Services.AddLinkCorsService(options =>
 {

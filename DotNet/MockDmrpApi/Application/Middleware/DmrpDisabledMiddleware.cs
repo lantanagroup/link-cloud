@@ -1,7 +1,6 @@
 using LantanaGroup.Link.MockDmrpApi.Application.Extensions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.MockDmrpApi.Application.Middleware;
@@ -24,11 +23,10 @@ public class DmrpDisabledMiddleware
     private readonly RequestDelegate _next;
     private readonly bool _enabled;
 
-    public DmrpDisabledMiddleware(
-        RequestDelegate next, IHostEnvironment environment, IConfiguration configuration)
+    public DmrpDisabledMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
-        _enabled = DmrpAvailability.IsEnabled(environment, configuration);
+        _enabled = DmrpAvailability.IsEnabled(configuration);
     }
 
     public async Task InvokeAsync(HttpContext context, IProblemDetailsService problemDetails)
@@ -46,8 +44,8 @@ public class DmrpDisabledMiddleware
             Title = "Mock DMRP API is disabled",
             Status = StatusCodes.Status503ServiceUnavailable,
             Type = DmrpProblemTypes.ServiceUnavailable,
-            Detail = "This deployment does not serve the mock DMRP surface. It is disabled by "
-                     + "configuration, or running in an environment where it is never enabled.",
+            Detail = "This deployment does not serve the mock DMRP surface. MockDmrpApi:Enabled "
+                     + "is false, or is not configured at all -- it defaults to disabled.",
             Instance = context.Request.Path
         };
 

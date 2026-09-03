@@ -1,0 +1,102 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Build_And_Push_All
+    trigger: true
+
+trigger:
+  branches:
+    include:
+    - nhsn-app-component
+  paths:
+    include:
+    - nhsn/NHSN-App-BFF/*
+    exclude:
+    - '*'
+    
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj.csproj'
+# - name: testProject
+#   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
+- name: serviceName
+  value: 'app-bff'
+- name: registry-repo-Name
+  value: 'link-app-bff'
+- name: dockerPath
+  value: '**/nhsn/NHSN-App-BFF/Dockerfile'
+- name: projectDir
+  value: 'nhsn/NHSN-App-BFF'
+  
+steps:
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)'
+    displayName: 'Run Tests'
+  
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+
+  - task: Docker@2
+    displayName: "Build & Push NHSN-App-BFF Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(MyTag)
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

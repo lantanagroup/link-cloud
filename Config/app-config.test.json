@@ -103,7 +103,7 @@
 			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "Report,Validation"
+				"link:consumers": "Validation,AutomationUI"
 			}
 		},
 		{
@@ -241,19 +241,39 @@
 			"tags": {}
 		},
 		{
-			"key": "/spring/kafka/retry/maxAttempts",
-			"value": "5",
-			"label": "MeasureEval",
-			"content_type": "",
-			"tags": {}
-		},
-		{
-			"key": "/spring/kafka/retry/retry-backoff-ms",
-			"value": "3000",
-			"label": "MeasureEval",
+			"key": "/spring/kafka/retry/consumer-retry-duration/0",
+			"value": "PT20S",
+			"label": null,
 			"content_type": "",
 			"tags": {
-				"link:consumers": "MeasureEval"
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/spring/kafka/retry/consumer-retry-duration/1",
+			"value": "PT60S",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/spring/kafka/retry/consumer-retry-duration/2",
+			"value": "PT120S",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
+			}
+		},
+		{
+			"key": "/spring/kafka/retry/disable-retry-consumer",
+			"value": "false",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "MeasureEval,Validation"
 			}
 		},
 		{
@@ -1585,15 +1605,6 @@
 		},
 		{
 			"key": "PatientAggregator:IncludeOrganizationResource",
-			"value": "true",
-			"label": null,
-			"content_type": "",
-			"tags": {
-				"link:consumers": "Report"
-			}
-		},
-		{
-			"key": "PreQualification:WritePreQualOperationOutcome",
 			"value": "true",
 			"label": null,
 			"content_type": "",
