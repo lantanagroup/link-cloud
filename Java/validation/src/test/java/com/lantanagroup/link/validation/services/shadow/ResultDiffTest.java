@@ -213,7 +213,9 @@ class ResultDiffTest {
     @Test
     void messagesDifferingBeyondTheObjectIdentityHashAreNotMatched() {
         // the hash normalization must not swallow real content differences -- here the class names
-        // themselves differ (not just the trailing hash), so these are genuinely different findings.
+        // themselves differ (not just the trailing hash), so the normalized messages still differ.
+        // Same (patientId, expression) key and same severity, so this is a message value mismatch
+        // reported as a severity change rather than a match -- not added+missing (the key still lines up).
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
                 "Unable to validate code against ValueSet$ConceptSetFilterComponent@5a0bb980 -- no matching code found");
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
@@ -221,8 +223,11 @@ class ResultDiffTest {
 
         ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
 
-        assertEquals(List.of(modern), diff.getAdded());
-        assertEquals(List.of(legacy), diff.getMissing());
+        assertEquals(1, diff.getSeverityChanged().size());
+        assertSame(legacy, diff.getSeverityChanged().get(0).legacy());
+        assertSame(modern, diff.getSeverityChanged().get(0).modern());
+        assertTrue(diff.getAdded().isEmpty());
+        assertTrue(diff.getMissing().isEmpty());
         assertEquals(0, diff.getMatchedCount());
     }
 
