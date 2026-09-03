@@ -67,8 +67,7 @@ namespace IntegrationTests.DataAcquisition
 
             if (string.IsNullOrWhiteSpace(ExternalConnectionString))
             {
-                _sqlContainer = new MsSqlBuilder()
-                    .WithImage(SqlServerImage)
+                _sqlContainer = new MsSqlBuilder(SqlServerImage)
                     .Build();
             }
         }
