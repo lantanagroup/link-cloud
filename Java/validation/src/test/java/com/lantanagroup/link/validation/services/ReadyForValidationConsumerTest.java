@@ -347,6 +347,17 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null));
+
+        verify(categorizationService).categorize(Collections.emptyList());
+        verify(resultRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void process_inactiveCodeResult_isCategorizedAsInactiveCodeAndPersisted() throws Exception {
         // Wire a real CategorizationService backed by the shipped categories.json so this exercises the
         // actual message -> inactive_code category -> saveAll path for an inactive-code finding.
@@ -622,13 +633,13 @@ public class ReadyForValidationConsumerTest {
 
     @Test
     void process_flagOn_bundleHasUnrelatedOperationOutcome_stillAppends() throws Exception {
-        // The Report service's legacy flat OperationOutcome carries no oo-total extension, so it must not
-        // be mistaken for ours and suppress the append.
+        // An OperationOutcome without the oo-total extension must not be mistaken for ours and
+        // suppress the append.
         preQualificationConfig.setWritePreQualOperationOutcome(true);
 
-        org.hl7.fhir.r4.model.OperationOutcome legacy = new org.hl7.fhir.r4.model.OperationOutcome();
-        legacy.addIssue().setDiagnostics("Patient has failed Validation");
-        bundle.addEntry().setResource(legacy);
+        org.hl7.fhir.r4.model.OperationOutcome unrelated = new org.hl7.fhir.r4.model.OperationOutcome();
+        unrelated.addIssue().setDiagnostics("Unrelated operation outcome");
+        bundle.addEntry().setResource(unrelated);
 
         stubBlobDownload();
 

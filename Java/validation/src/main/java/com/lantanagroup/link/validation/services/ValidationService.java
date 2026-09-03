@@ -5,7 +5,6 @@ import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
-import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
@@ -13,6 +12,8 @@ import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.Bundle;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,9 +36,16 @@ import java.util.stream.Collectors;
 public class ValidationService {
     private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
     private final FhirValidator fhirValidator;
+    private final ValidationResultIgnoreService validationResultIgnoreService;
 
-
-    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig, ValidationCacheService validationCacheService) throws IOException {
+    public ValidationService(
+            FhirContext fhirContext,
+            ArtifactService artifactService,
+            LinkConfig linkConfig,
+            ValidationCacheService validationCacheService,
+            ValidationResultIgnoreService validationResultIgnoreService,
+            @Qualifier("bundleValidationExecutor") ExecutorService bundleValidationExecutor) throws IOException {
+        this.validationResultIgnoreService = validationResultIgnoreService;
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
@@ -50,7 +58,7 @@ public class ValidationService {
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
         fhirValidator.setConcurrentBundleValidation(true);
-        fhirValidator.setExecutorService(ForkJoinPool.commonPool());
+        fhirValidator.setExecutorService(bundleValidationExecutor);
     }
 
     // Public so FhirConfig can compose the rubric engine's chain from the same terminology
@@ -81,6 +89,9 @@ public class ValidationService {
 
     public List<Result> validate(IBaseResource resource) {
         try {
+            if (resource instanceof Bundle bundle) {
+                logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
+            }
             ValidationResult validationResult = fhirValidator.validateWithResult(resource);
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
@@ -91,7 +102,7 @@ public class ValidationService {
                             r -> String.valueOf(r.getSeverity()), TreeMap::new, Collectors.counting()));
             logger.info("HAPI validation (legacy) returned {} findings ({} after inactive-dedup); severities {} are raw HAPI output — the legacy path applies no category/severity overrides",
                     results.size(), deduplicated.size(), bySeverity);
-            return deduplicated;
+            return validationResultIgnoreService.filterIgnored(deduplicated);
         } catch (Exception ex) {
             logger.error("Validation failed", ex);
             throw ex;

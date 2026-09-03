@@ -84,14 +84,23 @@ public static class StartScenarioRequestResolver
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
 
         var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
-        if (hasImportedPatients && (!reportStart.HasValue || !reportEnd.HasValue))
-        {
-            throw new InvalidOperationException(
-                "Report period start and end are required when imported patients are included in a run.");
-        }
-
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
+        var isLiveSimulation = request.IsLiveSimulation
+            || ExtractBoolFromJson(request.RunConfigurationJson, "isLiveSimulation") == true;
+        var scheduledLike = isLiveSimulation
+            || request.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+        if (hasImportedPatients && !scheduledLike && (!reportStart.HasValue || !reportEnd.HasValue))
+        {
+            throw new InvalidOperationException(
+                "Report period start and end are required when imported patients are included in an adhoc run.");
+        }
+        var reportingWindowMinutes = NormalizeReportingWindowMinutes(
+            request.ReportingWindowMinutes
+            ?? ExtractIntFromJson(request.RunConfigurationJson, "reportingWindowMinutes"));
+        var reportMethod = isLiveSimulation && request.ReportMethod == ReportMethod.Adhoc
+            ? ReportMethod.ScheduledReport
+            : request.ReportMethod;
 
         return defaults with
         {
@@ -103,14 +112,17 @@ public static class StartScenarioRequestResolver
             PollingIntervalSeconds = 3,
             // Keep an explicit hard timeout for custom runs so scheduled workflows
             // fail-fast when end-of-period orchestration does not advance.
-            MaxPollingDurationMinutes = defaults.MaxPollingDurationMinutes,
+            // Live windows need the reporting window plus time for EOP/finalization.
+            MaxPollingDurationMinutes = isLiveSimulation
+                ? Math.Max(defaults.MaxPollingDurationMinutes, reportingWindowMinutes + 30)
+                : defaults.MaxPollingDurationMinutes,
             LokiScrapeWindowMinutes = 30,
             CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
             CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
             SelectedMeasures = effectiveMeasures,
             PatientProfiles = profiles,
             PatientCohorts = cohorts,
-            ReportMethod = request.ReportMethod,
+            ReportMethod = reportMethod,
             QueryPlanTemplateId = request.QueryPlanTemplateId,
             NormalizationSuiteId = request.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = organizationResourceMapTemplateId,
@@ -118,7 +130,22 @@ public static class StartScenarioRequestResolver
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
             ReportPeriodEnd = reportEnd,
-            NhsnOrganizationId = nhsnOrganizationId
+            NhsnOrganizationId = nhsnOrganizationId,
+            IsLiveSimulation = isLiveSimulation,
+            ReportingWindowMinutes = reportingWindowMinutes
+        };
+    }
+
+    internal static int NormalizeReportingWindowMinutes(int? minutes)
+    {
+        if (!minutes.HasValue || minutes.Value <= 0)
+            return 10;
+
+        return minutes.Value switch
+        {
+            <= 5 => 5,
+            <= 10 => 10,
+            _ => 15
         };
     }
 
@@ -143,6 +170,56 @@ public static class StartScenarioRequestResolver
         }
 
         return null;
+    }
+
+    private static bool? ExtractBoolFromJson(string? runConfigurationJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(runConfigurationJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(runConfigurationJson);
+            if (!doc.RootElement.TryGetProperty(propertyName, out var prop))
+                return null;
+
+            return prop.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.String when bool.TryParse(prop.GetString(), out var parsed) => parsed,
+                _ => null
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static int? ExtractIntFromJson(string? runConfigurationJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(runConfigurationJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(runConfigurationJson);
+            if (!doc.RootElement.TryGetProperty(propertyName, out var prop))
+                return null;
+
+            if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var number))
+                return number;
+
+            if (prop.ValueKind == JsonValueKind.String && int.TryParse(prop.GetString(), out var parsed))
+                return parsed;
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string ResolveNhsnOrganizationId(StartScenarioRequest request, string defaultValue)

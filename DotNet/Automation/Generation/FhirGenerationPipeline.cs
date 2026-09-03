@@ -303,6 +303,188 @@ public static class FhirGenerationPipeline
     }
 
     /// <summary>
+    /// Generates one additional qualifying patient, uploads their resources, and
+    /// appends a new manifest row. Existing manifest rows are never rewritten.
+    /// Shared infrastructure is reused from <paramref name="targetManifest"/> when a
+    /// prior generated run-tag can be inferred; otherwise it is generated and uploaded.
+    /// </summary>
+    public static async Task<(string PatientId, PatientProfile Profile)> GenerateAndAppendPatientAsync(
+        IAutomationOutput output,
+        FhirDataLoader fhirDataLoader,
+        GenerationManifest targetManifest,
+        PatientProfile profile,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        int totalResourcesPerPatient = FhirBundleGenerator.DefaultResourcesPerPatient,
+        int? generationSeed = null,
+        FhirGenerationConfig? config = null,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
+        AcquisitionSimulationConfig? acquisitionSimulation = null)
+    {
+        ArgumentNullException.ThrowIfNull(targetManifest);
+        ArgumentNullException.ThrowIfNull(profile);
+        if (measures == null || measures.Count == 0)
+            throw new ArgumentException("At least one measure is required.", nameof(measures));
+
+        var (periodStart, periodEnd) = ParseClinicalPeriod(acquisitionSimulation);
+        var inferredRunTag = TryInferRunTag(targetManifest.PatientIds);
+        var uploadSharedInfrastructure = inferredRunTag == null;
+        var runTag = inferredRunTag ?? Guid.NewGuid().ToString("N")[..8];
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) =
+            GenerateSharedInfrastructure(generationRequirementsPlan, runTag);
+
+        if (uploadSharedInfrastructure)
+        {
+            var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
+            output.WriteLine($"[Pipeline] Uploading {sharedBundles.Count} shared infrastructure bundle(s) for mid-window generate...");
+            await fhirDataLoader.UploadBundlesSequentiallyAsync(output, sharedBundles, "[shared] ");
+        }
+
+        List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries = null;
+        if (acquisitionSimulation != null)
+            sharedSimEntries = BuildResourceIndex(sharedEntries);
+
+        var patientIndex = NextGeneratedPatientIndex(targetManifest.PatientIds, runTag);
+        var sliceBuilder = new GenerationManifest.IncrementalBuilder();
+        if (uploadSharedInfrastructure)
+            sliceBuilder.AddEntries(string.Empty, sharedEntries);
+
+        var (patientId, _, _, _) = await GenerateAndUploadSinglePatientAsync(
+            output,
+            fhirDataLoader,
+            sliceBuilder,
+            profile,
+            patientIndex,
+            generationSeed.GetValueOrDefault(),
+            totalResourcesPerPatient,
+            measures,
+            sharedPractitionerIds,
+            sharedMedicationIds,
+            sharedSimEntries,
+            acquisitionSimulation,
+            periodStart,
+            periodEnd,
+            config,
+            generationRequirementsPlan,
+            ids,
+            generatedTemplateCache: null);
+
+        var slice = sliceBuilder.Build(measures);
+        targetManifest.AppendFrom(slice);
+
+        var effectiveProfile = ResolveProfile(targetManifest, patientId) ?? profile;
+        output.WriteLine($"[Pipeline] Mid-window generate appended Patient/{patientId} to GenerationManifest.");
+        return (patientId, effectiveProfile);
+    }
+
+    /// <summary>
+    /// Imports one additional patient (upload bundle or existing FHIR ID) through the
+    /// same classification / simulator path as start-of-run imports and appends a
+    /// manifest row. Existing rows are never rewritten.
+    /// </summary>
+    public static async Task<(string PatientId, PatientProfile Profile)> ImportAndAppendPatientAsync(
+        IAutomationOutput output,
+        FhirDataLoader fhirDataLoader,
+        GenerationManifest targetManifest,
+        ImportedPatientInput imported,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        AcquisitionSimulationConfig? acquisitionSimulation = null)
+    {
+        ArgumentNullException.ThrowIfNull(targetManifest);
+        ArgumentNullException.ThrowIfNull(imported);
+        if (measures == null || measures.Count == 0)
+            throw new ArgumentException("At least one measure is required.", nameof(measures));
+
+        var (periodStart, periodEnd) = ParseClinicalPeriod(acquisitionSimulation);
+        var sliceBuilder = new GenerationManifest.IncrementalBuilder();
+        var (patientId, _) = await ProcessImportedPatientAsync(
+            output,
+            fhirDataLoader,
+            sliceBuilder,
+            imported,
+            measures,
+            sharedSimEntries: null,
+            acquisitionSimulation,
+            periodStart,
+            periodEnd);
+
+        var slice = sliceBuilder.Build(measures);
+        targetManifest.AppendFrom(slice);
+
+        var effectiveProfile = ResolveProfile(targetManifest, patientId)
+            ?? new PatientProfile(imported.MeasureEligibilities);
+        output.WriteLine($"[Pipeline] Mid-window import appended Patient/{patientId} to GenerationManifest.");
+        return (patientId, effectiveProfile);
+    }
+
+    public static string? TryInferRunTag(IEnumerable<string> patientIds)
+    {
+        foreach (var id in patientIds ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(id) || !id.StartsWith("Patient-", StringComparison.Ordinal))
+                continue;
+            var rest = id["Patient-".Length..];
+            var dash = rest.IndexOf('-');
+            if (dash != 8)
+                continue;
+            var tag = rest[..8];
+            if (IsSafeRunTagForTemplateCache(tag))
+                return tag;
+        }
+
+        return null;
+    }
+
+    public static int NextGeneratedPatientIndex(IEnumerable<string> patientIds, string runTag)
+    {
+        var prefix = $"Patient-{runTag}-";
+        var max = 0;
+        foreach (var id in patientIds ?? [])
+        {
+            if (!id.StartsWith(prefix, StringComparison.Ordinal))
+                continue;
+            if (int.TryParse(id[prefix.Length..], out var n) && n > max)
+                max = n;
+        }
+
+        return max;
+    }
+
+    private static (DateTime? Start, DateTime? End) ParseClinicalPeriod(AcquisitionSimulationConfig? acquisitionSimulation)
+    {
+        DateTime? start = null;
+        DateTime? end = null;
+        if (acquisitionSimulation == null)
+            return (start, end);
+
+        if (!string.IsNullOrWhiteSpace(acquisitionSimulation.ClinicalPeriodStart)
+            && DateTimeOffset.TryParse(acquisitionSimulation.ClinicalPeriodStart,
+                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var rs))
+        {
+            start = rs.UtcDateTime;
+        }
+
+        if (!string.IsNullOrWhiteSpace(acquisitionSimulation.ClinicalPeriodEnd)
+            && DateTimeOffset.TryParse(acquisitionSimulation.ClinicalPeriodEnd,
+                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var re))
+        {
+            end = re.UtcDateTime;
+        }
+
+        return (start, end);
+    }
+
+    private static PatientProfile? ResolveProfile(GenerationManifest manifest, string patientId)
+    {
+        for (var i = 0; i < manifest.PatientIds.Count && i < manifest.Profiles.Count; i++)
+        {
+            if (string.Equals(manifest.PatientIds[i], patientId, StringComparison.Ordinal))
+                return manifest.Profiles[i];
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Generates a single patient's FHIR resources, uploads them, accumulates manifest
     /// metadata, optionally runs acquisition simulation, then discards all FHIR data.
     /// </summary>
@@ -403,11 +585,20 @@ public static class FhirGenerationPipeline
         // semantics do not contribute to the intersection of exclusions that determines
         // whether a resource reaches ABS.
         HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
         var effectiveProfile = profile;
 
         if (cqlInput != null)
         {
+            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
+            {
+                cqlInput = cqlInput with
+                {
+                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
+                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
+                };
+            }
+
             effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,
@@ -565,10 +756,19 @@ public static class FhirGenerationPipeline
 
         // 3. CQL filter simulation + period-aware eligibility prediction
         HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
         var effectiveProfile = profile;
         if (cqlInput != null)
         {
+            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
+            {
+                cqlInput = cqlInput with
+                {
+                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
+                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
+                };
+            }
+
             effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,

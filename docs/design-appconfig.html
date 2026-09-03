@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -496,9 +498,9 @@
     <div class="col-md-8">
         
         <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.yaml</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
-<h2 id="when-to-add-a-setting-to-app-config-yaml" class="content-heading">When to Add a Setting to <code>/app-config.yaml</code> <a href="#when-to-add-a-setting-to-app-config-yaml" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.yaml"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Developers MUST add a configuration key to <code>/app-config.yaml</code> if:</p>
+<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.json</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
+<h2 id="when-to-add-a-setting-to-app-config-json" class="content-heading">When to Add a Setting to <code>/app-config.json</code> <a href="#when-to-add-a-setting-to-app-config-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Developers MUST add a configuration key to <code>/app-config.json</code> if:</p>
 <ol>
 <li><strong>The setting is required</strong> for the service to start or perform its core functions.</li>
 <li><strong>The setting is environment-specific</strong> (e.g., URLs, connection strings, API keys) and does not have a &quot;one-size-fits-all&quot; default.</li>
@@ -514,63 +516,29 @@
 <h2 id="integration-into-workflow" class="content-heading">Integration into Workflow <a href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <h3 id="pull-requests-prs" class="content-heading">Pull Requests (PRs) <a href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.yaml</code>.</li>
+<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.json</code>.</li>
 <li>PR reviewers should verify that the description for any new setting is clear and that no sensitive values or environment-specific defaults are included.</li>
-<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.yaml</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
+<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.json</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
 </ul>
-<h3 id="devops-release-notes" class="content-heading">DevOps &amp; Release Notes <a id="devops-amp-release-notes" href="#devops-amp-release-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DevOps &amp;amp; Release Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="devops-amp-release-notes" class="content-heading">DevOps &amp; Release Notes <a href="#devops-amp-release-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DevOps &amp;amp; Release Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li><code>/app-config.yaml</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
-<li>Release notes should highlight changes to <code>/app-config.yaml</code> to ensure transparency across teams.</li>
+<li><code>/app-config.json</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
+<li>Release notes should highlight changes to <code>/app-config.json</code> to ensure transparency across teams.</li>
 </ul>
 <h2 id="file-format-and-schema" class="content-heading">File Format and Schema <a href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>The <code>/app-config.yaml</code> follows a structured schema:</p>
+<p>The <code>/app-config.json</code> follows a structured schema:</p>
 <h3 id="global-array" class="content-heading"><code>global</code> Array <a href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains settings shared across most or all services (e.g., Kafka connection, Database provider).</p>
 <h3 id="services-object" class="content-heading"><code>services</code> Object <a href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains service-specific settings, keyed by the service name.</p>
 <h3 id="configuration-entry-fields" class="content-heading">Configuration Entry Fields: <a href="#configuration-entry-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Entry Fields:"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li><code>key</code>: The path to the configuration setting, in the notation of the runtime that reads it. See <a href="#key-notation-by-runtime">Key Notation by Runtime</a>.</li>
+<li><code>key</code>: The dot-delimited or colon-delimited path to the configuration setting as it appears in <code>appsettings.json</code> or environment variables.</li>
 <li><code>description</code>: A brief explanation of the setting's purpose and its impact on the system.</li>
-<li><code>required</code>: (Optional, default: true) <strong>A row for this key must exist in every environment store.</strong> This is narrower than "the service needs it to run": a setting with a working default in <code>appsettings.json</code> or <code>application.yml</code> should be <code>required: false</code> with that value recorded in <code>defaultValue</code>, because requiring it would mean provisioning one identical value into three stores. Reserve <code>required: true</code> for values that genuinely differ per environment, or that have no safe default. Enforced by <code>Scripts/AzureAppConfig/check_required_config.py</code>. Note that the schema default is documentation only &mdash; JSON Schema defaults are annotation and are never applied during validation, so entries should state <code>required</code> explicitly.</li>
-<li><code>label</code>: (Optional) The App Configuration label the entry is expected to carry.</li>
-<li><code>sensitive</code>: (Optional, default: false) Whether the setting holds a secret. A sensitive entry must never also set <code>defaultValue</code>; this is enforced.</li>
-<li><code>defaultValue</code>: (Optional) A default value, for settings that ship with a working fallback in <code>appsettings.json</code> or <code>application.yml</code>.</li>
-<li><code>runtime</code>: (Optional, <code>dotnet</code> or <code>java</code>) Overrides the runtime inferred from the owning service. Needed only for Java-notation keys listed under <code>global</code>, which has no owning service.</li>
-<li><code>consumers</code>: (Optional) The services that read this key, derived from the code inventory. Documentation only &mdash; it plays no part in resolution.</li>
+<li><code>required</code>: (Optional, default: true) A boolean indicating if the setting is strictly required for the service to function.</li>
 </ul>
-<h3 id="servicemeta-object" class="content-heading"><code>serviceMeta</code> Object <a href="#servicemeta-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: serviceMeta Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>Maps each service to two deployment facts: the App Configuration <code>label</code> the running service selects, and its <code>runtime</code>. Tooling reads this rather than hardcoding the mapping, so the label vocabulary lives in one place.</p>
-<p>Label values are compiled into the services and must match exactly, including case and spaces. In .NET they are constants passed to <code>AddExternalConfiguration()</code>; in Java they are the <code>label-filter</code> in <code>bootstrap.yml</code>. Three are not simply the service name: <code>AdminBFF</code> uses <code>LinkAdminBFF</code>, <code>AutomationUI</code> uses <code>Link Automation UI</code>, and <code>DataAcquisitionWorker</code> is a distinct label from <code>DataAcquisition</code>.</p>
-<h2 id="how-services-resolve-keys" class="content-heading">How Services Resolve Keys <a href="#how-services-resolve-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How Services Resolve Keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="label-resolution" class="content-heading">Label Resolution <a href="#label-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Label Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>Every service selects <strong>unlabeled keys first, then its own label</strong>. Both sets merge into one flat dictionary keyed by name alone &mdash; the label is a filter, not part of the resulting key &mdash; so a labeled row <strong>overrides</strong> the unlabeled row of the same name, for that service only. Other services, which do not select that label, continue to see the unlabeled value.</p>
-<p>Two consequences follow, and they are asymmetric:</p>
-<ul>
-<li><strong>Adding a labeled row on top of an unlabeled one is safe.</strong> This is the existing pattern for <code>AutoMigrate</code>, the <code>CORS:*</code> family and the Serilog <code>component</code> label.</li>
-<li><strong>Moving a key from unlabeled to labeled is not.</strong> Deleting the unlabeled row breaks every service that does not select that exact label. Only do this when precisely one service consumes the key.</li>
-</ul>
-<p>Because labels are compiled in, a running service cannot be re-pointed at a different label without a redeploy.</p>
-<h3 id="key-notation-by-runtime" class="content-heading">Key Notation by Runtime <a href="#key-notation-by-runtime" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Notation by Runtime"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>The two runtimes read different rows from the same store, in different notations. This is by design, not drift.</p>
-<ul>
-<li><strong>.NET</strong> reads colon-delimited rows such as <code>KafkaConnection:BootstrapServers:0</code>, matching <code>appsettings.json</code> section paths.</li>
-<li><strong>Java</strong> reads slash-prefixed rows such as <code>/spring/datasource/url</code>. The Spring Cloud Azure provider appends <code>*</code> to the configured <code>key-filter</code> of <code>/</code>, giving a server-side filter of <code>/*</code>; it then strips the leading slash and converts remaining slashes to dots. So <code>/spring/datasource/url</code> becomes the Spring property <code>spring.datasource.url</code>. The colon-delimited .NET rows are structurally invisible to Java services.</li>
-</ul>
-<p>The catalog records Java keys in the dotted Spring form (<code>spring.datasource.url</code>) while the store holds the slash form. These are two representations of one key; the transform between them is total and mechanical.</p>
-<p>Values whose <code>content_type</code> is <code>application/json</code> are <strong>flattened</strong> by both providers. A single row <code>/authentication</code> holding <code>{"anonymous": false, "authority": "..."}</code> therefore supplies the properties <code>authentication.anonymous</code> and <code>authentication.authority</code>. Key Vault references are resolved automatically in both runtimes.</p>
-<h3 id="precedence-over-environment-variables" class="content-heading">Precedence Over Environment Variables <a href="#precedence-over-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Precedence Over Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p><strong>A key present in App Configuration beats a container environment variable.</strong> This is the opposite of the usual expectation and is worth knowing before debugging a deployed service.</p>
-<ul>
-<li><strong>Java</strong>: the Spring Cloud bootstrap property source defaults to <code>overrideSystemProperties=true</code>, and nothing in this repository overrides it.</li>
-<li><strong>.NET</strong>: <code>AddAzureAppConfiguration</code> is called after the host builder has already registered the environment-variable source, so the App Configuration source is appended last and wins.</li>
-</ul>
-<p>Setting an environment variable on a pod will therefore be silently ignored for any key the store defines. Change the store instead.</p>
-<h3 id="java-enablement" class="content-heading">Java Enablement <a href="#java-enablement" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Java Enablement"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>The checked-in <code>bootstrap.yml</code> for both Java services sets <code>spring.cloud.azure.appconfiguration.enabled: false</code>. That is the correct default for local and Docker runs, which take configuration from YAML and environment variables. <strong>Deployed environments set <code>SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED=true</code> on the pods</strong>, so App Configuration is live in dev, test and qa. The endpoint and credentials are likewise supplied at deploy time and do not appear in this repository.</p>
 <h2 id="security-warning" class="content-heading">Security Warning <a href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.yaml</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
+<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.json</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
 
         
     </div>
@@ -578,7 +546,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nappconfig_1F4C6005["Design: Application Configuration Management Process"]</pre>
+nappconfig_23995AC0["Design: Application Configuration Management Process"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

@@ -44,6 +44,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
+    private readonly IResourceCachePurger _resourceCachePurger;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -61,7 +62,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyLocationOperationService copyLocationOperationService,
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        IResourceCachePurger resourceCachePurger)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -88,6 +90,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
+        _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -113,25 +116,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 {
                     try
                     {
-                        await ProcessMessageAsync(result, consumeCancellationToken);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
-                    }
-                    catch (TransientException ex)
-                    {
-                        _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
-                    }
-                    catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
-
-                        _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
+                        await ConsumeMessageAsync(result, consumeCancellationToken);
                     }
                     finally
                     {
@@ -182,15 +167,58 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Processes a single consumed message and routes any failure to the dead letter or retry topic.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the consume loop (which owns only the offset commit) so that the failure routing —
+    /// in particular which failures release the resource cache — is directly testable.
+    /// </remarks>
+    public async Task ConsumeMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
+    {
+        try
+        {
+            await ProcessMessageAsync(result, consumeCancellationToken);
+        }
+        catch (DeadLetterException ex)
+        {
+            _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
+
+            // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
+            // so release its acquisition keys and the {correlationId} key normalization was writing.
+            // The retry paths below must NOT do this — a redelivered message still needs its cache.
+            await _resourceCachePurger.PurgeAsync(
+                result.Message.Value,
+                $"{nameof(KafkaTopic.ResourcesAcquired)} dead-lettered: {ex.Message}",
+                consumeCancellationToken);
+        }
+        catch (TransientException ex)
+        {
+            _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
+        }
+        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
+
+            _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
+        }
+    }
+
     public async Task ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
+        var cacheKeys = result.Message.Value.CacheKeys ?? [];
+        var copiedKeys = new List<string>(cacheKeys.Count);
 
         using (var scope = _scopeFactory.CreateScope())
         {
-            foreach (var cacheKey in result.Message.Value.CacheKeys)
+            foreach (var cacheKey in cacheKeys)
             {
                 ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
@@ -203,6 +231,15 @@ public class ResourcesAcquiredListener : BackgroundService
                 }, cancellationToken: cancellationToken);
 
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
+                if (resources.Count == 0)
+                {
+                    // DA only lists a key after it has written (and not stripped) resources there.
+                    // An empty listed key is a producer defect, not a not-ready race: retries cannot
+                    // create data that was never cached (org-map filter, Encounter strip, etc.).
+                    throw new DeadLetterException(
+                        $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
+                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                }
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -290,11 +327,20 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
 
                 await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+                copiedKeys.Add(cacheKey);
+            }
+
+            if (cacheKeys.Count == 0)
+            {
+                _logger.LogInformation(
+                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
             }
 
             await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
-            await resourceCache.DeleteAsync(result.Message.Value.CacheKeys, cancellationToken);
+            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
         }
     }
 

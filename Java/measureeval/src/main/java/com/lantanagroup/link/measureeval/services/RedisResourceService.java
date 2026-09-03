@@ -1,9 +1,12 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -27,11 +30,25 @@ public class RedisResourceService {
 
     public List<Resource> readResources(String facilityId, String correlationId, String patientId) {
         HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
-        Map<String, String> fields = hashOps.entries(correlationId);
+
+        Map<String, String> fields;
+        try {
+            fields = hashOps.entries(correlationId);
+        } catch (DataAccessException e) {
+            // Differentiate a cache OUTAGE from a genuinely-absent key. A connection/command failure means
+            // the resources are unknown — not empty — so surface an explicit, transient (retryable) error
+            // instead of letting an empty/partial read masquerade as "no resources" (a bogus not-reportable)
+            // or a downstream ResourceNotFoundException. The record is then retried and redelivered once
+            // Redis recovers, rather than being evaluated against an incomplete bundle.
+            throw new ResourceCacheUnavailableException(
+                    "Resource cache (Redis) unavailable while reading resources for correlationId=" + correlationId, e);
+        }
+
         List<Resource> resources = new ArrayList<>();
 
         if (fields.isEmpty()) {
-            logger.debug("No Redis entries for correlationId='{}'", correlationId);
+            // Reached only when the cache was reachable: the key genuinely has no fields.
+            logger.debug("No Redis entries for correlationId='{}' (cache reachable, key absent)", LogUtils.sanitize(correlationId));
             return resources;
         }
 

@@ -95,6 +95,8 @@ public interface IDataAcquisitionLogQueries
     /// Safety-net query: finds one representative log ID per group that is
     /// fully terminal, has SiblingCount stamped, but TailSent is still false
     /// and the last ModifyDate is older than <paramref name="minAge"/>.
+    /// In-flight <c>TailClaimedAt</c> claims inside the lease are excluded;
+    /// stale claims (lease expired, TailSent still false) are included.
     /// </summary>
     Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default);
 
@@ -154,33 +156,28 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             reportTrackingGuid = parsedReportTrackingGuid;
         }
 
-        var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
-                                       join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
-                                       join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
-                                       where query.FacilityId == facilityId
-                                             && log.CorrelationId == correlationId
-                                             && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
-                                             && resourceTypeEntry.ResourceType == parsedResourceType
-                                       select log.ResourceIds.Select(r => r.ResourceId).ToList()).ToListAsync(cancellationToken);
+        // Drive from DataAcquisitionLog (FacilityId + CorrelationId are indexed) instead of
+        // FhirQuery.FacilityId (nvarchar(max), no index). SelectMany ResourceIds rather than
+        // joining FhirQuery × FhirQueryResourceType × ResourceIds, which timed out at 30s
+        // under load on the shared test Azure SQL.
+        var resourceIds = await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(log => log.FacilityId == facilityId
+                          && log.CorrelationId == correlationId
+                          && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
+                          && log.FhirQueries.Any(query =>
+                              query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                  resourceTypeEntry.ResourceType == parsedResourceType)))
+            .SelectMany(log => log.ResourceIds.Select(r => r.ResourceId))
+            .ToListAsync(cancellationToken);
 
-        var result = new List<string>();
         var resourceTypePrefix = $"{resourceType}/";
-
-        foreach (var resourceReferences in logsWithResources)
-        {
-            if (resourceReferences != null)
-            {
-                var filteredIds = resourceReferences
-                    .Select(r => NormalizeResourceId(r, resourceTypePrefix))
-                    .Where(r => !string.IsNullOrWhiteSpace(r))
-                    .Select(r => r!)
-                    .ToList();
-
-                result.AddRange(filteredIds);
-            }
-        }
-
-        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return resourceIds
+            .Select(r => NormalizeResourceId(r, resourceTypePrefix))
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static string? NormalizeResourceId(string? resourceId, string resourceTypePrefix)
@@ -367,9 +364,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             //          non-terminal logs (i.e. all logs are finished).
 
             // Phase 1 ? narrow candidate groups via terminal-status logs only.
+            // Skip in-flight claims so this path cannot double-produce while a worker holds the lease.
+            var leaseCutoff = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease);
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
+                    (log.TailClaimedAt == null || log.TailClaimedAt <= leaseCutoff) &&
                     log.Status != null && terminalStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null)
@@ -444,9 +444,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 var first = groupLogs.First();
 
-                // Only include cache keys for resource types that had at least one resource actually acquired.
-                // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
-                // is the substring before the first '/'.
+                // Candidate cache keys: resource types that had at least one ResourceId recorded.
+                // ResourceId rows use "TypeName/id". Org-location strip can empty Encounter after
+                // those ids are recorded; ResourcesAcquiredTailFinalizer drops keys that no longer
+                // have cached resources so Normalization is never pointed at an empty location.
                 var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
                     .Join(_dbContext.DataAcquisitionLogs,
                         rid => rid.DataAcquisitionLogId,
@@ -472,7 +473,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReports = first.ScheduledReport != null
                             ? new List<ScheduledReport> { first.ScheduledReport }
                             : new List<ScheduledReport>(),
-                        CacheType = _resourceCache.GetCacheTypeForCorrelationId(group.CorrelationId ?? string.Empty),
+                        CacheType = await _resourceCache.GetCacheTypeForCorrelationIdAsync(
+                            group.CorrelationId ?? string.Empty,
+                            cancellationToken),
                         CacheKeys = acquiredResourceTypes
                             .Select(rt => $"{group.CorrelationId}:{rt}")
                             .Distinct()
@@ -1126,7 +1129,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         CompletionDate = log.CompletionDate,
                         CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                        ResourceAcquiredIds = log.ResourceIds.Select(r => r.ResourceId).ToList(),
+                        ResourceAcquiredIds = new List<string>(),
                         Notes = null,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
@@ -1140,24 +1143,48 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         } : null
                     };
 
-        return await query
+        var logs = await query
             .Take(batchSize)
             .ToListAsync(cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            return logs;
+        }
+
+        var logIds = logs.Select(log => log.Id).ToList();
+        var resourceIds = await _dbContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(resourceId => resourceId.DataAcquisitionLogId != null
+                                 && logIds.Contains(resourceId.DataAcquisitionLogId.Value))
+            .Select(resourceId => new { resourceId.DataAcquisitionLogId, resourceId.ResourceId })
+            .ToListAsync(cancellationToken);
+
+        var resourceIdsByLogId = resourceIds.ToLookup(row => row.DataAcquisitionLogId!.Value, row => row.ResourceId);
+        foreach (var log in logs)
+        {
+            log.ResourceAcquiredIds = resourceIdsByLogId[log.Id].ToList();
+        }
+
+        return logs;
     }
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)
     {
         var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         var cutoff = DateTime.UtcNow.Subtract(minAge);
+        var leaseCutoff = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease);
 
         // Find groups where:
         //  - TailSent is still false
         //  - SiblingCount is stamped (creation completed)
         //  - Last activity was > minAge ago (avoids racing with the inline path)
+        //  - No in-flight TailClaimedAt inside the lease (stale claims are reclaimable)
         //  - ALL logs in the group are terminal (no incomplete siblings)
         var orphanedGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Where(l =>
                 !l.TailSent
+                && (l.TailClaimedAt == null || l.TailClaimedAt <= leaseCutoff)
                 && l.SiblingCount != null
                 && l.CorrelationId != null
                 && l.QueryPhase != null

@@ -1,5 +1,4 @@
 using Confluent.Kafka;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Options;
@@ -25,9 +24,9 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Report;
 
 /// <summary>
-/// Covers the PreQualification:WritePreQualOperationOutcome gate (LEGLINK-466). With the flag
-/// set, the Validation service is the sole writer of the pre-qualification OperationOutcome
-/// (LEGLINK-425) and Report must not append its own.
+/// Report records the validation result and produces SubmitPayload. It does not write
+/// OperationOutcome; the Validation service is the sole writer, gated by
+/// pre-qualification.write-pre-qual-operation-outcome.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class ValidationCompleteListenerTests
@@ -36,52 +35,24 @@ public class ValidationCompleteListenerTests
     private const string PatientId = "patient-1";
     private const string BlobName = "report/patient-1.ndjson";
 
-    [Fact]
-    public async Task ProcessMessageAsync_WhenInvalidAndFlagOff_AppendsOperationOutcome()
-    {
-        var harness = new Harness(writePreQualOperationOutcome: false);
-
-        await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid: false), CancellationToken.None);
-
-        harness.PatientAggregator.Verify(
-            a => a.AppendResourceToBlob(BlobName, It.IsAny<OperationOutcome>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task ProcessMessageAsync_WhenInvalidAndFlagOn_DoesNotAppendOperationOutcome()
-    {
-        var harness = new Harness(writePreQualOperationOutcome: true);
-
-        await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid: false), CancellationToken.None);
-
-        harness.PatientAggregator.Verify(
-            a => a.AppendResourceToBlob(It.IsAny<string>(), It.IsAny<DomainResource>()),
-            Times.Never);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ProcessMessageAsync_WhenValid_NeverAppendsRegardlessOfFlag(bool writePreQualOperationOutcome)
+    public async Task ProcessMessageAsync_NeverAppendsOperationOutcome(bool isValid)
     {
-        var harness = new Harness(writePreQualOperationOutcome);
+        var harness = new Harness();
 
-        await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid: true), CancellationToken.None);
+        await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid), CancellationToken.None);
 
         harness.PatientAggregator.Verify(
-            a => a.AppendResourceToBlob(It.IsAny<string>(), It.IsAny<DomainResource>()),
+            a => a.AppendResourceToBlob(It.IsAny<string>(), It.IsAny<Hl7.Fhir.Model.DomainResource>()),
             Times.Never);
     }
 
-    /// <summary>
-    /// The flag gates only the blob append — the entry status update and the SubmitPayload
-    /// produce must still happen when it is on.
-    /// </summary>
     [Fact]
-    public async Task ProcessMessageAsync_WhenFlagOn_StillUpdatesEntryAndProducesSubmitPayload()
+    public async Task ProcessMessageAsync_WhenInvalid_UpdatesEntryAndProducesSubmitPayload()
     {
-        var harness = new Harness(writePreQualOperationOutcome: true);
+        var harness = new Harness();
 
         await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid: false), CancellationToken.None);
 
@@ -96,6 +67,20 @@ public class ValidationCompleteListenerTests
                 nameof(KafkaTopic.SubmitPayload),
                 It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_WhenValid_SetsPassedValidation()
+    {
+        var harness = new Harness();
+
+        await harness.Listener.ProcessMessageAsync(CreateConsumeResult(harness.ReportId, isValid: true), CancellationToken.None);
+
+        harness.ReportEntryManager.Verify(
+            m => m.UpdateAsync(
+                It.Is<ReportEntryModel>(e => e.ReportingStatus == ReportingStatus.PassedValidation),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -128,7 +113,7 @@ public class ValidationCompleteListenerTests
         public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> Producer { get; } = new();
         public ValidationCompleteListener Listener { get; }
 
-        public Harness(bool writePreQualOperationOutcome)
+        public Harness()
         {
             var blobSettings = Options.Create(new BlobStorageSettings
             {
@@ -172,7 +157,7 @@ public class ValidationCompleteListenerTests
                 Mock.Of<ITenantApiService>(),
                 Options.Create(new PatientAggregatorSettings()));
             PatientAggregator
-                .Setup(a => a.AppendResourceToBlob(It.IsAny<string>(), It.IsAny<DomainResource>()))
+                .Setup(a => a.AppendResourceToBlob(It.IsAny<string>(), It.IsAny<Hl7.Fhir.Model.DomainResource>()))
                 .Returns(Task.CompletedTask);
 
             var services = new ServiceCollection();
@@ -196,7 +181,6 @@ public class ValidationCompleteListenerTests
                 scopeFactory,
                 new ServiceInformation { ServiceConfigName = "Report" },
                 new BlobStorageService(blobSettings),
-                Options.Create(new PreQualificationSettings { WritePreQualOperationOutcome = writePreQualOperationOutcome }),
                 Mock.Of<IExceptionLogger<ValidationCompleteListener>>());
         }
     }

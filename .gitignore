@@ -423,3 +423,9 @@ FodyWeavers.xsd
 #   python Scripts/AzureAppConfig/extract_config_keys.py
 Scripts/AzureAppConfig/config_symbols.json
 Config/config-key-inventory.json
+/Prompt Staging
+
+# Scratch build/agent output. Keep these outside the repo (e.g. %TEMP%).
+.agent-out/
+.tmp*/
+.tmp-*/

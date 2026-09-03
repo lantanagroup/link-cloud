@@ -32,6 +32,7 @@ public class MemoryCacheConfig {
         // below) don't exist
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
                 "validateCodeCache",
+                "lookupCodeCache",
                 "isCodeSystemSupportedCache",
                 "isValueSetSupportedCache");
         cacheManager.setCaffeine(Caffeine.newBuilder()

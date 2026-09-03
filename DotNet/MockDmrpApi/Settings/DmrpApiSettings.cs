@@ -6,16 +6,17 @@ public class DmrpApiSettings
 
     /// <summary>
     /// Master switch. When false the entire API surface answers 503 and no schema
-    /// migration runs. Production disables the service regardless of this value.
+    /// migration runs. Defaults to false, so an environment that does not provision it
+    /// stays dormant.
     /// </summary>
     /// <remarks>
-    /// Do not read this property to decide availability. It carries only what configuration
-    /// bound, so it misses the Production block that
-    /// <see cref="Application.Middleware.DmrpAvailability.IsEnabled"/> applies -- reading it
-    /// directly would let a production deployment serve the mock. It exists so the
-    /// configuration key can be named from a symbol rather than a string literal.
+    /// Prefer <see cref="Application.Middleware.DmrpAvailability.IsEnabled"/> to decide
+    /// availability; both the request pipeline and startup go through it, so a deployment
+    /// cannot end up serving traffic but skipping migrations, or the reverse. This property
+    /// exists so the configuration key can be named from a symbol rather than a string
+    /// literal, and its default is kept in step with the one that check applies.
     /// </remarks>
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
 
     /// <summary>
     /// Client id the token endpoint accepts. Not a secret, so it keeps a working default.

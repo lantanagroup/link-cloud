@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -45,7 +46,8 @@ namespace UnitTests.DMRP
         }
 
         private static FacilityReportingPlanQueries CreateQueries(TenantDbContext context) =>
-            new(new EntityRepository<FacilityReportingPlan, TenantDbContext>(context));
+            new(new EntityRepository<FacilityReportingPlan, TenantDbContext>(context),
+                new EntityRepository<MeasureMapping, TenantDbContext>(context));
 
         /// <summary>
         /// Reporting plans point at a measure mapping by foreign key, so one has to exist before any
@@ -77,6 +79,25 @@ namespace UnitTests.DMRP
 
             context.FacilityReportingPlans.Add(plan);
             return plan;
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_ResolvesMeasureDetailsFromTheMapping()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            mapping.Frequency = Frequency.Monthly;
+            AddPlan(context, mapping);
+            await context.SaveChangesAsync();
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId);
+
+            // The facility view labels rows by measure, not by mapping id, so the per-facility
+            // read resolves each plan through its measure mapping.
+            var plan = Assert.Single(results);
+            Assert.Equal(mapping.Measure, plan.Measure);
+            Assert.Equal(mapping.DQM, plan.DQM);
+            Assert.Equal(Frequency.Monthly, plan.Frequency);
         }
 
         [Fact]

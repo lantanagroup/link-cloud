@@ -80,6 +80,21 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return invokeRemoteValidateCode(theCodeSystem, theCode, theDisplay, null, theValueSet);
     }
 
+    @Override
+    public IBaseResource fetchCodeSystem(String theSystem) {
+        if (theSystem == null || isWhitelistedCodeSystem(theSystem)) {
+            return null;
+        }
+        if (validationCacheService != null) {
+            return validationCacheService.cachedFetchCodeSystem(this, theSystem);
+        }
+        return invokeFetchCodeSystem(theSystem);
+    }
+
+    IBaseResource invokeFetchCodeSystem(String theSystem) {
+        return fetchCodeSystem(theSystem, SummaryEnum.TRUE);
+    }
+
     @Nullable
     private IBaseResource fetchCodeSystem(String theSystem, @Nullable SummaryEnum theSummaryParam) {
         IGenericClient client = this.provideClient();
@@ -102,8 +117,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
 
     /**
      * Remote lookup for {@link #lookupCode}, extracted so the result can be cached at the
-     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
-     * delegate reference passed into the {@code @Cacheable} method.
+     * {@link ValidationCacheService} layer.
      */
     IValidationSupport.LookupCodeResult invokeLookupCode(String code, String system, String displayLanguage, String propertyNames) {
         IGenericClient client = this.provideClient();
@@ -286,7 +300,17 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
     static final SummaryEnum FETCH_VALUE_SET_SUMMARY_MODE = SummaryEnum.TRUE;
 
     public IBaseResource fetchValueSet(String theValueSetUrl) {
-        return this.fetchValueSet(theValueSetUrl, FETCH_VALUE_SET_SUMMARY_MODE);
+        if (theValueSetUrl == null || isWhitelistedValueSet(theValueSetUrl)) {
+            return null;
+        }
+        if (validationCacheService != null) {
+            return validationCacheService.cachedFetchValueSet(this, theValueSetUrl);
+        }
+        return invokeFetchValueSet(theValueSetUrl);
+    }
+
+    IBaseResource invokeFetchValueSet(String theValueSetUrl) {
+        return fetchValueSet(theValueSetUrl, FETCH_VALUE_SET_SUMMARY_MODE);
     }
 
     @Nullable
@@ -304,48 +328,51 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
     }
 
     public boolean isCodeSystemSupported(ValidationSupportContext theValidationSupportContext, String theSystem) {
-        if (theSystem == null || theSystem.length() > MAX_URL_MATCH_LENGTH) {
+        if (theSystem == null || isWhitelistedCodeSystem(theSystem)) {
             return false;
         }
-
-        for (Pattern pattern : whiteListCodeSystemPatterns) {
-            if (pattern.matcher(theSystem).matches()) {
-                return false;
-            }
-        }
-
         return validationCacheService.cachedIsCodeSystemSupported(this, theSystem);
     }
 
     public boolean isValueSetSupported(ValidationSupportContext theValidationSupportContext, String theValueSetUrl) {
-        if (theValueSetUrl == null || theValueSetUrl.length() > MAX_URL_MATCH_LENGTH) {
+        if (theValueSetUrl == null || isWhitelistedValueSet(theValueSetUrl)) {
             return false;
         }
-
-        for (Pattern pattern : whiteListValueSetPatterns) {
-            if (pattern.matcher(theValueSetUrl).matches()) {
-                return false;
-            }
-        }
-
         return validationCacheService.cachedIsValueSetSupported(this, theValueSetUrl);
     }
 
-    /**
-     * Remote lookup for {@link #isCodeSystemSupported}, extracted so the result can be cached at the
-     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
-     * delegate reference passed into the {@code @Cacheable} method.
-     */
     boolean invokeIsCodeSystemSupported(String theSystem) {
-        return this.fetchCodeSystem(theSystem, SummaryEnum.TRUE) != null;
+        return invokeFetchCodeSystem(theSystem) != null;
     }
 
-    /**
-     * Remote lookup for {@link #isValueSetSupported}, extracted for the same reason as
-     * {@link #invokeIsCodeSystemSupported}.
-     */
     boolean invokeIsValueSetSupported(String theValueSetUrl) {
-        return this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE) != null;
+        return invokeFetchValueSet(theValueSetUrl) != null;
+    }
+
+    // A URL longer than any legal canonical (MAX_URL_MATCH_LENGTH) is treated as whitelisted/skipped so a
+    // pathological pattern can't backtrack over unbounded input. Patterns are precompiled once at construction.
+    private boolean isWhitelistedCodeSystem(String theSystem) {
+        if (theSystem.length() > MAX_URL_MATCH_LENGTH) {
+            return true;
+        }
+        for (Pattern pattern : whiteListCodeSystemPatterns) {
+            if (pattern.matcher(theSystem).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isWhitelistedValueSet(String theValueSetUrl) {
+        if (theValueSetUrl.length() > MAX_URL_MATCH_LENGTH) {
+            return true;
+        }
+        for (Pattern pattern : whiteListValueSetPatterns) {
+            if (pattern.matcher(theValueSetUrl).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public TranslateConceptResults translateConcept(IValidationSupport.TranslateCodeRequest theRequest) {

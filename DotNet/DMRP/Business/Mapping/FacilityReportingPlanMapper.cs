@@ -15,6 +15,12 @@ namespace LantanaGroup.Link.DMRP.Business.Mapping
             ReportingYear = entity.ReportingYear,
             IsReporting = entity.IsReporting,
 
+            // Filled only when the caller loaded the navigation (the per-facility read does);
+            // reads that never touch the mapping leave them null rather than costing a join.
+            Measure = entity.MeasureMapping?.Measure,
+            DQM = entity.MeasureMapping?.DQM,
+            Frequency = entity.MeasureMapping?.Frequency,
+
             // The columns are datetime2 with no offset, so a value that round-tripped through
             // EF Core comes back DateTimeKind.Unspecified, while a value set in memory just
             // before SaveChangesAsync (UpdateBaseEntityInterceptor) is still DateTimeKind.Utc.
