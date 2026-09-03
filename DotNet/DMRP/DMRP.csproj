@@ -31,6 +31,13 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Composes the optional filters on the reporting plan reads into one predicate, the way
+		     Report's managers already do, so a filter the caller did not supply contributes no SQL
+		     rather than a null test the database has to evaluate. -->
+		<PackageReference Include="LinqKit.Core" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
 		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>

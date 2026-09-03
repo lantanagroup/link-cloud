@@ -74,6 +74,11 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // nothing downstream changes.
             builder.Services.AddScoped<IReportingPlanSource, DbBackedReportingPlanSource>();
 
+            // One derivation of "what does this enrollment schedule", shared by the facility's stored
+            // schedule and by the facility-facing look-ahead.
+            builder.Services.AddScoped<IReportingPlanScheduleProjector, ReportingPlanScheduleProjector>();
+            builder.Services.AddScoped<IFacilityReportingPlanLookAhead, FacilityReportingPlanLookAhead>();
+
             builder.Services.TryAddSingleton(TimeProvider.System);
 
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what
