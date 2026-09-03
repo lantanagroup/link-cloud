@@ -216,8 +216,7 @@ export function OnboardingProvider({
 
   const goTo = useCallback(
     (stepId: StepId) => {
-      const nextDraft: FacilityDraft = {...draft, currentStepId: stepId, currentView: undefined};
-      persistDraft(nextDraft).then(saved => {
+      persistDraft(draft).then(saved => {
         if (!saved) {
           return;
         }
