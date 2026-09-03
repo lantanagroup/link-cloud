@@ -49,6 +49,8 @@
 #  5. Slack
 #     - Webhook is read at runtime from Azure App Configuration
 #       (key Automation:SlackWebhookUrl, label "Link Automation UI").
+#     - App Config may store a Key Vault reference JSON; the fetch step
+#       resolves it to the https webhook URL before notifying Slack.
 #     - Results include per-suite status, duration, error (if any), and deep
 #       links into Automation.UI (Runs/Details for scenarios, ApiHealth for
 #       the stability suite). Failed suites are called out explicitly.
@@ -147,6 +149,7 @@ variables:
   # Slack webhook is fetched at runtime from Azure App Configuration so the
   # value never lives in source. Key 'Automation:SlackWebhookUrl' (label
   # 'Link Automation UI') in the 'nhnslink-ac-test' App Config resource.
+  # The stored value may be a Key Vault reference; the fetch step resolves it.
   AZURE_SERVICE_CONNECTION: "NHSNLink-RG ARM"
   APP_CONFIG_NAME:          "nhnslink-ac-test"
   APP_CONFIG_SLACK_KEY:     "Automation:SlackWebhookUrl"
@@ -719,6 +722,7 @@ stages:
           - task: AzureCLI@2
             displayName: "Fetch Slack webhook from Azure App Configuration"
             condition: and(always(), ne(variables.SKIP_RUN, 'true'))
+            continueOnError: true
             inputs:
               azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
               scriptType: "pscore"
@@ -751,6 +755,34 @@ stages:
                   exit 0
                 }
 
+                # Sensitive App Config keys are stored as Key Vault references:
+                #   {"uri":"https://<vault>.vault.azure.net/secrets/<name>"}
+                # Interpolating that JSON into PowerShell as $(SLACK_WEBHOOK_URL)
+                # fails with Unexpected token 'uri'.
+                $trimmed = "$value".Trim()
+                if ($trimmed.StartsWith('{')) {
+                  $ref = $null
+                  try { $ref = $trimmed | ConvertFrom-Json } catch { }
+                  if (-not $ref -or -not $ref.uri) {
+                    Write-Error "Slack webhook App Config value looks like JSON but is not a Key Vault reference with a uri."
+                    exit 1
+                  }
+
+                  Write-Host "App Config value is a Key Vault reference; resolving secret."
+                  $secretOut = az keyvault secret show --id $ref.uri --query value -o tsv 2>&1
+                  if ($LASTEXITCODE -ne 0) {
+                    Write-Error "Failed to resolve Slack webhook from Key Vault. The '$(AZURE_SERVICE_CONNECTION)' service connection needs Get on that secret."
+                    Write-Host "az output: $secretOut"
+                    exit 1
+                  }
+                  $value = "$secretOut".Trim()
+                }
+
+                if ($value -notmatch '^https://') {
+                  Write-Error "Slack webhook is not an https URL after resolution. Check App Config key '$(APP_CONFIG_SLACK_KEY)'."
+                  exit 1
+                }
+
                 Write-Host "Fetched Slack webhook from App Config."
                 Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL;issecret=true]$value"
 
@@ -760,18 +792,24 @@ stages:
           - task: PowerShell@2
             displayName: "Send result to Slack"
             condition: and(always(), ne(variables.SKIP_RUN, 'true'))
+            continueOnError: true
             env:
               SUITE_RESULTS_JSON: $(SUITE_RESULTS_JSON)
               OVERALL_STATUS: $(OVERALL_STATUS)
               COMMIT_SHORT: $(COMMIT_SHORT)
               SKIP_RUN: $(SKIP_RUN)
               AUTOMATION_UI_BASE_URL: $(AUTOMATION_UI_BASE_URL)
+              SLACK_WEBHOOK_URL: $(SLACK_WEBHOOK_URL)
             inputs:
               targetType: "inline"
               script: |
-                $webhook = "$(SLACK_WEBHOOK_URL)"
+                $webhook = $env:SLACK_WEBHOOK_URL
                 if (-not $webhook) {
                   Write-Host "SLACK_WEBHOOK_URL not set; skipping Slack notification."
+                  exit 0
+                }
+                if ($webhook -notmatch '^https://') {
+                  Write-Host "SLACK_WEBHOOK_URL is not an https URL; skipping Slack notification."
                   exit 0
                 }
 
