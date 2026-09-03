@@ -514,6 +514,10 @@ services:
       description: "The cron expression defining how often data acquisition jobs should run."
       required: false
       defaultValue: "0/10 * * * * ?"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200)."
+      required: false
+      defaultValue: "100"
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: false
@@ -556,6 +560,10 @@ services:
       description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
       required: false
       defaultValue: "8"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200). The worker is the process that pages FHIR searches."
+      required: false
+      defaultValue: "100"
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true

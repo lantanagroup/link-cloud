@@ -307,8 +307,16 @@ public class ReportApiHelper
 
             var milestoneReached = false;
             var milestonePhaseStart = DateTime.UtcNow;
-            while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - milestonePhaseStart < hardTimeout)
+            var milestoneDeadline = hardTimeout == TimeSpan.MaxValue
+                ? DateTime.MaxValue
+                : milestonePhaseStart + hardTimeout;
+            while (true)
             {
+                if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
+                {
+                    if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
+                        break;
+                }
                 if (diagnostics.HasCriticalFailure)
                 {
                     _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
@@ -372,8 +380,16 @@ public class ReportApiHelper
 
         string? lastStatus = null;
         var submissionPhaseStart = DateTime.UtcNow;
-        while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - submissionPhaseStart < hardTimeout)
+        var submissionDeadline = hardTimeout == TimeSpan.MaxValue
+            ? DateTime.MaxValue
+            : submissionPhaseStart + hardTimeout;
+        while (true)
         {
+            if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
+            {
+                if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
+                    break;
+            }
             if (diagnostics?.HasCriticalFailure == true)
             {
                 _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
@@ -529,10 +545,37 @@ public class ReportApiHelper
 
         // Adaptive lower bound to avoid premature timeout on high-volume tests.
         // Example: 1000 patients => at least ~20 minutes.
+        // Large single-patient resource counts are handled by the DA keep-alive
+        // (resource-count growth slides this deadline) rather than a bigger static floor.
         var adaptiveFloor = TimeSpan.FromSeconds(Math.Max(300, config.PatientIds.Count * 1.2));
         return config.MaxPollingDuration > adaptiveFloor
             ? config.MaxPollingDuration
             : adaptiveFloor;
+    }
+
+    private bool TryKeepAlive(
+        BackgroundDiagnosticsMonitor? diagnostics,
+        DateTime phaseStart,
+        TimeSpan hardTimeout,
+        ref DateTime deadline)
+    {
+        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
+        if (!AcquisitionActivityTracker.TryExtendDeadline(
+                DateTime.UtcNow,
+                phaseStart,
+                hardTimeout,
+                hasProgress,
+                ref deadline,
+                out var extendedBy))
+        {
+            return false;
+        }
+
+        _output.WriteLine(
+            $"[DIAG][DataAcq] Keep-alive: acquisition still progressing " +
+            $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
+            $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
+        return true;
     }
 
     public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)
