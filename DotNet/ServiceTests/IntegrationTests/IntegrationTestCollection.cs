@@ -35,6 +35,7 @@ public class IntegrationTestCollection :
     ICollectionFixture<DmrpIntegrationTestFixture>,
     ICollectionFixture<NormalizationIntegrationTestFixture>,
     ICollectionFixture<ReportIntegrationTestFixture>,
+    ICollectionFixture<ReportSqlServerIntegrationTestFixture>,
     ICollectionFixture<AutomationUIIntegrationTestFixture>,
     ICollectionFixture<MockDmrpApiIntegrationTestFixture>
 {

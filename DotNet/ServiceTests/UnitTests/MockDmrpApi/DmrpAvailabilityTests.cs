@@ -115,7 +115,7 @@ public class DmrpAvailabilityTests
 
     [Theory]
     [InlineData("/msc")]
-    [InlineData("/ps/annual")]
+    [InlineData("/ps/annual/mrp")]
     // These four share the /api/mock-dmrp prefix with the info endpoint above and must
     // still be blocked -- only .../info is exempt, not the whole support surface.
     [InlineData("/api/mock-dmrp")]

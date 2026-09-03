@@ -177,17 +177,6 @@ public class ReportingPlanService : IReportingPlanService
     }
 
     /// <summary>
-    /// Rejects an entry whose reporting period does not match its component's cadence.
-    /// </summary>
-    /// <remarks>
-    /// This cannot be a column constraint or a range annotation, because whether a month is
-    /// required depends on the component. It has to be enforced, not merely documented: a
-    /// patient-safety entry saved with a stray month satisfies the unique index perfectly
-    /// well, but the annual query does not filter on month, so the row would be returned for
-    /// every month -- or, with the month wrong on a monthly entry, returned for none. Both
-    /// failures are silent.
-    /// </remarks>
-    /// <summary>
     /// Trims a value that takes part in the natural key.
     /// </summary>
     /// <remarks>
@@ -207,7 +196,7 @@ public class ReportingPlanService : IReportingPlanService
     /// Brings an entry's key fields to the form they are stored and compared in.
     /// </summary>
     /// <remarks>
-    /// Runs before both the cadence guard and the duplicate pre-check, so an entry is
+    /// Runs before both the component and period guard and the duplicate pre-check, so an entry is
     /// validated and compared as it will be persisted rather than as it arrived.
     /// </remarks>
     private static void Normalize(ReportingPlanEntryEntity entry)
@@ -240,6 +229,15 @@ public class ReportingPlanService : IReportingPlanService
         }
     }
 
+    /// <summary>
+    /// Rejects an entry whose component is unknown, or whose reporting period cannot be
+    /// reported against.
+    /// </summary>
+    /// <remarks>
+    /// Both components are reported monthly, so every entry carries a month. An entry stored
+    /// with a month outside 1-12 is returned for no month at all, which is a silent failure:
+    /// the row is there, the unique index is satisfied, and the plan simply comes back short.
+    /// </remarks>
     private static void GuardComponentAndPeriod(ReportingPlanEntryEntity entry)
     {
         if (!ReportingComponents.IsKnown(entry.Component))
@@ -254,20 +252,6 @@ public class ReportingPlanService : IReportingPlanService
         // "msc" invisible to /msc -- a difference no local run against SQL Server's
         // default case-insensitive collation would ever reveal.
         entry.Component = ReportingComponents.Normalize(entry.Component);
-
-        var monthRequired = ReportingComponents.RequiresReportingMonth(entry.Component);
-
-        if (monthRequired && entry.ReportingMonth is null)
-        {
-            throw new InvalidReportingPlanEntryException(
-                $"Component '{entry.Component}' is reported monthly, so reportingMonth is required.");
-        }
-
-        if (!monthRequired && entry.ReportingMonth is not null)
-        {
-            throw new InvalidReportingPlanEntryException(
-                $"Component '{entry.Component}' is reported annually, so reportingMonth must be omitted.");
-        }
 
         if (entry.ReportingMonth is < 1 or > 12)
         {

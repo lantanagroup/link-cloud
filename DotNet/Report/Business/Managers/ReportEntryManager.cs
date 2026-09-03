@@ -1,6 +1,10 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using System.Text.Json;
+using LantanaGroup.Link.Report.Domain.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -12,6 +16,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportEntryManager
     {
+        /// <summary>
+        /// One entry with the evidence behind its mapping indicators, for the per-patient drill-down.
+        /// </summary>
+        Task<ReportEntryDetailModel?> GetEntryDetail(Guid reportScheduleId, string patientId,
+            CancellationToken cancellationToken = default);
+
         Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId,
             CancellationToken cancellationToken = default);
 
@@ -67,10 +77,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     public class ReportEntryManager : IReportEntryManager
     {
         private readonly ReportDbContext _dbContext;
+        private readonly ILogger<ReportEntryManager> _logger;
 
-        public ReportEntryManager(ReportDbContext dbContext)
+        public ReportEntryManager(ReportDbContext dbContext, ILogger<ReportEntryManager> logger)
         {
             _dbContext = dbContext;
+            _logger = logger;
         }
 
         private record ReportEntryProjection(
@@ -85,7 +97,30 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             DateTime? SubmitReportDateTime,
             string? AggregateReportUri,
             string? AggregateReportBlobName,
-            List<MeasureReportProjection> MeasureReports
+            List<MeasureReportProjection> MeasureReports,
+            MappingOutcomeProjection? MappingOutcome
+        );
+
+        /// <summary>
+        /// The mapping outcome row for the entry, or null when no source has reported for the patient yet.
+        /// </summary>
+        /// <remarks>
+        /// Left-joined. An inner join would drop every patient whose outcome row does not exist -- which is
+        /// every patient of every report that ran before this feature, and any patient still in flight --
+        /// silently shortening the grid rather than showing them as not yet evaluated.
+        /// </remarks>
+        /// <remarks>
+        /// Deliberately excludes the two detail blobs. Both are unbounded nvarchar(max), and this
+        /// projection backs the paged entry grid -- selecting them would transfer the whole evidence set
+        /// for every row of every page only to discard it, and AcquisitionDetails grows with the distinct
+        /// locations a patient touched. The per-patient drill-down reads them in its own targeted query.
+        /// </remarks>
+        private record MappingOutcomeProjection(
+            MappingIndicatorStatus LocationOrgStatus,
+            MappingIndicatorStatus EncounterMappingStatus,
+            MappingIndicatorStatus HslocMappingStatus,
+            DateTime? AcquisitionEvaluatedAt,
+            DateTime? NormalizationEvaluatedAt
         );
 
         private record MeasureReportProjection(
@@ -114,6 +149,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 SubmitReportDateTime = proj.SubmitReportDateTime,
                 AggregateReportUri = proj.AggregateReportUri,
                 AggregateReportBlobName = proj.AggregateReportBlobName,
+                LocationOrgStatus = proj.MappingOutcome?.LocationOrgStatus ?? MappingIndicatorStatus.NotEvaluated,
+                EncounterMappingStatus = proj.MappingOutcome?.EncounterMappingStatus ?? MappingIndicatorStatus.NotEvaluated,
+
+                // Resolved rather than copied: a patient whose encounters all fell outside the
+                // organization is not in the report, so any code map result about them describes
+                // resources the report never evaluates.
+                HslocMappingStatus = MappingIndicatorView.ResolveHsloc(
+                    proj.MappingOutcome?.HslocMappingStatus ?? MappingIndicatorStatus.NotEvaluated,
+                    proj.MappingOutcome?.LocationOrgStatus ?? MappingIndicatorStatus.NotEvaluated),
+
+                AcquisitionEvaluatedAt = proj.MappingOutcome?.AcquisitionEvaluatedAt,
+                NormalizationEvaluatedAt = proj.MappingOutcome?.NormalizationEvaluatedAt,
                 MeasureReports = proj.MeasureReports.Select(m => new EntryMeasureReportModel
                 {
                     MeasureReportId = m.MeasureReportId,
@@ -124,6 +171,94 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     ResourceCount = m.ResourceCounts.ToDictionary(rc => rc.ResourceType, rc => rc.ResourceCount)
                 }).ToList()
             };
+        }
+
+        public async Task<ReportEntryDetailModel?> GetEntryDetail(Guid reportScheduleId, string patientId,
+            CancellationToken cancellationToken = default)
+        {
+            var entry = await GetEntry(reportScheduleId, patientId, cancellationToken);
+
+            if (entry is null)
+            {
+                return null;
+            }
+
+            var stored = await _dbContext.ReportEntryMappingOutcome
+                .AsNoTracking()
+                .Where(o => o.ReportScheduleId == reportScheduleId && o.PatientId == patientId)
+                .Select(o => new
+                {
+                    o.AcquisitionDetails,
+                    o.AcquisitionEvaluatedAt,
+                    o.NormalizationDetails,
+                    o.NormalizationEvaluatedAt
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var detail = new ReportEntryDetailModel
+            {
+                Id = entry.Id,
+                CreateDate = entry.CreateDate,
+                ModifyDate = entry.ModifyDate,
+                FacilityId = entry.FacilityId,
+                ReportScheduleId = entry.ReportScheduleId,
+                PatientId = entry.PatientId,
+                ReportingStatus = entry.ReportingStatus,
+                SubmissionStatus = entry.SubmissionStatus,
+                SubmitReportDateTime = entry.SubmitReportDateTime,
+                AggregateReportUri = entry.AggregateReportUri,
+                AggregateReportBlobName = entry.AggregateReportBlobName,
+                MeasureReports = entry.MeasureReports,
+                LocationOrgStatus = entry.LocationOrgStatus,
+                EncounterMappingStatus = entry.EncounterMappingStatus,
+                HslocMappingStatus = entry.HslocMappingStatus,
+                AcquisitionEvaluatedAt = entry.AcquisitionEvaluatedAt,
+                NormalizationEvaluatedAt = entry.NormalizationEvaluatedAt
+            };
+
+            // Keyed off the timestamp rather than the blob. A source that reported nothing to say still
+            // stamps its timestamp, and its section should then be present-but-empty rather than absent --
+            // absent means "this source has not answered", which is a different fact.
+            if (stored?.AcquisitionEvaluatedAt is not null)
+            {
+                detail.Acquisition = Deserialize<AcquisitionMappingDetails>(
+                    stored.AcquisitionDetails, reportScheduleId, patientId, "acquisition");
+            }
+
+            if (stored?.NormalizationEvaluatedAt is not null)
+            {
+                detail.Normalization = Deserialize<NormalizationMappingDetails>(
+                    stored.NormalizationDetails, reportScheduleId, patientId, "normalization");
+            }
+
+            return detail;
+        }
+
+        /// <summary>
+        /// Reads a stored detail blob into its typed model. The blob is storage, not the API contract, so
+        /// a value that cannot be read is reported as absent rather than put on the wire as a string.
+        /// </summary>
+        private T? Deserialize<T>(string? json, Guid reportScheduleId, string patientId, string source)
+            where T : class
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<T>(json);
+            }
+            catch (JsonException exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stored {Source} mapping details for report schedule {ReportScheduleId} patient {PatientId} could not be read; reporting them as absent.",
+                    source, reportScheduleId, patientId.SanitizeForLog());
+
+                return null;
+            }
         }
 
         public async Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId,
@@ -151,7 +286,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.MeasureReportFileName,
                         m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
                             .ToList()
-                    )).ToList()
+                    )).ToList(),
+                    _dbContext.ReportEntryMappingOutcome
+                        .Where(o => o.ReportScheduleId == e.ReportScheduleId && o.PatientId == e.PatientId)
+                        .Select(o => new MappingOutcomeProjection(
+                            o.LocationOrgStatus,
+                            o.EncounterMappingStatus,
+                            o.HslocMappingStatus,
+                            o.AcquisitionEvaluatedAt,
+                            o.NormalizationEvaluatedAt))
+                        .FirstOrDefault()
                 ))
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -183,7 +327,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.MeasureReportFileName,
                         m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
                             .ToList()
-                    )).ToList()
+                    )).ToList(),
+                    _dbContext.ReportEntryMappingOutcome
+                        .Where(o => o.ReportScheduleId == e.ReportScheduleId && o.PatientId == e.PatientId)
+                        .Select(o => new MappingOutcomeProjection(
+                            o.LocationOrgStatus,
+                            o.EncounterMappingStatus,
+                            o.HslocMappingStatus,
+                            o.AcquisitionEvaluatedAt,
+                            o.NormalizationEvaluatedAt))
+                        .FirstOrDefault()
                 ))
                 .ToListAsync(cancellationToken);
 
@@ -215,7 +368,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.MeasureReportFileName,
                         m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
                             .ToList()
-                    )).ToList()
+                    )).ToList(),
+                    _dbContext.ReportEntryMappingOutcome
+                        .Where(o => o.ReportScheduleId == e.ReportScheduleId && o.PatientId == e.PatientId)
+                        .Select(o => new MappingOutcomeProjection(
+                            o.LocationOrgStatus,
+                            o.EncounterMappingStatus,
+                            o.HslocMappingStatus,
+                            o.AcquisitionEvaluatedAt,
+                            o.NormalizationEvaluatedAt))
+                        .FirstOrDefault()
                 ))
                 .SingleOrDefaultAsync(cancellationToken);
 
@@ -584,7 +746,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     m.MeasureReportFileName,
                     m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
                         .ToList()
-                )).ToList()
+                )).ToList(),
+                _dbContext.ReportEntryMappingOutcome
+                    .Where(o => o.ReportScheduleId == e.ReportScheduleId && o.PatientId == e.PatientId)
+                    .Select(o => new MappingOutcomeProjection(
+                        o.LocationOrgStatus,
+                        o.EncounterMappingStatus,
+                        o.HslocMappingStatus,
+                        o.AcquisitionEvaluatedAt,
+                        o.NormalizationEvaluatedAt))
+                    .FirstOrDefault()
             ));
 
             var projList = await query

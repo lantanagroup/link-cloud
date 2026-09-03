@@ -23,14 +23,14 @@ public class HSLOCControllerTests
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
         var expected = new List<HSLOC> { CreateHSLOC("A1") };
-        queries.Setup(query => query.GetAll(includeInactive)).ReturnsAsync(expected);
+        queries.Setup(query => query.GetAll(includeInactive, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetAll(includeInactive);
+        var result = await controller.GetAll(includeInactive, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Same(expected, ok.Value);
-        queries.Verify(query => query.GetAll(includeInactive), Times.Once);
+        queries.Verify(query => query.GetAll(includeInactive, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class HSLOCControllerTests
     {
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
-        queries.Setup(query => query.GetAll(It.IsAny<bool>())).ThrowsAsync(new Exception("query failed"));
+        queries.Setup(query => query.GetAll(It.IsAny<bool>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("query failed"));
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetAll();
+        var result = await controller.GetAll(false, CancellationToken.None);
 
         var problem = AssertProblem(result.Result!, HttpStatusCode.InternalServerError);
         Assert.Equal("query failed", problem.Detail);
@@ -59,11 +59,11 @@ public class HSLOCControllerTests
             OldVersion = "2025",
             NewVersion = "2026",
             CsvFile = null!
-        });
+        }, CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.BadRequest);
         Assert.Equal("A non-empty HSLOC CSV file must be provided.", problem.Detail);
-        manager.Verify(manager => manager.Update(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>()), Times.Never);
+        manager.Verify(manager => manager.Update(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         string? uploadedCsv = null;
         manager
-            .Setup(manager => manager.Update("2025", "2026", It.IsAny<Stream>()))
-            .Callback<string, string, Stream>((_, _, csv) =>
+            .Setup(manager => manager.Update("2025", "2026", It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, Stream, CancellationToken>((_, _, csv, _) =>
             {
                 using var reader = new StreamReader(csv, Encoding.UTF8, leaveOpen: true);
                 uploadedCsv = reader.ReadToEnd();
@@ -82,11 +82,11 @@ public class HSLOCControllerTests
             .Returns(Task.CompletedTask);
         var controller = CreateController(manager, queries);
 
-        var result = await controller.Update(CreateUpdateModel());
+        var result = await controller.Update(CreateUpdateModel(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal("CDCCode,ShortDescription,HSLOCCode,LongDescription", uploadedCsv);
-        manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>()), Times.Once);
+        manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -99,10 +99,10 @@ public class HSLOCControllerTests
         model.OldVersion = "<script>alert(1)</script>2025";
         model.NewVersion = "2026<script>alert(1)</script>";
 
-        var result = await controller.Update(model);
+        var result = await controller.Update(model, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>()), Times.Once);
+        manager.Verify(manager => manager.Update("2025", "2026", It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -112,11 +112,11 @@ public class HSLOCControllerTests
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
         manager
-            .Setup(manager => manager.Update(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>()))
+            .Setup(manager => manager.Update(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
         var controller = CreateController(manager, queries);
 
-        var result = await controller.Update(CreateUpdateModel());
+        var result = await controller.Update(CreateUpdateModel(), CancellationToken.None);
 
         var problem = AssertProblem(result, expectedStatus);
         Assert.Equal(exception.Message, problem.Detail);
@@ -136,10 +136,10 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteAll();
+        var result = await controller.DeleteAll(CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(manager => manager.DeleteAll(), Times.Once);
+        manager.Verify(manager => manager.DeleteAll(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -147,10 +147,10 @@ public class HSLOCControllerTests
     {
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
-        manager.Setup(manager => manager.DeleteAll()).ThrowsAsync(new Exception("delete failed"));
+        manager.Setup(manager => manager.DeleteAll(It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("delete failed"));
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteAll();
+        var result = await controller.DeleteAll(CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.InternalServerError);
         Assert.Equal("delete failed", problem.Detail);
@@ -163,11 +163,11 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteByVersion(" ");
+        var result = await controller.DeleteByVersion(" ", CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.BadRequest);
         Assert.Equal("An HSLOC version must be provided.", problem.Detail);
-        manager.Verify(manager => manager.DeleteByVersion(It.IsAny<string>()), Times.Never);
+        manager.Verify(manager => manager.DeleteByVersion(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -177,10 +177,10 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteByVersion("2026");
+        var result = await controller.DeleteByVersion("2026", CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(manager => manager.DeleteByVersion("2026"), Times.Once);
+        manager.Verify(manager => manager.DeleteByVersion("2026", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -190,10 +190,10 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteByVersion("2026<script>alert(1)</script>");
+        var result = await controller.DeleteByVersion("2026<script>alert(1)</script>", CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(manager => manager.DeleteByVersion("2026"), Times.Once);
+        manager.Verify(manager => manager.DeleteByVersion("2026", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -201,10 +201,10 @@ public class HSLOCControllerTests
     {
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
-        manager.Setup(manager => manager.DeleteByVersion(It.IsAny<string>())).ThrowsAsync(new Exception("delete failed"));
+        manager.Setup(manager => manager.DeleteByVersion(It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("delete failed"));
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteByVersion("2026");
+        var result = await controller.DeleteByVersion("2026", CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.InternalServerError);
         Assert.Equal("delete failed", problem.Detail);
@@ -217,11 +217,11 @@ public class HSLOCControllerTests
         var queries = new Mock<IHSLOCQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteById(Guid.Empty);
+        var result = await controller.DeleteById(Guid.Empty, CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.BadRequest);
         Assert.Equal("A valid HSLOC identifier must be provided.", problem.Detail);
-        manager.Verify(manager => manager.DeleteById(It.IsAny<Guid>()), Times.Never);
+        manager.Verify(manager => manager.DeleteById(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -232,10 +232,10 @@ public class HSLOCControllerTests
         var id = Guid.NewGuid();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteById(id);
+        var result = await controller.DeleteById(id, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
-        manager.Verify(manager => manager.DeleteById(id), Times.Once);
+        manager.Verify(manager => manager.DeleteById(id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -243,10 +243,10 @@ public class HSLOCControllerTests
     {
         var manager = new Mock<IHSLOCManager>();
         var queries = new Mock<IHSLOCQueries>();
-        manager.Setup(manager => manager.DeleteById(It.IsAny<Guid>())).ThrowsAsync(new Exception("delete failed"));
+        manager.Setup(manager => manager.DeleteById(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("delete failed"));
         var controller = CreateController(manager, queries);
 
-        var result = await controller.DeleteById(Guid.NewGuid());
+        var result = await controller.DeleteById(Guid.NewGuid(), CancellationToken.None);
 
         var problem = AssertProblem(result, HttpStatusCode.InternalServerError);
         Assert.Equal("delete failed", problem.Detail);

@@ -21,6 +21,8 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Normalization.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -46,6 +48,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
+    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -64,7 +67,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache,
-        IResourceCachePurger resourceCachePurger)
+        IResourceCachePurger resourceCachePurger,
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -92,6 +96,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
+        _mappingOutcomeProducer = mappingOutcomeProducer ?? throw new ArgumentNullException(nameof(mappingOutcomeProducer));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -235,9 +240,14 @@ public class ResourcesAcquiredListener : BackgroundService
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
+        var mappingOutcomes = new MappingOutcomeAccumulator();
+
+        await RegisterConfiguredCodeMapsAsync(
+            scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
+
         foreach (var cacheKey in cacheKeys)
         {
-                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
+            ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -304,7 +314,8 @@ public class ResourcesAcquiredListener : BackgroundService
                             if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:{operationResult.SuccessCode}");
-
+                                mappingOutcomes.Add(operationResult.CodeMapping);
+                                
                                 if (operationResult.SuccessCode == OperationStatus.Success)
                                 {
                                     _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
@@ -319,6 +330,11 @@ public class ResourcesAcquiredListener : BackgroundService
                             else
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:Failure");
+                                if (operation is CodeMapOperation codeMapOperation)
+                                {
+                                    mappingOutcomes.AddFailure(codeMapOperation); 
+                                }
+
                                 _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
                             }
                         }
@@ -343,19 +359,37 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                 }
 
-                await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
-                copiedKeys.Add(cacheKey);
-            }
+            await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            copiedKeys.Add(cacheKey);
+        }
 
-            if (cacheKeys.Count == 0)
-            {
-                _logger.LogInformation(
-                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
-                    result.Message.Key.FacilityId.SanitizeForLog(),
-                    correlationId.SanitizeForLog());
-            }
+        if (cacheKeys.Count == 0)
+        {
+            _logger.LogInformation(
+                "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                result.Message.Key.FacilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
 
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+
+        // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
+        // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
+        // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
+        // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
+        // avoidable noise on the topic, and this order also means a produce failure here can be
+        // swallowed without the pipeline caring, because the pipeline's own message is already out.
+        //
+        // Produced even when nothing was acquired: the configured code maps are declared up front, so
+        // this still reports them with zero counts, which is what separates "nothing reached the map"
+        // from "no map is configured".
+        await ProduceMappingOutcomeEvaluatedMessage(
+            result.Message.Key.FacilityId,
+            result.Message.Key.PatientId,
+            correlationId,
+            result.Message.Value,
+            mappingOutcomes,
+            cancellationToken);
 
         await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
     }
@@ -427,6 +461,126 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Declares every code map the facility has configured, before any resource is looked at.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The loop below only visits resource types Data Acquisition actually acquired -- a type it fetched
+    /// nothing for has no cache key, so its operation sequences are never even read. That leaves a facility
+    /// with a configured code map and no matching resource indistinguishable from one with no code map at
+    /// all: both report an empty outcome list. Declaring the configured maps up front separates them, since
+    /// a map nothing exercised then reports zero counts instead of being absent.
+    /// </para>
+    /// <para>
+    /// Searched across every resource type rather than per type, for the same reason. Results are cached
+    /// per facility by <c>OperationSequenceQueries</c>, so this is one lookup per patient-correlation, not
+    /// one per resource.
+    /// </para>
+    /// </remarks>
+    private async Task RegisterConfiguredCodeMapsAsync(
+        IServiceScope scope,
+        string facilityId,
+        MappingOutcomeAccumulator mappingOutcomes,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
+
+            var sequences = await operationSequenceQueries.Search(
+                new OperationSequenceSearchModel { FacilityId = facilityId },
+                cancellationToken: cancellationToken);
+
+            foreach (var sequence in sequences ?? [])
+            {
+                var dbEntity = sequence.OperationResourceType?.Operation;
+
+                if (dbEntity is null || dbEntity.IsDisabled || dbEntity.OperationType != OperationType.CodeMap.ToString())
+                {
+                    continue;
+                }
+
+                if (OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson) is CodeMapOperation codeMapOperation)
+                {
+                    mappingOutcomes.Register(codeMapOperation);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Declaring the configured maps only sharpens the reported status; it is not the normalization
+            // work itself. Failing the message here would stop a patient's resources from being normalized
+            // over a reporting detail, so the run continues with the less precise result.
+            //
+            // Cancellation is excluded deliberately. The Search above takes the ambient token, so on
+            // shutdown this would otherwise absorb the OperationCanceledException and let the whole
+            // resource loop and both produces run on a cancelled token instead of unwinding.
+            _logger.LogWarning(
+                exception,
+                "Could not read the configured code maps for {FacilityId}; a code map that never runs will report as unconfigured.",
+                facilityId.SanitizeForLog());
+        }
+    }
+
+    private async Task ProduceMappingOutcomeEvaluatedMessage(
+        string? facilityId,
+        string? patientId,
+        string? correlationId,
+        ResourcesAcquiredValue acquiredValue,
+        MappingOutcomeAccumulator mappingOutcomes,
+        CancellationToken cancellationToken = default)
+    {
+        var outcomes = mappingOutcomes.BuildAll().ToList();
+        var value = new MappingOutcomeEvaluatedValue
+        {
+            Source = MappingOutcomeSource.Normalization,
+            ScheduledReports = acquiredValue.ScheduledReports,
+            CodeMapOutcomes = outcomes,
+
+            // Names the pass rather than the message, so a redelivery carries the same identity and the
+            // consumer replaces that pass's contribution instead of adding it a second time.
+            CorrelationId = correlationId,
+            QueryType = acquiredValue.QueryType
+        };
+        var headers = new Headers
+        {
+            new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId ?? ""))
+        };
+
+        if (outcomes.Count != 0)
+        {
+            _logger.LogDebug(
+                "Mapping outcomes for {FacilityId}/{CorrelationId}: {Outcomes}",
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog(),
+                string.Join(", ", outcomes.Select(o => $"{o.TargetSystem}={o.Status}")).SanitizeForLog());
+        }
+
+        try
+        {
+            await _mappingOutcomeProducer.ProduceAsync(KafkaTopic.MappingOutcomeEvaluated.ToString(),
+                new Message<ResourceKey, MappingOutcomeEvaluatedValue>
+                {
+                    Key = new ResourceKey
+                    {
+                        FacilityId = facilityId ?? string.Empty,
+                        PatientId = patientId ?? string.Empty
+                    },
+                    Headers = headers,
+                    Value = value
+                }, cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _logger.LogError(e, "Failed to produce MappingOutcomeEvaluated message. " +
+                                "FacilityId: {FacilityId}, PatientId: {PatientId}, CorrelationId: {CorrelationId}",
+                facilityId.SanitizeForLog(), 
+                patientId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
         }
     }
 

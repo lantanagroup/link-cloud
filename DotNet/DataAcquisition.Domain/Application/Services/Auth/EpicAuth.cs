@@ -102,11 +102,6 @@ public class EpicAuth : IAuth
 
         var resolvedPem = await ResolvePem(facilityId, authSettings, cancellationToken);
 
-        var signingCredentials =
-            TryGetECDsaSigningCredentials(resolvedPem)
-            ?? TryGetRSASigningCredentials(resolvedPem)
-            ?? throw new InvalidOperationException("PEM uses unsupported algorithm.");
-
         if (string.IsNullOrWhiteSpace(authSettings.ClientId))
                 throw new ArgumentException("A secret name for ClientId must be provided for Epic authentication.");
         var clientId = await _secretManager.GetSecretAsync(authSettings.ClientId, CancellationToken.None);
@@ -117,7 +112,19 @@ public class EpicAuth : IAuth
         if (string.IsNullOrWhiteSpace(audience))
             throw new InvalidOperationException("An Audience or TokenUrl must be provided for Epic authentication.");
 
-        return GetToken(clientId, audience, signingCredentials);
+        using var ecdsa = TryGetECDsa(resolvedPem);
+        if (ecdsa is not null)
+        {
+            var algorithm = GetECDsaAlgorithm(ecdsa);
+            if (algorithm is not null)
+                return GetToken(clientId, audience, new SigningCredentials(new ECDsaSecurityKey(ecdsa), algorithm));
+        }
+
+        using var rsa = TryGetRSA(resolvedPem);
+        if (rsa is not null)
+            return GetToken(clientId, audience, new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256));
+
+        throw new InvalidOperationException("PEM uses unsupported algorithm.");
     }
 
     private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
@@ -133,58 +140,64 @@ public class EpicAuth : IAuth
             return authSettings.Key;
         }
 
-        var vendorSecretName = await _tenantApiService.GetVendorSigningKeySecretId(facilityId, cancellationToken);
+        //char array so it can be cleared from memory asap
+        var vendorSecretName = (await _tenantApiService.GetVendorSigningKeySecretId(facilityId, cancellationToken))?.ToCharArray();
 
-        var pemName = string.IsNullOrWhiteSpace(vendorSecretName)
-            ? $"{facilityId}{PemSuffix}"
+        var pemName = vendorSecretName == null || vendorSecretName.Length == 0 || Array.TrueForAll(vendorSecretName, char.IsWhiteSpace)
+            ? $"{facilityId}{PemSuffix}".ToCharArray()
             : vendorSecretName;
 
-        var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
+        var resolvedPem = await _secretManager.GetSecretAsync(new string(pemName) ?? "", CancellationToken.None);
+        if(pemName != null)
+        {
+            Array.Clear(pemName);
+        }
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
             throw new InvalidOperationException(
-                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
+                $"Authentication configuration is incomplete or the signing key could not be resolved.");
 
         return resolvedPem;
     }
 
-    private SigningCredentials? TryGetECDsaSigningCredentials(string pem)
+    private static ECDsa? TryGetECDsa(string pem)
     {
-        ECDsa ecdsa = ECDsa.Create();
+        var ecdsa = ECDsa.Create();
         try
         {
             ecdsa.ImportFromPem(pem);
         }
         catch (Exception)
         {
+            ecdsa.Dispose();
             return null;
         }
-        string? algorithm = ecdsa.KeySize switch
+
+        return ecdsa;
+    }
+
+    private static string? GetECDsaAlgorithm(ECDsa ecdsa) => ecdsa.KeySize switch
         {
             256 => SecurityAlgorithms.EcdsaSha256,
             384 => SecurityAlgorithms.EcdsaSha384,
             521 => SecurityAlgorithms.EcdsaSha512,
             _ => null
         };
-        if (algorithm == null)
-        {
-            return null;
-        }
-        return new SigningCredentials(new ECDsaSecurityKey(ecdsa), algorithm);
-    }
 
-    private SigningCredentials? TryGetRSASigningCredentials(string pem)
+    private static RSA? TryGetRSA(string pem)
     {
-        RSA rsa = RSA.Create();
+        var rsa = RSA.Create();
         try
         {
             rsa.ImportFromPem(pem);
         }
         catch (Exception)
         {
+            rsa.Dispose();
             return null;
         }
-        return new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256);
+
+        return rsa;
     }
 
     private string GetToken(string clientId, string audience, SigningCredentials credentials)
