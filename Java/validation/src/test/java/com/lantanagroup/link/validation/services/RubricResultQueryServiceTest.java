@@ -119,7 +119,7 @@ class RubricResultQueryServiceTest {
         assertThat(dto.getSubject().getPatientId()).isEqualTo("p1");
         // trace timing
         assertThat(dto.getTrace().getDurationMs()).isEqualTo(42L);
-        // finding's stored check_id UUID resolved to the human-facing local id (matches $evaluate)
+        // finding's stored check_id UUID resolved to the human-facing local id (matches $rubric-validate)
         assertThat(dto.getFindings()).hasSize(1);
         assertThat(dto.getFindings().get(0).getCheckId()).isEqualTo("chk-term-1");
         assertThat(dto.getFindings().get(0).getCode()).isEqualTo("terminology-code-invalid");

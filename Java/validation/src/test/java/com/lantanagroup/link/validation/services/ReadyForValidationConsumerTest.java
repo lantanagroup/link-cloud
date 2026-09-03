@@ -15,6 +15,7 @@ import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
+import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
@@ -36,6 +37,7 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -64,12 +66,15 @@ public class ReadyForValidationConsumerTest {
     @Mock private ConsumerRecordRecoverer recoverer;
     @Mock private RubricExecutionService rubricExecutionService;
     @Mock private LegacyResultMapper legacyResultMapper;
+    @Mock private KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
 
     private static final String RUBRIC_ID = "measure-report-submission-v1";
 
     private ReadyForValidationConsumer consumer;
     private ReadyForValidationConsumer consumerWithoutBlobStorage;
     private ReadyForValidationConsumer consumerWithBridgeEnabled;
+    private ReadyForValidationConsumer consumerWithShadowEnabled;
+    private ReadyForValidationConsumer consumerWithBridgeAndShadowEnabled;
 
     // Real instances (no deps); the flag defaults to false so the append path is off by default.
     private PreQualificationConfig preQualificationConfig;
@@ -99,8 +104,10 @@ public class ReadyForValidationConsumerTest {
                 rubricExecutionService,
                 legacyResultMapper,
                 objectMapper,
+                shadowCompareEventTemplate,
                 false,
                 RUBRIC_ID,
+                false,
                 recoverer);
 
         consumerWithoutBlobStorage = new ReadyForValidationConsumer(
@@ -117,8 +124,10 @@ public class ReadyForValidationConsumerTest {
                 rubricExecutionService,
                 legacyResultMapper,
                 objectMapper,
+                shadowCompareEventTemplate,
                 false,
                 RUBRIC_ID,
+                false,
                 recoverer);
 
         consumerWithBridgeEnabled = new ReadyForValidationConsumer(
@@ -135,8 +144,50 @@ public class ReadyForValidationConsumerTest {
                 rubricExecutionService,
                 legacyResultMapper,
                 objectMapper,
+                shadowCompareEventTemplate,
                 true,
                 RUBRIC_ID,
+                false,
+                recoverer);
+
+        consumerWithShadowEnabled = new ReadyForValidationConsumer(
+                fhirContext,
+                reportClient,
+                validationService,
+                categorizationService,
+                resultRepository,
+                validationCompleteTemplate,
+                validationMetrics,
+                Optional.of(blobStorageService),
+                preQualificationConfig,
+                preQualOperationOutcomeBuilder,
+                rubricExecutionService,
+                legacyResultMapper,
+                objectMapper,
+                shadowCompareEventTemplate,
+                false,
+                RUBRIC_ID,
+                true,
+                recoverer);
+
+        consumerWithBridgeAndShadowEnabled = new ReadyForValidationConsumer(
+                fhirContext,
+                reportClient,
+                validationService,
+                categorizationService,
+                resultRepository,
+                validationCompleteTemplate,
+                validationMetrics,
+                Optional.of(blobStorageService),
+                preQualificationConfig,
+                preQualOperationOutcomeBuilder,
+                rubricExecutionService,
+                legacyResultMapper,
+                objectMapper,
+                shadowCompareEventTemplate,
+                true,
+                RUBRIC_ID,
+                true,
                 recoverer);
 
         bundle = new Bundle();
@@ -145,6 +196,10 @@ public class ReadyForValidationConsumerTest {
         CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
         lenient().when(validationCompleteTemplate.send(any(ProducerRecord.class))).thenReturn(future);
         lenient().when(future.get()).thenReturn(null);
+
+        // Default shadow-event send stub: a real, already-completed future so whenComplete(...) runs inline.
+        lenient().when(shadowCompareEventTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
     }
 
     // -------------------------------------------------------------------------
@@ -370,7 +425,7 @@ public class ReadyForValidationConsumerTest {
                 fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
                 validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
-                legacyResultMapper, objectMapper, false, RUBRIC_ID, recoverer);
+                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -813,5 +868,100 @@ public class ReadyForValidationConsumerTest {
         Result acceptable = resultWithCategories(List.of(categoryWithAcceptable(true)));
         assertTrue(captureBridgeValidationComplete(
                 new BridgeOutcome(List.of(acceptable), null)).isValid());
+    }
+
+    // -------------------------------------------------------------------------
+    // Shadow-run (ADR-0003 shadow-compare)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void process_shadowDisabled_neverPublishesShadowCompareEvent() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null));
+
+        verifyNoInteractions(shadowCompareEventTemplate);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEnabledBridgeOff_publishesEventWithRanNewEngineFalse() throws Exception {
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        ArgumentCaptor<ProducerRecord<String, ShadowCompareEvent>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        when(shadowCompareEventTemplate.send(captor.capture()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        consumerWithShadowEnabled.process(buildRecord(null, true));
+
+        ShadowCompareEvent event = captor.getValue().value();
+        assertFalse(event.isRanNewEngine());
+        assertEquals(1, event.getAuthoritativeResult().size());
+        assertEquals(FACILITY_ID, captor.getValue().key());
+        assertNull(event.getRequestId(), "legacy engine has no request id to share, unlike the rubric engine");
+        assertEquals(CORRELATION_ID, event.getCorrelationId(),
+                "correlationId read from the ReadyForValidation header must reach the shadow comparison event");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEnabledBridgeOn_publishesEventWithRanNewEngineTrue() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        UUID rubricRequestId = UUID.randomUUID();
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().requestId(rubricRequestId).build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
+
+        ArgumentCaptor<ProducerRecord<String, ShadowCompareEvent>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        when(shadowCompareEventTemplate.send(captor.capture()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        consumerWithBridgeAndShadowEnabled.process(buildRecord(null, true));
+
+        ShadowCompareEvent event = captor.getValue().value();
+        assertTrue(event.isRanNewEngine());
+        assertEquals(rubricRequestId, event.getRequestId(),
+                "the rubric engine's own request id (already on its rubric_result row) should be forwarded as-is");
+        assertEquals(CORRELATION_ID, event.getCorrelationId(),
+                "correlationId read from the ReadyForValidation header must reach the shadow comparison event");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEventSendThrowsSynchronously_doesNotPropagateAndValidationCompleteAlreadySent() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(shadowCompareEventTemplate.send(any(ProducerRecord.class)))
+                .thenThrow(new RuntimeException("broker unavailable"));
+
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> vcCaptor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(vcCaptor.capture())).thenReturn(future);
+        when(future.get()).thenReturn(null);
+
+        assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
+
+        assertEquals(PATIENT_ID, vcCaptor.getValue().value().getPatientId());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEventSendFailsAsynchronously_doesNotPropagate() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        CompletableFuture<SendResult<String, ShadowCompareEvent>> failed = new CompletableFuture<>();
+        failed.completeExceptionally(new RuntimeException("send failed"));
+        when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenReturn(failed);
+
+        assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
     }
 }
