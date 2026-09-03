@@ -187,11 +187,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="200">
         /// The matching reporting plans. A facility with none, or one that does not exist, returns an
-        /// empty list rather than a 404 - absence of enrollment is a meaningful answer here.
+        /// empty list rather than a 404 - absence of enrollment is a meaningful answer here. Asking
+        /// for refresh is the exception, because it writes rather than reads; see 404.
         /// </response>
         /// <response code="400">
         /// month or year is outside its range, monthsAhead is outside 1 to 24, or monthsAhead was
         /// combined with month or year.
+        /// </response>
+        /// <response code="404">
+        /// refresh was asked for and the facility is not one Link knows. Only the refresh needs it to
+        /// exist: a refresh writes rows keyed on the id, where a plain read only answers about it.
         /// </response>
         /// <response code="502">
         /// refresh was asked for and DMRP could not be read. Nothing stale is served in its place:
@@ -200,6 +205,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="500">The reporting plans could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityReportingPlanModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}")]
@@ -272,10 +278,15 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="200">
         /// A page of reporting periods in chronological order, oldest first, with paging metadata that
         /// counts periods rather than plan rows. A facility with no plans, or one that does not exist,
-        /// returns an empty records array rather than a 404.
+        /// returns an empty records array rather than a 404. Asking for refresh is the exception,
+        /// because it writes rather than reads; see 404.
         /// </response>
         /// <response code="400">
         /// monthsAhead is outside 1 to 24, or a paging argument is out of range.
+        /// </response>
+        /// <response code="404">
+        /// refresh was asked for and the facility is not one Link knows. Only the refresh needs it to
+        /// exist: a refresh writes rows keyed on the id, where a plain read only answers about it.
         /// </response>
         /// <response code="502">
         /// refresh was asked for and DMRP could not be read. Nothing stale is served in its place:
@@ -284,6 +295,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="500">The reporting plan could not be read.</response>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityReportingPlanPeriodDto))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("facilities/{facilityId}/periods", Name = "GetFacilityReportingPlanPeriods")]

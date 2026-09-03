@@ -216,7 +216,8 @@ namespace LantanaGroup.Link.DMRP.Business
                     row.MeasureMappingId = mappingId;
                 }
 
-                _plans.Update(row);
+                // Deliberately not marked modified: the rows are tracked, so change detection picks
+                // up only the ones a branch above actually altered.
             }
 
             // Only the period that was asked about. Absence is how DMRP says "withdrawn", but it can
@@ -260,7 +261,6 @@ namespace LantanaGroup.Link.DMRP.Business
                 // Set false rather than deleted: the row is the record of what DMRP said and when
                 // it changed, and the facility's own view shows it as history.
                 row.IsReporting = false;
-                _plans.Update(row);
 
                 withdrawn++;
             }

@@ -511,5 +511,54 @@ namespace UnitTests.DMRP
             Assert.Equal(DmrpSyncResult.Nothing, second);
             Assert.Equal(1, await context.FacilityReportingPlans.CountAsync());
         }
+
+        [Fact]
+        public async Task Sync_ARowNothingChanged_KeepsItsModifyDateUnset()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context, "HOB");
+            AddPlan(context, "HOB", mappingId: mapping.Id);
+            await context.SaveChangesAsync();
+
+            await CreateSync(context, Entry("HOB")).SyncAsync(FacilityId, Month, Year);
+
+            // ModifyDate answers when the enrollment last changed, and a sync that found nothing to
+            // change must leave it alone. It only can because the row is never marked modified:
+            // UpdateBaseEntityInterceptor stamps whatever EF reports as Modified, so marking every
+            // row unconditionally would date every enrollment to the last refresh that touched it.
+            Assert.Null((await context.FacilityReportingPlans.SingleAsync()).ModifyDate);
+        }
+
+        [Fact]
+        public async Task Sync_ReinstatingARow_StampsModifyDate()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context, "HOB");
+            AddPlan(context, "HOB", isReporting: false, mappingId: mapping.Id);
+            await context.SaveChangesAsync();
+
+            await CreateSync(context, Entry("HOB")).SyncAsync(FacilityId, Month, Year);
+
+            // The other direction, and the reason leaving it to change detection is safe rather than
+            // merely tidier: a row a branch did alter is still stamped.
+            Assert.NotNull((await context.FacilityReportingPlans.SingleAsync()).ModifyDate);
+        }
+
+        [Fact]
+        public async Task Sync_WithdrawingARow_StampsModifyDate()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context, "HOB");
+            AddPlan(context, "HOB", mappingId: mapping.Id);
+            await context.SaveChangesAsync();
+
+            // The component answered but did not list HOB, which is the only way a withdrawal appears.
+            await CreateSync(context, Entry("HTCDI")).SyncAsync(FacilityId, Month, Year);
+
+            var withdrawn = await context.FacilityReportingPlans.SingleAsync(p => p.Measure == "HOB");
+
+            Assert.False(withdrawn.IsReporting);
+            Assert.NotNull(withdrawn.ModifyDate);
+        }
     }
 }
