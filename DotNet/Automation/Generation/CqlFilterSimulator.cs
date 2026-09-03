@@ -662,11 +662,7 @@ public static class CqlFilterSimulator
     }
 
     private static string ReferenceId(string? reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference)) return string.Empty;
-        var slash = reference.IndexOf('/');
-        return slash >= 0 ? reference[(slash + 1)..] : reference;
-    }
+        => FhirReferenceId.FromReference(reference);
 
     private static bool ReferencesPatient(string? reference, string patientId) =>
         !string.IsNullOrWhiteSpace(patientId)

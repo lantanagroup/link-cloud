@@ -144,8 +144,7 @@ public static class ImportedPatientClassifier
         if (string.IsNullOrWhiteSpace(reference))
             return false;
 
-        var slash = reference.IndexOf('/');
-        var id = slash >= 0 ? reference[(slash + 1)..] : reference;
+        var id = FhirReferenceId.FromReference(reference);
         if (!medicationCodes.TryGetValue(id, out var codes))
             return false;
         return codes.Any(EncounterIpClassification.IsDiabetesMedicationCode);

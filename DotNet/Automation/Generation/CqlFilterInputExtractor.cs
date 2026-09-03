@@ -488,8 +488,7 @@ public static class CqlFilterInputExtractor
         if (string.IsNullOrWhiteSpace(reference))
             return [];
 
-        var slash = reference.IndexOf('/');
-        var id = slash >= 0 ? reference[(slash + 1)..] : reference;
+        var id = FhirReferenceId.FromReference(reference);
         return medicationCodes.TryGetValue(id, out var codes) ? codes : [];
     }
 
