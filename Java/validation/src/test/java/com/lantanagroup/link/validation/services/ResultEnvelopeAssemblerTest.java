@@ -93,7 +93,7 @@ class ResultEnvelopeAssemblerTest {
 
         RubricVersion version = version();
         ResultEnvelopeAssembler.AssembleOutput out =
-                assembler.assemble(ctx, version, identity(raw), checkResults, Map.of("c-e1", 12L), completedAt);
+                assembler.assemble(ctx, version, identity(raw), checkResults, Map.of("c-e1", 12.0), completedAt);
 
         // envelope
         assertThat(out.envelope().getRubricId()).isEqualTo("piqi.core");

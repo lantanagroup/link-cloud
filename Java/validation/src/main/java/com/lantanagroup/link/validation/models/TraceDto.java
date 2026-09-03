@@ -20,7 +20,7 @@ public class TraceDto {
     private OffsetDateTime requestedAt;
     private OffsetDateTime completedAt;
     private long durationMs;
-    private Map<String, Long> checkDurationsMs;
-    private Long checkWorkMs;
+    private Map<String, Double> checkDurationsMs;
+    private Double checkWorkMs;
     private String validatorVersion;
 }

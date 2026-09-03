@@ -17,7 +17,8 @@ import java.util.List;
  *
  * @param checkLocalId the originating check's local id (used to key per-check durations)
  * @param findings     the findings this check produced (empty means the check passed)
- * @param durationMs    wall-clock time this check took, in milliseconds
+ * @param durationMs    wall-clock time this check took, in milliseconds (sub-millisecond precision,
+ *                      rounded to 2 decimal places; nanoTime-based since most checks run well under 1ms)
  */
-public record CheckOutcome(String checkLocalId, List<RawFinding> findings, long durationMs) {
+public record CheckOutcome(String checkLocalId, List<RawFinding> findings, double durationMs) {
 }

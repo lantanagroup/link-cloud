@@ -130,7 +130,7 @@ public class RubricExecutionService {
 
         List<RawFinding> allFindings = new ArrayList<>();
         List<CheckSlice> slices = new ArrayList<>(outcomes.size());
-        Map<String, Long> checkDurations = new LinkedHashMap<>();
+        Map<String, Double> checkDurations = new LinkedHashMap<>();
         for (CheckOutcome outcome : outcomes) {
             int from = allFindings.size();
             allFindings.addAll(outcome.findings());
@@ -195,7 +195,7 @@ public class RubricExecutionService {
     }
 
     private CheckOutcome runOne(RubricCheck c, ExecutionContext ctx, IBaseResource resource) {
-        long start = System.currentTimeMillis();
+        long startNanos = System.nanoTime();
         List<RawFinding> findings;
 
         referenceResolver.bind(ctx.getReferenceIndex());
@@ -216,7 +216,8 @@ public class RubricExecutionService {
         } finally {
             referenceResolver.clear();
         }
-        long durationMs = System.currentTimeMillis() - start;
+        // nanoTime-based so sub-millisecond checks (the common case) don't truncate to 0
+        double durationMs = Math.round((System.nanoTime() - startNanos) / 1_000_000.0 * 100) / 100.0;
         return new CheckOutcome(c.getCheckLocalId(), findings, durationMs);
     }
 
