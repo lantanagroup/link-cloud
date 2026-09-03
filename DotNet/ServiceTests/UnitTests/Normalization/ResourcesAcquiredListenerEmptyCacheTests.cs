@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -210,8 +211,10 @@ public class ResourcesAcquiredListenerEmptyCacheTests
 
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
-        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer)
+        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
     {
+        mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
         sequenceQueries
             .Setup(item => item.Search(
@@ -254,7 +257,8 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
-            Mock.Of<IResourceCachePurger>());
+            Mock.Of<IResourceCachePurger>(),
+            mappingOutcomeProducer.Object);
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)

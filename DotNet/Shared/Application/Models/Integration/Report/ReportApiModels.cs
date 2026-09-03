@@ -30,6 +30,169 @@ public class ReportEntryApiModel
     public ReportingStatus ReportingStatus { get; set; }
     public SubmissionStatus? SubmissionStatus { get; set; }
     public List<EntryMeasureReportApiModel> MeasureReports { get; set; } = [];
+
+    /// <summary>
+    /// Whether the patient's encounters resolved to locations belonging to the reporting organization.
+    /// </summary>
+    public MappingIndicatorStatus LocationOrgStatus { get; set; }
+
+    /// <summary>
+    /// Whether the patient's encounters carried locations that could be resolved at all -- a different
+    /// question from whether those locations belong to the organization.
+    /// </summary>
+    public MappingIndicatorStatus EncounterMappingStatus { get; set; }
+
+    /// <summary>
+    /// Whether the patient's location type codes were mapped into HSLOC.
+    /// </summary>
+    public MappingIndicatorStatus HslocMappingStatus { get; set; }
+
+    /// <summary>
+    /// When DataAcquisition evaluated the two columns it owns, or null if it has not reported.
+    /// </summary>
+    /// <remarks>
+    /// The two timestamps separate "this source reported nothing to say" from "this source has not
+    /// answered yet". Without them a zero and an absence look identical.
+    /// </remarks>
+    public DateTime? AcquisitionEvaluatedAt { get; set; }
+
+    /// <summary>
+    /// When Normalization evaluated the code maps, or null if it has not reported.
+    /// </summary>
+    /// <inheritdoc cref="AcquisitionEvaluatedAt" path="/remarks"/>
+    public DateTime? NormalizationEvaluatedAt { get; set; }
+}
+
+/// <summary>
+/// One entry with the evidence behind its mapping indicators, as returned by the per-patient operation.
+/// </summary>
+/// <remarks>
+/// The paged search returns <see cref="ReportEntryApiModel"/> and carries no evidence: serializing it for
+/// every row of every page is work a table view never reads. Call the per-patient operation for the
+/// detail behind a single indicator.
+/// </remarks>
+public class ReportEntryDetailApiModel : ReportEntryApiModel
+{
+    /// <summary>
+    /// What DataAcquisition found when it resolved the patient's encounters, or null if it never reported.
+    /// </summary>
+    /// <remarks>
+    /// Null rather than an empty object on purpose: an empty object would claim the source ran and found
+    /// nothing, which is a different fact from its not having answered.
+    /// </remarks>
+    public AcquisitionMappingDetailsApiModel? Acquisition { get; set; }
+
+    /// <summary>
+    /// What Normalization counted per code map, or null if it never reported.
+    /// </summary>
+    /// <inheritdoc cref="Acquisition" path="/remarks"/>
+    public NormalizationMappingDetailsApiModel? Normalization { get; set; }
+}
+
+public class AcquisitionMappingDetailsApiModel
+{
+    public LocationOrgDetailsApiModel LocationOrg { get; set; } = new();
+}
+
+public class LocationOrgDetailsApiModel
+{
+    public int EncounterCount { get; set; }
+
+    /// <summary>Encounters resolved to a location belonging to the organization.</summary>
+    public int OrgEncounterCount { get; set; }
+
+    /// <summary>
+    /// Of those, how many were treated as belonging to the organization without being verified, because
+    /// the encounter carried no resolvable location reference.
+    /// </summary>
+    public int AssumedOrgEncounterCount { get; set; }
+
+    public List<LocationOrgMatchApiModel> Matches { get; set; } = [];
+}
+
+public class LocationOrgMatchApiModel
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public string? PartOfValue { get; set; }
+    public bool IsOrgLocation { get; set; }
+}
+
+public class NormalizationMappingDetailsApiModel
+{
+    /// <summary>The combined totals across every acquisition pass.</summary>
+    public List<CodeMapOutcomeApiModel> CodeMaps { get; set; } = [];
+
+    /// <summary>Each pass's own contribution, from which the totals above are summed.</summary>
+    public List<NormalizationPassApiModel> Passes { get; set; } = [];
+}
+
+public class NormalizationPassApiModel
+{
+    public string? CorrelationId { get; set; }
+    public string? QueryType { get; set; }
+    public List<CodeMapOutcomeApiModel> CodeMaps { get; set; } = [];
+}
+
+public class CodeMapOutcomeApiModel
+{
+    public string SourceSystem { get; set; } = string.Empty;
+    public string TargetSystem { get; set; } = string.Empty;
+    public int MappedCount { get; set; }
+    public int UnmappedCount { get; set; }
+    public int FailureCount { get; set; }
+
+    /// <summary>
+    /// The distinct source codes that had no entry in the map -- what an operator would go and configure.
+    /// Capped; <see cref="UnmappedCount"/> is the true total.
+    /// </summary>
+    public List<string> UnmappedCodes { get; set; } = [];
+}
+
+/// <summary>
+/// The value behind one of the report detail mapping indicators.
+/// </summary>
+/// <remarks>
+/// Declared here rather than shared with the Report service's own enum, matching how
+/// <see cref="ReportingStatus"/> and <see cref="SubmissionStatus"/> are handled: the SDK contract is
+/// deliberately decoupled, so a service-internal refactor cannot silently change what consumers see.
+/// <c>MappingIndicatorStatusContractTests</c> asserts the two stay identical.
+/// </remarks>
+public enum MappingIndicatorStatus
+{
+    /// <summary>No source has reported for this entry yet.</summary>
+    NotEvaluated = 0,
+
+    /// <summary>Nothing is configured to produce this value.</summary>
+    NotApplicable = 1,
+
+    /// <summary>Everything that could be mapped was mapped.</summary>
+    Mapped = 2,
+
+    /// <summary>Some mapped and some did not; the per-patient detail names which.</summary>
+    PartiallyMapped = 3,
+
+    /// <summary>Nothing mapped, though there was something to map.</summary>
+    Unmapped = 4,
+
+    /// <summary>The mapping could not be determined because the operation itself failed.</summary>
+    Unknown = 5,
+
+    /// <summary>
+    /// Treated as belonging to the reporting organization without being verified, because the encounters
+    /// carried no resolvable location references.
+    /// </summary>
+    Assumed = 6,
+
+    /// <summary>Configured correctly, but no resource reached it to be mapped.</summary>
+    NothingToEvaluate = 7,
+
+    /// <summary>
+    /// The patient is not in this report -- none of their encounters belonged to the reporting
+    /// organization -- so no mapping result about them is meaningful for it.
+    /// </summary>
+    Excluded = 8
 }
 
 public class ReportEntrySummaryApiModel
