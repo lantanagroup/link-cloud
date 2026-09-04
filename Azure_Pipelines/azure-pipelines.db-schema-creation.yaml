@@ -88,60 +88,10 @@ stages:
         fetchTags: true
         persistCredentials: true
 
-      # The baseline is what is actually running in the target environment rather than a
-      # hand-typed tag. A typed guess is what let QA2 receive a schema far ahead of its images.
-      - task: Bash@3
-        name: getDeployedCommit
-        displayName: Get the commit deployed to ${{ parameters.environment }}
-        inputs:
-          targetType: inline
-          script: |
-            python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
-
-      - task: Bash@3
-        displayName: Compare current_release against the deployed commit
-        env:
-          DEPLOYED_COMMIT: $(FromCommit)
-          TARGET_RELEASE: ${{ parameters.current_release }}
-        inputs:
-          targetType: inline
-          script: |
-            set -euo pipefail
-            git fetch origin --tags --quiet || true
-
-            if [ -z "${TARGET_RELEASE}" ]; then
-              echo "##vso[task.logissue type=error]current_release is required."
-              exit 1
-            fi
-
-            if ! TARGET_SHA=$(git rev-parse --verify "${TARGET_RELEASE}^{commit}" 2>/dev/null); then
-              echo "##vso[task.logissue type=error]current_release ${TARGET_RELEASE} is not a commit or tag in this repository."
-              exit 1
-            fi
-
-            if ! git cat-file -e "${DEPLOYED_COMMIT}^{commit}" 2>/dev/null; then
-              echo "##vso[task.logissue type=error]Deployed commit ${DEPLOYED_COMMIT} is not present in this clone."
-              exit 1
-            fi
-
-            echo "Deployed to ${{ parameters.environment }}: ${DEPLOYED_COMMIT}"
-            echo "Schema will be generated from: ${TARGET_SHA} (${TARGET_RELEASE})"
-
-            if [ "${TARGET_SHA}" = "${DEPLOYED_COMMIT}" ]; then
-              echo "Schema and deployed code are the same commit."
-            elif git merge-base --is-ancestor "${DEPLOYED_COMMIT}" "${TARGET_SHA}"; then
-              AHEAD=$(git rev-list --count "${DEPLOYED_COMMIT}..${TARGET_SHA}")
-              echo "##vso[task.logissue type=warning]Schema is ${AHEAD} commit(s) AHEAD of the code deployed to ${{ parameters.environment }}. A destructive migration in this range will break the running services until they are redeployed. Review the migrations listed below before approving the apply stage."
-              echo "Migration files added or changed in that range:"
-              git diff --name-only "${DEPLOYED_COMMIT}" "${TARGET_SHA}" -- "*Migrations/*" "*migrations/*" || true
-            elif git merge-base --is-ancestor "${TARGET_SHA}" "${DEPLOYED_COMMIT}"; then
-              BEHIND=$(git rev-list --count "${TARGET_SHA}..${DEPLOYED_COMMIT}")
-              echo "##vso[task.logissue type=error]Schema is ${BEHIND} commit(s) BEHIND the code deployed to ${{ parameters.environment }}. The running services expect migrations this script does not contain."
-              exit 1
-            else
-              echo "##vso[task.logissue type=error]current_release and the deployed commit share no ancestry. Check that this pipeline was queued on the right branch."
-              exit 1
-            fi
+      - template: templates/verify-release-against-deployed.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          currentRelease: ${{ parameters.current_release }}
 
       - task: PowerShell@2
         name: setVariables
@@ -641,23 +591,41 @@ stages:
 ############################################################################################
 - stage: Apply_TEST_Update_SQL_DBs
   displayName: Apply TEST SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_TEST below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  # Only Build is a prerequisite, so choosing one environment does not skip this stage
-  # as a knock-on from an earlier one being skipped. Dropping always() also means a
-  # failed comparison in Build blocks the apply instead of being advisory.
-  dependsOn: Build
   condition: eq('${{ parameters.environment }}', 'scale-test')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_TEST
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_TEST
         displayName: Update ${{ db.alias }}
+        dependsOn: Verify_TEST
 
         steps:
         - download: current
@@ -676,6 +644,7 @@ stages:
 
   - job: Update_validation_TEST
     displayName: Update validation
+    dependsOn: Verify_TEST
 
     steps:
     - download: current
@@ -759,23 +728,41 @@ stages:
 ############################################################################################
 - stage: Apply_QA_Update_SQL_DBs
   displayName: Apply QA SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  # Only Build is a prerequisite, so choosing one environment does not skip this stage
-  # as a knock-on from an earlier one being skipped. Dropping always() also means a
-  # failed comparison in Build blocks the apply instead of being advisory.
-  dependsOn: Build
   condition: eq('${{ parameters.environment }}', 'scale-qa')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_QA
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_QA
         displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA
 
         steps:
         - download: current
@@ -794,6 +781,7 @@ stages:
 
   - job: Update_validation_QA
     displayName: Update validation
+    dependsOn: Verify_QA
 
     steps:
     - download: current
@@ -877,23 +865,41 @@ stages:
 ############################################################################################
 - stage: Apply_QA2_Update_SQL_DBs
   displayName: Apply QA2 SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA2 below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  # Only Build is a prerequisite, so choosing one environment does not skip this stage
-  # as a knock-on from an earlier one being skipped. Dropping always() also means a
-  # failed comparison in Build blocks the apply instead of being advisory.
-  dependsOn: Build
   condition: eq('${{ parameters.environment }}', 'scale-qa2')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_QA2
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_QA2
         displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA2
 
         steps:
         - download: current
@@ -912,6 +918,7 @@ stages:
 
   - job: Update_validation_QA2
     displayName: Update validation
+    dependsOn: Verify_QA2
 
     steps:
     - download: current
