@@ -199,9 +199,8 @@ internal sealed class RunExecutor
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
             var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
-
+            var mockDmrpApiHelper = services.GetRequiredService<MockDmrpApiHelper>();
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
-
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
@@ -221,6 +220,18 @@ internal sealed class RunExecutor
                 state.Options.EnableDmrp,
                 dmrpClient,
                 output);
+
+
+            if (state.Options.EnableDmrp)
+            {
+                await mockDmrpApiHelper.EnsureReachableAsync(
+                    state.Options.NhsnOrganizationId,
+                    cancellationToken);
+
+                output.WriteLine(
+                    $"MockDmrpApi reachable for NHSN Organization ID " +
+                    $"'{state.Options.NhsnOrganizationId}'.");
+            }
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
@@ -1593,6 +1604,7 @@ internal sealed class RunExecutor
 
         services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportApiHelper>();
+        services.AddTransient<MockDmrpApiHelper>();
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();

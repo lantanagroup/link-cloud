@@ -704,6 +704,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: link-automation-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
@@ -734,6 +735,8 @@ services:
       mongo:
         condition: service_healthy
       admin-bff:
+        condition: service_healthy
+      mock-dmrp-api:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
