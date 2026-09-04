@@ -2281,13 +2281,6 @@
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
-      "dmrp": {
-        "type": "Project",
-        "dependencies": {
-          "LinkSdk": "[1.0.0, )",
-          "com.lantanagroup.link.Shared": "[0.4.0, )"
-        }
-      },
       "link.authorization": {
         "type": "Project",
         "dependencies": {
@@ -2372,7 +2365,6 @@
           "CompareNETObjects": "[4.84.0, )",
           "Confluent.Kafka": "[2.14.2, )",
           "CronExpressionDescriptor": "[2.48.0, )",
-          "DMRP": "[0.1.0, )",
           "Grpc.AspNetCore": "[2.80.0, )",
           "Grpc.AspNetCore.Server.Reflection": "[2.80.0, )",
           "LinkSdk": "[1.0.0, )",

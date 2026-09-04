@@ -22,20 +22,32 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
         public string ErrorMessage { get; }
         public DomainResource Resource { get; }
 
-        public OperationResult(OperationStatus successCode, string errorMessage, DomainResource resource)
+        /// <summary>
+        /// Per-code-map counts for this resource. Populated only by <c>CodeMapOperationService</c>; null on
+        /// every other operation type, and null on <see cref="OperationStatus.Failure"/> because an
+        /// operation that threw produced no counts to report.
+        /// </summary>
+        public IReadOnlyList<CodeMappingOutcome>? CodeMapping { get; }
+
+        public OperationResult(OperationStatus successCode, string errorMessage, DomainResource resource, IReadOnlyList<CodeMappingOutcome>? codeMapping = null)
         {
             SuccessCode = successCode;
             ErrorMessage = errorMessage ?? string.Empty;
             Resource = resource;
+            CodeMapping = codeMapping;
         }
 
-        public static OperationResult Success(DomainResource resource) =>
-            new OperationResult(OperationStatus.Success, string.Empty, resource);
+        public static OperationResult Success(DomainResource resource, IReadOnlyList<CodeMappingOutcome>? codeMapping = null) =>
+            new OperationResult(OperationStatus.Success, string.Empty, resource, codeMapping);
 
         public static OperationResult Failure(string errorMessage, DomainResource resource = null) =>
             new OperationResult(OperationStatus.Failure, errorMessage, resource);
 
-        public static OperationResult NoAction(string errorMessage, DomainResource resource = null) =>
-    new OperationResult(OperationStatus.NoAction, errorMessage, resource);
+        // NoAction carries the counts as well as Success: a code map that matched its FHIRPath but found no
+        // entry for any code returns NoAction, and that is precisely the fully-unmapped case a report needs
+        // to surface. Treating it as "nothing to say" would hide the worst result behind the same silence
+        // as an operation that never ran.
+        public static OperationResult NoAction(string errorMessage, DomainResource resource = null, IReadOnlyList<CodeMappingOutcome>? codeMapping = null) =>
+            new OperationResult(OperationStatus.NoAction, errorMessage, resource, codeMapping);
     }
 }

@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,25 +497,25 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produced By:</strong> <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service [service]</a></div><div class="mb-3"><strong>Consumed By:</strong> <a href="service-censusservice.html">Census Service [service]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Used to update admission or discharge status and to trigger additional processing for each patient.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nPatientListsAcquired_4681892E["Event: Patient Lists Acquired"]
-  nDataAcquisitionWorkerService_1C09C8B6["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_4681892E
-  nPatientListsAcquired_4681892E -->|consumed by| nCensusService_1BD4C8F8["Service: CensusService"]
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionWorkerService_1C09C8B6
-    nPatientListsAcquired_4681892E
+nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
+  nDataAcquisitionWorkerService_32E6F397["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_2B002DF
+  nPatientListsAcquired_2B002DF -->|consumed by| nCensusService_676D2042["Service: CensusService"]
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionWorkerService_32E6F397
+    nPatientListsAcquired_2B002DF
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nCensusService_1BD4C8F8
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nCensusService_676D2042
   end
 </pre></div>
-<h2 id="event-schema" class="content-heading">Event Schema <a id="event-schema" href="#event-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="key" class="content-heading">Key <a id="key" href="#key" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="event-schema" class="content-heading">Event Schema <a href="#event-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="key" class="content-heading">Key <a href="#key" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The facility ID (string) is used as the Kafka message key.</p>
-<h3 id="headers" class="content-heading">Headers <a id="headers" href="#headers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Headers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="headers" class="content-heading">Headers <a href="#headers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Headers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -528,7 +530,7 @@ nPatientListsAcquired_4681892E["Event: Patient Lists Acquired"]
 </tr>
 </tbody>
 </table>
-<h3 id="payload" class="content-heading">Payload <a id="payload" href="#payload" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Payload"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="payload" class="content-heading">Payload <a href="#payload" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Payload"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><em>(SchemaViewer tag used improperly, or no schema specified)</em></p>
 
         
@@ -537,15 +539,15 @@ nPatientListsAcquired_4681892E["Event: Patient Lists Acquired"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientListsAcquired_4681892E["Event: Patient Lists Acquired"]
-  nDataAcquisitionWorkerService_1C09C8B6["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_4681892E
-  nPatientListsAcquired_4681892E -->|consumed by| nCensusService_1BD4C8F8["Service: CensusService"]
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionWorkerService_1C09C8B6
-    nPatientListsAcquired_4681892E
+nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
+  nDataAcquisitionWorkerService_32E6F397["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_2B002DF
+  nPatientListsAcquired_2B002DF -->|consumed by| nCensusService_676D2042["Service: CensusService"]
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionWorkerService_32E6F397
+    nPatientListsAcquired_2B002DF
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nCensusService_1BD4C8F8
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nCensusService_676D2042
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

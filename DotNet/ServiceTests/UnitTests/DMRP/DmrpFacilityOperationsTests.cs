@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -33,8 +33,11 @@ namespace UnitTests.DMRP
         private readonly Mock<IEntityRepository<FacilityReportingPlan>> _planRepository = new();
 
         private DmrpFacilityOperations CreateOperations() =>
-            new(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object, _planManager.Object,
-                _planRepository.Object, new FixedTimeProvider(FixedNow));
+            // The real projector rather than a mock: these tests assert on the schedule that comes
+            // out, and that derivation is exactly what moved behind the seam.
+            new(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object,
+                new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance),
+                _planManager.Object, _planRepository.Object, new FixedTimeProvider(FixedNow));
 
         private void GivenPlan(params ReportingPlanEntry[] entries) =>
             _plans.Setup(p => p.GetForPeriodAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),

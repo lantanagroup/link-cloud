@@ -135,10 +135,12 @@ namespace UnitTests.DMRP
         }
 
         [Theory]
-        [InlineData("cms130", null)]     // lower-case measure
-        [InlineData("cMs130V", null)]    // mixed-case measure
-        [InlineData(null, "preventive")] // lower-case DQM
-        [InlineData(null, "pReVeNtIvE")] // mixed-case DQM
+        [InlineData("cms130", null)]       // lower-case measure
+        [InlineData("cMs130V", null)]      // mixed-case measure
+        [InlineData(null, "preventive")]   // lower-case DQM
+        [InlineData(null, "pReVeNtIvE")]   // mixed-case DQM
+        [InlineData("  cms130  ", null)]   // padded measure — filters trim before matching
+        [InlineData(null, " preventive ")] // padded DQM
         public async Task PagedSearchAsync_MeasureAndDqm_MatchCaseInsensitively(string? measure, string? dqm)
         {
             using var context = CreateContext();

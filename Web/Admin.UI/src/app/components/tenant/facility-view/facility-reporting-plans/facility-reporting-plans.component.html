@@ -1,0 +1,156 @@
+<div class="reporting-plans-section">
+
+  @if (loading) {
+    <div class="section-state" data-testid="reporting-plans-loading">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+  } @else if (loadFailed) {
+    <div class="section-state" data-testid="reporting-plans-error">
+      <mat-icon color="warn">error_outline</mat-icon>
+      <p>The reporting plans could not be loaded. Please try again.</p>
+      <button mat-stroked-button (click)="loadReportingPlans()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  } @else {
+    @if (allPlans.length > 0) {
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Measure</mat-label>
+          <input matInput [(ngModel)]="filterMeasure" (ngModelChange)="onFilterChange()"
+                 placeholder="Search measure..." data-testid="reporting-plans-filter-measure">
+          <button *ngIf="filterMeasure" matSuffix mat-icon-button aria-label="Clear measure filter"
+                  (click)="filterMeasure=''; onFilterChange()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>dQM</mat-label>
+          <input matInput [(ngModel)]="filterDqm" (ngModelChange)="onFilterChange()"
+                 placeholder="Search dQM..." data-testid="reporting-plans-filter-dqm">
+          <button *ngIf="filterDqm" matSuffix mat-icon-button aria-label="Clear dqm filter"
+                  (click)="filterDqm=''; onFilterChange()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting Period</mat-label>
+          <mat-select [(ngModel)]="filterPeriod" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All periods</mat-option>
+            <mat-option *ngFor="let period of periodOptions" [value]="period.key">{{ period.label }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting Cadence</mat-label>
+          <mat-select [(ngModel)]="filterFrequency" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            <mat-option *ngFor="let freq of frequencyOptions" [value]="freq">{{ freq }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Reporting</mat-label>
+          <mat-select [(ngModel)]="filterReporting" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            <mat-option [value]="true">Reporting</mat-option>
+            <mat-option [value]="false">Not reporting</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="filter-actions">
+          <button mat-stroked-button (click)="clearFilters()" *ngIf="hasActiveFilters()">
+            <mat-icon>filter_list_off</mat-icon> Clear Filters
+          </button>
+        </div>
+      </div>
+    }
+
+    <div class="table-container no-border">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)"
+             style="width: 100%; background-color: transparent">
+
+        <!-- Measure -->
+        <ng-container matColumnDef="measure">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Measure</th>
+          <td mat-cell *matCellDef="let plan">{{ plan.measure ?? plan.measureMappingId }}</td>
+        </ng-container>
+
+        <!-- dQM -->
+        <ng-container matColumnDef="dqm">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>dQM</th>
+          <td mat-cell *matCellDef="let plan">{{ plan.dqm ?? '—' }}</td>
+        </ng-container>
+
+        <!-- Frequency -->
+        <ng-container matColumnDef="frequency">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Cadence</th>
+          <td mat-cell *matCellDef="let plan">
+            @if (plan.frequency) {
+              <span [ngClass]="{
+                  'monthly-frequency': plan.frequency === 'Monthly',
+                  'weekly-frequency': plan.frequency === 'Weekly',
+                  'daily-frequency': plan.frequency === 'Daily',
+                  'adhoc-frequency': plan.frequency === 'Adhoc'
+              }">{{ plan.frequency }}</span>
+            } @else {
+              —
+            }
+          </td>
+        </ng-container>
+
+        <!-- Reporting period -->
+        <ng-container matColumnDef="period">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Period</th>
+          <td mat-cell *matCellDef="let plan">{{ periodLabel(plan) }}</td>
+        </ng-container>
+
+        <!-- Reporting state -->
+        <ng-container matColumnDef="isReporting">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting</th>
+          <td mat-cell *matCellDef="let plan">
+            @if (plan.isReporting) {
+              <span class="reporting-yes">Yes</span>
+            } @else {
+              <span class="reporting-withdrawn">Not reporting</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Last updated -->
+        <ng-container matColumnDef="lastUpdated">
+          <th mat-header-cell *matHeaderCellDef>Last Updated</th>
+          <td mat-cell *matCellDef="let plan">{{ lastUpdated(plan) | date:'M/d/yy h:mm a' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.withdrawn-row]="!row.isReporting"></tr>
+
+        <!-- Empty state: nothing recorded at all vs. filters excluding every row -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            @if (allPlans.length === 0) {
+              <div class="no-data-message" data-testid="reporting-plans-empty">
+                <mat-icon>event_busy</mat-icon>
+                No reporting plans have been recorded for this facility.
+              </div>
+            } @else {
+              <div class="no-data-message" data-testid="reporting-plans-no-match">
+                <mat-icon>filter_list_off</mat-icon>
+                No reporting plans match the current filters.
+              </div>
+            }
+          </td>
+        </tr>
+
+      </table>
+    </div>
+
+    @if (allPlans.length > 0) {
+      <mat-paginator [pageSizeOptions]="pageSizeOptions" [pageSize]="10" showFirstLastButtons
+                     aria-label="Select page of reporting plans"></mat-paginator>
+    }
+  }
+</div>

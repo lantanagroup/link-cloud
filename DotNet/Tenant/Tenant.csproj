@@ -10,7 +10,7 @@
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<Configurations>Debug;Release;Debug IIS</Configurations>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
-		<Version>0.7.0</Version>
+		<Version>0.7.1</Version>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
@@ -44,7 +44,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\DMRP\DMRP.csproj" />
 		<ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
 		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
