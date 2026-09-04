@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface RubricResultRepository extends JpaRepository<RubricResult, UUID> {
+public interface RubricResultRepository extends JpaRepository<RubricResult, Long> {
 
     Optional<RubricResult> findByRequestId(UUID requestId);
 }

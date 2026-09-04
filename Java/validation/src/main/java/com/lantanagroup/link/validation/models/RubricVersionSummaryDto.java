@@ -12,14 +12,13 @@ import lombok.Getter;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Getter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RubricVersionSummaryDto {
 
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
     private String rubricId;
     private String semver;
     private RubricVersionStatus status;

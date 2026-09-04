@@ -66,7 +66,7 @@ class RubricExecutionServiceCategoryOverrideTest {
             Runnable::run, new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(), false);
 
     private final RubricVersion version = RubricVersion.builder()
-            .rubricId("piqi.core").semver("1.0.0").rubricVersionId(UUID.randomUUID()).checksum("abc").build();
+            .rubricId("piqi.core").semver("1.0.0").rubricVersionId(1L).checksum("abc").build();
 
     private static Category acceptableWarning(String id) {
         Category category = new Category();
@@ -80,7 +80,7 @@ class RubricExecutionServiceCategoryOverrideTest {
 
     private static RubricCheck conformanceCheck() {
         return RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .checkLocalId("c1")
                 .type(CheckType.FHIR_CONFORMANCE)
                 .dimension(PiqiDimension.CONFORMANCE)
@@ -137,7 +137,7 @@ class RubricExecutionServiceCategoryOverrideTest {
         policyConfig.getCategoryOverride().setEnabled(true);
 
         RubricCheck check = RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .checkLocalId("c1")
                 .type(CheckType.TERMINOLOGY)
                 .dimension(PiqiDimension.TERMINOLOGY)

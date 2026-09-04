@@ -82,7 +82,7 @@ class RubricControllerTest {
 
     private static RubricVersion version(String rubricId, String semver, RubricVersionStatus status) {
         return RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId(rubricId)
                 .semver(semver)
                 .status(status)

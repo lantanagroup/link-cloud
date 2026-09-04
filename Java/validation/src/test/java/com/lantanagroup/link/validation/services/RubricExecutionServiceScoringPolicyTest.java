@@ -67,7 +67,7 @@ class RubricExecutionServiceScoringPolicyTest {
     @DisplayName("a non-default scoring policy survives snapshot resolution: check-scorecard rubrics score byCheck, not the dimension default")
     void scoringPolicySurvivesSnapshotResolution() throws Exception {
         RubricVersion entity = RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId("piqi.core")
                 .semver("1.0.0")
                 .status(RubricVersionStatus.PUBLISHED)
@@ -75,7 +75,7 @@ class RubricExecutionServiceScoringPolicyTest {
                 .scoringPolicyJson("{\"type\":\"piqi-check-scorecard\",\"rollup\":\"worst-of\"}")
                 .build();
         RubricCheck check = RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .rubricVersionId(entity.getRubricVersionId())
                 .checkLocalId("c1")
                 .type(CheckType.FHIRPATH)
@@ -118,7 +118,7 @@ class RubricExecutionServiceScoringPolicyTest {
     @DisplayName("dimension scorecard scopes to checked dimensions: a CONFORMANCE-only rubric scores only CONFORMANCE, not every PiqiDimension")
     void dimensionScorecardScopesToCheckedDimensions() throws Exception {
         RubricVersion entity = RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId("piqi.conformance")
                 .semver("1.0.0")
                 .status(RubricVersionStatus.PUBLISHED)
@@ -126,7 +126,7 @@ class RubricExecutionServiceScoringPolicyTest {
                 .scoringPolicyJson("{\"type\":\"piqi-dimension-scorecard\",\"rollup\":\"worst-of\"}")
                 .build();
         RubricCheck check = RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .rubricVersionId(entity.getRubricVersionId())
                 .checkLocalId("c1")
                 .type(CheckType.FHIRPATH)

@@ -13,6 +13,7 @@ import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ExecutionContext;
+import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,7 +66,7 @@ class RubricExecutionServiceTest {
             new ScoreAggregator(new FindingStatusResolver()), resultPersister, fhirContext, objectMapper,
             Runnable::run, new com.lantanagroup.link.validation.services.execution.BundleReferenceResolver(), false);
 
-    private final UUID versionId = UUID.randomUUID();
+    private final Long versionId = 1L;
     private final RubricVersion version = RubricVersion.builder()
             .rubricId("piqi.core").semver("1.0.0").rubricVersionId(versionId).checksum("abc").build();
 
@@ -78,7 +80,7 @@ class RubricExecutionServiceTest {
 
     private static RubricCheck check(boolean enabled) {
         return RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .checkLocalId("c1")
                 .type(CheckType.FHIRPATH)
                 .dimension(PiqiDimension.CONFORMANCE)
@@ -87,12 +89,14 @@ class RubricExecutionServiceTest {
     }
 
     private ResultEnvelopeAssembler.AssembleOutput stubAssembler() {
-        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().requestId(UUID.randomUUID()).build();
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder()
+                .requestId(UUID.randomUUID())
+                .findings(new ArrayList<>(List.of(FindingDto.builder().build())))
+                .build();
         RubricResult resultEntity = RubricResult.builder()
-                .resultId(UUID.randomUUID())
                 .status(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)
                 .build();
-        List<RubricFinding> findingEntities = List.of(RubricFinding.builder().findingId(UUID.randomUUID()).build());
+        List<RubricFinding> findingEntities = new ArrayList<>(List.of(RubricFinding.builder().build()));
         ResultEnvelopeAssembler.AssembleOutput out =
                 new ResultEnvelopeAssembler.AssembleOutput(envelope, resultEntity, findingEntities);
         when(assembler.assemble(any(ExecutionContext.class), eq(version), anyList(), anyList(), anyMap(), any(OffsetDateTime.class)))
