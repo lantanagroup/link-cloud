@@ -1,0 +1,1529 @@
+.nhsn-link {
+  font-family: var(--kendo-font-family, 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--kendo-color-app-text, #1f2328);
+  background: var(--kendo-color-surface, #f7f9fc);
+  height: 100vh;
+  overflow: hidden;
+  --nhsn-scrollbar-thumb: var(--kendo-color-border, #d0d7de);
+  --nhsn-scrollbar-thumb-hover: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link h1,
+.nhsn-link h2,
+.nhsn-link h3 {
+  font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.nhsn-link,
+.nhsn-link * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nhsn-scrollbar-thumb) transparent;
+}
+
+.nhsn-link::-webkit-scrollbar,
+.nhsn-link *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.nhsn-link::-webkit-scrollbar-track,
+.nhsn-link *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nhsn-link::-webkit-scrollbar-thumb,
+.nhsn-link *::-webkit-scrollbar-thumb {
+  background-color: var(--nhsn-scrollbar-thumb);
+  border-radius: 8px;
+}
+
+.nhsn-link::-webkit-scrollbar-thumb:hover,
+.nhsn-link *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--nhsn-scrollbar-thumb-hover);
+}
+
+.nhsn-link h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+
+.nhsn-link h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+
+.nhsn-link__layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.nhsn-link__nav,
+.nhsn-link__panel,
+.nhsn-link__content {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.nhsn-link__content {
+  padding: 0 32px 28px;
+}
+
+.nhsn-link__content .page-header-title:focus {
+  outline: none;
+}
+
+.nhsn-link__nav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: linear-gradient(180deg, #063f78, #0b5cab);
+  color: #ffffff;
+  --nhsn-scrollbar-thumb: rgba(255, 255, 255, 0.4);
+  --nhsn-scrollbar-thumb-hover: rgba(255, 255, 255, 0.65);
+}
+
+.nhsn-link__nav-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.5rem;
+  color: #ffffff;
+}
+
+.nhsn-link__nav ul,
+.nhsn-link__panel ul {
+  padding-left: 1.25rem;
+}
+
+.nhsn-link__nav ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* Identity header: title, signed-in user, facility. Sits outside the
+   scrolling body below so it stays visible however far the step rail (or the
+   nav buttons) scroll. */
+.nhsn-link__nav-header {
+  flex: none;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nhsn-link__nav-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nhsn-link__nav-sections {
+  display: grid;
+  gap: 1rem;
+}
+
+.nhsn-link__nav-section-heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nhsn-link__nav li {
+  margin-bottom: 0.5rem;
+}
+
+.nhsn-link__nav-userinfo {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.nhsn-link__nav-userinfo p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.nhsn-link__nav-button {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nhsn-link__nav-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nhsn-link__nav-button--active {
+  background: #ffffff;
+  color: var(--kendo-color-primary, #0057b7);
+  border-color: #ffffff;
+}
+
+.nhsn-link__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  background: white;
+  margin: 2rem;
+  border: 1px solid var(--nhsn-gray-200);
+  border-radius: var(--nhsn-radius-lg);
+}
+
+.nhsn-link__state-card {
+  max-width: 600px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.nhsn-link__state--error {
+  display: block;
+  min-height: 0;
+  margin: 0 0 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border-left: 4px solid;
+  text-align: left;
+  background: var(--kendo-color-error-subtle, #fcf2f1);
+  border-left-color: var(--kendo-color-error, #cc1b22);
+  color: var(--kendo-color-error-on-subtle, #961c1c);
+}
+
+/* ---------------------------------------------------------- step machine */
+
+.nhsn-link__step-nav-facility {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.nhsn-link__step-nav-facility-name {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nhsn-link__step-nav-facility-id {
+  font-family: Consolas, monospace;
+  color: #ffffff;
+}
+
+.nhsn-link__steps {
+  /* The step number is rendered as its own element so it can carry a
+     completion state, so the list must not also draw its own markers —
+     otherwise every row reads "1. 1 Welcome". */
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.nhsn-link__step {
+  margin: 0 0 2px 0;
+  border-radius: 8px;
+  opacity: 0.5;
+  transition: background 0.15s ease;
+}
+
+.nhsn-link__step--unlocked {
+  opacity: 1;
+}
+
+.nhsn-link__step-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  text-align: left;
+  cursor: not-allowed;
+}
+
+.nhsn-link__step--unlocked .nhsn-link__step-button {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.nhsn-link__step--unlocked .nhsn-link__step-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nhsn-link__step-index {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+}
+
+.nhsn-link__step-label {
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.nhsn-link__step--current .nhsn-link__step-button {
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 600;
+}
+
+.nhsn-link__step--current .nhsn-link__step-index {
+  background: #00c853;
+  border-color: #ffffff;
+  color: #063f14;
+  font-weight: 700;
+}
+
+.nhsn-link__step--done .nhsn-link__step-index {
+  background: #00c853;
+  border-color: #00c853;
+  color: #063f14;
+  font-weight: 700;
+}
+
+.nhsn-link__step-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content {
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content > * {
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------- side panel (docked detail/results panel) */
+
+.nhsn-link__side-panel-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.nhsn-link__side-panel-layout > *:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nhsn-link__side-panel {
+  flex: 0 0 460px;
+  display: flex;
+  flex-direction: column;
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1.5px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 12px;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.nhsn-link__side-panel .section-title {
+  color: var(--kendo-color-primary-hover, #032659);
+  margin-top: 0;
+}
+
+.nhsn-link__side-panel .nhsn-link__summary-list {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__side-panel .nhsn-link__summary-list li {
+  border-bottom-color: #dce9f8;
+}
+
+.nhsn-link__step-panel :has(> .page-header) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+  padding-top: 28px;
+  background-color: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link__subtitle {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  line-height: 1.6;
+  font-size: 14px;
+  max-width: 70ch;
+  margin: 0 0 22px;
+}
+
+.nhsn-link__step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* core/fields Button, styled everywhere - not just in StepActions, or a standalone Button renders unstyled. */
+.nhsn-link .k-button.k-button-primary {
+  background: var(--kendo-color-primary, #0057b7);
+  border-color: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+  padding: 7px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.nhsn-link .k-button.k-button-primary:hover:not(:disabled) {
+  background: var(--kendo-color-primary-hover, #063f78);
+  border-color: var(--kendo-color-primary-hover, #063f78);
+}
+
+.nhsn-link .k-button.k-button-base {
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  padding: 7px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.nhsn-link .k-button.k-button-base:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #eef0f3);
+  border-color: var(--kendo-color-primary, #0057b7);
+}
+
+.nhsn-link .k-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nhsn-link .k-button:focus,
+.nhsn-link .k-button.k-focus {
+  box-shadow: none;
+}
+
+.nhsn-link__step-actions .k-button:focus,
+.nhsn-link__step-actions .k-button.k-focus {
+  box-shadow: none !important;
+}
+
+.nhsn-link__step-actions .k-button:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
+  padding-bottom: 0;
+}
+
+.nhsn-link__step-panel .nhsn-link__step-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  flex: none;
+  margin-top: auto;
+  margin-left: -32px;
+  margin-right: -32px;
+  padding: 16px 32px 28px;
+  background-color: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link__button-spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: nhsn-link__spin 0.7s linear infinite;
+}
+
+.nhsn-link__step-actions .k-button.k-button-base .nhsn-link__button-spinner {
+  border-color: var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-primary, #0057b7);
+}
+
+@keyframes nhsn-link__spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.nhsn-link__grid {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.notification-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 2rem));
+}
+
+.notification-stack__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  color: var(--kendo-color-on-inverse, #ffffff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.notification-stack__item--success {
+  background: var(--kendo-color-success, #1e5f25);
+}
+
+.notification-stack__item--error {
+  background: var(--kendo-color-error, #cc1b22);
+}
+
+.notification-stack__item--info {
+  background: var(--kendo-color-primary, #0057b7);
+}
+
+.notification-stack__message {
+  flex: 1;
+}
+
+.notification-stack__close {
+  border: none;
+  background: transparent;
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------- form layout */
+
+/* core/fields' plain text/number inputs, styled everywhere - a bare `.k-input` has no usable default. */
+.nhsn-link .k-input,
+.nhsn-link .k-numerictextbox {
+  width: 100%;
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link .k-input,
+.nhsn-link .k-input *,
+.nhsn-link .k-numerictextbox,
+.nhsn-link .k-numerictextbox * {
+  font-family: 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.nhsn-link .k-input::placeholder {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  opacity: 1;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* Browser autofill (Chrome/Edge tint an input it thinks it can fill) overrides any background we
+   set - forced back to the app's own surface color and text color here. */
+.nhsn-link input.k-input:-webkit-autofill,
+.nhsn-link input.k-input:-webkit-autofill:hover,
+.nhsn-link input.k-input:-webkit-autofill:focus,
+.nhsn-link .k-input-inner:-webkit-autofill,
+.nhsn-link .k-input-inner:-webkit-autofill:hover,
+.nhsn-link .k-input-inner:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--kendo-color-app-text, #1f2328);
+  -webkit-box-shadow: 0 0 0 1000px var(--kendo-color-app-surface, #ffffff) inset;
+  box-shadow: 0 0 0 1000px var(--kendo-color-app-surface, #ffffff) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* The package's default focus style darkens text and adds a heavy glow - replaced with a plain outline. */
+.nhsn-link .k-input:focus,
+.nhsn-link .k-input:focus-within,
+.nhsn-link .k-input.k-focus {
+  /* Inset (negative offset) so the ring stays inside the input's own box and
+     is never clipped by a scrollable ancestor like .nhsn-link__repeatable-scroll. */
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: -2px;
+  border-color: var(--kendo-color-border, #d0d7de);
+  color: inherit;
+  background: var(--kendo-color-app-surface, #ffffff);
+  box-shadow: none;
+}
+
+.nhsn-link__form-error {
+  color: var(--kendo-color-error, #cc1b22);
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+}
+
+.nhsn-link__field {
+  max-width: 420px;
+  margin-bottom: 1rem;
+}
+
+.nhsn-link .k-form-hint {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  top: auto;
+  left: 0;
+  right: auto;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  background: var(--kendo-color-app-text, #1f2328);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+}
+
+.nhsn-link .k-form-hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  border: 5px solid transparent;
+  border-top-color: var(--kendo-color-app-text, #1f2328);
+}
+
+/* ------------------------------------------- facility-info (onboarding POC parity) */
+
+.nhsn-facility-info {
+  padding: 0 32px 28px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.nhsn-facility-info .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__reporting-plan .page-header,
+.nhsn-link__manual-upload .page-header,
+.nhsn-link__complete .page-header,
+.nhsn-link__welcome .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__reporting-plan .nhsn-link__subtitle,
+.nhsn-link__manual-upload .nhsn-link__subtitle,
+.nhsn-link__complete .nhsn-link__subtitle,
+.nhsn-link__welcome .nhsn-link__subtitle {
+  max-width: none;
+}
+
+.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll {
+  display: block;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-link__reporting-plan-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.nhsn-link__reporting-plan-table th:first-child,
+.nhsn-link__reporting-plan-table td:first-child {
+  width: 24%;
+  white-space: nowrap;
+}
+
+.nhsn-link__reporting-plan-table th:nth-child(2),
+.nhsn-link__reporting-plan-table td:nth-child(2) {
+  width: 22%;
+  white-space: nowrap;
+}
+
+.nhsn-link__reporting-plan-table th:last-child,
+.nhsn-link__reporting-plan-table td:last-child {
+  width: 54%;
+}
+
+.nhsn-link__reporting-plan-table {
+  font-size: 12.5px;
+}
+
+.nhsn-link__reporting-plan-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 9px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__reporting-plan-table td {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  vertical-align: top;
+}
+
+.nhsn-link__reporting-plan-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nhsn-link__reporting-plan-table td ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.nhsn-link__reporting-plan-table td ul li {
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------- complete step summary list */
+
+.nhsn-link__summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nhsn-link__summary-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--kendo-color-base-hover, #f2f4f7);
+  font-size: 13.5px;
+}
+
+.nhsn-link__summary-list li span:first-child {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__summary-list li span:last-child {
+  color: var(--kendo-color-app-text, #1f2328);
+  font-weight: 600;
+  text-align: right;
+}
+
+.nhsn-facility-info .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-facility-info .page-header-buttons {
+  display: none;
+}
+
+.nhsn-facility-info .nhsn-link__subtitle {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: none;
+  margin: 0 0 22px 0;
+}
+
+.nhsn-facility-info .nhsn-link__field {
+  max-width: none;
+  margin-bottom: 18px;
+}
+
+.nhsn-facility-info .k-form-field {
+  position: relative;
+}
+
+.nhsn-facility-info .k-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-facility-info .k-label svg {
+  display: none;
+}
+
+.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border-radius: 50%;
+  background: var(--kendo-color-border, #d0d7de);
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  anchor-name: --facility-hint-badge;
+}
+
+.nhsn-facility-info .k-form-field--hint-open .k-label::after {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+@supports (position-anchor: --facility-hint-badge) {
+  .nhsn-facility-info .k-form-hint {
+    position-anchor: --facility-hint-badge;
+    left: anchor(center);
+    bottom: calc(anchor(top) + 9px);
+    transform: translateX(-50%);
+  }
+
+  .nhsn-facility-info .k-form-hint::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+.nhsn-facility-info .k-form-field--hint-open .k-form-hint {
+  display: block;
+}
+
+.nhsn-facility-info .k-dropdownlist {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-facility-info .k-dropdownlist.k-focus,
+.nhsn-facility-info .k-dropdownlist:focus {
+  border-color: var(--kendo-color-primary, #0057b7);
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 1px;
+}
+
+.nhsn-facility-info .k-dropdownlist .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-facility-info-popup.k-list-container {
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.k-animation-container .nhsn-facility-info-popup.k-list-container {
+  margin-top: 4px;
+}
+
+.nhsn-facility-info-popup .k-list {
+  background: var(--kendo-color-app-surface, #ffffff);
+  font-family: inherit;
+}
+
+.nhsn-facility-info-popup .k-list-item,
+.nhsn-facility-info-popup .k-list-optionlabel {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-facility-info-popup .k-list-item:hover,
+.nhsn-facility-info-popup .k-list-item.k-hover,
+.nhsn-facility-info-popup .k-list-optionlabel:hover,
+.nhsn-facility-info-popup .k-list-optionlabel.k-hover {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-facility-info-popup .k-list-item.k-selected,
+.nhsn-facility-info-popup .k-list-optionlabel.k-selected {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-facility-info-popup .k-list-item.k-selected:hover,
+.nhsn-facility-info-popup .k-list-optionlabel.k-selected:hover {
+  background: var(--kendo-color-primary-hover, #032659);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-facility-info .nhsn-link__form-error {
+  font-size: 15px;
+}
+
+/* ------------------------------------------------------- manual upload */
+
+.nhsn-link__download-field {
+  margin: 1.25rem 0;
+}
+
+.nhsn-link__download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nhsn-link__download-button:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nhsn-link__download-icon {
+  flex: 0 0 auto;
+}
+
+.nhsn-link__hint-text {
+  margin: 0.4rem 0 0 0;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 0.85rem;
+}
+
+.nhsn-link__upload-field {
+  margin: 1.25rem 0;
+}
+
+.nhsn-link__upload-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__upload-field input[type='file'] {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  padding: 0.4rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 14px;
+}
+
+.nhsn-link__upload-field input[type='file']::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nhsn-link__upload-field input[type='file']::file-selector-button:hover {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__upload-field input[type='file']:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nhsn-link__status-message {
+  margin: 0.5rem 0 1.25rem 0;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .nhsn-link {
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__nav,
+  .nhsn-link__grid {
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__step-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__nav-scroll {
+    overflow: visible;
+  }
+
+  .nhsn-link__step-panel > .nhsn-link__content,
+  .fhir-server-info,
+  .fhir-server-info .card,
+  .fhir-server-info .card-scroll {
+    flex: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  .nhsn-link__step-panel :has(> .page-header) {
+    position: static;
+  }
+
+  .nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
+    padding-bottom: 28px;
+  }
+
+  .nhsn-link__step-panel .nhsn-link__step-actions,
+  .fhir-server-info .card .nhsn-link__step-actions {
+    position: static;
+    margin: 1.5rem 0 0;
+    padding: 0;
+  }
+}
+
+/* ------------------------------------------------------- shared step blocks
+   Written for Organization Identification and deliberately generic: the
+   mapping and report steps repeat the same tab row, repeatable list, picker
+   dialog and instruction box. Add to these rather than restating them under a
+   step-specific selector. */
+
+.nhsn-link__field-group {
+  margin-bottom: 18px;
+}
+
+.nhsn-link__field-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+/* core/fields/layout.tsx FieldLabel's decorative check badge. */
+.nhsn-link__field-check {
+  flex: 0 0 auto;
+  color: #0d7a4a;
+}
+
+.nhsn-link__field-check circle {
+  fill: #cfeee0;
+}
+
+/* Kendo's own label, visually hidden (never `display: none`) where FieldLabel already shows it. */
+.nhsn-link__field-group--labeled .k-label,
+.nhsn-link__repeatable-fields .k-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- tabs (core/fields/Tabs.tsx) */
+
+.nhsn-link__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.nhsn-link__tab {
+  padding: 7px 14px;
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nhsn-link__tab:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__tab--selected,
+.nhsn-link__tab--selected:hover:not(:disabled) {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-link__tab:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- repeatable list (core/fields/RepeatableList.tsx) */
+
+.nhsn-link__repeatable {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Scrolls on its own so the add button below it never scrolls out of reach.
+   Height tracks the viewport instead of a fixed pixel value, so it only
+   kicks in once rows actually run out of the space the screen has. */
+.nhsn-link__repeatable-scroll {
+  width: 100%;
+  max-height: 45vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding-right: 4px;
+}
+
+.nhsn-link__repeatable-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+
+.nhsn-link__repeatable-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+}
+
+.nhsn-link__repeatable-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nhsn-link__repeatable-fields > * {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 0;
+  /* The package's .k-form-field reserves 1rem for the next field in a
+     horizontal form row - redundant here since the row's own `gap` already
+     separates fields, and it otherwise reads as dead space before Remove. */
+  padding-right: 0;
+}
+
+/* Every row repeats the same labels, and the placeholder already carries them.
+   Hidden visually, kept for assistive technology — never `display: none`. Rule
+   is above, grouped with `.nhsn-link__field-group--labeled .k-label`. */
+
+.nhsn-link__repeatable > .nhsn-link__hint-text {
+  margin-bottom: 10px;
+}
+
+.nhsn-link__repeatable-add,
+.nhsn-link__repeatable-remove {
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.nhsn-link__repeatable-remove {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nhsn-link__repeatable-add:hover:not(:disabled),
+.nhsn-link__repeatable-remove:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__repeatable-add:disabled,
+.nhsn-link__repeatable-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- instruction box and document download (core/documents/) */
+
+.nhsn-link__instructions {
+  background: var(--kendo-color-surface, #f7f9fc);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.nhsn-link__instructions-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__document-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  /* An <a>, not a <button> - reset the anchor defaults the button variant
+     never needed. */
+  text-decoration: none;
+  cursor: pointer;
+  cursor: pointer;
+}
+
+.nhsn-link__document-link:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__document-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- inline spinner (core/fields/layout.tsx) */
+
+.nhsn-link__inline-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__inline-spinner-dial {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2.5px solid var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-primary, #0057b7);
+  border-radius: 50%;
+  animation: nhsn-link__spin 0.7s linear infinite;
+}
+
+.nhsn-link__inline-spinner-label {
+  line-height: 1.4;
+}
+
+/* ---- info tooltip (core/fields/InfoTooltip.tsx) - click-pin owned by useHintTooltips() in NHSNLink.tsx ---- */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 50%;
+  background: var(--kendo-color-border, #d0d7de);
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+}
+
+.info-icon:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.info-icon.info-icon--open {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+  outline: none;
+}
+
+.info-icon .tooltip-bubble {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--kendo-color-app-text, #1f2328);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+}
+
+.info-icon .tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--kendo-color-app-text, #1f2328);
+}
+
+.info-icon:hover .tooltip-bubble,
+.info-icon:focus-visible .tooltip-bubble,
+.info-icon.info-icon--open .tooltip-bubble {
+  display: block;
+}
+
+/* ---- modal (core/fields/overlays.tsx) */
+
+.nhsn-link__modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 20, 30, 0.55);
+}
+
+.nhsn-link__modal {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 86vh;
+  padding: 26px 28px;
+  border-radius: 10px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.nhsn-link__modal--large {
+  width: 860px;
+  max-width: 95vw;
+  max-height: 94vh;
+}
+
+.nhsn-link__modal--small {
+  width: 340px;
+}
+
+.nhsn-link__modal-title {
+  flex: none;
+  margin: 0 0 10px 0;
+  font-size: 17px;
+}
+
+.nhsn-link__modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nhsn-link__modal-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ---- plain data table (pickers and reference tables) */
+
+.nhsn-link__table-scroll {
+  max-height: 52vh;
+  overflow-y: auto;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-link__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.nhsn-link__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 8px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  vertical-align: top;
+}
+
+.nhsn-link__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nhsn-link__table-select-column {
+  width: 36px;
+}
+
+/* A table cell's codings list - the Cerner site-location picker's own use. */
+.nhsn-link__plain-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.nhsn-link__plain-list li {
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------- organization identification */
+
+/* Suppresses the package's default page-header border/padding, like every other step does. */
+.nhsn-link__location-org .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+/* .nhsn-link__content has no top padding, so with the page-header's own padding
+   suppressed above, its border/shadow reads as missing along the top edge -
+   give the step back its own breathing room instead. */
+.nhsn-link__location-org.nhsn-link__content {
+  padding-top: 28px;
+}
+
+.nhsn-link__location-org .page-header-buttons {
+  display: none;
+}
+
+.nhsn-link__location-org .nhsn-link__subtitle {
+  max-width: none;
+}
+
+.nhsn-link__location-org .nhsn-link__field-group {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__location-org .nhsn-link__subtitle {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__location-org .nhsn-link__tabs {
+  gap: 14px;
+  margin-top: 2px;
+}
+
+/* The site-location picker is wider than it is tall — give its rows room
+   rather than the dialog's default scroll height. */
+.nhsn-link__location-org .nhsn-link__table-scroll {
+  max-height: 70vh;
+}

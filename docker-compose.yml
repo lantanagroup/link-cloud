@@ -30,6 +30,8 @@
 ## tenant: 8074
 ## validation: 8075
 ## terminology: 8076
+## nhsn-app-bff: 8079
+## nhsn-app-ui: 8090
 
 services:
   
@@ -527,6 +529,49 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
+
+  nhsn-app-bff:
+    image: link-nhsn-app-bff
+    container_name: link-nhsn-app-bff
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      EnableSwagger: "true"
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-nhsn-app-bff;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+    ports:
+      - "8079:8079"
+    build:
+      context: .
+      dockerfile: nhsn/NHSN-App-BFF/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8079/health"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
+
+  nhsn-app-ui:
+    image: link-nhsn-app-ui
+    container_name: link-nhsn-app-ui
+    environment:
+      NHSN_APP_UI_DEFAULT_JWT_ISSUER: https://docker-nhsn-app.example.org
+      NHSN_APP_UI_DEFAULT_JWT_KEY_ID: '399E34CBAADFE1B9EBF3484198B5B451C6FD3800'
+      NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8bBAWSvX80TrIXvT\niuwm0MhA2Babh4aomKZtnoszZfihRANCAAQNoNqXozIM+J/ZIq6fa/vhsayZ+GlY\nE2kQAYPpDGfo3boxro6EDvNAj5D+EbY5650CZZhBQTin3r3Ahk6/nNk2\n-----END PRIVATE KEY-----'
+    ports:
+      - "8090:8090"
+    build:
+      context: ./nhsn/NHSN-App-UI
+      dockerfile: Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      nhsn-app-bff:
+        condition: service_healthy
   
   audit:
     image: link-audit
@@ -1064,7 +1109,6 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true
     volumes:
       - terminology_data:/data
     ports:
@@ -1108,3 +1152,6 @@ volumes:
     driver: local
   automation_ui_keys:
     driver: local
+
+
+

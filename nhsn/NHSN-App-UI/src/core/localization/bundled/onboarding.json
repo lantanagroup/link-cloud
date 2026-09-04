@@ -1,0 +1,373 @@
+{
+  "steps": {
+    "welcome": "Welcome",
+    "reportingPlan": "Facility Reporting Plan",
+    "facilityInfo": "Facility Information",
+    "manualUpload": "Manual Upload",
+    "fhir": "FHIR Server Information",
+    "census": "Patients of Interest Configuration",
+    "locationOrg": "Organization Identification",
+    "hsloc": "Location Identification (HSLOC)",
+    "encounter": "Encounter Mapping",
+    "report": "Generate Test Report",
+    "reportResults": "Report Results",
+    "mrnIntake": "MRN Identifier Intake",
+    "complete": "Enrollment Complete"
+  },
+  "welcome": {
+    "title": "Welcome to DQM Onboarding",
+    "intro": "The National Healthcare Safety Network (NHSN) uses <nhsnlink>NHSNLink</nhsnlink>, an open-source Fast Healthcare Interoperability Resources (<fhir>FHIR®</fhir>) application, to enable reporting of digital quality measures (dQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of dQMs to NHSN.",
+    "audienceTitle": "Intended Audience",
+    "audienceBody": "The onboarding steps that follow should be completed by the site’s information technology team.",
+    "workflowTitle": "Workflow",
+    "workflowBody": "Each onboarding section includes downloadable materials and instructions to facilitate completion. Onboarding steps do not have to be completed at one time; the user can save the information and return at a later time."
+  },
+  "reportingPlan": {
+    "title": "Facility Reporting Plan",
+    "subtitle": "Before you get started, here's a preview of the 6-month look-ahead of NHSN measures your facility will be scheduled to report against once enrollment is complete.",
+    "columns": {
+      "month": "Report Month",
+      "year": "Report Year",
+      "measures": "NHSN Measures"
+    },
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    },
+    "measures": {
+      "adultSepsis": "Adult Sepsis Bacteria & Fungemia",
+      "antimicrobialUseResistance": "Antimicrobial Use and Resistance (AU/AR)",
+      "cDifficile": "C. Difficile Infection",
+      "glycemicControl": "Glycemic Control",
+      "respiratoryPathogens": "Respiratory Pathogens Surveillance (RPS)"
+    },
+    "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available."
+  },
+  "facilityInfo": {
+    "title": "Facility Information",
+    "intro": "Some general information related to your facility is needed prior to beginning the onboarding process.",
+    "fields": {
+      "timeZoneLabel": "Facility Time Zone",
+      "timeZoneTooltip": "The time zone setting is used to determine when NHSNLink schedules a new reporting period for your facility.",
+      "timeZonePlaceholder": "Select a time zone…",
+      "ehrVendorLabel": "EHR Vendor",
+      "ehrVendorPlaceholder": "Select a vendor…"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "loadError": "Unable to load facility information.",
+      "saveSuccess": "Facility information saved.",
+      "saveError": "Unable to save facility information."
+    }
+  },
+  "manualUpload": {
+    "title": "Manual Upload Option",
+    "intro": "If you are not able to complete the onboarding form online, download the form, complete it with your facility's technical team, and upload it here. You can upload a partially completed form and return later to finish the process.",
+    "downloadTemplate": "Download Import Sheet & Instructions",
+    "downloadHint": "Downloads the .xlsx import sheet.",
+    "uploadFile": "Upload Completed Import Sheet",
+    "reading": "Reading file...",
+    "imported": "Imported {{imported}} of {{total}} field(s) from {{fileName}}.",
+    "readError": "Could not read that file — make sure it is the .xlsx import sheet downloaded from this page.",
+    "uploadRejected": "The file could not be imported. Please check the file and try again.",
+    "errors": {
+      "invalidFormat": "The file is not a valid import sheet.",
+      "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
+      "invalidUrl": "Enter a valid, fully-qualified URL.",
+      "invalidNumber": "Enter a whole number of zero or greater.",
+      "invalidLocationMethod": "Enter a valid organization identification method."
+    }
+  },
+  "fhirServerInfo": {
+    "title": "FHIR Server Information",
+    "subtitlePrefix": "NHSNLink uses the",
+    "subtitleFhirLinkText": "FHIR",
+    "subtitleSuffix": "standard to connect with your facility's EHR system. Please provide the technical information needed to securely connect your EHR FHIR APIs to NHSNLink.",
+    "authenticationSectionTitle": "Authentication",
+    "throttleSectionTitle": "Throttle Settings",
+    "fields": {
+      "baseUrlLabel": "FHIR Server Base URL",
+      "baseUrlTooltip": "The FHIR base URL used to access your facility's FHIR resources. Example: https://ehr.example.org/fhir/r4",
+      "baseUrlPlaceholder": "https://ehr.example.org/fhir/r4",
+      "jwksInstructions": "{{vendor}} facilities now support JSON Web Key Set (JWKS) based authentication. This is enabled directly by your facility's EHR administrator from the {{vendor}} vendor portal — no credentials need to be entered here. Download the instructions below and provide them to your EHR administrator to enable JWKS for NHSNLink.",
+      "downloadPdfInstructions": "Download PDF Instructions",
+      "maxConcurrentRequestsLabel": "Max Concurrent Requests",
+      "maxConcurrentRequestsTooltip": "NHSNLink is capable of querying resources concurrently for reported patients. This setting throttles how many requests will run concurrently against the facility FHIR server.",
+      "maxRetriesLabel": "Max Retries",
+      "maxRetriesTooltip": "If NHSNLink experiences an issue while querying the facility FHIR server, it can retry the request. This setting determines the maximum number of retries NHSNLink can attempt for a given FHIR resource request. The value must be between 0 and 10.",
+      "minPullTimeLabel": "Min Acquisition Pull Time",
+      "minPullTimeTooltip": "Specifies the earliest time NHSNLink is allowed to start querying the facility FHIR server for patient resources.",
+      "maxPullTimeLabel": "Max Acquisition Pull Time",
+      "maxPullTimeTooltip": "Specifies the time NHSNLink stops querying the facility FHIR server for patient resources.",
+      "pullTimePlaceholder": "HH:MM",
+      "lagLabel": "Patient Resource Acquisition Lag Duration",
+      "lagTooltip": "A lag time can be applied for each patient being reported to ensure that data related to the visit has settled prior to acquiring it from the facility FHIR server, for example so lab results can be finalized and medication orders completed. Scheduled reports wait until each patient in the census is accounted for, even if the applied lag extends beyond the reporting period.",
+      "lagDaysLabel": "Days",
+      "lagHoursLabel": "Hours",
+      "lagMinutesLabel": "Minutes"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "invalidBaseUrl": "Enter a valid URL starting with http:// or https:// (e.g. https://ehr.example.org/fhir/r4).",
+      "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number of 1 or greater.",
+      "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
+      "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
+      "invalidLagDays": "Days must be a whole number of 0 or greater.",
+      "invalidLagHours": "Hours must be a whole number between 0 and 23.",
+      "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
+      "loadError": "Unable to load FHIR server information.",
+      "saveSuccess": "FHIR server information saved.",
+      "saveError": "Unable to save FHIR server information.",
+      "testing": "Testing connection…",
+      "testSuccess": "Connection test succeeded.",
+      "testFailure": "Connection test failed.",
+      "testError": "Unable to test the connection.",
+      "connectionNotTested": "Test the connection before continuing."
+    }
+  },
+  "census": {
+    "title": "Patients of Interest Configuration",
+    "intro1": "Patients of Interest (POI) are the patients included for NHSN ACH dQM surveillance and measure evaluation. POI includes patients receiving care in inpatient, emergency department, observation, and short-stay settings during the surveillance measurement period.",
+    "intro2": "NHSNLink must identify the POI before retrieving the FHIR resources needed for measure evaluation. How the POI is identified depends on your EHR and configuration. The following steps will guide you through configuring how NHSNLink identifies your facility's POI.",
+    "epic": {
+      "sectionTitle": "Epic Patient Lists",
+      "subtitle": "For Epic facilities using automated POI acquisition, NHSNLink uses configured Epic system patient lists to identify currently admitted and recently discharged patients. The Epic List API has a limit of 1500 patients returned with any one query, so building six separate system lists is recommended to keep daily queries well under the 1500 limit threshold and to avoid missing patients with short admissions.",
+      "downloadInstructions": "Download PDF Instructions",
+      "instructionsHint": "If Epic FHIR List Id's have not been created by your facility for census management, the following instructions can be downloaded for your technical team to generate them.",
+      "lists": {
+        "admitLt24": "Admit - Within 24 Hours",
+        "admit24to48": "Admit - Between 24 and 48 hours",
+        "admitGt48": "Admit - Over 48 hours",
+        "dischargeLt24": "Discharge - Where lookback of admission is within past 24 hours",
+        "discharge24to48": "Discharge - Where lookback of admission is between 24 and 48 hours",
+        "dischargeGt48": "Discharge - Where lookback of admission is over 48 hours"
+      },
+      "validateButton": "Validate Census Results",
+      "validating": "Validating…",
+      "viewResultsAria": "View results for {{list}}",
+      "queryError": "Unable to query this patient list.",
+      "resultsTitle": "List Results Preview",
+      "summary": {
+        "listName": "Patient List Name",
+        "listId": "List Id",
+        "queriedAt": "Queried At",
+        "patientCount": "Patient Count"
+      },
+      "columns": {
+        "patientId": "FHIR Patient Id"
+      }
+    },
+    "cerner": {
+      "sectionTitle": "Cerner SFTP Configuration",
+      "downloadInstructions": "Download PDF Instructions",
+      "instructionsHint": "If an SFTP endpoint or file extraction has not been disclosed for NHSNLink usage, the following instructions can be downloaded for your technical team to use to set up Cerner census extracts.",
+      "fields": {
+        "hostLabel": "SFTP Host URL",
+        "portLabel": "SFTP Host URL Port",
+        "usernameLabel": "Username",
+        "passwordLabel": "Password",
+        "credentialsHint": "Only needed if your facility's SFTP server requires basic authentication.",
+        "credentialsOnFile": "Credentials are on file. Enter new values to replace them.",
+        "remoteDirectoryLabel": "Remote Directory",
+        "remoteDirectoryHint": "Path to the directory on the SFTP server (use '/' for root)",
+        "removeAfterProcessingLabel": "Remove files after processing"
+      },
+      "testConnection": "Test Connection",
+      "testing": "Testing connection…",
+      "testSuccess": "Connection test succeeded.",
+      "testFailure": "Connection test failed.",
+      "testError": "Unable to test the connection.",
+      "filesTitle": "SFTP Acquisition Results",
+      "noFiles": "No files found.",
+      "viewResultsAria": "View results for {{file}}",
+      "resultsTitle": "List Results Preview",
+      "columns": {
+        "fileName": "SFTP File Name",
+        "queriedAt": "Queried At",
+        "patientCount": "Patient Count",
+        "patientId": "FHIR Patient Id"
+      }
+    },
+    "fields": {
+      "frequencyLabel": "Census Acquisition Frequency",
+      "frequencyTooltip": "This setting determines the frequency in which NHSNLink will attempt to get the latest patients of interest results.",
+      "hoursLabel": "Hours",
+      "minutesLabel": "Minutes",
+      "exportResults": "Export Results",
+      "accuracyAck": "I acknowledge that the patients of interest results are accurate."
+    },
+    "messages": {
+      "incomplete": "Please complete all required fields before continuing.",
+      "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
+      "vendorRequired": "Complete Facility Information before configuring patients of interest.",
+      "ackError": "Unable to record the acknowledgement."
+    },
+    "errors": {
+      "listIdRequired": "This field is required.",
+      "hostRequired": "SFTP Host URL is required.",
+      "portRequired": "SFTP Host URL Port is required.",
+      "portInvalid": "Enter a valid port between 1 and 65535.",
+      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes."
+    }
+  },
+  "locationOrg": {
+    "title": "Organization Identification",
+    "intro": "If your health system uses multiple FHIR endpoints, NHSNLink needs to determine which facility in the health system each patient encounter belongs to. Use the form below to help identify your specific facility in the FHIR data. No additional configuration is needed if your facility's FHIR data is not shared with other facilities in your health system.",
+    "methodLabel": "Resolution Method",
+    "noneAdded": "None added yet.",
+    "methods": {
+      "managingOrg": "Managing Organization",
+      "locationIdentifier": "Location Identifier",
+      "locationType": "Location Type",
+      "customFhirPath": "Custom FHIRPath"
+    },
+    "managingOrg": {
+      "listLabel": "Managing Organizations",
+      "placeholder": "Managing Organization",
+      "add": "+ Add Managing Organization",
+      "tooltip": "Add the identifiers of the FHIR Organization resources that manage your facility's Locations. NHSNLink uses these to determine which Locations belong to your facility."
+    },
+    "locationType": {
+      "intro": "Cerner Millennium supports querying Locations by physical type. NHSNLink can use this capability to search for Locations tagged as \"Site\" which typically can be used to correlate Location resources that represent your reporting facility organization. The search button below can assist in applying these mappings.",
+      "search": "Search {{vendor}} Site Locations",
+      "searchTitle": "{{vendor}} Site Locations",
+      "searching": "Searching for Site locations…",
+      "noCandidates": "No Site locations were returned.",
+      "addSelected": "Add",
+      "listLabel": "Location Type Code / Location Alias",
+      "codeLabel": "Location Type Code",
+      "aliasLabel": "Location Alias",
+      "add": "+ Add Location Type",
+      "columns": {
+        "id": "Location Id",
+        "alias": "Location Alias",
+        "type": "Location Type",
+        "codings": "Location Type Coding(s)"
+      },
+      "tooltip": "Add the Location.type code and alias values that identify your facility's Locations. Use Search Cerner Site Locations to find and add these automatically."
+    },
+    "locationIdentifier": {
+      "instructions": "Instructions are available to download here with more information on how to identify the FHIR Location resource that represents your reporting facility.",
+      "downloadPdf": "Download PDF Instructions",
+      "listLabel": "Location Identifier System / Location Identifier Code",
+      "systemLabel": "Location Identifier System",
+      "codeLabel": "Location Identifier Code",
+      "add": "+ Add Location Identifier",
+      "tooltip": "Add the identifier system and code that uniquely identify your facility's Location resource in the FHIR data."
+    },
+    "customFhirPath": {
+      "label": "Custom FHIR Path",
+      "placeholder": "e.g. Location.extension.where(url='...')",
+      "tooltip": "Enter a FHIRPath expression NHSNLink can evaluate against a Location resource to determine whether it belongs to your reporting facility."
+    },
+    "messages": {
+      "searchError": "Unable to search for Site locations.",
+      "candidatesAdded": "Added {{count}} location to Location Type.",
+      "candidatesAdded_other": "Added {{count}} locations to Location Type."
+    },
+    "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
+  },
+  "hsloc": {
+    "title": "Location Identification (HSLOC)"
+  },
+  "encounter": {
+    "title": "Encounter Mapping",
+    "subtitle": "The NHSN measures evaluated by Link conform to the FHIR <uscore>US Core</uscore> implementation guide. This guide is a set of rules and best practices that help healthcare providers share patient information accross the United States. In this rule set, all patient FHIR <encounters>Encounters</encounters> must have an Encounter Type (e.g. e-mail consultation, surgical day-care, skilled nursing, rehabilitation) that maps to Patient Encounter Procedure SNOMED or CPT codes. More information on those requirements can be found <valueset>here</valueset>. Below is a form to associate your local Encounter.type codes to their corresponding SMOMED or CPT codes.",
+    "tabs": {
+      "mapping": "Encounter Mapping",
+      "reference": "CPT / SNOMED Reference Table"
+    },
+    "fields": {
+      "codeSystemsLabel": "Encounter.type Code Systems",
+      "codeSystemsHint": "Add each source code system your facility's local Encounter.type codes come from. Within each code system, map its local codes to the corresponding CPT or SNOMED reference code.",
+      "codeSystemLabel": "Encounter.type Code System",
+      "codeSystemPlaceholder": "e.g. http://mysite.org/fhir/encounter-type",
+      "noCodeSystems": "No code systems added yet.",
+      "addCodeSystem": "+ Add Code System",
+      "removeCodeSystem": "Remove System",
+      "removeCodeSystemAriaLabel": "Remove code system {{system}}",
+      "mappingListLabel": "Local Encounter.type Code Mappings",
+      "noMappings": "None added yet.",
+      "addMapping": "+ Add Mapping",
+      "removeMapping": "Remove",
+      "removeMappingAriaLabel": "Remove mapping {{code}}",
+      "localCodeLabel": "Encounter.type code",
+      "localCodePlaceholder": "Encounter.type code",
+      "targetCodeLabel": "CPT or SNOMED code",
+      "targetCodePlaceholder": "Search CPT or SNOMED code…",
+      "targetCodeNoMatches": "No matching codes.",
+      "incompleteRowHint": "This mapping is missing a local code or a CPT/SNOMED code."
+    },
+    "reference": {
+      "searchLabel": "Search reference codes",
+      "searchPlaceholder": "Search code system, category, code, description…",
+      "systemFilterLabel": "Code system",
+      "systemFilterAll": "All Code Systems",
+      "categoryFilterLabel": "Category",
+      "categoryFilterAll": "All Categories",
+      "resultCount": "{{count}} of {{total}} codes",
+      "noResults": "No matching codes.",
+      "columns": {
+        "system": "System",
+        "category": "Category",
+        "code": "Code",
+        "description": "Description"
+      },
+      "detailNoSelection": "No matching codes to display.",
+      "detailMappedTitle": "Your Mapped Encounter.type Codes",
+      "detailNoMappedCodes": "No Encounter.type codes you've entered map to this code yet."
+    },
+    "messages": {
+      "loadError": "Unable to load encounter mapping data.",
+      "saveError": "Unable to save encounter mappings."
+    }
+  },
+  "report": {
+    "title": "Generate Test Report"
+  },
+  "reportResults": {
+    "title": "Report Results"
+  },
+  "mrnIntake": {
+    "title": "MRN Identifier Intake"
+  },
+  "complete": {
+    "title": "Enrollment Complete",
+    "subtitle": "This facility's onboarding has been completed and saved.",
+    "summary": {
+      "facilityId": "Facility ID",
+      "vendor": "Vendor",
+      "timeZone": "Time Zone",
+      "fhirBaseUrl": "FHIR Base URL",
+      "connectionTest": "Connection Test",
+      "censusMethod": "Census Method",
+      "reportsGenerated": "Reports Generated",
+      "completedReportId": "Completed From Report Id"
+    },
+    "connectionTested": "Passed",
+    "connectionNotTested": "Not tested",
+    "notAvailable": "—"
+  },
+  "page": {
+    "title": "Onboarding",
+    "intro": "Hello world..."
+  },
+  "messages": {
+    "completeSuccess": "Completed onboarding for facility {{facilityId}}.",
+    "completeError": "Unable to complete onboarding.",
+    "stepNotImplemented": "This step is not implemented yet.",
+    "stepUnavailable": "That step is not available.",
+    "draftConflict": "This facility was updated in another window. Reload to see the latest version.",
+    "notConnected": "Not yet connected to live data. The values shown are simulated."
+  }
+}

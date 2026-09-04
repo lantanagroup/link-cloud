@@ -1,0 +1,568 @@
+.encounter-mapping {
+  --encounter-blue: #0b5cab;
+  --encounter-blue-dark: #063f78;
+  --encounter-red: #c62828;
+  --encounter-gray-50: #f7f8fa;
+  --encounter-gray-100: #eef0f3;
+  --encounter-gray-200: #dde1e6;
+  --encounter-gray-600: #5b6472;
+  --encounter-gray-800: #2b323b;
+  --encounter-radius: 8px;
+
+  color: var(--encounter-gray-800);
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.encounter-mapping .card {
+  background: #ffffff;
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(20, 30, 50, 0.06);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.encounter-mapping .card-scroll {
+  padding: 0 32px 28px;
+  border-radius: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.encounter-mapping .page-header {
+  padding: 0;
+  border-bottom: none !important;
+  display: block;
+}
+
+.encounter-mapping .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--encounter-gray-800);
+}
+
+.encounter-mapping .page-header-title:focus {
+  outline: none;
+}
+
+.encounter-mapping .page-header-buttons {
+  display: none;
+}
+
+.encounter-mapping .subtitle {
+  color: var(--encounter-gray-600);
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.encounter-mapping .subtitle a {
+  color: var(--encounter-blue);
+}
+
+.encounter-mapping .section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--encounter-gray-600);
+  margin: 15px 0 10px;
+  font-weight: 600;
+}
+
+.encounter-mapping .section-title:first-child {
+  margin-top: 0;
+}
+
+.encounter-mapping .section-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--encounter-gray-800);
+}
+
+.encounter-mapping .form-group {
+  margin-bottom: 18px;
+}
+
+.encounter-mapping .form-group > label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--encounter-gray-800);
+}
+
+.encounter-mapping .form-hint {
+  font-size: 12.5px;
+  color: var(--encounter-gray-600);
+  margin: 5px 0 0;
+}
+
+/* POC's empty-state hint relies on the browser's default <p> bottom margin
+   to space itself from the button that follows; this app resets that
+   margin above, so restore it just for the empty-state case. */
+.encounter-mapping .form-hint--spaced {
+  margin-bottom: 12.5px;
+}
+
+.encounter-mapping .card .nhsn-link__step-actions {
+  position: static;
+  margin: 0;
+  padding: 16px 32px 28px;
+}
+
+/* -------------------------------------------------- buttons (POC .btn / .btn-secondary / .btn-sm) */
+
+.encounter-mapping .card-scroll .k-button {
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.encounter-mapping .card-scroll .k-button.k-button-base {
+  background: #ffffff;
+  color: var(--encounter-blue);
+  border: 1px solid var(--encounter-blue);
+  padding: 9px 18px;
+  font-size: 14px;
+}
+
+.encounter-mapping .card-scroll .k-button.k-button-base:hover {
+  background: var(--encounter-gray-100);
+}
+
+.encounter-mapping .card-scroll .k-button.nhsn-link__button--sm {
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+
+/* -------------------------------------------------- tabs (POC .btn-group > .btn / .btn-secondary) */
+
+.encounter-mapping .btn-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.encounter-mapping .tab-btn {
+  border: 1px solid var(--encounter-blue);
+  background: #ffffff;
+  color: var(--encounter-blue);
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.encounter-mapping .tab-btn:hover {
+  background: var(--encounter-gray-100);
+}
+
+.encounter-mapping .tab-btn--active {
+  background: var(--encounter-blue);
+  border-color: var(--encounter-blue);
+  color: #ffffff;
+}
+
+.encounter-mapping .tab-btn--active:hover {
+  background: var(--encounter-blue-dark);
+}
+
+/* -------------------------------------------------- mapping tab */
+
+.encounter-mapping .codesystem-block {
+  background: var(--encounter-gray-50);
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: var(--encounter-radius);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
+.encounter-mapping .codesystem-block .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.encounter-mapping .codesystem-row {
+  display: flex;
+  gap: 8px;
+}
+
+.encounter-mapping .codesystem-row input {
+  flex: 1;
+}
+
+.encounter-mapping .repeat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.encounter-mapping .repeat-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.encounter-mapping .repeat-row--incomplete .encounter-code-picker input,
+.encounter-mapping .repeat-row--incomplete > input {
+  border-color: var(--encounter-red);
+}
+
+.encounter-mapping .encounter-row-hint {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--encounter-red);
+}
+
+.encounter-mapping input[type='text'] {
+  box-sizing: border-box;
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--encounter-gray-800);
+  padding: 9px 11px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.encounter-mapping input[type='text']::placeholder {
+  color: var(--encounter-gray-600);
+  opacity: 1;
+}
+
+.encounter-mapping input[type='text']:focus-visible {
+  outline: 2px solid var(--encounter-blue);
+  outline-offset: 1px;
+}
+
+.encounter-mapping .repeat-row > input[type='text'] {
+  flex: 1;
+}
+
+.encounter-mapping .encounter-code-picker {
+  flex: 2;
+  min-width: 220px;
+  position: relative;
+}
+
+.encounter-mapping .encounter-code-picker input {
+  width: 100%;
+}
+
+.encounter-mapping .encounter-code-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: var(--encounter-radius);
+  box-shadow: 0 4px 14px rgba(20, 30, 50, 0.14);
+  z-index: 5;
+}
+
+.encounter-mapping .encounter-code-option {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.encounter-mapping .encounter-code-option:hover,
+.encounter-mapping .encounter-code-option--highlighted {
+  background: var(--encounter-gray-50);
+}
+
+.encounter-mapping .encounter-code-option-empty {
+  color: var(--encounter-gray-600);
+  cursor: default;
+}
+
+.encounter-mapping .encounter-code-option-empty:hover {
+  background: none;
+}
+
+.encounter-mapping .encounter-code-option-system {
+  font-weight: 700;
+  color: var(--encounter-blue-dark);
+}
+
+.encounter-mapping .encounter-code-option-code {
+  font-weight: 700;
+}
+
+/* -------------------------------------------------- reference tab */
+
+.encounter-mapping .encounter-reference-layout {
+  display: flex;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.encounter-mapping .encounter-reference-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Search + filters carry their meaning via placeholder text in the POC (no
+   visible field labels) — keep the a11y label but hide it visually. */
+.encounter-mapping .encounter-reference-main .k-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.encounter-mapping .encounter-reference-main .k-form-field {
+  margin-bottom: 10px;
+}
+
+.encounter-mapping .encounter-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.encounter-mapping .encounter-filters > * {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* POC's filters are plain <select> elements (thin gray border, white
+   background, 14px text); restyle the Kendo dropdown to match instead of
+   its default themed picker look. */
+.encounter-mapping .encounter-filters .k-dropdownlist {
+  background: #ffffff;
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: 6px;
+  height: auto;
+  min-height: 0;
+  box-shadow: none;
+}
+
+.encounter-mapping .encounter-filters .k-dropdownlist:hover,
+.encounter-mapping .encounter-filters .k-dropdownlist.k-hover {
+  background: #ffffff;
+  border-color: var(--encounter-gray-200);
+}
+
+.encounter-mapping .encounter-filters .k-dropdownlist.k-focus,
+.encounter-mapping .encounter-filters .k-dropdownlist:focus {
+  border-color: var(--encounter-blue);
+  outline: 2px solid var(--encounter-blue);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.encounter-mapping .encounter-filters .k-dropdownlist .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--encounter-gray-800);
+  height: auto;
+}
+
+.encounter-mapping .encounter-filters .k-dropdownlist .k-input-button {
+  background: transparent;
+  padding: 0 10px 0 0;
+  color: var(--encounter-gray-600);
+  height: auto;
+}
+
+.encounter-mapping .encounter-filters .k-dropdownlist .k-input-button .k-icon {
+  width: 11px;
+  height: 11px;
+}
+
+.encounter-mapping .encounter-system-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.encounter-mapping .encounter-system-badge-cpt {
+  background: var(--encounter-blue);
+}
+
+.encounter-mapping .encounter-system-badge-snomed {
+  background: #7c3aed;
+}
+
+.encounter-mapping .encounter-system-badge-other {
+  background: var(--encounter-gray-600);
+}
+
+.encounter-mapping .encounter-detail-panel {
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1.5px solid var(--encounter-blue);
+  border-radius: 12px;
+  padding: 20px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(20, 30, 50, 0.06);
+  overflow-y: auto;
+}
+
+.encounter-mapping .encounter-detail-panel .section-title {
+  color: var(--encounter-blue-dark);
+}
+
+.encounter-mapping .encounter-detail-system {
+  font-family: 'Consolas', monospace;
+  word-break: break-all;
+  margin-top: 4px;
+}
+
+.encounter-mapping .encounter-detail-description {
+  font-weight: 600;
+  margin: 10px 0 4px;
+}
+
+.encounter-mapping .summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.encounter-mapping .summary-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--encounter-gray-100);
+  font-size: 13.5px;
+}
+
+.encounter-mapping .summary-list li > span:first-child {
+  color: var(--encounter-gray-600);
+}
+
+.encounter-mapping .summary-list li > span:last-child {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* -------------------------------------------------- reference table (plain table, matching reporting-plan's pattern and the POC's .table-scroll look) */
+
+.encounter-mapping .encounter-table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--encounter-gray-200);
+  border-radius: var(--encounter-radius);
+}
+
+.encounter-mapping .encounter-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  color: var(--encounter-gray-800);
+}
+
+.encounter-mapping .encounter-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 9px;
+  background: var(--encounter-gray-50);
+  border-bottom: 1px solid var(--encounter-gray-200);
+  text-align: left;
+  color: var(--encounter-gray-600);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.encounter-mapping .encounter-table td {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--encounter-gray-100);
+  vertical-align: middle;
+}
+
+.encounter-mapping .encounter-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.encounter-mapping .encounter-table-empty {
+  color: var(--encounter-gray-600);
+  text-align: center;
+  padding: 22px 0;
+}
+
+.encounter-mapping .encounter-row {
+  cursor: pointer;
+}
+
+.encounter-mapping .encounter-row:hover {
+  background: var(--encounter-gray-50);
+}
+
+.encounter-mapping .encounter-row--selected,
+.encounter-mapping .encounter-row--selected:hover {
+  background: #eaf2fc;
+}
+
+.encounter-mapping .encounter-row:focus-visible {
+  outline: 2px solid var(--encounter-blue);
+  outline-offset: -2px;
+}
+
+@container (max-width: 780px) {
+  .encounter-mapping .encounter-reference-layout {
+    flex-direction: column;
+  }
+
+  .encounter-mapping .encounter-detail-panel {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .encounter-mapping .encounter-table td:not(:last-child) {
+    white-space: nowrap;
+  }
+
+  .encounter-mapping .encounter-table td:nth-child(2) {
+    max-width: 170px;
+    white-space: normal;
+  }
+
+  .encounter-mapping .encounter-table td:last-child {
+    min-width: 260px;
+    white-space: normal;
+  }
+  
+  .encounter-mapping .encounter-detail-empty {
+    text-align: center;
+  }
+}

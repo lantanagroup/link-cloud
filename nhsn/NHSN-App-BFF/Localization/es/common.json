@@ -1,0 +1,102 @@
+{
+  "app": {
+    "title": "Shell de UI de la aplicación NHSN",
+    "linkTitle": "NHSNLink"
+  },
+  "shell": {
+    "tagline": "Shell de entorno inferior para cambiar entre usuarios de prueba con JWT firmado guardados mientras se ejercita la UI compartida de NHSNLink.",
+    "savedTestUsersTitle": "Usuarios de prueba guardados",
+    "noSavedUsers": "Aún no se han guardado usuarios de prueba. Responde \"¿a quién estás simulando?\" abajo.",
+    "signedJwtPrefix": "JWT firmado",
+    "updateProfileTitle": "Actualizar perfil de prueba",
+    "createProfileTitle": "Crear un perfil de prueba JWT para entorno inferior",
+    "selectOrCreateDescription": "El shell independiente solo inicializa NHSNLink después de seleccionar un perfil de prueba JWT firmado. Usa los controles del shell a la izquierda para configurar la identidad de prueba, el emisor, el id de clave y la clave privada que utiliza el entorno de pruebas inferior para firmar el token bearer.",
+    "form": {
+      "friendlyLabel": "Etiqueta descriptiva",
+      "email": "Correo electrónico",
+      "name": "Nombre",
+      "groups": "Grupos (separados por comas)",
+      "groupsPlaceholder": "FACADMIN, AUTHENTICATED",
+      "facilityId": "ID del centro",
+      "jwtIssuer": "Emisor JWT",
+      "jwtKeyId": "ID de clave JWT (kid)",
+      "jwtKeyIdPlaceholder": "Huella digital del certificado / id de clave",
+      "jwtPrivateKeyPem": "Clave privada JWT PEM",
+      "jwtPrivateKeyPlaceholder": "-----BEGIN PRIVATE KEY-----"
+    },
+    "modeTitle": "Modo del entorno de pruebas",
+    "modeLabel": "Backend",
+    "modeMock": "Simulado (sin conexión)",
+    "modeBff": "NHSN-App-BFF (:8079)",
+    "modeMockHint": "Datos de prueba en memoria. No requiere servicios de backend.",
+    "modeBffHint": "Firma un JWT real del usuario de prueba activo y llama al BFF."
+  },
+  "navigation": {
+    "title": "Navegación",
+    "facility": "Centro",
+    "home": "Inicio",
+    "facilityInformation": "Información del centro",
+    "fhirServerInformation": "Información del servidor FHIR",
+    "onboarding": "Incorporación",
+    "configuration": "Configuración"
+  },
+  "actions": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "remove": "Eliminar",
+    "submitRequest": "Enviar una solicitud",
+    "completeOnboarding": "Completar incorporación",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "reload": "Recargar",
+    "download": "Descargar",
+    "saveAndActivate": "Guardar y activar perfil de prueba",
+    "cancelEdit": "Cancelar edición",
+    "testConnection": "Probar conexión"
+  },
+  "commonBoolean": {
+    "yes": "Sí",
+    "no": "No"
+  },
+  "state": {
+    "loadingUserContext": "Cargando contexto de usuario de NHSNLink...",
+    "noUserContext": "No se devolvió contexto de usuario.",
+    "selectOrCreateProfile": "Selecciona o crea un perfil de prueba",
+    "loadUserContextError": "No se pudo cargar el contexto de usuario."
+  },
+  "home": {
+    "userContextTitle": "Contexto de usuario",
+    "facilityLabel": "Centro:",
+    "groupsLabel": "Grupos:",
+    "accessStateLabel": "Estado de acceso:",
+    "facilityAdminLabel": "Administrador del centro:",
+    "onboardingLabel": "Incorporación:",
+    "notAssigned": "No asignado",
+    "noGroupsProvided": "No se proporcionaron grupos",
+    "onboardingComplete": "Completada",
+    "onboardingInProgress": "En curso",
+    "frameworkStatusTitle": "Estado del framework",
+    "maintenanceModeDescription": "Esta base del framework está en modo de mantenimiento. A medida que evoluciona la configuración del centro, esta área puede mostrar los artefactos o ajustes de incorporación específicos que deben revisarse o actualizarse.",
+    "onboardingModeDescription": "Esta base del framework está en modo de incorporación. El trabajo futuro guiará al usuario durante la incorporación inicial del centro, la coordinación del sistema de origen y las tareas de configuración apropiadas para su rol.",
+    "availableNavigationTitle": "Navegación disponible desde el BFF"
+  },
+  "notifications": {
+    "close": "Cerrar notificación",
+    "onboardingCompleted": "Incorporación completada para el centro {{facilityId}}.",
+    "onboardingFailed": "No se pudo completar la incorporación."
+  },
+  "auth": {
+    "missingAccessTitle": "Actualmente no tienes acceso a la configuración de NHSNLink.",
+    "missingAccessDescription": "Tu identidad de NHSN App no incluye el rol FACADMIN requerido para esta experiencia.",
+    "missingFacilityTitle": "Debes seleccionar un centro antes de continuar.",
+    "missingFacilityDescription": "Tu contexto de usuario no incluía un centro. Vuelve a NHSN App y selecciona un centro antes de continuar."
+  },
+  "status": {
+    "saving": "Guardando…",
+    "loading": "Cargando…"
+  },
+  "errors": {
+    "unexpected": "Algo salió mal. Inténtelo de nuevo."
+  }
+}

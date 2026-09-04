@@ -1,0 +1,289 @@
+.fhir-server-info {
+  --fhir-blue: var(--kendo-color-primary, #0057b7);
+  --fhir-blue-dark: var(--kendo-color-primary-hover, #032659);
+  --fhir-green: #00c853;
+  --fhir-red: var(--kendo-color-error, #cc1b22);
+  --fhir-gray-50: var(--kendo-color-surface, #f7f9fc);
+  --fhir-gray-100: var(--kendo-color-base-hover, #f2f4f7);
+  --fhir-gray-200: var(--kendo-color-border, #d0d7de);
+  --fhir-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
+  --fhir-gray-800: var(--kendo-color-app-text, #1f2328);
+  --fhir-radius: 8px;
+
+  color: var(--fhir-gray-800);
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.fhir-server-info .card {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--fhir-gray-200);
+  border-radius: var(--fhir-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.fhir-server-info .card-scroll {
+  padding: 0 32px 28px;
+  border-radius: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.fhir-server-info .card-scroll > * {
+  flex-shrink: 0;
+}
+
+.fhir-server-info .page-header {
+  padding: 0;
+  border-bottom: none !important;
+  display: block;
+}
+
+.fhir-server-info .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.fhir-server-info .page-header-title:focus {
+  outline: none;
+}
+
+.fhir-server-info .page-header-buttons {
+  display: none;
+}
+
+.fhir-server-info .subtitle {
+  color: var(--fhir-gray-600);
+  margin: 0 0 22px;
+  font-size: 14px;
+}
+
+.fhir-server-info .subtitle a {
+  color: var(--fhir-blue);
+}
+
+.fhir-server-info .section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fhir-gray-600);
+  margin: 15px 0 10px;
+  font-weight: 600;
+}
+
+.fhir-server-info .form-group {
+  margin-bottom: 18px;
+}
+
+.fhir-server-info .form-group > label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--fhir-gray-800);
+}
+
+/* .info-icon / .tooltip-bubble are now shared, generalized rules in NHSNLink.css. */
+
+.fhir-server-info .instructions-box {
+  background: var(--fhir-gray-50);
+  border: 1px solid var(--fhir-gray-200);
+  border-radius: var(--fhir-radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.fhir-server-info .instructions-box p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fhir-gray-600);
+}
+
+.fhir-server-info .download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--fhir-blue);
+  border-radius: var(--fhir-radius);
+  text-decoration: none;
+  color: var(--fhir-blue);
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.fhir-server-info .download-link:hover {
+  background: var(--fhir-gray-100);
+}
+
+.fhir-server-info .card .nhsn-link__step-actions {
+  position: static;
+  margin: 0;
+  padding: 16px 32px 28px;
+}
+
+.fhir-server-info .triplet {
+  display: flex;
+  gap: 1rem;
+}
+
+.fhir-server-info .triplet .k-form-field {
+  flex: 1;
+}
+
+.fhir-server-info .fhir-test-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.fhir-server-info .result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fhir-server-info .result-icon-success {
+  background: var(--fhir-green);
+}
+
+.fhir-server-info .result-icon-failed {
+  background: var(--fhir-red);
+}
+
+.fhir-server-info .result-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2.5px solid var(--fhir-gray-200);
+  border-top-color: var(--fhir-blue);
+  border-radius: 50%;
+  animation: fhir-test-spin 0.7s linear infinite;
+}
+
+@keyframes fhir-test-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fhir-server-info .k-form-field {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.fhir-server-info .k-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--fhir-gray-800);
+}
+
+.fhir-server-info .k-label svg {
+  display: none;
+}
+
+.fhir-server-info .k-input,
+.fhir-server-info .k-numerictextbox {
+  width: 100%;
+  border-radius: var(--fhir-radius);
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.fhir-server-info .k-input::placeholder {
+  color: var(--fhir-gray-600);
+  opacity: 1;
+}
+
+.fhir-server-info .k-input:focus-within {
+  outline: 2px solid var(--fhir-blue);
+  outline-offset: 1px;
+}
+
+.fhir-server-info .k-input.k-invalid,
+.fhir-server-info .k-numerictextbox.k-invalid {
+  border-color: var(--fhir-red);
+}
+
+.fhir-server-info .k-input.k-invalid:focus-within,
+.fhir-server-info .k-numerictextbox.k-invalid:focus-within {
+  outline-color: var(--fhir-red);
+}
+
+.fhir-server-info .k-form-error {
+  color: var(--fhir-red);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fhir-server-info .k-form-field:has(.k-form-hint) .k-label::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border-radius: 50%;
+  background: var(--fhir-gray-200);
+  color: var(--fhir-gray-600);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  anchor-name: --fhir-hint-badge;
+}
+
+.fhir-server-info .k-form-field--hint-open .k-label::after {
+  background: var(--fhir-blue);
+  color: var(--kendo-color-on-inverse, #ffffff);
+}
+
+@supports (position-anchor: --fhir-hint-badge) {
+  .fhir-server-info .k-form-hint {
+    position-anchor: --fhir-hint-badge;
+    left: anchor(center);
+    bottom: calc(anchor(top) + 9px);
+    transform: translateX(-50%);
+  }
+
+  .fhir-server-info .k-form-hint::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+.fhir-server-info .k-form-field--hint-open .k-form-hint {
+  display: block;
+}
