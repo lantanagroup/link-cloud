@@ -198,6 +198,7 @@ internal sealed class RunExecutor
             state.FhirDataLoader = fhirDataLoader;
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
+            var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
 
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
 
@@ -215,6 +216,11 @@ internal sealed class RunExecutor
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
             output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
+
+            await ValidateDmrpConfigurationAsync(
+                state.Options.EnableDmrp,
+                dmrpClient,
+                output);
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
@@ -445,8 +451,7 @@ internal sealed class RunExecutor
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
-                services.GetRequiredService<IDmrpServiceClient>(),
-                output, facilityId, measureIds, cancellationToken);
+                dmrpClient, output, facilityId, measureIds, cancellationToken);
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
@@ -1694,6 +1699,51 @@ internal sealed class RunExecutor
         }
 
         return plan;
+    }
+
+    private static async Task ValidateDmrpConfigurationAsync(
+    bool enableDmrp,
+    IDmrpServiceClient dmrpClient,
+    IAutomationOutput output)
+    {
+        var tenantDmrpEnabled = await IsTenantDmrpEnabledAsync(dmrpClient);
+
+        if (enableDmrp && !tenantDmrpEnabled)
+        {
+            throw new InvalidOperationException(
+                "DMRP is enabled for this Automation scenario, but DMRP is disabled in Tenant.");
+        }
+
+        if (!enableDmrp && tenantDmrpEnabled)
+        {
+            throw new InvalidOperationException(
+                "DMRP is disabled for this Automation scenario, but DMRP is enabled in Tenant.");
+        }
+
+        output.WriteLine(
+            $"DMRP configuration validated: scenario={(enableDmrp ? "enabled" : "disabled")}, " +
+            $"Tenant={(tenantDmrpEnabled ? "enabled" : "disabled")}.");
+    }
+
+    private static async Task<bool> IsTenantDmrpEnabledAsync(
+        IDmrpServiceClient dmrpClient)
+    {
+        var response = await dmrpClient.SearchFacilityReportingPlansAsync(pageSize: 1);
+
+        // When Tenant DMRP is disabled, the DMRP routes are not registered.
+        if ((int)response.StatusCode == StatusCodes.Status404NotFound)
+            return false;
+
+        // Anything other than success or the expected disabled-route 404 is a real
+        // connectivity/auth/service problem and must not be treated as "disabled".
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Unable to determine Tenant DMRP configuration. " +
+                $"DMRP reporting-plan probe returned HTTP {(int)response.StatusCode}.");
+        }
+
+        return true;
     }
 
     private sealed record NormalizationFacilitySetup(
