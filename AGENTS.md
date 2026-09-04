@@ -12,7 +12,7 @@ The pipeline is roughly: `Census → DataAcquisition → Normalization → Measu
 
 ## Building, running and testing
 
-See **[docs/development.md](docs/development.md)** for the full set: the local docker-compose
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for the full set: the local docker-compose
 stack, `dotnet build`/`test` for the solution or one service, the Backend E2E suites, the Maven
 builds under `Java/`, the Admin UI, and EF Core migrations.
 
@@ -25,7 +25,7 @@ Two things that catch people out and are worth knowing without opening it:
 
 ## Architecture
 
-See **[docs/architecture.md](docs/architecture.md)**. It covers the five-layer .NET service
+See **[ARCHITECTURE.md](ARCHITECTURE.md)**. It covers the five-layer .NET service
 shape, `DotNet/Shared` as the contract layer, Kafka topic and key conventions, the configuration
 registry, the automation and E2E projects, the report-generation pipeline end to end, MongoDB
 usage, the internal/external blob trust boundary, and the known latent issues.
