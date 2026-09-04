@@ -1,0 +1,92 @@
+#!/bin/sh
+#
+# Refuses to push commits that carry the per-environment App Configuration exports.
+#
+# LEGLINK-912 moved those files to the private link-cac repository. A separate, scheduled
+# operation rewrites this repository's history to purge the copies committed before that
+# move. THIS HOOK IS LANDED AHEAD OF THAT OPERATION ON PURPOSE, and does nothing until it
+# runs: the commits it looks for are still reachable from origin today, so they are never
+# part of what a push introduces.
+#
+# It matters afterwards. A clone made before the rewrite still contains the old commits,
+# and `git pull` on such a clone does NOT refuse - this repository's earliest commits are
+# unsigned, so they survive the rewrite and a merge base still exists - and the merge
+# silently brings the purged files back into that clone's history. The working tree looks
+# completely normal. Pushing then restores them to the public repository.
+#
+# Shipping the hook now is what puts it on the machines that will make that mistake: a
+# stale clone carries whatever .githooks it last pulled.
+#
+# This is the last client-side stop before that happens. It is not the only control: a
+# server-side push ruleset blocks the same thing for everyone and cannot be bypassed with
+# --no-verify, and CI fails any pull request whose history carries these paths. This hook
+# exists because it produces a clear message at the moment of the mistake, on the machine
+# that can still fix it cheaply.
+#
+# Enable for your clone with:
+#     git config core.hooksPath .githooks
+#
+# Bypass with `git push --no-verify`. Do not, unless you are certain.
+
+set -e
+
+PURGED_PATHS="Config/app-config.dev.json \
+Config/app-config.qa.json \
+Config/app-config.qa2.json \
+Config/app-config.test.json"
+
+# 40 zeros: git uses this for "no such ref" on branch creation and deletion.
+ZERO="0000000000000000000000000000000000000000"
+
+remote_name="$1"
+blocked=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Nothing to inspect when the push deletes a remote branch.
+    if [ "$local_sha" = "$ZERO" ]; then
+        continue
+    fi
+
+    if [ "$remote_sha" = "$ZERO" ]; then
+        # New branch: everything not already published on this remote is being pushed.
+        range="$local_sha --not --remotes=$remote_name"
+    else
+        # Existing branch: only what the remote does not already have.
+        range="$remote_sha..$local_sha"
+    fi
+
+    # shellcheck disable=SC2086
+    offenders=$(git rev-list $range -- $PURGED_PATHS 2>/dev/null || true)
+
+    if [ -n "$offenders" ]; then
+        blocked=1
+        count=$(printf '%s\n' "$offenders" | wc -l | tr -d ' ')
+        echo ""
+        echo "pre-push: BLOCKED -- $local_ref carries $count commit(s) that reintroduce the"
+        echo "pre-push: App Configuration exports removed from history by LEGLINK-912:"
+        echo ""
+        printf '%s\n' "$offenders" | head -5 | while read -r c; do
+            echo "    $(git log -1 --format='%h %ad %s' --date=short "$c" 2>/dev/null | cut -c1-72)"
+        done
+        if [ "$count" -gt 5 ]; then
+            echo "    ... and $((count - 5)) more"
+        fi
+    fi
+done
+
+if [ "$blocked" -eq 1 ]; then
+    echo ""
+    echo "pre-push: This almost always means your clone predates the history rewrite and you"
+    echo "pre-push: ran 'git pull' instead of re-cloning. Your working tree will look normal;"
+    echo "pre-push: the files are in your history, not your files."
+    echo ""
+    echo "pre-push: Fix it by re-cloning. To keep unpushed work first:"
+    echo "pre-push:     git format-patch -<n> HEAD -o ~/my-work"
+    echo "pre-push:     git fetch origin && git reset --hard origin/<branch>"
+    echo "pre-push:     git am ~/my-work/*.patch"
+    echo ""
+    echo "pre-push: Then delete every other local branch - they still point at old history."
+    exit 1
+fi
+
+exit 0
