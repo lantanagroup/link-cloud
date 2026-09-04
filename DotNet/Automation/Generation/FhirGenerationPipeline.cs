@@ -724,26 +724,15 @@ public static class FhirGenerationPipeline
         if (entries.Count == 0)
             throw new InvalidOperationException($"Imported patient '{patientId}' produced no FHIR entries.");
 
-        // 2. Build per-measure eligibility (auto-detect when requested; user override wins).
-        var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>();
+        // 2. Derive per-measure eligibility from the imported resources (same IP rules as generated configs).
+        var detection = ImportedPatientClassifier.Classify(entries, measures);
+        var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>(detection.MeasureEligibilities);
         foreach (var m in measures)
-            eligibilities[m] = MeasureEligibility.NonQualifying;
+            eligibilities.TryAdd(m, MeasureEligibility.NonQualifying);
 
-        if (imported.AutoDetect)
-        {
-            var detection = ImportedPatientClassifier.Classify(entries, measures);
-            foreach (var (m, e) in detection.MeasureEligibilities)
-                eligibilities[m] = e;
-        }
-
-        // User overrides (always take precedence over auto-detection).
-        if (imported.MeasureEligibilities != null)
-        {
-            foreach (var (m, e) in imported.MeasureEligibilities)
-                eligibilities[m] = e;
-        }
-
-        var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
+        var profile = new PatientProfile(
+            eligibilities,
+            ClinicalScenarioId: detection.DetectedClinicalScenarioId ?? imported.DetectedClinicalScenarioId);
 
         var effectiveProfile = IndexPatientEntries(
             manifestBuilder,
@@ -1121,82 +1110,21 @@ public static class FhirGenerationPipeline
         DateTime? clinicalPeriodStart,
         DateTime? clinicalPeriodEnd)
     {
-        if (!profile.RequiresInpatientEncounter())
+        if (ScheduledStayWindow.TryCompute(
+                profile.ScheduledInpatientPattern,
+                clinicalPeriodStart,
+                clinicalPeriodEnd,
+                seed,
+                out var start,
+                out var end))
         {
-            return FhirBundleGenerator.DeriveOutpatientEncounterWindow(seed, clinicalPeriodStart, clinicalPeriodEnd);
+            return (start, end);
         }
 
-        if (profile.ScheduledInpatientPattern.HasValue
-            && clinicalPeriodStart.HasValue
-            && clinicalPeriodEnd.HasValue
-            && clinicalPeriodEnd.Value > clinicalPeriodStart.Value)
-        {
-            return DeriveScheduledPatternInpatientWindow(
-                profile.ScheduledInpatientPattern.Value,
-                seed,
-                clinicalPeriodStart.Value,
-                clinicalPeriodEnd.Value);
-        }
+        if (!profile.RequiresInpatientEncounter())
+            return FhirBundleGenerator.DeriveOutpatientEncounterWindow(seed, clinicalPeriodStart, clinicalPeriodEnd);
 
         return FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, clinicalPeriodStart, clinicalPeriodEnd);
-    }
-
-    private static (DateTime Start, DateTime End) DeriveScheduledPatternInpatientWindow(
-        ScheduledInpatientPattern pattern,
-        int seed,
-        DateTime reportStart,
-        DateTime reportEnd)
-    {
-        var rs = DateTime.SpecifyKind(reportStart, DateTimeKind.Utc);
-        var re = DateTime.SpecifyKind(reportEnd, DateTimeKind.Utc);
-
-        if (re <= rs)
-            return FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, rs, re);
-
-        var period = re - rs;
-        var totalMinutes = Math.Max(1, (int)period.TotalMinutes);
-
-        // Keep deterministic placement but avoid minute-scale stays that are too sparse to
-        // reliably satisfy downstream measure criteria in scheduled scenarios.
-        var admissionOffsetMinutes = Math.Max(5, (int)Math.Round(totalMinutes * 0.20));
-        var dischargeOffsetMinutes = Math.Max(admissionOffsetMinutes + 30, (int)Math.Round(totalMinutes * 0.75));
-
-        // Seed-driven jitter to prevent all scheduled patients from sharing identical timestamps.
-        var jitter = Math.Abs(seed % 20);
-
-        var inPeriodStart = rs.AddMinutes(Math.Min(totalMinutes - 1, admissionOffsetMinutes + jitter));
-        var inPeriodEnd = rs.AddMinutes(Math.Min(totalMinutes - 1, dischargeOffsetMinutes + jitter));
-        if (inPeriodEnd <= inPeriodStart)
-            inPeriodEnd = inPeriodStart.AddMinutes(30);
-
-        // Padding used for "before" / "after" patterns. Ensure at least 6h separation from
-        // report boundaries when the report window is reasonably sized.
-        var boundaryPad = period.TotalHours >= 12
-            ? TimeSpan.FromHours(6)
-            : TimeSpan.FromMinutes(Math.Max(60, totalMinutes / 6));
-
-        return pattern switch
-        {
-            ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
-                => (rs - boundaryPad, re + boundaryPad),
-
-            ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod
-                => (rs - boundaryPad, inPeriodEnd),
-
-            ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod
-                => (inPeriodStart, re + boundaryPad),
-
-            ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
-                => (inPeriodStart, inPeriodEnd),
-
-            ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
-                => (rs - (boundaryPad + TimeSpan.FromHours(6)), rs - TimeSpan.FromHours(1)),
-
-            ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
-                => (re + TimeSpan.FromHours(1), re + (boundaryPad + TimeSpan.FromHours(6))),
-
-            _ => FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, rs, re)
-        };
     }
 
     // ------------------------------------------------------------------

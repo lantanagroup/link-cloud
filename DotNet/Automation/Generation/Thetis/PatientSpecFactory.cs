@@ -31,10 +31,9 @@ public static class PatientSpecFactory
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(scenario);
 
-        var inpatient = profile.RequiresInpatientEncounter();
-        var hypo = profile.RequiresHypoglycemicMedication();
-        var spec = FromScenario(scenario, inpatient, hypo, totalResourcesPerPatient, config);
-        return ApplyIntent(spec, profile.Intent, hypo);
+        var hypo = ConfigurationQualification.ResolveHypoglycemicInsulin(profile.Intent, scenario);
+        var spec = FromScenario(scenario, inpatient: true, hypo: hypo, totalResourcesPerPatient, config);
+        return ApplyIntent(spec, profile.Intent, hypoFromEligibility: false);
     }
 
     public static PatientGenerationSpec FromScenario(
@@ -273,11 +272,14 @@ public static class PatientSpecFactory
         IReadOnlyList<ObservationPaletteItem>? overlay,
         PaletteMode mode)
     {
-        if (overlay is not { Count: > 0 })
+        if (overlay is null)
             return baseline;
-        // Inherit + empty list = story default. Inherit + codes is treated as Replace,
-        // matching the configurator UI which auto-promotes Inherit → Replace on pick.
-        if (mode is PaletteMode.Replace or PaletteMode.Inherit)
+        // Replace is the saved list, including empty (user cleared the picker).
+        if (mode is PaletteMode.Replace)
+            return overlay.ToList();
+        if (overlay.Count == 0)
+            return baseline;
+        if (mode is PaletteMode.Inherit)
             return overlay.ToList();
 
         var merged = baseline.ToList();
@@ -296,9 +298,13 @@ public static class PatientSpecFactory
         IReadOnlyList<CodedPaletteItem>? overlay,
         PaletteMode mode)
     {
-        if (overlay is not { Count: > 0 })
+        if (overlay is null)
             return baseline;
-        if (mode is PaletteMode.Replace or PaletteMode.Inherit)
+        if (mode is PaletteMode.Replace)
+            return overlay.ToList();
+        if (overlay.Count == 0)
+            return baseline;
+        if (mode is PaletteMode.Inherit)
             return overlay.ToList();
 
         var merged = baseline.ToList();

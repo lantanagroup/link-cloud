@@ -10,82 +10,76 @@ public sealed class PatientConfigurationSeedService(
 {
     private static readonly Guid PneumoniaId = new("00000000-0000-0000-3000-000000000001");
     private static readonly Guid DiabeticHypoId = new("00000000-0000-0000-3000-000000000002");
-    private static readonly Guid AchQualifyingId = new("00000000-0000-0000-3000-000000000003");
-    private static readonly Guid AchNonQualifyingId = new("00000000-0000-0000-3000-000000000004");
+    private static readonly Guid AchQualifyingAllStoriesId = new("00000000-0000-0000-3000-000000000003");
+    private static readonly Guid PneumoniaNqId = new("00000000-0000-0000-3000-000000000004");
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var ach = ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation;
-        var hypo = ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation;
+        await store.DeleteAsync(AchQualifyingAllStoriesId, cancellationToken);
 
-        await UpsertAsync(new PatientConfiguration
-        {
-            Id = PneumoniaId,
-            Name = "Pneumonia (ACH qualifying)",
-            Description = "Inpatient pneumonia story pack. Quick setup equivalent.",
-            IsSystem = true,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            CohortQualification = MeasureEligibility.Qualifying,
-            MeasureEligibilities = new() { [ach] = MeasureEligibility.Qualifying },
-            ClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
-            ResourcesPerPatientMin = 50,
-            ResourcesPerPatientMax = 100
-        }, cancellationToken);
+        await UpsertAsync(Build(
+            PneumoniaId,
+            "Pneumonia (inpatient)",
+            "Inpatient pneumonia. Predicted qualifying for ACH from encounter class.",
+            ClinicalScenarioIds.Pneumonia,
+            inpatient: true,
+            hypo: false), cancellationToken);
 
-        await UpsertAsync(new PatientConfiguration
-        {
-            Id = DiabeticHypoId,
-            Name = "Diabetic hypoglycemia (ACH + Hypo)",
-            Description = "Inpatient diabetic hypoglycemia with insulin pair.",
-            IsSystem = true,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            CohortQualification = MeasureEligibility.Qualifying,
-            MeasureEligibilities = new()
-            {
-                [ach] = MeasureEligibility.Qualifying,
-                [hypo] = MeasureEligibility.Qualifying
-            },
-            ClinicalScenarioIds = [ClinicalScenarioIds.DiabeticHypoglycemia.ToString()],
-            ResourcesPerPatientMin = 50,
-            ResourcesPerPatientMax = 100,
-            Intent = new PatientGenerationIntent { IncludeHypoglycemicInsulin = true }
-        }, cancellationToken);
+        await UpsertAsync(Build(
+            DiabeticHypoId,
+            "Diabetic hypoglycemia (inpatient + insulin)",
+            "Inpatient diabetic hypoglycemia with the hypoglycemic insulin pair. Predicted qualifying for ACH and Hypo.",
+            ClinicalScenarioIds.DiabeticHypoglycemia,
+            inpatient: true,
+            hypo: true), cancellationToken);
 
-        await UpsertAsync(new PatientConfiguration
-        {
-            Id = AchQualifyingId,
-            Name = "ACH qualifying (all stories)",
-            Description = "Qualifying ACH patients rotating through all clinical story packs.",
-            IsSystem = true,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            CohortQualification = MeasureEligibility.Qualifying,
-            MeasureEligibilities = new() { [ach] = MeasureEligibility.Qualifying },
-            ClinicalScenarioIds = [],
-            ResourcesPerPatientMin = 50,
-            ResourcesPerPatientMax = 100
-        }, cancellationToken);
-
-        await UpsertAsync(new PatientConfiguration
-        {
-            Id = AchNonQualifyingId,
-            Name = "ACH non-qualifying (all stories)",
-            Description = "Non-qualifying ACH cohort. Story packs remain selectable independently of qualification.",
-            IsSystem = true,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            CohortQualification = MeasureEligibility.NonQualifying,
-            MeasureEligibilities = new() { [ach] = MeasureEligibility.NonQualifying },
-            ClinicalScenarioIds = [],
-            ResourcesPerPatientMin = 50,
-            ResourcesPerPatientMax = 100
-        }, cancellationToken);
+        await UpsertAsync(Build(
+            PneumoniaNqId,
+            "Pneumonia (ambulatory)",
+            "Ambulatory pneumonia. Predicted non-qualifying for ACH because the encounter class is not an initial-population class.",
+            ClinicalScenarioIds.Pneumonia,
+            inpatient: false,
+            hypo: false), cancellationToken);
 
         logger.LogInformation("Seeded system Patient Configurations.");
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task UpsertAsync(PatientConfiguration configuration, CancellationToken ct)
+    private static PatientConfiguration Build(
+        Guid id,
+        string name,
+        string description,
+        Guid scenarioId,
+        bool inpatient,
+        bool hypo)
     {
-        await store.UpsertAsync(configuration, ct);
+        var scenario = FhirGenerationCodes.GetScenarioById(scenarioId.ToString())!;
+        var intent = PatientConfigurationTemplate.FromClinicalProfile(scenario, 50, inpatient, hypo);
+        ConfigurationQualification.Stamp(
+            intent,
+            scenarioId.ToString(),
+            out var eligibilities,
+            out var cohortQualification);
+        return new PatientConfiguration
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            IsSystem = true,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CohortQualification = cohortQualification,
+            MeasureEligibilities = eligibilities,
+            ScheduledInpatientPattern = inpatient
+                ? ScheduledStayWindow.DefaultPattern
+                : ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod,
+            ClinicalScenarioIds = [scenarioId.ToString()],
+            ResourcesPerPatientMin = 50,
+            ResourcesPerPatientMax = 100,
+            Intent = intent
+        };
     }
+
+    private async Task UpsertAsync(PatientConfiguration configuration, CancellationToken ct)
+        => await store.UpsertAsync(configuration, ct);
 }

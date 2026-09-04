@@ -15,9 +15,8 @@ public class PatientCohortDefinition
     public int PatientCount { get; set; }
 
     /// <summary>
-    /// Concrete cohort-level expected qualification outcome used by prediction logic.
-    /// This allows scenarios to explicitly mark a cohort as qualifying vs non-qualifying
-    /// independent of per-measure checkbox drift in UI editing.
+    /// Derived cohort-level qualification (any selected measure is IP-qualifying).
+    /// Stamped from <see cref="ConfigurationQualification"/>; not a user-facing switch.
     /// </summary>
     public MeasureEligibility CohortQualification { get; set; } = MeasureEligibility.Qualifying;
 
@@ -28,9 +27,8 @@ public class PatientCohortDefinition
     public ScheduledInpatientPattern? ScheduledInpatientPattern { get; set; }
 
     /// <summary>
-    /// Per-measure eligibility map. Every selected measure should have an entry.
-    /// Drives encounter type (inpatient vs ambulatory) and measure-specific
-    /// resource generation (e.g., diabetic medication for Hypo).
+    /// Derived per-measure IP prediction from the clinical shape. Generation reads
+    /// encounter class and insulin from <see cref="Intent"/> instead of this map.
     /// </summary>
     public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = new();
 
@@ -93,14 +91,19 @@ public class PatientCohortDefinition
                 var seedOffset = seedCursor;
                 var scenarioId = scenarios[seedCursor % scenarios.Count];
                 var resources = ComputeResourceTarget(seed, cohortIndex, i, min, max);
+                var intent = PatientGenerationIntent.Clone(cohort.Intent);
+                var prediction = ConfigurationQualification.PredictFromConfiguration(
+                    intent,
+                    scenarioId,
+                    pattern: cohort.ScheduledInpatientPattern);
                 result.Add(new PatientProfile(
-                    new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
+                    prediction.MeasureEligibilities,
                     seedOffset,
                     scenarioId,
                     resources,
                     cohort.ScheduledInpatientPattern,
-                    cohort.CohortQualification,
-                    PatientGenerationIntent.Clone(cohort.Intent)));
+                    prediction.CohortQualification,
+                    intent));
                 seedCursor++;
             }
 

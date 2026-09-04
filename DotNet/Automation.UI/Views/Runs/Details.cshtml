@@ -803,17 +803,9 @@
 
         function patientConfigLabel(cohort) {
             const id = cohort?.patientConfigurationId;
-            if (!id) {
-                const customized = cohort?.intent && Object.keys(cohort.intent).some(function (k) {
-                    const v = cohort.intent[k];
-                    return v != null && v !== '' && v !== 'Inherit' && !(Array.isArray(v) && v.length === 0);
-                });
-                return customized ? 'Quick setup (customized)' : 'Quick setup';
-            }
+            if (!id) return 'No configuration';
             const hit = (patientConfigurationCatalog || []).find(function (c) { return c.id === id; });
-            const name = hit ? hit.name : String(id).slice(0, 8);
-            const customized = cohort?.intent && Object.keys(cohort.intent).length > 0;
-            return customized ? name + ' + overlays' : name;
+            return hit ? hit.name : String(id).slice(0, 8);
         }
 
         function formatScheduledPattern(value) {

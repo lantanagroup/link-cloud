@@ -66,7 +66,7 @@
 /// gaps are most likely to surface.
 /// </para>
 /// </summary>
-internal static class EncounterIpClassification
+public static class EncounterIpClassification
 {
     /// <summary>
     /// Which measure family's IP class predicate to evaluate.
@@ -102,17 +102,12 @@ internal static class EncounterIpClassification
         new[] { "in-progress", "finished", "triaged", "onleave", "entered-in-error" };
 
     /// <summary>
-    /// A best-effort, locally-curated subset of the "Diabetes Medications" value set
-    /// (<c>http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1190.58</c>),
-    /// limited to the RxNorm codes the Automation generator emits today
-    /// (see <c>FhirGenerationCodes.Medications</c>). Used only by the
+    /// Hardcoded RxNorm subset of the "Diabetes Medications" value set
+    /// (<c>http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1190.58</c>)
+    /// matching codes the generator emits today (see <c>FhirGenerationCodes.Medications</c>).
+    /// Measure-bundle expansions overlay additional codes via
+    /// <see cref="RegisterDiabetesMedicationCodes"/>. Used by the
     /// <see cref="ImportedPatientClassifier"/> heuristic for hypoglycemic-IP detection.
-    ///
-    /// <para>
-    /// This is <b>not</b> a complete value-set expansion; expanding the full Diabetes
-    /// Medications value set (insulins, sulfonylureas, biguanides, GLP-1 agonists,
-    /// SGLT2 inhibitors, DPP-4 inhibitors, etc.) is tracked as a future enhancement.
-    /// </para>
     /// </summary>
     public static readonly IReadOnlyList<string> DiabetesMedicationCodes =
         new[]
@@ -154,10 +149,35 @@ internal static class EncounterIpClassification
     /// True when the supplied medication code (typically RxNorm) is recognized as an
     /// antidiabetic agent under <see cref="DiabetesMedicationCodes"/>.
     /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> ExtraDiabetesMedicationCodes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public static void RegisterDiabetesMedicationCodes(IEnumerable<string>? codes)
+    {
+        if (codes == null)
+            return;
+        foreach (var code in codes)
+        {
+            if (!string.IsNullOrWhiteSpace(code))
+                ExtraDiabetesMedicationCodes.TryAdd(code.Trim(), 0);
+        }
+    }
+
+    public static IReadOnlyList<string> KnownDiabetesMedicationCodes()
+    {
+        if (ExtraDiabetesMedicationCodes.IsEmpty)
+            return DiabetesMedicationCodes;
+        return DiabetesMedicationCodes
+            .Concat(ExtraDiabetesMedicationCodes.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static bool IsDiabetesMedicationCode(string? code)
     {
         if (string.IsNullOrWhiteSpace(code)) return false;
-        return Matches(code, DiabetesMedicationCodes);
+        if (Matches(code, DiabetesMedicationCodes)) return true;
+        return ExtraDiabetesMedicationCodes.ContainsKey(code);
     }
 
     private static bool Matches(string value, IReadOnlyList<string> set)

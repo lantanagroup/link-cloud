@@ -257,7 +257,7 @@ public class GenerationManifestExpectedAbsTests
     }
 
     [Fact]
-    public void Cohort_non_qualifying_designation_excludes_patient_from_predictions()
+    public void Non_qualifying_clinical_shape_excludes_patient_from_predictions()
     {
         var manifest = new GenerationManifest
         {
@@ -265,8 +265,7 @@ public class GenerationManifestExpectedAbsTests
             Profiles =
             [
                 new PatientProfile(
-                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.Qualifying },
-                    CohortQualification: MeasureEligibility.NonQualifying)
+                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.NonQualifying })
             ],
             SelectedMeasures = [Ach],
             ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
@@ -277,6 +276,5 @@ public class GenerationManifestExpectedAbsTests
 
         manifest.GetExpectedAbsKeysForPatient("p-cohort-nq").Should().BeEmpty();
         manifest.ExpectedSubmittedPatientIds().Should().BeEmpty();
-        manifest.QualifyingPatientCount("any").Should().Be(0);
     }
 }

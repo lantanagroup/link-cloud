@@ -73,12 +73,13 @@ public class ScenariosController(
 
             cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
 
-            var allNonQualifying = model.SelectedMeasures.Count > 0
-                && model.SelectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
-
-            // Back-compat normalization for payloads that do not yet send cohortQualification.
-            if (allNonQualifying)
-                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+            var scenarioId = cohort.EligibleClinicalScenarioIds.FirstOrDefault();
+            var prediction = ConfigurationQualification.PredictFromConfiguration(
+                cohort.Intent,
+                scenarioId,
+                cohort.ScheduledInpatientPattern);
+            cohort.MeasureEligibilities = prediction.MeasureEligibilities;
+            cohort.CohortQualification = prediction.CohortQualification;
         }
 
         // ----- Imported-patient validation (fail save on bad input) -----

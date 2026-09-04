@@ -802,6 +802,9 @@ a.au-scenario-card:hover {
 .pc-picker-item:hover {
   background: #f4f6f8;
 }
+.pc-picker-add {
+  font-size: .82rem;
+}
 .pc-section-badge {
   font-size: .7rem;
   font-weight: 600;

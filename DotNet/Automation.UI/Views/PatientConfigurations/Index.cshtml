@@ -7,21 +7,17 @@
 <div class="container mt-4">
     <h2 class="fw-bold mb-1"><i class="bi bi-person-gear me-2"></i>Patient Configurations</h2>
     <p class="text-muted mb-2">
-        Reusable patient shapes for scenario cohorts. <strong>Quick setup</strong> in a scenario still works without a saved configuration.
+        Named patient shapes. Each configuration is one Clinical Profile, filled in so you can see and edit what generates.
     </p>
     <details class="au-help-panel">
         <summary><i class="bi bi-info-circle"></i> How Patient Configurations work</summary>
         <div class="au-help-body">
-            <p>Split the <strong>shape of the patient</strong> from <strong>how many of them appear in a test</strong>.</p>
+            <p>Pick a <strong>Clinical Profile</strong> to seed the form, edit anything, then save a name. A scenario cohort points at one configuration.</p>
             <ul>
-                <li>A <strong>Patient Configuration</strong> is a reusable clinical story plus optional detailed overlays (demographics, encounter, codes, volume mix).</li>
-                <li>A scenario <strong>cohort</strong> still owns patient count, Qualifying / Non-Qualifying, measure checkboxes, and inpatient pattern.</li>
-                <li>Most tests can stay on <strong>Quick setup</strong> in the scenario editor — no saved configuration required.</li>
-                <li>Blank overlay fields <strong>inherit the clinical story pack</strong>. You only fill the details a specific test needs.</li>
-                <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Use <strong>Clone</strong> to freeze a copy for one test.</li>
-                <li><strong>System</strong> rows are view-only starter kits (Pneumonia, Diabetic hypoglycemia, ACH Q/NQ). Clone them to customize.</li>
+                <li>A scenario <strong>cohort</strong> is how many of this configuration to generate. Stay timing, encounter, and clinical content are saved here and reused.</li>
+                <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy.</li>
+                <li><strong>System</strong> rows are view-only starter kits. Clone them to customize.</li>
             </ul>
-            <p>Open a configuration to see field-level <i class="bi bi-info-circle"></i> help. In a scenario, pick a configuration on the cohort row or click <strong>Customize</strong> for overlays that apply only to that test.</p>
         </div>
     </details>
 
@@ -34,28 +30,35 @@
         </div>
         <div class="card-body p-0 au-help-scope">
             <div id="pcColStory" class="au-help-text mx-3 mt-2" hidden>
-                Clinical story pack(s) used as the starter kit (diagnosis, matching labs/meds/procedures). “All stories” rotates through every pack. Story pack is independent of Qualifying / Non-Qualifying.
+                The Clinical Profile this configuration was built from. One profile per configuration.
             </div>
             <div id="pcColDefaults" class="au-help-text mx-3 mt-2" hidden>
-                Default qualification applied when this configuration is inserted into a scenario. <strong>Customized</strong> means at least one overlay (gender, palettes, counts, and so on) is set. The cohort can still change Q/NQ after insert.
+                Predicted from this configuration’s encounter class, insulin, and stay timing. Green check qualifies; red X does not. Not a setting you pick.
+            </div>
+            <div id="pcColStay" class="au-help-text mx-3 mt-2" hidden>
+                Admit/discharge placement relative to the scenario report period. Saved on this configuration so it does not change per cohort.
             </div>
             <div id="pcColResources" class="au-help-text mx-3 mt-2" hidden>
-                Target resources per patient (min–max). Live-referenced when a scenario cohort points at this configuration. Pin exact per-type counts in Customize → Volume mix if you need a specific Observation or Condition count.
+                Target resources per patient (min–max) stored on this configuration. Open Resource volume to change the range the generator picks from, or to pin exact counts per type.
             </div>
             <div id="pcColType" class="au-help-text mx-3 mt-2" hidden>
-                <strong>System</strong> configurations are seeded starter kits and cannot be edited or deleted — clone them. <strong>Custom</strong> configurations are yours. Editing a custom config updates every scenario that still points at it.
+                <strong>System</strong> configurations are starter kits and cannot be edited or deleted — clone them, or Configure from a cohort and save a named copy. <strong>Custom</strong> configurations are yours. Editing a custom config updates every scenario that still points at it.
             </div>
             <table class="table au-table mb-0" id="pcTable">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>
-                            Story
-                            <button type="button" class="au-info-toggle" data-help="pcColStory" aria-label="About story column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                            Clinical Profile
+                            <button type="button" class="au-info-toggle" data-help="pcColStory" aria-label="About clinical profile column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </th>
                         <th>
-                            Defaults
-                            <button type="button" class="au-info-toggle" data-help="pcColDefaults" aria-label="About defaults column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                            Predicted
+                            <button type="button" class="au-info-toggle" data-help="pcColDefaults" aria-label="About predicted qualification" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                        </th>
+                        <th>
+                            Stay timing
+                            <button type="button" class="au-info-toggle" data-help="pcColStay" aria-label="About stay timing" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </th>
                         <th>
                             Resources
@@ -72,11 +75,10 @@
                 <tbody>
                     @foreach (var t in Model)
                     {
-                        var story = t.ClinicalScenarioIds.Count == 0
-                            ? "All stories"
-                            : $"{t.ClinicalScenarioIds.Count} pack(s)";
-                        var q = t.CohortQualification == MeasureEligibility.Qualifying ? "Qualifying" : "Non-Qualifying";
-                        var customized = t.Intent != null && t.Intent.HasOverlays();
+                        var storyId = t.ClinicalScenarioIds.FirstOrDefault();
+                        var storyDef = FhirGenerationCodes.GetScenarioById(storyId);
+                        var story = storyDef?.PrimaryDxDisplay ?? (string.IsNullOrWhiteSpace(storyId) ? "Not set" : storyId);
+                        var prediction = ConfigurationQualification.Predict(t.Intent, storyDef);
                         <tr data-id="@t.Id">
                             <td>
                                 <strong>@t.Name</strong>
@@ -87,12 +89,17 @@
                             </td>
                             <td><small>@story</small></td>
                             <td>
-                                <small>@q</small>
-                                @if (customized)
+                                @foreach (var measure in ConfigurationQualification.KnownMeasures)
                                 {
-                                    <span class="badge bg-primary ms-1">Customized</span>
+                                    var qualifies = prediction.QualifiesFor(measure);
+                                    var reason = prediction.Reasons.TryGetValue(measure, out var r) ? r : "";
+                                    <span class="d-inline-flex align-items-center gap-1 me-2" title="@reason">
+                                        <i class="bi @(qualifies ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger")" aria-hidden="true"></i>
+                                        <small>@ConfigurationQualification.ShortName(measure)</small>
+                                    </span>
                                 }
                             </td>
+                            <td><small>@((t.ScheduledInpatientPattern ?? ScheduledStayWindow.DefaultPattern).GetUiShortLabel())</small></td>
                             <td><small>@t.ResourcesPerPatientMin–@t.ResourcesPerPatientMax</small></td>
                             <td>
                                 @if (t.IsSystem)
@@ -156,9 +163,10 @@
     var cloneUrl = '@Url.Action("CloneInline", "PatientConfigurations")';
     var deleteUrl = '@Url.Action("DeleteInline", "PatientConfigurations")';
     var catalogUrl = '@Url.Action("Catalog", "PatientConfigurations")';
+    var seedUrl = '@Url.Action("SeedFromProfile", "PatientConfigurations")';
     var editor = window.PatientConfigurationEditor;
 
-    editor.init({ catalogUrl: catalogUrl });
+    editor.init({ catalogUrl: catalogUrl, seedUrl: seedUrl });
 
     function token() {
         var t = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -176,7 +184,7 @@
         editor.ensureCatalog().then(function () {
             editor.setMode('library');
             editor.setReadOnly(false);
-            editor.populate({ id: crypto.randomUUID(), name: 'New patient configuration', intent: {} });
+            editor.populate({ id: crypto.randomUUID(), name: '', intent: {} });
             document.getElementById('pcModalTitle').innerHTML = '<i class="bi bi-person-gear me-2"></i>Patient Configuration';
             document.getElementById('btnPcSave').style.display = '';
             openModal();
@@ -186,6 +194,10 @@
     document.getElementById('btnPcSave').addEventListener('click', function () {
         var model = editor.collect();
         if (!model.name || !model.name.trim()) { showErr('Name is required.'); return; }
+        if (!model.clinicalScenarioIds || !model.clinicalScenarioIds.length) {
+            showErr('Select a Clinical Profile. That fills the rest of this configuration.');
+            return;
+        }
         fetch(saveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },

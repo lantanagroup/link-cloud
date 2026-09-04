@@ -41,6 +41,7 @@ public sealed class MongoIndexManager
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
         EnsurePatientConfigurationIndexes();
+        EnsureGenerationCatalogIndexes();
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
         EnsureRunMetricsIndexes();
@@ -200,6 +201,17 @@ public sealed class MongoIndexManager
     {
         var collection = _database.GetCollection<BsonDocument>("automation_patient_configurations");
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    private void EnsureGenerationCatalogIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoGenerationCatalogStore.CollectionName);
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Kind", 1 }, { "System", 1 }, { "Code", 1 } },
+            unique: true,
+            "idx_kind_system_code");
+        CreateIndexSafe(collection, new BsonDocument { { "Kind", 1 }, { "Display", 1 } }, unique: false, "idx_kind_display");
     }
 
     // --- automation_normalization_* ---

@@ -25,13 +25,15 @@ public static class PatientConfigurationHydrator
 
             changed = true;
             cohort.Intent = PatientGenerationIntent.Merge(config.Intent, cohort.Intent);
-            // Live reference: story pack and resource range come from the prefab.
-            // Count, Q/NQ, and inpatient pattern stay on the cohort.
-            cohort.EligibleClinicalScenarioIds = [.. config.ClinicalScenarioIds];
+            // Live reference: clinical profile, resource range, and stay timing come from
+            // the configuration. Count stays on the cohort. Q/NQ is derived.
+            cohort.EligibleClinicalScenarioIds = config.ClinicalScenarioIds.Take(1).ToList();
             if (config.ResourcesPerPatientMin > 0)
                 cohort.ResourcesPerPatientMin = config.ResourcesPerPatientMin;
             if (config.ResourcesPerPatientMax >= cohort.ResourcesPerPatientMin)
                 cohort.ResourcesPerPatientMax = config.ResourcesPerPatientMax;
+            cohort.ScheduledInpatientPattern = config.ScheduledInpatientPattern
+                ?? ScheduledStayWindow.DefaultPattern;
         }
 
         if (!changed)

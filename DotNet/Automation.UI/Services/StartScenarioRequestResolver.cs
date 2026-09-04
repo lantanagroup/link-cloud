@@ -97,7 +97,7 @@ public static class StartScenarioRequestResolver
                       defaultResourcesMax: 250)
               ];
 
-        ApplyCohortDefaults(cohorts, effectiveMeasures);
+        ApplyCohortDefaults(cohorts);
 
         // Cohorts are the single source of truth for patient profiles; expand them.
         var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, request.Seed ?? defaults.Seed);
@@ -345,19 +345,10 @@ public static class StartScenarioRequestResolver
         return cohort;
     }
 
-    private static void ApplyCohortDefaults(
-        IReadOnlyList<PatientCohortDefinition> cohorts,
-        IReadOnlyList<ProfiledMeasureType> selectedMeasures)
+    private static void ApplyCohortDefaults(IReadOnlyList<PatientCohortDefinition> cohorts)
     {
         foreach (var cohort in cohorts)
-        {
             cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
-
-            var allNonQualifying = selectedMeasures.Count > 0
-                && selectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
-            if (allNonQualifying)
-                cohort.CohortQualification = MeasureEligibility.NonQualifying;
-        }
     }
 
     /// <summary>

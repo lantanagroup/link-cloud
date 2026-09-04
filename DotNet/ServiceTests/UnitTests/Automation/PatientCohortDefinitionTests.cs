@@ -54,4 +54,25 @@ public class PatientCohortDefinitionTests
             profiles.Select(p => p.ResourcesPerPatient).ToArray(),
             secondPass.Select(p => p.ResourcesPerPatient).ToArray());
     }
+
+    [Fact]
+    public void ExpandProfiles_derives_qualification_from_clinical_shape()
+    {
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            new()
+            {
+                PatientCount = 1,
+                EligibleClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
+                Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false },
+                ResourcesPerPatientMin = 10,
+                ResourcesPerPatientMax = 10
+            }
+        };
+
+        var profile = Assert.Single(PatientCohortDefinition.ExpandProfiles(cohorts, seed: 1));
+        Assert.False(profile.QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation));
+        Assert.Equal("AMB", profile.Intent!.EncounterClass);
+        Assert.False(profile.RequiresInpatientEncounter());
+    }
 }

@@ -196,16 +196,21 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
-    public void Cohort_qualification_is_extracted_and_propagated_to_profiles()
+    public void Derived_qualification_comes_from_clinical_shape_not_saved_flags()
     {
         var json = """
             {
                 "patientCohorts": [
                     {
                         "patientCount": 1,
-                        "cohortQualification": "NonQualifying",
+                        "cohortQualification": "Qualifying",
                         "measureEligibilities": {
                             "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        },
+                        "eligibleClinicalScenarioIds": ["f640c3ef-a8f4-4f85-87f1-1f1df74c8a01"],
+                        "intent": {
+                            "encounterClass": "AMB",
+                            "includeHypoglycemicInsulin": false
                         }
                     }
                 ]
@@ -218,10 +223,11 @@ public class StartScenarioRequestResolverTests
             RunConfigurationJson = json,
         });
 
-        options.PatientCohorts.Should().ContainSingle();
-        options.PatientCohorts[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
         options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            .Should().BeFalse();
         options.PatientProfiles[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
+        options.PatientProfiles[0].Intent!.EncounterClass.Should().Be("AMB");
     }
 
     // ---------- Custom scenario: JSON fallback when typed properties are missing ----------

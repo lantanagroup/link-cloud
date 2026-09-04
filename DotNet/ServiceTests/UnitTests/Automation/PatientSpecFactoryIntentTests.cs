@@ -119,6 +119,27 @@ public class PatientSpecFactoryIntentTests
     }
 
     [Fact]
+    public void Replace_with_empty_palette_clears_story_codes()
+    {
+        var spec = PatientSpecFactory.From(
+            Profile(new PatientGenerationIntent
+            {
+                ObservationPaletteMode = PaletteMode.Replace,
+                ObservationPalette = [],
+                ConditionPaletteMode = PaletteMode.Replace,
+                ConditionPalette = [],
+                ProcedurePaletteMode = PaletteMode.Replace,
+                ProcedurePalette = []
+            }),
+            Pneumonia(),
+            40);
+
+        Assert.Empty(spec.ObservationPalette);
+        Assert.Empty(spec.ConditionPalette);
+        Assert.Empty(spec.ProcedurePalette);
+    }
+
+    [Fact]
     public void Condition_palette_append_keeps_story_codes()
     {
         var baseline = PatientSpecFactory.From(Profile(null), Pneumonia(), 40);

@@ -184,16 +184,13 @@
                             </div>
                         </div>
                         <div class="col-12 au-help-scope">
-                            <label class="form-label d-block">
-                                Metrics run
-                                <button type="button" class="au-info-toggle" data-help="metricsRunHelp" aria-label="About metrics runs" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
-                            </label>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="IsMetricsRun" />
-                                <label class="form-check-label" for="IsMetricsRun">Record extra performance data for this scenario. Off keeps ordinary runs cheap (pass/fail, evidence, high-level counts only).</label>
+                                <label class="form-check-label" for="IsMetricsRun">Metrics run</label>
+                                <button type="button" class="au-info-toggle" data-help="metricsRunHelp" aria-label="About metrics runs" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                             </div>
                             <div id="metricsRunHelp" class="au-help-text mb-2" hidden>
-                                Ordinary runs already tell you whether the pipeline succeeded. A metrics run also records how long it took, how fast patients moved, and how long each pipeline step took. The Performance page treats this scenario as a use case you can track over time — including when you change patient count, seed, or concurrency (that starts a new setup version). Use this for comparisons, not everyday pass/fail tests.
+                                Includes this scenario on the Metrics dashboard and gathers extra performance data: step timings, throughput, and related measurements. Changing patient count, seed, or concurrency starts a new setup version there.
                             </div>
                             <div class="row g-2" id="metricsRunOptions" style="display:none;">
                                 <div class="col-md-4">
@@ -251,32 +248,18 @@
                                         <button type="button" class="btn btn-link btn-sm py-0 au-info-toggle" data-help="cohortHelpPanel" aria-label="About cohorts" aria-expanded="false"><i class="bi bi-info-circle me-1"></i>How cohorts work</button>
                                     </div>
                                     <div id="cohortHelpPanel" class="au-help-text" hidden>
-                                        <p>Each row is a group of generated patients. Count, Qualifying / Non-Qualifying, measure checkboxes, and inpatient pattern belong to the <strong>test</strong>. Patient configuration is the <strong>clinical shape</strong>.</p>
+                                        <p>Each row is <strong>how many</strong> of one saved Patient Configuration to generate. Stay timing, encounter, and clinical content live on that configuration so you can configure a patient once and reuse it.</p>
                                         <ul>
-                                            <li><strong>Quick setup</strong> — today’s high-level path. Story pack + resource min/max is enough for most tests.</li>
-                                            <li><strong>Patient config</strong> — pick a saved configuration to reuse a QA-built patient. That is a live reference: editing the configuration later updates this scenario.</li>
-                                            <li><strong>Customize</strong> — overlays for this cohort only (age, discharge, specific LOINCs, and so on). Empty fields inherit the story pack or the selected configuration. Use Save as configuration to make overlays reusable.</li>
-                                            <li><strong>Clinical Profiles</strong> are the story pack. They stay selectable for Non-Qualifying cohorts — Q/NQ is the prediction switch, not the diagnosis list.</li>
-                                            <li><strong>Inpatient Pattern</strong> times admit/discharge against the report window. It is not stored on the Patient Configuration.</li>
+                                            <li>Each cohort uses <strong>one Patient Configuration</strong>, and each configuration uses <strong>one Clinical Profile</strong>.</li>
+                                            <li><strong>Configure</strong> opens the profile → form pipeline: pick a Clinical Profile, see admit/discharge dates against this scenario’s report period, edit, and save.</li>
+                                            <li><strong>+ Inpatient pneumonia</strong> / <strong>+ Ambulatory pneumonia</strong> attach starter kits. They do not set a qualifying flag.</li>
                                         </ul>
                                     </div>
-                                    <div id="cohortHelpOutcome" class="au-help-text" hidden>
-                                        Expected report outcome for this row. Qualifying patients are predicted in the submission when their inpatient pattern also places them in the report window. Non-Qualifying is a prediction switch — it does not empty the story pack list.
-                                    </div>
-                                    <div id="cohortHelpElig" class="au-help-text" hidden>
-                                        Per-measure checkboxes. Hypoglycemic requires ACH Monthly. For a Qualifying cohort at least one selected measure must stay checked. Non-Qualifying disables these boxes.
-                                    </div>
-                                    <div id="cohortHelpRes" class="au-help-text" hidden>
-                                        Target FHIR resources per patient. Locked when a Patient Configuration is selected (the configuration owns the range). Use Customize → Volume mix to pin exact counts per resource type.
-                                    </div>
-                                    <div id="cohortHelpStories" class="au-help-text" hidden>
-                                        Clinical story pack: primary diagnosis plus matching labs, meds, and procedures. Independent of Qualifying / Non-Qualifying. Locked when a Patient Configuration is selected because the configuration owns the story.
+                                    <div id="cohortHelpPredicted" class="au-help-text" hidden>
+                                        Green check / red X is predicted from the attached configuration (encounter class, insulin, stay timing) against the measures and report period on this scenario. Out of window means the stay does not overlap the report period.
                                     </div>
                                     <div id="cohortHelpConfig" class="au-help-text" hidden>
-                                        <strong>Quick setup</strong> uses only this row. A named configuration is a live library reference. <strong>Customize</strong> adds overlays on this cohort; <strong>Customized</strong> means overlays are already stored. Save as configuration from Customize to reuse them in other tests.
-                                    </div>
-                                    <div id="cohortHelpPattern" class="au-help-text" hidden>
-                                        When the patient is admitted and discharged relative to the reporting window (for example remains inpatient through the period). This is test orchestration, not part of the Patient Configuration.
+                                        This cohort’s patient. Pick a saved configuration, or click Configure, name it, and save. Count is the only thing this row owns.
                                     </div>
                                     <div class="table-responsive au-table-wrap au-cohort-table-wrap mt-2 mb-2">
                                         <table class="table table-sm table-bordered au-table au-cohort-table mb-0" id="cohortTable">
@@ -284,30 +267,13 @@
                                                 <tr>
                                                     <th style="width:40px">#</th>
                                                     <th style="width:100px">Patients</th>
-                                                    <th style="width:140px">
-                                                        Cohort Outcome
-                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpOutcome" aria-label="About cohort outcome" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
-                                                    </th>
-                                                    <th>
-                                                        Measure Eligibility
-                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpElig" aria-label="About measure eligibility" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
-                                                    </th>
-                                                    <th style="width:90px">
-                                                        Res Min
-                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpRes" aria-label="About resource min and max" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
-                                                    </th>
-                                                    <th style="width:90px">Res Max</th>
-                                                    <th>
-                                                        Clinical Profiles
-                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpStories" aria-label="About clinical profiles" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
-                                                    </th>
-                                                    <th style="min-width:260px">
-                                                        Patient config
+                                                    <th style="min-width:280px">
+                                                        Patient configuration
                                                         <button type="button" class="au-info-toggle" data-help="cohortHelpConfig" aria-label="About patient configuration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                                                     </th>
-                                                    <th class="cohort-pattern-col" style="min-width:240px">
-                                                        Inpatient Pattern
-                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpPattern" aria-label="About inpatient pattern" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                                    <th style="min-width:220px">
+                                                        Predicted
+                                                        <button type="button" class="au-info-toggle" data-help="cohortHelpPredicted" aria-label="About predicted qualification" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                                                     </th>
                                                     <th style="width:40px"></th>
                                                 </tr>
@@ -316,8 +282,8 @@
                                         </table>
                                     </div>
                                     <div class="d-flex gap-2" id="cohortActions">
-                                        <button type="button" class="btn btn-sm btn-outline-success" id="addQualifyingCohort">+ Qualifying</button>
-                                        <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifyingCohort">+ Non-Qualifying</button>
+                                        <button type="button" class="btn btn-sm btn-outline-success" id="addQualifyingCohort">+ Inpatient pneumonia</button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifyingCohort">+ Ambulatory pneumonia</button>
                                     </div>
                                 </div>
                             </div>
@@ -338,7 +304,7 @@
                                                     <th style="width:40px">#</th>
                                                     <th style="width:90px">Source</th>
                                                     <th>Patient ID / File</th>
-                                                    <th>Measure Eligibility</th>
+                                                    <th>Predicted</th>
                                                     <th style="width:170px">Encounter Dates</th>
                                                     <th style="width:90px">Detected</th>
                                                     <th style="width:40px"></th>
@@ -416,12 +382,11 @@
         <div class="au-help-scope" style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:980px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="bi bi-person-gear me-2"></i>Customize patient
-                    <button type="button" class="au-info-toggle au-info-toggle-on-dark" data-help="pcCohortActionsHelp" aria-label="About apply and save as" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                    <i class="bi bi-person-gear me-2"></i>Patient configuration
+                    <button type="button" class="au-info-toggle au-info-toggle-on-dark" data-help="pcCohortActionsHelp" aria-label="About saving a configuration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                 </h5>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnPcCohortSaveAs">Save as configuration</button>
-                    <button type="button" class="btn btn-sm btn-success" id="btnPcCohortApply">Apply to cohort</button>
+                    <button type="button" class="btn btn-sm btn-success" id="btnPcCohortSaveAs">Save configuration</button>
                     <button type="button" class="btn btn-sm btn-outline-light" id="btnPcCohortClose">Close</button>
                 </div>
             </div>
@@ -429,9 +394,9 @@
             <div style="flex:1;overflow-y:auto;padding:1.25rem;" class="au-help-scope">
                 <div id="pcCohortActionsHelp" class="au-help-text" hidden>
                     <ul class="mb-0">
-                        <li><strong>Apply to cohort</strong> — keep overlays on this test only. The library configuration is unchanged.</li>
-                        <li><strong>Save as configuration</strong> — write a reusable library item (merged with the selected prefab if any), then point this cohort at it. Requires a name in Save as configuration.</li>
-                        <li>Empty fields inherit. You do not need to fill every accordion section.</li>
+                        <li>Pick a <strong>Clinical Profile</strong> first. The form fills with that pack so you can see the diagnosis, labs, and meds.</li>
+                        <li>Give the configuration a <strong>name</strong> and click <strong>Save configuration</strong>. This cohort then uses that one configuration.</li>
+                        <li>Count stays on the cohort row. Stay timing and qualification are saved on this configuration.</li>
                     </ul>
                 </div>
                 @await Html.PartialAsync("_PatientConfigurationEditor")
@@ -467,15 +432,25 @@
                             c.ClinicalScenarioIds,
                             c.ResourcesPerPatientMin,
                             c.ResourcesPerPatientMax,
-                            CohortQualification = c.CohortQualification.ToString(),
-                            MeasureEligibilities = c.MeasureEligibilities.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.ToString())
+                            ScheduledInpatientPattern = (c.ScheduledInpatientPattern ?? ScheduledStayWindow.DefaultPattern).ToString(),
+                            QualificationInputs = new
+                            {
+                                EncounterClass = c.Intent?.EncounterClass,
+                                EncounterStatus = c.Intent?.EncounterStatus,
+                                IncludeHypoglycemicInsulin = c.Intent?.IncludeHypoglycemicInsulin,
+                                MedicationAdministrationRxNorm = c.Intent?.MedicationAdministrationRxNorm,
+                                ClinicalScenarioId = c.ClinicalScenarioIds.FirstOrDefault()
+                            }
                         }),
                         new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
         var patientConfigSaveUrl = '@Url.Action("SaveInline", "PatientConfigurations")';
         var patientConfigGetUrl = '@Url.Action("GetJson", "PatientConfigurations")';
         var patientConfigCatalogUrl = '@Url.Action("Catalog", "PatientConfigurations")';
+        var patientConfigSeedUrl = '@Url.Action("SeedFromProfile", "PatientConfigurations")';
         var pcEditor = window.PatientConfigurationEditor;
-        if (pcEditor) pcEditor.init({ catalogUrl: patientConfigCatalogUrl });
+        if (pcEditor) pcEditor.init({ catalogUrl: patientConfigCatalogUrl, seedUrl: patientConfigSeedUrl });
+        var SYSTEM_PNEUMONIA_Q = '00000000-0000-0000-3000-000000000001';
+        var SYSTEM_PNEUMONIA_NQ = '00000000-0000-0000-3000-000000000004';
         var pcCohortRow = null;
         var modal = document.getElementById('scenarioModal');
         var backdrop = document.getElementById('scenarioModalBackdrop');
@@ -930,27 +905,13 @@
         }
         function sid(v) { return String(v || '').toLowerCase(); }
 
-        function defaultElig(isQ) {
-            var m = {}; selectedMeasureTypes().forEach(function (t) { m[t] = isQ ? QUALIFYING : NON_QUALIFYING; }); return m;
-        }
-        function normElig(raw) {
+        function normalizeEligMap(raw) {
             var n = {};
             selectedMeasureTypes().forEach(function (m) {
-                if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) { n[m] = QUALIFYING; return; }
+                if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) { n[m] = NON_QUALIFYING; return; }
                 var v = raw[m]; n[m] = (v === QUALIFYING || v === 0 || v === '0') ? QUALIFYING : NON_QUALIFYING;
             });
             return n;
-        }
-        function cohortMatchesScenario(sc, elig) {
-            return selectedMeasureTypes().every(function (m) {
-                var d = Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING;
-                var q = (sc.qualifiesForMeasureTypes || []).indexOf(m) >= 0;
-                return d === QUALIFYING ? q : !q;
-            });
-        }
-        function eligIds(elig) {
-            var n = normElig(elig);
-            return clinicalScenarioCatalog.filter(function (sc) { return cohortMatchesScenario(sc, n); }).map(function (sc) { return sid(sc.scenarioId); });
         }
 
         function normalizeScheduledPattern(value) {
@@ -970,60 +931,65 @@
             return DEFAULT_SCHEDULED_PATTERN;
         }
 
-        function normalizeCohortQualification(value) {
-            var raw = String(value || '').trim();
-            if (!raw) return QUALIFYING;
-            var lowered = raw.toLowerCase();
-            if (lowered === 'nonqualifying' || lowered === 'non_qualifying' || lowered === 'non-qualifying' || lowered === '1')
-                return NON_QUALIFYING;
-            return QUALIFYING;
-        }
-
-        function inferCohortQualification(elig) {
-            var n = normElig(elig);
-            var measures = selectedMeasureTypes();
-            var allNonQualifying = measures.length > 0 && measures.every(function (m) { return n[m] === NON_QUALIFYING; });
-            return allNonQualifying ? NON_QUALIFYING : QUALIFYING;
-        }
-
-        function allowedScheduledPatternsForQualification(qualification) {
-            var normalized = normalizeCohortQualification(qualification);
-            return scheduledPatternOptions.filter(function (o) {
-                return normalized === QUALIFYING ? !!o.expectedInReport : !o.expectedInReport;
-            });
-        }
-
-        function buildScheduledPatternEditor(pattern, qualification) {
-            var allowed = allowedScheduledPatternsForQualification(qualification);
+        function patternExpectedInReport(pattern) {
             var normalized = normalizeScheduledPattern(pattern);
-            var selected = allowed.some(function (o) { return o.value === normalized; })
-                ? normalized
-                : (allowed[0] ? allowed[0].value : DEFAULT_SCHEDULED_PATTERN);
-            var options = allowed.map(function (o) {
+            var match = scheduledPatternOptions.find(function (o) { return o.value === normalized; });
+            return match ? !!match.expectedInReport : true;
+        }
+
+        function buildScheduledPatternEditor(pattern) {
+            var selected = normalizeScheduledPattern(pattern);
+            var options = scheduledPatternOptions.map(function (o) {
                 return '<option value="' + o.value + '" title="' + escAttr(o.hint || o.label) + '" ' + (o.value === selected ? 'selected' : '') + '>' + esc(o.label) + '</option>';
             }).join('');
             return '<select class="form-select form-select-sm cohort-scheduled-pattern">' + options + '</select>';
         }
 
-        function buildCohortQualificationEditor(value) {
-            var selected = normalizeCohortQualification(value);
-            return '<select class="form-select form-select-sm cohort-qualification">' +
-                '<option value="' + QUALIFYING + '" ' + (selected === QUALIFYING ? 'selected' : '') + '>Qualifying</option>' +
-                '<option value="' + NON_QUALIFYING + '" ' + (selected === NON_QUALIFYING ? 'selected' : '') + '>Non-Qualifying</option>' +
-                '</select>';
+        function qualificationInputsFromIntent(intent, clinicalScenarioId) {
+            intent = intent || {};
+            return {
+                encounterClass: intent.encounterClass || intent.EncounterClass,
+                encounterStatus: intent.encounterStatus || intent.EncounterStatus,
+                includeHypoglycemicInsulin: intent.includeHypoglycemicInsulin != null ? intent.includeHypoglycemicInsulin : intent.IncludeHypoglycemicInsulin,
+                medicationAdministrationRxNorm: intent.medicationAdministrationRxNorm || intent.MedicationAdministrationRxNorm,
+                clinicalScenarioId: clinicalScenarioId || null
+            };
         }
 
-        function readCohortQualification(row) {
-            var select = row.querySelector('.cohort-qualification');
-            return normalizeCohortQualification(select ? select.value : QUALIFYING);
+        function qualificationInputsForRow(row) {
+            var select = row.querySelector('.cohort-patient-config');
+            var config = findPatientConfig(select && select.value);
+            if (config && config.qualificationInputs)
+                return config.qualificationInputs;
+            var intent = null;
+            try { intent = row.dataset.intentJson ? JSON.parse(row.dataset.intentJson) : null; } catch (_) { intent = null; }
+            var storyId = config && config.clinicalScenarioIds && config.clinicalScenarioIds[0];
+            return intent ? qualificationInputsFromIntent(intent, storyId) : null;
         }
 
-        function syncScheduledPatternEditorForRow(row) {
-            var cell = row.querySelector('.cohort-pattern-cell');
+        function renderRowPredicted(row) {
+            var cell = row.querySelector('.cohort-predicted-cell');
             if (!cell) return;
-            var qualification = readCohortQualification(row);
-            var current = row.querySelector('.cohort-scheduled-pattern');
-            cell.innerHTML = buildScheduledPatternEditor(current ? current.value : DEFAULT_SCHEDULED_PATTERN, qualification);
+            if (!pcEditor || !pcEditor.predictQualification) {
+                cell.innerHTML = '<span class="text-muted small">Select a configuration</span>';
+                return;
+            }
+            var inputs = qualificationInputsForRow(row);
+            if (!inputs) {
+                cell.innerHTML = '<span class="text-muted small">Select a configuration</span>';
+                return;
+            }
+            var prediction = pcEditor.predictQualification(inputs);
+            var config = findPatientConfig(row.querySelector('.cohort-patient-config') && row.querySelector('.cohort-patient-config').value);
+            var pattern = (config && config.scheduledInpatientPattern) || DEFAULT_SCHEDULED_PATTERN;
+            var census = pcEditor.patternExpectedInReport
+                ? pcEditor.patternExpectedInReport(pattern)
+                : patternExpectedInReport(pattern);
+            cell.innerHTML = pcEditor.renderQualificationBadges(prediction, selectedMeasureTypes(), census);
+        }
+
+        function refreshAllPredicted() {
+            Array.prototype.forEach.call(cohortRows.children, renderRowPredicted);
         }
 
         function syncPatternColumns() {
@@ -1032,17 +998,6 @@
         }
 
         // ---- Cohort row builders ----
-        function buildEligEditor(elig) {
-            var sel = selectedMeasureTypes();
-            if (!sel.length) return '<span class="text-muted small">Select measures</span>';
-            return sel.map(function (m) {
-                var cb = measureCheckboxForFamily(m);
-                var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
-                var cur = (Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING);
-                return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
-            }).join('');
-        }
-
         function buildScenarioSelect(ids) {
             var set = new Set((ids || []).map(sid));
             var all = set.size === 0;
@@ -1087,99 +1042,49 @@
                 return true;
             });
         }
-        function buildPatientConfigSelect(selectedId, customized) {
-            var opts = '<option value="">Quick setup</option>' +
+        function buildPatientConfigSelect(selectedId) {
+            var opts = '<option value="">Select a configuration…</option>' +
                 patientConfigurationCatalog.map(function (c) {
                     return '<option value="' + c.id + '" ' + (c.id === selectedId ? 'selected' : '') + '>' + esc(c.name) + (c.isSystem ? ' (system)' : '') + '</option>';
                 }).join('');
-            var customizeClass = customized ? 'btn-primary' : 'btn-outline-secondary';
-            var customizeLabel = customized ? 'Customized' : 'Customize';
             return '<div class="d-flex gap-1 pc-cohort-config-cell">' +
                 '<select class="form-select form-select-sm cohort-patient-config">' + opts + '</select>' +
-                '<button type="button" class="btn btn-sm ' + customizeClass + ' btn-cohort-customize" title="Customize this cohort">' + customizeLabel + '</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary btn-cohort-customize" title="Configure this patient">Configure</button>' +
                 '</div>';
         }
         function syncPatientConfigLock(row, applyDefaults) {
-            var select = row.querySelector('.cohort-patient-config');
-            var config = findPatientConfig(select && select.value);
-            var minEl = row.querySelector('.cohort-min');
-            var maxEl = row.querySelector('.cohort-max');
-            var storyOptions = row.querySelectorAll('.cohort-scenario-option');
-            var locked = !!config;
-            if (minEl) minEl.disabled = locked;
-            if (maxEl) maxEl.disabled = locked;
-            storyOptions.forEach(function (cb) { cb.disabled = locked; });
-            if (!config) {
-                updateSummary(row);
-                return;
-            }
-            if (applyDefaults) {
-                if (minEl) minEl.value = config.resourcesPerPatientMin || minEl.value;
-                if (maxEl) maxEl.value = config.resourcesPerPatientMax || maxEl.value;
-                var stories = config.clinicalScenarioIds || [];
-                var all = stories.length === 0;
-                storyOptions.forEach(function (cb) { cb.checked = all || stories.indexOf(cb.value) >= 0; });
-                if (config.cohortQualification) {
-                    var qEl = row.querySelector('.cohort-qualification');
-                    if (qEl) qEl.value = normalizeCohortQualification(config.cohortQualification);
-                    enforceCohortMeasureRules(row);
-                    if (config.measureEligibilities && readCohortQualification(row) === QUALIFYING) {
-                        row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) {
-                            var m = cb.getAttribute('data-measure');
-                            var v = config.measureEligibilities[m];
-                            cb.checked = v === QUALIFYING || v === 0 || v === '0';
-                        });
-                        enforceDeps(row);
-                        enforceCohortMeasureRules(row);
-                    }
-                    syncScheduledPatternEditorForRow(row);
-                }
-            }
-            updateSummary(row);
+            renderRowPredicted(row);
         }
         function refreshCustomizeButton(row) {
             var btn = row.querySelector('.btn-cohort-customize');
             if (!btn) return;
-            var intent = null;
-            try { intent = row.dataset.intentJson ? JSON.parse(row.dataset.intentJson) : null; } catch (_) { intent = null; }
-            var on = intentHasOverlays(intent);
-            btn.textContent = on ? 'Customized' : 'Customize';
-            btn.classList.toggle('btn-primary', on);
-            btn.classList.toggle('btn-outline-secondary', !on);
+            btn.textContent = 'Configure';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-secondary');
         }
-        function addCohortRow(count, elig, scenarios, rMin, rMax, scheduledPattern, cohortQualification, patientConfigurationId, intent) {
-            var idx = cohortRows.children.length, ne = normElig(elig);
-            var sel = (scenarios && scenarios.length > 0) ? scenarios : eligIds(ne);
-            var normalizedQualification = normalizeCohortQualification(cohortQualification || inferCohortQualification(ne));
-            var effectivePattern = normalizeScheduledPattern(scheduledPattern);
+        function addCohortRow(count, patientConfigurationId, intent, rMin, rMax) {
+            var idx = cohortRows.children.length;
             var tr = document.createElement('tr');
             tr.innerHTML = '<td class="text-center align-middle">' + (idx + 1) + '</td>' +
                 '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
-                '<td>' + buildCohortQualificationEditor(normalizedQualification) + '</td>' +
-                '<td><div class="cohort-measure-editor">' + buildEligEditor(ne) + '</div></td>' +
-                '<td><input type="number" class="form-control form-control-sm cohort-min" min="1" value="' + (rMin || 50) + '" /></td>' +
-                '<td><input type="number" class="form-control form-control-sm cohort-max" min="1" value="' + (rMax || rMin || 100) + '" /></td>' +
-                '<td>' + buildScenarioSelect(sel) + '</td>' +
-                '<td>' + buildPatientConfigSelect(patientConfigurationId || '', intentHasOverlays(intent)) + '</td>' +
-                '<td class="cohort-pattern-cell">' + buildScheduledPatternEditor(effectivePattern, normalizedQualification) + '</td>' +
+                '<td>' + buildPatientConfigSelect(patientConfigurationId || '') + '</td>' +
+                '<td class="cohort-predicted-cell align-middle"></td>' +
                 '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-cohort">&times;</button></td>';
             if (intent) tr.dataset.intentJson = JSON.stringify(intent);
             if (patientConfigurationId) tr.dataset.patientConfigurationId = patientConfigurationId;
+            var cfg = findPatientConfig(patientConfigurationId);
+            tr.dataset.resourcesMin = String((cfg && cfg.resourcesPerPatientMin) || rMin || 50);
+            tr.dataset.resourcesMax = String((cfg && cfg.resourcesPerPatientMax) || rMax || rMin || 100);
             cohortRows.appendChild(tr);
-            enforceCohortMeasureRules(tr);
-            enforceDeps(tr);
-            enforceCohortMeasureRules(tr);
-            applyFilter(tr, readElig(tr));
-            updateSummary(tr);
-            syncPatientConfigLock(tr, false);
             refreshCustomizeButton(tr);
+            renderRowPredicted(tr);
             reindex();
             syncCount();
-            syncPatternColumns();
         }
-        function addDefault(count, isQ, rMin, rMax) {
-            var qualification = isQ ? QUALIFYING : NON_QUALIFYING;
-            addCohortRow(count, defaultElig(!!isQ), null, rMin, rMax, DEFAULT_SCHEDULED_PATTERN, qualification);
+        function addDefault(count, isQ) {
+            var configId = isQ ? SYSTEM_PNEUMONIA_Q : SYSTEM_PNEUMONIA_NQ;
+            if (!findPatientConfig(configId)) configId = '';
+            addCohortRow(count, configId);
         }
 
         function mergeIntent(under, over) {
@@ -1208,61 +1113,71 @@
             pcCohortRow = row;
             var select = row.querySelector('.cohort-patient-config');
             var configId = select && select.value;
-            var config = findPatientConfig(configId);
-            var intent = null;
-            try { intent = row.dataset.intentJson ? JSON.parse(row.dataset.intentJson) : null; } catch (_) { intent = null; }
-            var banner = config
-                ? 'Overlays apply on top of “' + config.name + '”. Empty fields still inherit that configuration and its story pack.'
-                : 'Overlays apply on top of Quick setup. Empty fields inherit the clinical story pack.';
             pcEditor.ensureCatalog().then(function () {
                 pcEditor.setMode('cohort');
-                pcEditor.setReadOnly(false);
-                pcEditor.setBanner(banner);
-                pcEditor.populate({ intent: intent || {}, name: '' });
-                var saveAs = document.getElementById('PcSaveAsName');
-                if (saveAs) saveAs.value = config ? (config.name + ' (custom)') : '';
+                syncEditorReportPeriod();
                 showPcCohortErr('');
-                document.getElementById('pcCohortModal').style.display = '';
+                function show() { document.getElementById('pcCohortModal').style.display = ''; }
+                if (!configId) {
+                    pcEditor.setReadOnly(false);
+                    pcEditor.setBanner('Pick a Clinical Profile to fill this form, then name and save the configuration onto this cohort.');
+                    pcEditor.populate({
+                        id: crypto.randomUUID(),
+                        name: '',
+                        resourcesPerPatientMin: 50,
+                        resourcesPerPatientMax: 100,
+                        scheduledInpatientPattern: DEFAULT_SCHEDULED_PATTERN,
+                        intent: {}
+                    });
+                    show();
+                    return;
+                }
+                return fetch(patientConfigGetUrl + '?id=' + encodeURIComponent(configId)).then(function (r) { return r.json(); }).then(function (model) {
+                    var system = !!model.isSystem;
+                    if (system) {
+                        model.id = crypto.randomUUID();
+                        model.isSystem = false;
+                        model.name = (model.name || 'Configuration') + ' (custom)';
+                    }
+                    pcEditor.setReadOnly(false);
+                    pcEditor.setBanner(system
+                        ? 'This started from a system kit. Saving creates your own named configuration on this cohort.'
+                        : 'Editing “' + (model.name || 'this configuration') + '”. Save writes back to the library and this cohort.');
+                    return pcEditor.populate(model);
+                }).then(show).catch(function (e) { showPcCohortErr(e.message); });
             });
-        }
-        function applyCohortCustomize() {
-            if (!pcEditor || !pcCohortRow) return;
-            var intent = pcEditor.collectIntent();
-            pcCohortRow.dataset.intentJson = JSON.stringify(intent);
-            refreshCustomizeButton(pcCohortRow);
-            closeCohortCustomize();
         }
         function saveCohortAsConfiguration() {
             if (!pcEditor || !pcCohortRow) return;
-            var nameEl = document.getElementById('PcSaveAsName');
-            var name = nameEl && nameEl.value ? nameEl.value.trim() : '';
-            if (!name) { showPcCohortErr('Name is required to save as a configuration.'); return; }
-            var select = pcCohortRow.querySelector('.cohort-patient-config');
-            var configId = select && select.value;
-            var overlay = pcEditor.collectIntent();
+            var model = pcEditor.collect();
+            if (!(model.name || '').trim()) { showPcCohortErr('Name is required.'); return; }
+            if (!model.clinicalScenarioIds || !model.clinicalScenarioIds.length) {
+                showPcCohortErr('Select a Clinical Profile. That fills the rest of this configuration.');
+                return;
+            }
+            model.isSystem = false;
+            if (!model.id) model.id = crypto.randomUUID();
             var tokenEl = document.querySelector('#scenarioModal input[name="__RequestVerificationToken"]') || document.querySelector('input[name="__RequestVerificationToken"]');
             var headerToken = tokenEl ? tokenEl.value : '';
-            function persist(mergedIntent, defaults) {
-                var model = {
-                    id: crypto.randomUUID(),
-                    name: name,
-                    description: '',
-                    isSystem: false,
-                    cohortQualification: (defaults && defaults.cohortQualification) || readCohortQualification(pcCohortRow),
-                    measureEligibilities: (defaults && defaults.measureEligibilities) || readElig(pcCohortRow),
-                    clinicalScenarioIds: (defaults && defaults.clinicalScenarioIds) || Array.prototype.map.call(pcCohortRow.querySelectorAll('.cohort-scenario-option:checked'), function (cb) { return cb.value; }),
-                    resourcesPerPatientMin: parseInt((defaults && defaults.resourcesPerPatientMin) || pcCohortRow.querySelector('.cohort-min').value || '50', 10),
-                    resourcesPerPatientMax: parseInt((defaults && defaults.resourcesPerPatientMax) || pcCohortRow.querySelector('.cohort-max').value || '100', 10),
-                    intent: mergedIntent
-                };
-                return fetch(patientConfigSaveUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': headerToken },
-                    body: JSON.stringify(model)
-                }).then(function (r) {
-                    if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.statusText); });
-                    return r.json().then(function (body) {
-                        var id = body.id || model.id;
+            fetch(patientConfigSaveUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': headerToken },
+                body: JSON.stringify(model)
+            }).then(function (r) {
+                if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.statusText); });
+                return r.json().then(function (body) {
+                    var id = body.id || model.id;
+                    var existing = findPatientConfig(id);
+                    if (existing) {
+                        existing.name = model.name;
+                        existing.clinicalScenarioIds = model.clinicalScenarioIds;
+                        existing.resourcesPerPatientMin = model.resourcesPerPatientMin;
+                        existing.resourcesPerPatientMax = model.resourcesPerPatientMax;
+                        existing.scheduledInpatientPattern = model.scheduledInpatientPattern || DEFAULT_SCHEDULED_PATTERN;
+                        existing.qualificationInputs = qualificationInputsFromIntent(
+                            model.intent,
+                            model.clinicalScenarioIds && model.clinicalScenarioIds[0]);
+                    } else {
                         patientConfigurationCatalog.push({
                             id: id,
                             name: model.name,
@@ -1270,8 +1185,10 @@
                             clinicalScenarioIds: model.clinicalScenarioIds,
                             resourcesPerPatientMin: model.resourcesPerPatientMin,
                             resourcesPerPatientMax: model.resourcesPerPatientMax,
-                            cohortQualification: model.cohortQualification,
-                            measureEligibilities: model.measureEligibilities
+                            scheduledInpatientPattern: model.scheduledInpatientPattern || DEFAULT_SCHEDULED_PATTERN,
+                            qualificationInputs: qualificationInputsFromIntent(
+                                model.intent,
+                                model.clinicalScenarioIds && model.clinicalScenarioIds[0])
                         });
                         Array.prototype.forEach.call(cohortRows.querySelectorAll('.cohort-patient-config'), function (sel) {
                             var opt = document.createElement('option');
@@ -1279,89 +1196,25 @@
                             opt.textContent = model.name;
                             sel.appendChild(opt);
                         });
-                        select.value = id;
-                        pcCohortRow.dataset.patientConfigurationId = id;
-                        pcCohortRow.dataset.intentJson = '';
-                        syncPatientConfigLock(pcCohortRow, true);
-                        refreshCustomizeButton(pcCohortRow);
-                        closeCohortCustomize();
-                    });
-                }).catch(function (e) { showPcCohortErr(e.message); });
-            }
-            if (!configId) return persist(overlay, null);
-            return fetch(patientConfigGetUrl + '?id=' + encodeURIComponent(configId)).then(function (r) { return r.json(); }).then(function (cfg) {
-                return persist(mergeIntent(cfg.intent || {}, overlay), cfg);
+                    }
+                    var select = pcCohortRow.querySelector('.cohort-patient-config');
+                    if (select) select.value = id;
+                    pcCohortRow.dataset.patientConfigurationId = id;
+                    pcCohortRow.dataset.intentJson = '';
+                    syncPatientConfigLock(pcCohortRow, true);
+                    renderRowPredicted(pcCohortRow);
+                    closeCohortCustomize();
+                });
             }).catch(function (e) { showPcCohortErr(e.message); });
         }
         document.getElementById('btnPcCohortClose').addEventListener('click', closeCohortCustomize);
-        document.getElementById('btnPcCohortApply').addEventListener('click', applyCohortCustomize);
         document.getElementById('btnPcCohortSaveAs').addEventListener('click', saveCohortAsConfiguration);
 
-        function readElig(row) {
-            var v = {}; row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) { v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING; });
-            return normElig(v);
-        }
-        function enforceDeps(row, ch) {
-            var hypo = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnGlycemicControlHypoglycemicInitialPopulation"]');
-            var ach = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
-            if (!hypo || !ach) return;
-            if (ch === 'NhsnGlycemicControlHypoglycemicInitialPopulation' && hypo.checked && !ach.checked) { ach.checked = true; return; }
-            if (ch === 'NhsnAcuteCareHospitalMonthlyInitialPopulation' && !ach.checked && hypo.checked) { hypo.checked = false; return; }
-            if (hypo.checked && !ach.checked) ach.checked = true;
-        }
-        function enforceCohortMeasureRules(row, changedMeasure) {
-            var qualification = readCohortQualification(row);
-            var boxes = Array.prototype.slice.call(row.querySelectorAll('.cohort-measure-eligibility'));
-            if (!boxes.length) return;
-
-            if (qualification === NON_QUALIFYING) {
-                boxes.forEach(function (cb) { cb.checked = false; cb.disabled = true; });
-                return;
-            }
-
-            boxes.forEach(function (cb) { cb.disabled = false; });
-
-            if (boxes.length === 1) {
-                boxes[0].checked = true;
-                boxes[0].disabled = true;
-                return;
-            }
-
-            var checked = boxes.filter(function (cb) { return cb.checked; });
-            if (!checked.length) {
-                var fallback = changedMeasure
-                    ? row.querySelector('.cohort-measure-eligibility[data-measure="' + changedMeasure + '"]')
-                    : null;
-                (fallback || boxes[0]).checked = true;
-            }
-        }
-        function rerenderEditor(row) {
-            var ed = row.querySelector('.cohort-measure-editor'); if (!ed) return;
-            ed.innerHTML = buildEligEditor(readElig(row));
-            enforceCohortMeasureRules(row);
-            enforceDeps(row);
-            applyFilter(row, readElig(row));
-        }
-        function applyFilter(row, elig) {
-            // Story pack is independent of Q/NQ. Qualification drives prediction, not which
-            // clinical stories are available (otherwise ACH NQ had an empty picker).
-            updateSummary(row);
-        }
-
-        function updateSummary(row) {
-            var dd = row.querySelector('.cohort-scenarios-dropdown');
-            if (!dd) return;
-
-            var toggle = dd.querySelector('.cohort-scenarios-toggle');
-            var all = dd.querySelectorAll('.cohort-scenario-option:not(:disabled)');
-            var sel = dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
-
-            toggle.textContent =
-                !all.length || !sel.length
-                    ? 'None'
-                    : sel.length === all.length
-                        ? 'All'
-                        : sel.length + ' selected';
+        function predictedEligForRow(row) {
+            if (!pcEditor || !pcEditor.predictQualification) return {};
+            var inputs = qualificationInputsForRow(row);
+            if (!inputs) return {};
+            return pcEditor.predictQualification(inputs).measures || {};
         }
 
         function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
@@ -1373,21 +1226,23 @@
         }
         function getCohorts() {
             return Array.prototype.map.call(cohortRows.children, function (row) {
-                var min = parseInt(row.querySelector('.cohort-min').value || '50', 10);
-                var max = parseInt(row.querySelector('.cohort-max').value || String(min), 10);
-                if (max < min) { max = min; row.querySelector('.cohort-max').value = String(max); }
-                var patternSelect = row.querySelector('.cohort-scheduled-pattern');
-                var qualification = readCohortQualification(row);
                 var configSelect = row.querySelector('.cohort-patient-config');
+                var cfg = findPatientConfig(configSelect && configSelect.value);
+                var min = (cfg && cfg.resourcesPerPatientMin) || parseInt(row.dataset.resourcesMin || '50', 10);
+                var max = (cfg && cfg.resourcesPerPatientMax) || parseInt(row.dataset.resourcesMax || String(min), 10);
+                if (max < min) max = min;
                 var intent = null;
                 try { intent = row.dataset.intentJson ? JSON.parse(row.dataset.intentJson) : null; } catch (_) { intent = null; }
+                var predicted = predictedEligForRow(row);
+                var anyQ = selectedMeasureTypes().some(function (m) { return predicted[m] === QUALIFYING; });
+                var ids = cfg && cfg.clinicalScenarioIds ? cfg.clinicalScenarioIds : [];
                 return {
                     patientCount: parseInt(row.querySelector('.cohort-count').value || '0', 10),
-                    cohortQualification: qualification,
-                    measureEligibilities: readElig(row),
-                    eligibleClinicalScenarioIds: Array.prototype.map.call(row.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)'), function (cb) { return sid(cb.value); }).filter(Boolean),
+                    cohortQualification: anyQ ? QUALIFYING : NON_QUALIFYING,
+                    measureEligibilities: predicted,
+                    eligibleClinicalScenarioIds: ids.length ? [ids[0]] : [],
                     resourcesPerPatientMin: min, resourcesPerPatientMax: max,
-                    scheduledInpatientPattern: normalizeScheduledPattern(patternSelect ? patternSelect.value : DEFAULT_SCHEDULED_PATTERN),
+                    scheduledInpatientPattern: normalizeScheduledPattern((cfg && cfg.scheduledInpatientPattern) || DEFAULT_SCHEDULED_PATTERN),
                     patientConfigurationId: configSelect && configSelect.value ? configSelect.value : null,
                     intent: intent
                 };
@@ -1395,8 +1250,8 @@
         }
 
         // ---- Cohort event handlers ----
-        document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true, 50, 100); });
-        document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false, 50, 100); });
+        document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true); });
+        document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false); });
         cohortRows.addEventListener('click', function (e) {
             var row = e.target.closest('tr');
             if (!row) return;
@@ -1414,40 +1269,8 @@
                 return;
             }
 
-            if (e.target.closest('.cohort-scenarios-select-all')) {
-                row.querySelectorAll('.cohort-scenario-option:not(:disabled)')
-                    .forEach(function (cb) {
-                        cb.checked = true;
-                    });
-                updateSummary(row);
-                return;
-            }
-
-            if (e.target.closest('.cohort-scenarios-deselect-all')) {
-                row.querySelectorAll('.cohort-scenario-option:not(:disabled)')
-                    .forEach(function (cb) {
-                        cb.checked = false;
-                    });
-                updateSummary(row);
-            }
         });
         cohortRows.addEventListener('change', function (e) {
-            if (e.target.classList.contains('cohort-measure-eligibility')) {
-                var r1 = e.target.closest('tr');
-                enforceCohortMeasureRules(r1, e.target.getAttribute('data-measure'));
-                enforceDeps(r1, e.target.getAttribute('data-measure'));
-                enforceCohortMeasureRules(r1, e.target.getAttribute('data-measure'));
-                applyFilter(r1, readElig(r1));
-            }
-            if (e.target.classList.contains('cohort-qualification')) {
-                var r2 = e.target.closest('tr');
-                enforceCohortMeasureRules(r2);
-                enforceDeps(r2);
-                enforceCohortMeasureRules(r2);
-                applyFilter(r2, readElig(r2));
-                syncScheduledPatternEditorForRow(r2);
-            }
-            if (e.target.classList.contains('cohort-scenario-option')) updateSummary(e.target.closest('tr'));
             if (e.target.classList.contains('cohort-count')) syncCount();
             if (e.target.classList.contains('cohort-patient-config')) {
                 var r3 = e.target.closest('tr');
@@ -1460,12 +1283,15 @@
         });
         cohortRows.addEventListener('input', function () { syncCount(); });
         document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
-            cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
+            cb.addEventListener('change', function () {
+                refreshAllPredicted();
+                rerenderImportedEligEditors();
+            });
         });
         document.getElementById('ReportMethod').addEventListener('change', function () {
-            syncPatternColumns();
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
+            syncEditorReportPeriod();
         });
         document.getElementById('IsLiveSimulation').addEventListener('change', function () {
             syncLiveSimulationUi();
@@ -1579,9 +1405,12 @@
             if (!scheduledLike) {
                 startEl.disabled = false;
                 endEl.disabled = false;
-                startEl.required = false;
-                endEl.required = false;
-                hintEl.textContent = 'Optional. When empty, default period behavior is used for this run type.';
+                startEl.required = true;
+                endEl.required = true;
+                if (!(startEl.value || '').trim() || !(endEl.value || '').trim())
+                    fillDefaultAdhocPeriod();
+                hintEl.textContent = 'Required. Adhoc windows default to the previous completed calendar month so generated stays stay in the past. Stay timing on each configuration is placed against this window.';
+                syncEditorReportPeriod();
                 return;
             }
 
@@ -1589,13 +1418,33 @@
             applyScheduledEndLock();
             startEl.disabled = false;
             endEl.disabled = true;
-            startEl.required = false;
-            endEl.required = false;
+            startEl.required = true;
+            endEl.required = true;
             var extra = scheduledWindowExtraMinutes();
             var live = !!(document.getElementById('IsLiveSimulation') || {}).checked;
             hintEl.textContent = live
-                ? ('End is locked to today plus the live inject window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.')
-                : ('End is locked to today plus the scheduled close window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.');
+                ? ('End is locked to today plus the live inject window (' + extra + ' minutes). Start is editable. Generated stays use each configuration’s stay timing against this window.')
+                : ('End is locked to today plus the scheduled close window (' + extra + ' minutes). Start is editable. Generated stays use each configuration’s stay timing against this window.');
+            syncEditorReportPeriod();
+        }
+
+        function fillDefaultAdhocPeriod() {
+            var startEl = document.getElementById('ReportPeriodStart');
+            var endEl = document.getElementById('ReportPeriodEnd');
+            if (!startEl || !endEl) return;
+            var now = new Date();
+            var end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+            var start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+            if (!(startEl.value || '').trim()) startEl.value = formatUtcDateInput(start);
+            if (!(endEl.value || '').trim()) endEl.value = formatUtcDateInput(end);
+        }
+
+        function syncEditorReportPeriod() {
+            if (!pcEditor || !pcEditor.setReportPeriod) return;
+            var startEl = document.getElementById('ReportPeriodStart');
+            var endEl = document.getElementById('ReportPeriodEnd');
+            pcEditor.setReportPeriod(startEl && startEl.value, endEl && endEl.value);
+            refreshAllPredicted();
         }
 
         // Adhoc: fill empty start/end from encounter dates (month snap, never overwrite).
@@ -1621,8 +1470,15 @@
             if (!s) s = e;
             if (!e) e = s;
 
-            var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+            var now = new Date();
+            var lastCompleted = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
             var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
+            if (monthEnd > lastCompleted) monthEnd = lastCompleted;
+            var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+            if (monthStart > lastCompleted)
+                monthStart = new Date(Date.UTC(lastCompleted.getUTCFullYear(), lastCompleted.getUTCMonth(), 1));
+            if (monthStart > monthEnd)
+                monthStart = new Date(Date.UTC(monthEnd.getUTCFullYear(), monthEnd.getUTCMonth(), 1));
 
             if (!hasStart) startEl.value = formatUtcDateInput(monthStart);
             if (!hasEnd) endEl.value = formatUtcDateInput(monthEnd);
@@ -1663,23 +1519,18 @@
         }
 
         function importedRowEligEditor(elig) {
-            var sel = selectedMeasureTypes();
-            if (!sel.length) return '<span class="text-muted small">Select measures</span>';
-            return sel.map(function (m) {
-                var cb = measureCheckboxForFamily(m);
-                var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
-                var cur = (elig && Object.prototype.hasOwnProperty.call(elig, m)) ? elig[m] : NON_QUALIFYING;
-                return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input imp-elig" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
-            }).join('');
+            if (!pcEditor || !pcEditor.renderQualificationBadges) {
+                return '<span class="text-muted small">Select measures</span>';
+            }
+            var items = selectedMeasureTypes().map(function (m) {
+                var v = elig && elig[m];
+                var q = v === QUALIFYING || v === 0 || v === '0';
+                return { id: m, qualifying: q, reason: q ? 'Classified qualifying from imported resources.' : 'Classified non-qualifying from imported resources.' };
+            });
+            return pcEditor.renderQualificationBadges({ items: items }, selectedMeasureTypes());
         }
         function readImportedElig(row) {
-            var v = {};
-            row.querySelectorAll('.imp-elig').forEach(function (cb) {
-                v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING;
-            });
-            // Make sure every selected measure has an explicit entry.
-            selectedMeasureTypes().forEach(function (m) { if (!Object.prototype.hasOwnProperty.call(v, m)) v[m] = NON_QUALIFYING; });
-            return v;
+            try { return JSON.parse(row.dataset.measureEligibilities || '{}'); } catch (_) { return {}; }
         }
         function updateImportedSummary() {
             var rows = importedRows.children;
@@ -1746,7 +1597,8 @@
             tr.dataset.bundleJson = row.bundleJson || '';
             tr.dataset.fileName = row.fileName || '';
             tr.dataset.detectedClinicalScenarioId = row.detectedClinicalScenarioId || '';
-            tr.dataset.autoDetect = String(row.autoDetect !== false);
+            tr.dataset.autoDetect = 'true';
+            tr.dataset.measureEligibilities = JSON.stringify(normalizeEligMap(elig));
             tr.dataset.encounterStart = row.encounterStart || '';
             tr.dataset.encounterEnd = row.encounterEnd || '';
             tr.dataset.organizationId = orgId;
@@ -1833,7 +1685,7 @@
                 };
                 var res = await postJson(classifyImportedUrl, body);
                 if (res && res.measureEligibilities) {
-                    // Rebuild the eligibility editor with returned values.
+                    row.dataset.measureEligibilities = JSON.stringify(normalizeEligMap(res.measureEligibilities));
                     var ed = row.querySelector('.imp-elig-editor');
                     ed.innerHTML = importedRowEligEditor(res.measureEligibilities);
                     if (res.detectedClinicalScenarioId) row.dataset.detectedClinicalScenarioId = res.detectedClinicalScenarioId;
@@ -2011,14 +1863,6 @@
             var det = e.target.closest('.btn-detect-imported');
             if (det) { classifyImportedRow(det.closest('tr')); return; }
         });
-        importedRows.addEventListener('change', function (e) {
-            if (e.target.classList.contains('imp-elig')) {
-                // User override — turn off auto-detect implicitly.
-                e.target.closest('tr').dataset.autoDetect = 'false';
-                updateImportedSummary();
-            }
-        });
-
         function getImportedPatients() {
             return Array.prototype.map.call(importedRows.children, function (r) {
                 return {
@@ -2027,17 +1871,12 @@
                     fileName: r.dataset.fileName || null,
                     uploadedBundleId: r.dataset.source === 'Bundle' ? (r.dataset.uploadedBundleId || null) : null,
                     bundleJson: r.dataset.source === 'Bundle' && !r.dataset.uploadedBundleId ? (r.dataset.bundleJson || null) : null,
-                    autoDetect: r.dataset.autoDetect !== 'false',
+                    autoDetect: true,
                     measureEligibilities: readImportedElig(r),
                     detectedClinicalScenarioId: r.dataset.detectedClinicalScenarioId || null
                 };
             });
         }
-
-        // Re-render imported eligibility editors when measure selection changes (parallels cohorts).
-        document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
-            cb.addEventListener('change', rerenderImportedEligEditors);
-        });
 
         // Recompute the in/out-of-period indicator on every imported row whenever the
         // Report Period inputs change (so the user gets immediate feedback when adjusting it).
@@ -2055,6 +1894,7 @@
                     }
                 }
                 rerenderImportedEncounterCells();
+                syncEditorReportPeriod();
             });
         });
 
@@ -2156,17 +1996,12 @@
                 data.patientCohorts.forEach(function (c) {
                     addCohortRow(
                         c.patientCount,
-                        c.measureEligibilities || defaultElig(true),
-                        c.eligibleClinicalScenarioIds || [],
-                        c.resourcesPerPatientMin || data.resourcesPerPatientMin || 50,
-                        c.resourcesPerPatientMax || data.resourcesPerPatientMax || 100,
-                        c.scheduledInpatientPattern || DEFAULT_SCHEDULED_PATTERN,
-                        c.cohortQualification || inferCohortQualification(c.measureEligibilities),
                         c.patientConfigurationId || '',
-                        c.intent || null);
+                        c.intent || null,
+                        c.resourcesPerPatientMin || data.resourcesPerPatientMin || 50,
+                        c.resourcesPerPatientMax || data.resourcesPerPatientMax || 100);
                 });
             }
-            syncPatternColumns();
             // Imported patients
             importedRows.innerHTML = '';
             (data.importedPatientIds || []).forEach(function (p) {
@@ -2216,6 +2051,8 @@
 
         // ---- Open modal ----
         async function openEditor(id, mode) {
+            if (pcEditor && pcEditor.ensureCatalog)
+                await pcEditor.ensureCatalog();
             clearErrors();
             clearWarnings();
             cfgGenFingerprint = null;
@@ -2257,6 +2094,7 @@
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
+                fillDefaultAdhocPeriod();
                 selectDefaultQueryPlanTemplate();
                 selectDefaultNormalizationSuite();
                 selectDefaultOrganizationResourceMap();
@@ -2265,7 +2103,7 @@
                     || document.querySelector('.measure-checkbox[data-family="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
                 if (defaultMonthly) defaultMonthly.checked = true;
                 cohortRows.innerHTML = '';
-                addDefault(10, true, 50, 100);
+                addDefault(10, true);
                 importedRows.innerHTML = '';
                 updateImportedSummary();
                 syncCount();
@@ -2317,40 +2155,28 @@
                 valid = false;
             }
 
-            var invalidClinicalProfileCohort = Array.prototype.findIndex.call(
+            var missingConfig = Array.prototype.findIndex.call(
                 cohortRows.children,
                 function (row) {
-                    var patientCount = parseInt(
-                        row.querySelector('.cohort-count').value || '0',
-                        10);
-
+                    var patientCount = parseInt(row.querySelector('.cohort-count').value || '0', 10);
                     if (patientCount <= 0) return false;
-
-                    return !row.querySelector(
-                        '.cohort-scenario-option:checked:not(:disabled)');
+                    var sel = row.querySelector('.cohort-patient-config');
+                    return !sel || !sel.value;
                 });
-
-            if (invalidClinicalProfileCohort >= 0) {
+            if (missingConfig >= 0) {
                 showError(
-                    'Cohort ' + (invalidClinicalProfileCohort + 1) +
-                    ' must have at least one Clinical Profile selected.');
+                    'Cohort ' + (missingConfig + 1) +
+                    ' needs a Patient Configuration. Click Configure, pick a Clinical Profile, and save it.');
                 valid = false;
             }
 
-            if (hasImported) {
-                if (!model.reportPeriodStart) {
-                    markFieldError(
-                        'ReportPeriodStart',
-                        'Report Period Start is required when imported patients are used.');
-                    valid = false;
-                }
-
-                if (!model.reportPeriodEnd) {
-                    markFieldError(
-                        'ReportPeriodEnd',
-                        'Report Period End is required when imported patients are used.');
-                    valid = false;
-                }
+            if (!model.reportPeriodStart) {
+                markFieldError('ReportPeriodStart', 'Report Period Start is required. Generated stays are placed against this window.');
+                valid = false;
+            }
+            if (!model.reportPeriodEnd) {
+                markFieldError('ReportPeriodEnd', 'Report Period End is required. Generated stays are placed against this window.');
+                valid = false;
             }
             // Imported-by-ID rows must have a non-empty patient id.
             var badId = (model.importedPatientIds || []).find(function (p) {

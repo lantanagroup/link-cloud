@@ -663,24 +663,23 @@
         try {
             const cfg = runConfigurationJson ? JSON.parse(runConfigurationJson) : null;
             const cohorts = Array.isArray(cfg?.patientCohorts) ? cfg.patientCohorts : [];
-            if (!cohorts.length || !manifestData?.patientIds) return 'Quick setup';
+            if (!cohorts.length || !manifestData?.patientIds) return 'No configuration';
             const index = manifestData.patientIds.indexOf(patientId);
-            if (index < 0) return 'Quick setup';
+            if (index < 0) return 'No configuration';
             let cursor = 0;
             for (const c of cohorts) {
                 const count = Number.parseInt(String(c?.patientCount ?? 0), 10);
                 const safe = Number.isFinite(count) && count > 0 ? count : 0;
                 if (index < cursor + safe) {
                     const id = c?.patientConfigurationId;
-                    if (!id) return c?.intent ? 'Quick setup (customized)' : 'Quick setup';
+                    if (!id) return 'No configuration';
                     const hit = (patientConfigurationCatalog || []).find(x => x.id === id);
-                    const name = hit ? hit.name : String(id).slice(0, 8);
-                    return c?.intent ? name + ' + overlays' : name;
+                    return hit ? hit.name : String(id).slice(0, 8);
                 }
                 cursor += safe;
             }
         } catch { /* ignore */ }
-        return 'Quick setup';
+        return 'No configuration';
     }
 
     // ─── COMPARISON TAB ────────────────────────────────────────────

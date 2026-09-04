@@ -44,17 +44,14 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
 
-    private static readonly List<string> DefaultNonQualifyingScenarioIds =
-        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.NonQualifying)];
+    private static readonly List<string> AmbulatoryPneumoniaScenarioIds =
+        [ClinicalScenarioIds.Pneumonia.ToString()];
 
     private static readonly List<string> DailyAchEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DailyAchMeasures, MeasureEligibility.Qualifying)];
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultQualifyingEligibilities =
         DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
-
-    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultNonQualifyingEligibilities =
-        DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying);
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DailyAchQualifyingEligibilities =
         DailyAchMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
@@ -340,22 +337,20 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    CohortQualification = MeasureEligibility.NonQualifying,
-                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
-                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    EligibleClinicalScenarioIds = [..AmbulatoryPneumoniaScenarioIds],
                     ResourcesPerPatientMin = 50,
                     ResourcesPerPatientMax = 100,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }
                 },
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    CohortQualification = MeasureEligibility.NonQualifying,
-                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
-                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    EligibleClinicalScenarioIds = [..AmbulatoryPneumoniaScenarioIds],
                     ResourcesPerPatientMin = 50,
                     ResourcesPerPatientMax = 100,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }
                 }
             ],
             CleanupServiceData = false,
@@ -412,40 +407,25 @@ public sealed class ScenarioSeedService : IHostedService
             ResourcesPerPatientMax = 250,
             PatientCohorts =
             [
-                // Cohort 1: qualifies for both ACH and Hypo (inpatient + diabetic med)
+                // Cohort 1: ACH + Hypo — inpatient diabetic hypoglycemia with insulin
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
-                    {
-                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
-                        [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.Qualifying
-                    },
-                    EligibleClinicalScenarioIds =
-                    [
-                        ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
-                        [
-                            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-                            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-                        ], MeasureEligibility.Qualifying)
-                    ],
+                    EligibleClinicalScenarioIds = [ClinicalScenarioIds.DiabeticHypoglycemia.ToString()],
                     ResourcesPerPatientMin = 250,
                     ResourcesPerPatientMax = 250,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = true }
                 },
-                // Cohort 2: qualifies for ACH only (inpatient, no Hypo med)
+                // Cohort 2: ACH only — inpatient pneumonia, no hypoglycemic insulin
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
-                    {
-                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
-                        [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
-                    },
-                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    EligibleClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
                     ResourcesPerPatientMin = 250,
                     ResourcesPerPatientMax = 250,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false }
                 }
             ],
             CleanupServiceData = false,
