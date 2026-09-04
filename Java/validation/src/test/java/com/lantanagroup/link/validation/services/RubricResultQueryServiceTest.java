@@ -51,8 +51,8 @@ class RubricResultQueryServiceTest {
     @DisplayName("maps entity -> DTO: parses score_json, rebuilds subject/summary/trace, resolves check local ids")
     void mapsResultToDto() throws Exception {
         UUID requestId = UUID.randomUUID();
-        UUID resultId = UUID.randomUUID();
-        UUID checkId = UUID.randomUUID();
+        Long resultId = 1L;
+        Long checkId = 100L;
 
         Map<PiqiDimension, RubricResultStatus> byDim = new EnumMap<>(PiqiDimension.class);
         byDim.put(PiqiDimension.CONFORMANCE, RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
@@ -66,7 +66,7 @@ class RubricResultQueryServiceTest {
                 .resultId(resultId)
                 .requestId(requestId)
                 .rubricId("piqi.core")
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(10L)
                 .status(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)
                 .scoreJson(objectMapper.writeValueAsString(score))
                 .errorCount(0)
@@ -82,7 +82,7 @@ class RubricResultQueryServiceTest {
                 .build();
 
         RubricFinding finding = RubricFinding.builder()
-                .findingId(UUID.randomUUID())
+                .findingId(1L)
                 .resultId(resultId)
                 .checkId(checkId)
                 .dimension(PiqiDimension.CONFORMANCE)
@@ -129,7 +129,7 @@ class RubricResultQueryServiceTest {
     @DisplayName("a null subject (no facility/patient/etc.) is omitted rather than emitted as an empty object")
     void nullSubjectOmitted() {
         UUID requestId = UUID.randomUUID();
-        UUID resultId = UUID.randomUUID();
+        Long resultId = 2L;
         RubricResult result = RubricResult.builder()
                 .resultId(resultId)
                 .requestId(requestId)

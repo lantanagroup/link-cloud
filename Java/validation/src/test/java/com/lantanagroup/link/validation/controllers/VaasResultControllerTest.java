@@ -37,7 +37,7 @@ class VaasResultControllerTest {
         UUID requestId = UUID.randomUUID();
         RubricResultDto dto = RubricResultDto.builder()
                 .requestId(requestId)
-                .resultId(UUID.randomUUID())
+                .resultId(1L)
                 .rubricId("piqi.core")
                 .status(RubricResultStatus.ACCEPTABLE)
                 .build();

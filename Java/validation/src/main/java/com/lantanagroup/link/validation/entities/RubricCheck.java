@@ -9,12 +9,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -22,8 +24,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.UUID;
 
 // note: (rubric_version_id, check_local_id) uniqueness only applies to live rows, so it's a
 // filtered unique index in the migration (uq_check_rv_local_active) rather than a
@@ -43,11 +43,13 @@ import java.util.UUID;
 public class RubricCheck {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rubric_check_seq")
+    @SequenceGenerator(name = "rubric_check_seq", sequenceName = "rubric_check_sequence", allocationSize = 50)
     @Column(name = "check_id")
-    private UUID checkId;
+    private Long checkId;
 
     @Column(name = "rubric_version_id", nullable = false)
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
 
     // Read-only association purely to emit a real FK (rubric_check.rubric_version_id -> rubric_version).
     // The scalar rubricVersionId above remains the writable mapping; do not use this field in code.
@@ -88,11 +90,4 @@ public class RubricCheck {
     // kept for history but hidden from evaluate/dry-run and the read APIs
     @Column(nullable = false)
     private boolean deleted;
-
-    @PrePersist
-    void onCreate() {
-        if (checkId == null) {
-            checkId = UUID.randomUUID();
-        }
-    }
 }

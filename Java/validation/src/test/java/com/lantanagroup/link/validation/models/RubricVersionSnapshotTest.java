@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,8 +17,8 @@ class RubricVersionSnapshotTest {
 
     private static final String POLICY_JSON = "{\"type\":\"piqi-check-scorecard\",\"rollup\":\"worst-of\"}";
 
-    private final UUID versionId = UUID.randomUUID();
-    private final UUID checkId = UUID.randomUUID();
+    private final Long versionId = 1L;
+    private final Long checkId = 100L;
 
     private RubricVersion version() {
         return RubricVersion.builder()

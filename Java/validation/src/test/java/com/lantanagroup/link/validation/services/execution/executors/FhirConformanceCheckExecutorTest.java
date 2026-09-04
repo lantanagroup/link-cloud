@@ -14,24 +14,32 @@ import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Patient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class FhirConformanceCheckExecutorTest {
 
     private static final FhirContext FHIR_CONTEXT = FhirContext.forR4();
+    private static final int DEFAULT_BATCH_SIZE = 10;
 
     private final FhirValidator fhirValidator = mock(FhirValidator.class);
     private final FhirConformanceCheckExecutor executor =
-            new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper());
+            new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), DEFAULT_BATCH_SIZE);
 
     private static RubricCheck check() {
         return RubricCheck.builder().checkLocalId("fc-1").dimension(PiqiDimension.CONFORMANCE).build();
@@ -39,6 +47,10 @@ class FhirConformanceCheckExecutorTest {
 
     private static ExecutionContext context() {
         return ExecutionContext.builder().resource(new Patient()).build();
+    }
+
+    private static ExecutionContext bundleContext(List<IBaseResource> entries) {
+        return ExecutionContext.builder().resource(new Bundle()).bundleEntries(entries).build();
     }
 
     private static SingleValidationMessage message(ResultSeverityEnum severity, String text) {
@@ -243,5 +255,142 @@ class FhirConformanceCheckExecutorTest {
         assertThat(findings.get(0).getCode()).isEqualTo("fhir-conformance");
         assertThat(findings.get(0).getSeverity()).isEqualTo(Severity.ERROR);
         assertThat(findings.get(0).isNotEvaluated()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a Bundle input splits into independent entries and aggregates their findings")
+    void bundleSplitsEntriesAndAggregatesFindings() {
+        IBaseResource entryA = new Patient();
+        IBaseResource entryB = new Patient();
+        IBaseResource entryC = new Patient();
+
+        when(fhirValidator.validateWithResult(eq(entryA), any(ValidationOptions.class)))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(message(ResultSeverityEnum.ERROR, "a-bad"))));
+        when(fhirValidator.validateWithResult(eq(entryB), any(ValidationOptions.class)))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(message(ResultSeverityEnum.WARNING, "b-meh"))));
+        when(fhirValidator.validateWithResult(eq(entryC), any(ValidationOptions.class)))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of()));
+
+        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of(entryA, entryB, entryC)));
+
+        assertThat(findings).extracting(RawFinding::getMessage).containsExactly("a-bad", "b-meh");
+    }
+
+    @Test
+    @DisplayName("a Bundle with no entries produces no findings and never calls the validator")
+    void emptyBundleProducesNoFindings() {
+        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of()));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("per-entry not-evaluated classification still applies inside a Bundle entry")
+    void notEvaluatedClassificationAppliesPerBundleEntry() {
+        IBaseResource entry = new Patient();
+        when(fhirValidator.validateWithResult(eq(entry), any(ValidationOptions.class)))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(
+                        message(ResultSeverityEnum.WARNING, "ValueSet 'http://nhsn/vs' not found",
+                                "Terminology_TX_ValueSet_NotFound"))));
+
+        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of(entry)));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("binding-not-evaluated");
+        assertThat(findings.get(0).isNotEvaluated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("profile scoping from check parameters is applied to every Bundle entry")
+    void profileScopingAppliedToEveryBundleEntry() {
+        RubricCheck check = RubricCheck.builder()
+                .checkLocalId("fc-1")
+                .dimension(PiqiDimension.CONFORMANCE)
+                .parametersJson("{\"profiles\":[\"http://example.org/StructureDefinition/my-profile\"]}")
+                .build();
+
+        ArgumentCaptor<ValidationOptions> optionsCaptor = ArgumentCaptor.forClass(ValidationOptions.class);
+        when(fhirValidator.validateWithResult(any(IBaseResource.class), optionsCaptor.capture()))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of()));
+
+        executor.execute(check, bundleContext(List.of(new Patient(), new Patient())));
+
+        assertThat(optionsCaptor.getAllValues()).hasSize(2);
+        assertThat(optionsCaptor.getAllValues()).allSatisfy(opts ->
+                assertThat(opts.getProfiles()).contains("http://example.org/StructureDefinition/my-profile"));
+    }
+
+    @Test
+    @DisplayName("concurrent Bundle validations are capped at the configured batch size")
+    void bundleValidationConcurrencyIsCappedAtBatchSize() {
+        int batchSize = 2;
+        FhirConformanceCheckExecutor cappedExecutor =
+                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), batchSize);
+
+        List<IBaseResource> entries = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            entries.add(new Patient());
+        }
+
+        AtomicInteger current = new AtomicInteger(0);
+        AtomicInteger maxObserved = new AtomicInteger(0);
+        when(fhirValidator.validateWithResult(any(IBaseResource.class), any(ValidationOptions.class)))
+                .thenAnswer(invocation -> {
+                    int now = current.incrementAndGet();
+                    maxObserved.updateAndGet(prev -> Math.max(prev, now));
+                    Thread.sleep(50);
+                    current.decrementAndGet();
+                    return new ValidationResult(FHIR_CONTEXT, List.of());
+                });
+
+        cappedExecutor.execute(check(), bundleContext(entries));
+
+        assertThat(maxObserved.get()).isEqualTo(batchSize);
+    }
+
+    @Test
+    @DisplayName("a slow resource does not block later resources from starting or finishing (no wave waiting)")
+    void slowResourceDoesNotBlockLaterResourcesFromFinishing() {
+        int batchSize = 3;
+        FhirConformanceCheckExecutor cappedExecutor =
+                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), batchSize);
+
+        IBaseResource slow = new Patient();
+        List<IBaseResource> entries = new ArrayList<>();
+        entries.add(slow);
+        for (int i = 0; i < 5; i++) {
+            entries.add(new Patient());
+        }
+
+        List<IBaseResource> completionOrder = Collections.synchronizedList(new ArrayList<>());
+
+        when(fhirValidator.validateWithResult(eq(slow), any(ValidationOptions.class)))
+                .thenAnswer(invocation -> {
+                    Thread.sleep(300);
+                    completionOrder.add(slow);
+                    return new ValidationResult(FHIR_CONTEXT, List.of());
+                });
+        when(fhirValidator.validateWithResult(argThat((IBaseResource r) -> r != slow), any(ValidationOptions.class)))
+                .thenAnswer(invocation -> {
+                    IBaseResource resource = invocation.getArgument(0);
+                    completionOrder.add(resource);
+                    return new ValidationResult(FHIR_CONTEXT, List.of());
+                });
+
+        cappedExecutor.execute(check(), bundleContext(entries));
+
+        assertThat(completionOrder).hasSize(6);
+        assertThat(completionOrder.get(completionOrder.size() - 1)).isSameAs(slow);
+    }
+
+    @Test
+    @DisplayName("non-Bundle validation behavior is unchanged")
+    void nonBundleBehaviorUnchanged() {
+        stubValidator(message(ResultSeverityEnum.ERROR, "bad"));
+
+        List<RawFinding> findings = executor.execute(check(), context());
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("fhir-conformance");
     }
 }

@@ -52,18 +52,16 @@ public class ResultEnvelopeAssembler {
                 .informationCount(countBy(evaluated, Severity.INFORMATION))
                 .build();
 
-        UUID resultId = UUID.randomUUID();
         ValidationPolicyConfig.Response responseConfig = policyConfig.getResponse();
 
+        // finding_id/result_id are DB-sequence-generated on persist (see RubricResultPersister); the
+        // DTOs below get their id backfilled by the caller once the entities have been saved.
         List<FindingDto> findingDtos = new ArrayList<>(evaluated.size());
         List<RubricFinding> findingEntities = new ArrayList<>(evaluated.size());
         for (EvaluatedFinding f : evaluated) {
             RawFinding r = f.raw();
-            UUID fid = UUID.randomUUID();
-            findingDtos.add(toDto(fid, f, r, responseConfig));
+            findingDtos.add(toDto(f, r, responseConfig));
             findingEntities.add(RubricFinding.builder()
-                    .findingId(fid)
-                    .resultId(resultId)
                     .checkId(r.getCheckId())
                     .dimension(r.getDimension())
                     // Effective severity, so persisted findings reconcile with the persisted status.
@@ -100,7 +98,6 @@ public class ResultEnvelopeAssembler {
                 .build();
 
         RubricResult resultEntity = RubricResult.builder()
-                .resultId(resultId)
                 .requestId(ctx.getRequestId())
                 .rubricId(version.getRubricId())
                 .rubricVersionId(version.getRubricVersionId())
@@ -124,10 +121,9 @@ public class ResultEnvelopeAssembler {
         return new AssembleOutput(envelope, resultEntity, findingEntities);
     }
 
-    private FindingDto toDto(UUID findingId, EvaluatedFinding f, RawFinding r,
+    private FindingDto toDto(EvaluatedFinding f, RawFinding r,
                              ValidationPolicyConfig.Response responseConfig) {
         FindingDto.FindingDtoBuilder builder = FindingDto.builder()
-                .id(findingId)
                 .checkId(r.getCheckLocalId())
                 .dimension(r.getDimension())
                 .severity(f.effectiveSeverity())

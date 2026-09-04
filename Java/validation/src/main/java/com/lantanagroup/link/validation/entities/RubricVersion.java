@@ -8,11 +8,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -38,8 +41,10 @@ import java.util.UUID;
 public class RubricVersion {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rubric_version_seq")
+    @SequenceGenerator(name = "rubric_version_seq", sequenceName = "rubric_version_sequence", allocationSize = 50)
     @Column(name = "rubric_version_id")
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
 
     @Column(name = "rubric_id", length = 128, nullable = false)
     private String rubricId;
@@ -112,9 +117,6 @@ public class RubricVersion {
 
     @PrePersist
     void onCreate() {
-        if (rubricVersionId == null) {
-            rubricVersionId = UUID.randomUUID();
-        }
         createdAt = OffsetDateTime.now();
     }
 }

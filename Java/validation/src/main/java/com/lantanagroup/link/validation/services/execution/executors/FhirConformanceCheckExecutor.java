@@ -13,8 +13,10 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.Bundle;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -22,14 +24,36 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Semaphore;
+import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class FhirConformanceCheckExecutor implements CheckExecutor {
 
     private final FhirValidator fhirValidator;
     private final ObjectMapper objectMapper;
+
+    /**
+     * Max concurrent Bundle-entry validations. Configured value of 0 (the default) means "auto":
+     * match {@link ForkJoinPool#commonPool()}'s own parallelism, since that is the pool entry
+     * validations actually run on -- this avoids a hardcoded number going stale if the pool's
+     * parallelism ever changes (e.g. via the java.util.concurrent.ForkJoinPool.common.parallelism
+     * system property).
+     */
+    private final int batchSize;
+
+    public FhirConformanceCheckExecutor(
+            FhirValidator fhirValidator,
+            ObjectMapper objectMapper,
+            @Value("${link.fhir-conformance-check.batch-size:0}") int configuredBatchSize) {
+        this.fhirValidator = fhirValidator;
+        this.objectMapper = objectMapper;
+        this.batchSize = configuredBatchSize > 0 ? configuredBatchSize : ForkJoinPool.commonPool().getParallelism();
+    }
 
     @Override
     public CheckType supports() {
@@ -38,6 +62,16 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
 
     @Override
     public List<RawFinding> execute(RubricCheck check, ExecutionContext context) {
+        ValidationOptions options = buildOptions(check);
+        IBaseResource resource = context.getResource();
+
+        if (resource instanceof Bundle) {
+            return executeBundle(check, context, options);
+        }
+        return validate(check, resource, options);
+    }
+
+    private ValidationOptions buildOptions(RubricCheck check) {
         ValidationOptions options = new ValidationOptions();
         if (check.getParametersJson() != null) {
             try {
@@ -50,8 +84,44 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
                 log.warn("Failed to parse FHIR_CONFORMANCE parameters for check {}: {}", check.getCheckLocalId(), e.getMessage());
             }
         }
+        return options;
+    }
 
-        ValidationResult result = fhirValidator.validateWithResult(context.getResource(), options);
+    /**
+     * Validates each Bundle entry as its own independent resource, capping concurrent validations at
+     * {@link #batchSize} via a {@link Semaphore}. All entries are submitted up front (no batch/wave
+     * joins in between) so a slow resource never delays the start of the next one -- only the number
+     * of validations actually running at once is bounded.
+     */
+    private List<RawFinding> executeBundle(RubricCheck check, ExecutionContext context, ValidationOptions options) {
+        Semaphore semaphore = new Semaphore(batchSize);
+        List<CompletableFuture<List<RawFinding>>> futures = context.getBundleEntries().stream()
+                .map(entry -> CompletableFuture.supplyAsync(() -> validateThrottled(check, entry, options, semaphore),
+                        ForkJoinPool.commonPool()))
+                .collect(Collectors.toList());
+
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+    }
+
+    private List<RawFinding> validateThrottled(RubricCheck check, IBaseResource resource, ValidationOptions options, Semaphore semaphore) {
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CompletionException(e);
+        }
+        try {
+            return validate(check, resource, options);
+        } finally {
+            semaphore.release();
+        }
+    }
+
+    private List<RawFinding> validate(RubricCheck check, IBaseResource resource, ValidationOptions options) {
+        ValidationResult result = fhirValidator.validateWithResult(resource, options);
         List<SingleValidationMessage> messages = result.getMessages();
         log.info("HAPI validation (rubric engine) returned {} messages for check {}", messages.size(), check.getCheckLocalId());
 

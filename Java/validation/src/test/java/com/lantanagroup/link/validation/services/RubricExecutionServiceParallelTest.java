@@ -75,7 +75,7 @@ class RubricExecutionServiceParallelTest {
     @BeforeEach
     void setUp() {
         version = RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId(RUBRIC_ID)
                 .semver("1.0.0")
                 .checksum("checksum")
@@ -318,7 +318,7 @@ class RubricExecutionServiceParallelTest {
     private static List<RubricCheck> checks(int count) {
         return IntStream.range(0, count)
                 .mapToObj(i -> RubricCheck.builder()
-                        .checkId(UUID.randomUUID())
+                        .checkId((long) i)
                         .checkLocalId(String.format("check-%02d", i))
                         .type(CheckType.FHIRPATH)
                         .dimension(PiqiDimension.CONFORMANCE)

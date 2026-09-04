@@ -12,7 +12,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Cached form of a rubric version + its live checks, so one cache hit covers everything the
@@ -32,7 +31,7 @@ import java.util.UUID;
 @Builder
 public class RubricVersionSnapshot {
 
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
     private String rubricId;
     private String semver;
     private RubricVersionStatus status;
@@ -45,8 +44,8 @@ public class RubricVersionSnapshot {
     @AllArgsConstructor
     @Builder
     public static class CheckSnapshot {
-        private UUID checkId;
-        private UUID rubricVersionId;
+        private Long checkId;
+        private Long rubricVersionId;
         private String checkLocalId;
         private CheckType type;
         private PiqiDimension dimension;
