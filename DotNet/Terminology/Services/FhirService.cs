@@ -3,6 +3,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Extensions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
@@ -720,15 +721,12 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             return byId;
         }
 
-        var bySystem = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, version);
-        if (bySystem == null || (!string.IsNullOrEmpty(version) && !string.Equals(bySystem.Version, version, StringComparison.CurrentCultureIgnoreCase)))
+        var bySystem = cacheService.GetCodeGroupExact(CodeGroup.CodeGroupTypes.CodeSystem, system, version);
+        if (bySystem == null)
         {
-            if (!string.IsNullOrEmpty(version))
-            {
-                throw new KeyNotFoundException($"Code system version '{version}' could not be found");
-            }
-
-            throw new KeyNotFoundException($"Code system '{system}' was not found");
+            throw new KeyNotFoundException(!string.IsNullOrEmpty(version)
+                ? $"Code system version '{version}' could not be found"
+                : $"Code system '{system}' was not found");
         }
 
         return bySystem;
