@@ -4,9 +4,10 @@ Knowing which services read a given key is currently archaeology: you grep the c
 the .csproj reference graph, and hope. Scripts/AzureAppConfig/extract_config_keys.py already computes it, so
 this writes the answer onto the rows as a tag.
 
-This edits the committed exports under Config/ only. It does not talk to Azure. The exports
-are the source that LEGLINK-775's pipeline will import, so a change belongs here first, where
-it is reviewable as a diff, and reaches a store only when that pipeline runs.
+This edits the committed exports in the private `link-cac` repository only - it does not talk
+to Azure. They are the source that LEGLINK-775's pipeline will import, so a change belongs
+there first, where it is reviewable as a diff, and reaches a store only when that pipeline runs.
+The diff lands in a different repository from this script; commit it there.
 
 Why tags and not labels
 -----------------------
@@ -44,7 +45,7 @@ import config_findings as findings_mod
 import config_key_matching as matching  # noqa: E402
 
 DEFAULT_CATALOG = "app-config.yaml"
-DEFAULT_INVENTORY = "Config/config-key-inventory.json"
+DEFAULT_INVENTORY = "Scripts/AzureAppConfig/config-key-inventory.json"
 CONSUMERS_TAG = "link:consumers"
 
 
@@ -160,7 +161,9 @@ def main() -> int:
         description="Tag the App Config exports with their consuming services.")
     parser.add_argument("--env", help="Which export to process")
     parser.add_argument("--all", action="store_true", help="Process every environment")
-    parser.add_argument("--config-dir", default="Config")
+    parser.add_argument("--config-dir", default=matching.default_config_dir(),
+                        help="Where link-cac's exports are (default: %(default)s; "
+                             "also settable with LINK_CAC_CONFIG_DIR)")
     parser.add_argument("--inventory", default=DEFAULT_INVENTORY)
     parser.add_argument("--catalog", default=DEFAULT_CATALOG)
     parser.add_argument("--write", action="store_true",
@@ -191,8 +194,9 @@ def main() -> int:
     elif not args.write:
         print("\nDRY RUN - nothing was written. Re-run with --write to edit the export(s).")
     else:
-        print(f"\nTagged {total} row(s). The only diff should be tags:")
-        print("    git diff -- Config/")
+        print(f"\nTagged {total} row(s) in {args.config_dir}. The only diff should be tags,")
+        print("and it is in the link-cac repository, not this one:")
+        print(f"    git -C {os.path.dirname(os.path.abspath(args.config_dir))} diff")
     return 0
 
 

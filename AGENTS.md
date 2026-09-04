@@ -8,6 +8,20 @@ This system is a high-performing, big-data platform intended to support collecti
 * The Scripts directory contains scripts used by developers and admins to help operate the system at runtime. These scripts must always abstract out sensitive variables into arguments. Arguments may default values to environment variables for ease-of use, when appropriate.
 * Changes to entities that are persisted with EntityFramework must always have a migration created for them, which ideally supports both upgarding *and* downgrading (in the event of failed system updates in other services).
 
+### Application Configuration
+
+The **catalog** — which keys exist and what they mean — is `/app-config.yaml` in this repository. The **values**, one export per environment, live in the private `lantanagroup/link-cac` repository under `Config/`. Everything in `Scripts/AzureAppConfig/` runs from this repository's root and looks for those exports at `../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR`, or with `--config-dir` on the tools that accept it. `validate_aac_secrets.py` is the exception: it takes export paths positionally and has no `--config-dir`.
+
+* Any new configuration key that is **required** (has no safe default) must be added to `/app-config.yaml` in the same PR. Prefer shipping a working default in `appsettings.json` / `application.yml` and recording it as `required: false` with a `defaultValue` — requiring a key means provisioning one identical value into every environment.
+* **State `required` explicitly.** The schema declares `default: true`, but JSON Schema defaults are annotation only and are never applied during validation.
+* A `sensitive: true` entry must **never** carry a `defaultValue`. Secrets are supplied per environment, never seeded from this file.
+* A `required: true` key needs a row in **every** environment export in `link-cac`. **CI here does not verify that** — this repository's workflows never read `link-cac`, because its Actions logs are public. `link-cac` checks it on its own PRs and daily. Run `Scripts/AzureAppConfig/check_required_config.py` locally before merging a catalog change.
+* **Azure App Configuration outranks environment variables** in both runtimes. Setting an env var on a pod is silently ignored for any key the store defines — change the store instead.
+* **.NET reads colon-delimited keys** (`KafkaConnection:BootstrapServers:0`); **Java reads slash-prefixed keys** (`/spring/datasource/url`) which the Spring provider converts to dots. The catalog records Java keys in the dotted form while the store holds the slash form. A Java service never sees the colon rows.
+* A row is identified by the pair **(key, label)**. Each service selects unlabeled rows first, then its own label. Adding a labeled row on top of an unlabeled one is safe; *moving* a key from unlabeled to labeled breaks every service that does not select that exact label. Labels are compiled into the services — the mapping is the `serviceMeta` block in `/app-config.yaml` — and a label containing `:` matches nothing at all.
+* Secrets must be Key Vault references carrying `content_type: application/vnd.microsoft.appconfig.keyvaultref+json`. With any other content type the provider serves the literal text `{"uri": "..."}` as the value, so the service uses that string as its password. Never write a literal credential into an export.
+* A row with `content_type: application/json` is flattened into child properties, so a key such as `authentication.authority` will not appear in an export — its parent `/authentication` blob will.
+
 ### REST Operations
 
 - Ensure inputs are validated and sanitized before passing inputs onto business logic.
@@ -63,11 +77,20 @@ This system is a high-performing, big-data platform intended to support collecti
 
 ## Pull Requests
 
-PR summaries/titles must follow one of the two formats:
-* TECH_DEBT: <brief_summary>
-* LNK-XXX: <brief_summary>
+PR summaries/titles must begin with one of the following prefixes. This is enforced by `.github/workflows/pr-title-check.yml`, which is the authoritative list — keep this section in step with it.
 
-Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates, documentation (such as markdown files) and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must reference a JIRA ticket number in their summary for the LNK project, and include information on what testing was performed in the description of the PR.
+* LEGLINK-XXX: <brief_summary>  — the current JIRA project, and the right choice for most work
+* LNK-XXX: <brief_summary>      — the former project key, still accepted for older tickets
+* LEGPROG-XXX: <brief_summary>
+* TECH_DEBT: <brief_summary>
+* DOCS: <brief_summary>
+* SNYK: <brief_summary>
+
+`Dops-` and `Bump` (with its trailing space) are also accepted, for DevOps and dependency-update automation respectively. Do not use them for hand-written PRs.
+
+Note the format is exact: the ticket prefix is upper-case, followed by a colon and a **space**. A title such as `LEGLINK-912:Fix the thing` fails the check.
+
+Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates and logging improvements. Documentation-only changes belong under `DOCS:`. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must reference a JIRA ticket number in their summary, and include information on what testing was performed in the description of the PR.
 
 The description of the PR must follow this template:
 
