@@ -175,13 +175,8 @@ export interface CensusListResult {
 export interface SftpFile {
   fileName: string;
   queriedAt: string;
-  patients: SftpFilePatient[];
+  patientIds: string[];
   simulated?: boolean;
-}
-
-export interface SftpFilePatient {
-  patientId: string;
-  patientName: string;
 }
 
 export interface SftpConfig {

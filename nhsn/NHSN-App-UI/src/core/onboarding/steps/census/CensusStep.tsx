@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import * as XLSX from "xlsx";
 import { useApiClient } from "../../../api/ApiClientContext";
 import type {
   CensusListKey,
@@ -45,19 +46,14 @@ interface ListQueryState {
   error?: string;
 }
 
-function summarize(items: string[], limit = 8): string {
-  if (items.length <= limit) {
-    return items.join(", ");
-  }
-  return `${items.slice(0, limit).join(", ")}, +${items.length - limit}`;
-}
-
-function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
-function toCsv(rows: string[][]): string {
-  return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+function buildXlsxBlob(headers: string[], rows: string[][]): Blob {
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Census Results");
+  const content = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  return new Blob([content], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }
 
 function ViewResultsIcon() {
@@ -123,6 +119,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const [connectionResult, setConnectionResult] =
     useState<ConnectionResult | null>(null);
   const [sftpFiles, setSftpFiles] = useState<SftpFile[] | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(
+    null,
+  );
 
   const patientListsLive = user.capabilities?.patientListWithNames ?? false;
   const sftpListingLive = user.capabilities?.sftpFileListing ?? false;
@@ -228,6 +227,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     setTestingConnection(true);
     setConnectionResult(null);
     setSftpFiles(null);
+    setSelectedFileName(null);
 
     try {
       if (sftpUsername.trim() && sftpPassword.trim()) {
@@ -321,55 +321,52 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     ? listState[selectedListKey]
     : undefined;
 
-  const fileRows = (sftpFiles ?? []).map((file) => ({
-    fileName: file.fileName,
-    queriedAtText: formatDateTime(file.queriedAt),
-    patientCountText: String(file.patients.length),
-    patientNamesText: summarize(file.patients.map((p) => p.patientName)),
-  }));
+  const selectedFile = selectedFileName
+    ? (sftpFiles ?? []).find((file) => file.fileName === selectedFileName)
+    : undefined;
 
   async function handleExportEpicResults(): Promise<Blob> {
-    const rows = [
+    const rows = CENSUS_LIST_KEYS.filter((key) => listState[key]?.result).flatMap(
+      (key) => {
+        const state = listState[key]!;
+        return state.result!.patientIds.map((patientId) => [
+          t(LIST_LABEL_KEYS[key]),
+          census.patientListIds?.[key] ?? "",
+          formatDateTime(state.queriedAt),
+          patientId,
+        ]);
+      },
+    );
+    return buildXlsxBlob(
       [
         t("onboarding:census.epic.summary.listName"),
         t("onboarding:census.epic.summary.listId"),
         t("onboarding:census.epic.summary.queriedAt"),
-        t("onboarding:census.epic.summary.patientCount"),
         t("onboarding:census.epic.columns.patientId"),
       ],
-      ...CENSUS_LIST_KEYS.filter((key) => listState[key]?.result).map((key) => {
-        const state = listState[key]!;
-        return [
-          t(LIST_LABEL_KEYS[key]),
-          census.patientListIds?.[key] ?? "",
-          formatDateTime(state.queriedAt),
-          String(state.result!.patientCount),
-          state.result!.patientIds.join("; "),
-        ];
-      }),
-    ];
-    return new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8;" });
+      rows,
+    );
   }
 
   async function handleExportSftpResults(): Promise<Blob> {
-    const rows = [
+    const rows = (sftpFiles ?? []).flatMap((file) =>
+      file.patientIds.map((patientId) => [
+        file.fileName,
+        patientId,
+        formatDateTime(file.queriedAt),
+      ]),
+    );
+    return buildXlsxBlob(
       [
         t("onboarding:census.cerner.columns.fileName"),
+        t("onboarding:census.cerner.columns.patientId"),
         t("onboarding:census.cerner.columns.queriedAt"),
-        t("onboarding:census.cerner.columns.patientCount"),
-        t("onboarding:census.cerner.columns.patients"),
       ],
-      ...fileRows.map((row) => [
-        row.fileName,
-        row.queriedAtText,
-        row.patientCountText,
-        row.patientNamesText,
-      ]),
-    ];
-    return new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8;" });
+      rows,
+    );
   }
 
-  const exportFileName = `${user.facilityId ?? "facility"}_Census_Results.csv`;
+  const exportFileName = `${user.facilityId ?? "facility"}_Census_Results.xlsx`;
 
   const epicResultsPanel = selectedListKey && selectedListState?.result && (
     <SidePanel>
@@ -405,6 +402,44 @@ export function CensusStep({ onNext, onBack }: StepProps) {
             {selectedListState.result.patientIds.map((id) => (
               <tr key={id}>
                 <td>{id}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SidePanel>
+  );
+
+  const sftpResultsPanel = selectedFile && (
+    <SidePanel>
+      <div className="section-title">
+        {t("onboarding:census.cerner.resultsTitle")}
+      </div>
+      <ul className="nhsn-link__summary-list">
+        <li>
+          <span>{t("onboarding:census.cerner.columns.fileName")}</span>
+          <span>{selectedFile.fileName}</span>
+        </li>
+        <li>
+          <span>{t("onboarding:census.cerner.columns.queriedAt")}</span>
+          <span>{formatDateTime(selectedFile.queriedAt)}</span>
+        </li>
+        <li>
+          <span>{t("onboarding:census.cerner.columns.patientCount")}</span>
+          <span>{selectedFile.patientIds.length}</span>
+        </li>
+      </ul>
+      <div className="census-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("onboarding:census.cerner.columns.patientId")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedFile.patientIds.map((patientId) => (
+              <tr key={patientId}>
+                <td>{patientId}</td>
               </tr>
             ))}
           </tbody>
@@ -691,49 +726,30 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                       <div className="section-title">
                         {t("onboarding:census.cerner.filesTitle")}
                       </div>
-                      {fileRows.length === 0 ? (
+                      {(sftpFiles ?? []).length === 0 ? (
                         <p className="subtitle">
                           {t("onboarding:census.cerner.noFiles")}
                         </p>
                       ) : (
-                        <div className="census-table-scroll">
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>
-                                  {t(
-                                    "onboarding:census.cerner.columns.fileName",
-                                  )}
-                                </th>
-                                <th>
-                                  {t(
-                                    "onboarding:census.cerner.columns.queriedAt",
-                                  )}
-                                </th>
-                                <th>
-                                  {t(
-                                    "onboarding:census.cerner.columns.patientCount",
-                                  )}
-                                </th>
-                                <th>
-                                  {t(
-                                    "onboarding:census.cerner.columns.patients",
-                                  )}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {fileRows.map((row) => (
-                                <tr key={row.fileName}>
-                                  <td>{row.fileName}</td>
-                                  <td>{row.queriedAtText}</td>
-                                  <td>{row.patientCountText}</td>
-                                  <td>{row.patientNamesText}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        (sftpFiles ?? []).map((file) => (
+                          <div className="census-file-row" key={file.fileName}>
+                            <span>{file.fileName}</span>
+                            <button
+                              type="button"
+                              className={`census-view-btn${selectedFileName === file.fileName ? " active" : ""}`}
+                              aria-label={t(
+                                "onboarding:census.cerner.viewResultsAria",
+                                { file: file.fileName },
+                              )}
+                              onClick={() =>
+                                setSelectedFileName((prev) =>
+                                  prev === file.fileName ? null : file.fileName,
+                                )
+                              }>
+                              <ViewResultsIcon />
+                            </button>
+                          </div>
+                        ))
                       )}
                     </div>
                   </>
@@ -767,6 +783,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
           </StepActions>
         </div>
         {acquisition === "PatientList" && epicResultsPanel}
+        {acquisition === "Sftp" && sftpResultsPanel}
       </SidePanelLayout>
     </div>
   );

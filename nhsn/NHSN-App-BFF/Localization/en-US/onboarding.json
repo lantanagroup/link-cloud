@@ -189,11 +189,13 @@
       "testError": "Unable to test the connection.",
       "filesTitle": "SFTP Acquisition Results",
       "noFiles": "No files found.",
+      "viewResultsAria": "View results for {{file}}",
+      "resultsTitle": "List Results Preview",
       "columns": {
         "fileName": "SFTP File Name",
         "queriedAt": "Queried At",
         "patientCount": "Patient Count",
-        "patients": "Patients"
+        "patientId": "FHIR Patient Id"
       }
     },
     "fields": {
