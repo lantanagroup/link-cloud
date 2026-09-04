@@ -19,6 +19,7 @@ public sealed class TestScenarioDocument
 
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? TestRailCaseId { get; set; }
     public bool IsSystemScenario { get; set; }
 
     public string ReportMethod { get; set; } = "Adhoc";

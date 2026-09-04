@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services;
+using Automation.UI.Services.TestRail;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -272,6 +273,10 @@ builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
 builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
+builder.Services.Configure<TestRailOptions>(builder.Configuration.GetSection(TestRailOptions.SectionName));
+builder.Services.AddHttpClient("TestRail");
+builder.Services.AddSingleton<ITestRailApiClient, TestRailApiClient>();
+builder.Services.AddSingleton<ITestRailPublisher, TestRailPublisher>();
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

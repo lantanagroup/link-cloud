@@ -396,6 +396,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = model.Id,
             Name = model.Name,
             Description = model.Description,
+            TestRailCaseId = model.TestRailCaseId,
             IsSystemScenario = model.IsSystemScenario,
             ReportMethod = model.ReportMethod.ToString(),
             SelectedMeasures = model.SelectedMeasures.Select(m => m.ToString()).ToList(),
@@ -425,6 +426,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = doc.Id,
             Name = doc.Name,
             Description = doc.Description,
+            TestRailCaseId = doc.TestRailCaseId,
             IsSystemScenario = doc.IsSystemScenario,
             ReportMethod = Enum.TryParse<ReportMethod>(doc.ReportMethod, true, out var rm) ? rm : ReportMethod.Adhoc,
             SelectedMeasures = doc.SelectedMeasures
