@@ -30,7 +30,7 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
     private sealed record Candidate(string System, Code Code, bool FromCodeSystem);
 
     /// <inheritdoc />
-    public PagedConfigModel<TerminologyCodeModel> Search(CodeSearchQuery query, CancellationToken cancellationToken = default)
+    public Task<PagedConfigModel<TerminologyCodeModel>> Search(CodeSearchQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
 
@@ -64,9 +64,9 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
             })
             .ToList();
 
-        return new PagedConfigModel<TerminologyCodeModel>(
+        return Task.FromResult(new PagedConfigModel<TerminologyCodeModel>(
             records,
-            new PaginationMetadata(pageSize, pageNumber, ordered.Count));
+            new PaginationMetadata(pageSize, pageNumber, ordered.Count)));
     }
 
     /// <summary>
@@ -132,12 +132,12 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
     {
         if (query.CodeSystem is not null)
         {
-            return [RequireGroup(CodeGroup.CodeGroupTypes.CodeSystem, query.CodeSystem, query.Version, "codeSystem")];
+            return [RequireGroup(CodeGroup.CodeGroupTypes.CodeSystem, query.CodeSystem, query.Version, CodeSearchParameters.CodeSystem)];
         }
 
         if (query.ValueSet is not null)
         {
-            return [RequireGroup(CodeGroup.CodeGroupTypes.ValueSet, query.ValueSet, query.Version, "valueSet")];
+            return [RequireGroup(CodeGroup.CodeGroupTypes.ValueSet, query.ValueSet, query.Version, CodeSearchParameters.ValueSet)];
         }
 
         var groups = cacheService.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem);
@@ -169,7 +169,7 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
         if (!string.IsNullOrEmpty(effectiveVersion) && cacheService.GetCodeGroup(type, canonical) is not null)
         {
             throw new ArgumentException(
-                $"No {type} version '{effectiveVersion}' is loaded for '{canonical}'.", "version");
+                $"No {type} version '{effectiveVersion}' is loaded for '{canonical}'.", CodeSearchParameters.Version);
         }
 
         throw new ArgumentException($"No {type} is loaded with the URI '{canonical}'.", parameterName);

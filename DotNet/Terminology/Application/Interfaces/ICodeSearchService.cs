@@ -26,5 +26,5 @@ public interface ICodeSearchService
     /// A named code system, value set or version is not loaded. <see cref="ArgumentException.ParamName"/>
     /// carries the query parameter the caller needs to correct.
     /// </exception>
-    PagedConfigModel<TerminologyCodeModel> Search(CodeSearchQuery query, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<TerminologyCodeModel>> Search(CodeSearchQuery query, CancellationToken cancellationToken = default);
 }
