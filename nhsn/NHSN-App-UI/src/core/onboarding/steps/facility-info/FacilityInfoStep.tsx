@@ -6,7 +6,7 @@ import {Button, NHSNLoadingIndicator, PageHeader, Select, StepActions} from '../
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
-import {validateFacilityInfo} from './validate';
+import {validateFacilityInfo, type FieldErrors} from './validate';
 
 /**
  * Step scaffold. The screen's own fields, validation and API calls are LEGLINK story: facility information.
@@ -22,6 +22,7 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
 
   const [loading, setLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [timezones, setTimezones] = useState<Timezone[]>([]);
   const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
 
@@ -55,14 +56,28 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
   }, [api]);
 
   function handleNext() {
-    const errors = validateFacilityInfo(draft);
-    if (Object.keys(errors).length > 0) {
+    const fieldErrors = validateFacilityInfo(draft);
+    setErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
       setValidationError(t('onboarding:facilityInfo.messages.incomplete'));
       return;
     }
 
     setValidationError(null);
     onNext();
+  }
+
+  function refreshFieldError(field: string) {
+    const nextErrors = validateFacilityInfo(draft);
+    setErrors(prev => {
+      const next = {...prev};
+      if (nextErrors[field]) {
+        next[field] = nextErrors[field];
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
   }
 
   if (loading) {
@@ -81,10 +96,12 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
           hint={t('onboarding:facilityInfo.fields.timeZoneTooltip')}
           placeholder={t('onboarding:facilityInfo.fields.timeZonePlaceholder')}
           required
+          error={errors.timeZone ? t(errors.timeZone) : undefined}
           value={timeZone}
           options={timezones.map(zone => ({value: zone.id, label: zone.displayName}))}
           popupClassName="nhsn-facility-info-popup"
-          onChange={value => patch('facilityInfo', {timeZone: value})} />
+          onChange={value => patch('facilityInfo', {timeZone: value})}
+          onBlur={() => refreshFieldError('timeZone')} />
       </div>
 
       <div className="nhsn-link__field">
@@ -93,10 +110,12 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
           label={t('onboarding:facilityInfo.fields.ehrVendorLabel')}
           placeholder={t('onboarding:facilityInfo.fields.ehrVendorPlaceholder')}
           required
+          error={errors.vendor ? t(errors.vendor) : undefined}
           value={ehrVendor}
           options={vendorProfiles.map(profile => ({value: profile.vendor, label: profile.displayName}))}
           popupClassName="nhsn-facility-info-popup"
-          onChange={value => patch('facilityInfo', {vendor: value as EhrVendor})} />
+          onChange={value => patch('facilityInfo', {vendor: value as EhrVendor})}
+          onBlur={() => refreshFieldError('vendor')} />
       </div>
 
       {validationError && (
@@ -109,7 +128,7 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
         <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={handleNext} disabled={saving}>
+        <Button onClick={handleNext} disabled={saving} loading={saving}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

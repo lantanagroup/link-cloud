@@ -474,23 +474,47 @@
   box-shadow: none;
 }
 
+.nhsn-link__step-actions .k-button:focus,
+.nhsn-link__step-actions .k-button.k-focus {
+  box-shadow: none !important;
+}
+
+.nhsn-link__step-actions .k-button:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
+  padding-bottom: 0;
+}
+
 .nhsn-link__step-panel .nhsn-link__step-actions {
   position: sticky;
   bottom: 0;
   z-index: 5;
   flex: none;
   margin-top: auto;
+  margin-left: -32px;
+  margin-right: -32px;
+  padding: 16px 32px 28px;
   background-color: var(--kendo-color-app-surface, #ffffff);
 }
 
-.nhsn-link__saving {
+.nhsn-link__button-spinner {
   display: inline-block;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2.5px solid var(--kendo-color-border, #d0d7de);
-  border-top-color: var(--kendo-color-primary, #0057b7);
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #ffffff;
   border-radius: 50%;
   animation: nhsn-link__spin 0.7s linear infinite;
+}
+
+.nhsn-link__step-actions .k-button.k-button-base .nhsn-link__button-spinner {
+  border-color: var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-primary, #0057b7);
 }
 
 @keyframes nhsn-link__spin {
@@ -1065,10 +1089,14 @@
     position: static;
   }
 
+  .nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
+    padding-bottom: 28px;
+  }
+
   .nhsn-link__step-panel .nhsn-link__step-actions,
   .fhir-server-info .card .nhsn-link__step-actions {
     position: static;
-    margin-top: 1.5rem;
+    margin: 1.5rem 0 0;
     padding: 0;
   }
 }

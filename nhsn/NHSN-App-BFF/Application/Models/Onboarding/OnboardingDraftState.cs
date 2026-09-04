@@ -25,6 +25,8 @@ public sealed record OnboardingDraftState
     // Contract-pending: HSLOC mappings have no Link owner until Normalization support lands.
     public HslocWorkflowState Hsloc { get; init; } = new();
 
+    public EncounterWorkflowState Encounter { get; init; } = new();
+
     public ManualUploadWorkflowState ManualUpload { get; init; } = new();
 
     public ReportWorkflowState Report { get; init; } = new();
@@ -60,6 +62,11 @@ public sealed record HslocMappingState
 {
     public string? LocationId { get; init; }
     public string? HslocCode { get; init; }
+}
+
+public sealed record EncounterWorkflowState
+{
+    public List<string> CodeSystems { get; init; } = [];
 }
 
 public sealed record ManualUploadWorkflowState

@@ -114,6 +114,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             "hsloc" => state with { Hsloc = new HslocWorkflowState { Mappings = [.. draft.Hsloc.Mappings] } },
 
+            "encounter" => state with { Encounter = new EncounterWorkflowState { CodeSystems = [.. draft.Encounter.CodeSystems] } },
+
             "manual-upload" => state with
             {
                 ManualUpload = new ManualUploadWorkflowState
@@ -143,9 +145,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             "reporting-plan" => state with { ReportingPlan = new ReportingPlanWorkflowState { Reviewed = draft.ReportingPlan.Reviewed } },
 
-            // welcome, facility-info, census, location-org, encounter, mrn-intake, complete: no
-            // workflow slice of their own. Their data is configuration, or a BFF table written
-            // through its own endpoint.
+            // welcome, facility-info, census, location-org, mrn-intake, complete: no workflow slice
+            // of their own. Their data is configuration, or a BFF table written through its own
+            // endpoint.
             _ => state
         };
 
@@ -243,14 +245,11 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 }, cancellationToken);
                 break;
 
-            case "encounter":
-                _logger.LogWarning(
-                    "Step {StepId} for facility {FacilityId}: configuration not written. Normalization write path exists but is not yet wired.",
-                    stepId, facility.FacilityId);
-                break;
-
             default:
                 // Workflow-only step, or one whose data is written through its own endpoint.
+                // encounter falls here: code systems are workflow state (see
+                // SaveWorkflowStateAsync), and the mappings are Normalization CodeMap operations
+                // written through their own /encounter-mappings endpoint.
                 break;
         }
     }

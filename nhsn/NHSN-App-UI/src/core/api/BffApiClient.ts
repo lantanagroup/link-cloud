@@ -129,9 +129,17 @@ export class BffApiClient implements ApiClient {
     });
   }
 
-  async getEncounterCodes(query: string): Promise<EncounterCode[]> {
+  async getEncounterCodes(query?: string): Promise<EncounterCode[]> {
+    const q = query?.trim();
+    if (!q) {
+      return cachedReference('encounter-codes', async () => {
+        const {data} = await this.http.get<EncounterCode[]>('/reference/encounter-codes');
+        return data;
+      });
+    }
+
     const {data} = await this.http.get<EncounterCode[]>(
-      `/reference/encounter-codes?q=${encodeURIComponent(query)}`
+      `/reference/encounter-codes?q=${encodeURIComponent(q)}`
     );
     return data;
   }

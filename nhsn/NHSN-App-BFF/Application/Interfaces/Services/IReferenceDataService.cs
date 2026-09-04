@@ -11,4 +11,6 @@ public interface IReferenceDataService
     IReadOnlyList<VendorProfile> GetVendorProfiles();
 
     IReadOnlyList<TimezoneResponse> GetTimezones();
+
+    IReadOnlyList<EncounterCode> GetEncounterCodes(string? query = null);
 }

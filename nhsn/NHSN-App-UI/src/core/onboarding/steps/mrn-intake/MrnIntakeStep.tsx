@@ -24,7 +24,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
         <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={onNext} disabled={saving}>
+        <Button onClick={onNext} disabled={saving} loading={saving}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

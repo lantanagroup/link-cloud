@@ -3,6 +3,7 @@ import type {FacilityDraft} from '../../core/onboarding/types';
 import {createEmptyDraft, migrateDraft} from '../../core/onboarding/types';
 import type {Operation} from '../../core/api/http';
 import type * as C from '../../core/api/contracts';
+import {ENCOUNTER_REFERENCE_CODES} from './fixtures/encounterReferenceCodes';
 
 /**
  * Offline implementation of the port.
@@ -37,6 +38,10 @@ export class MockApiClient implements ApiClient {
 
   private get draftKey(): string {
     return `${DRAFT_KEY_PREFIX}${this.facilityId}`;
+  }
+
+  private get encounterMappingsKey(): string {
+    return `${this.draftKey}.encounterMappings`;
   }
 
   // ------------------------------------------------------------ session
@@ -210,9 +215,17 @@ export class MockApiClient implements ApiClient {
     ];
   }
 
-  async getEncounterCodes(): Promise<C.EncounterCode[]> {
+  async getEncounterCodes(query?: string): Promise<C.EncounterCode[]> {
     await tick();
-    return [{system: 'http://example.invalid/encounter', code: 'IMP', display: 'Inpatient'}];
+    const q = query?.trim().toLowerCase();
+    if (!q) {
+      return ENCOUNTER_REFERENCE_CODES;
+    }
+    return ENCOUNTER_REFERENCE_CODES.filter(c =>
+      `${c.system} ${c.code} ${c.display} ${c.category ?? ''} ${c.categoryName ?? ''}`
+        .toLowerCase()
+        .includes(q)
+    );
   }
 
   async getDocument(documentKey: string): Promise<Blob> {
@@ -304,11 +317,13 @@ export class MockApiClient implements ApiClient {
 
   async getEncounterMappings(): Promise<C.EncounterMapping[]> {
     await tick();
-    return [];
+    const raw = window.localStorage.getItem(this.encounterMappingsKey);
+    return raw ? JSON.parse(raw) : [];
   }
 
-  async saveEncounterMappings(): Promise<void> {
+  async saveEncounterMappings(mappings: C.EncounterMapping[]): Promise<void> {
     await tick();
+    window.localStorage.setItem(this.encounterMappingsKey, JSON.stringify(mappings));
   }
 
   // ------------------------------------------------------------ mrn intake

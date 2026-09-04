@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.EncounterCodes;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
@@ -50,6 +51,20 @@ public sealed class ReferenceDataService : IReferenceDataService
     public IReadOnlyList<VendorProfile> GetVendorProfiles() => VendorProfileCatalog.All;
 
     public IReadOnlyList<TimezoneResponse> GetTimezones() => Timezones.Value;
+
+    public IReadOnlyList<EncounterCode> GetEncounterCodes(string? query = null)
+    {
+        var q = query?.Trim();
+        if (string.IsNullOrEmpty(q))
+        {
+            return EncounterCodeCatalog.All;
+        }
+
+        return EncounterCodeCatalog.All
+            .Where(code => $"{code.System} {code.Code} {code.Display} {code.Category} {code.CategoryName}"
+                .Contains(q, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
 
     private static IReadOnlyList<TimezoneResponse> BuildTimezones() =>
         OrderedTimezoneIds

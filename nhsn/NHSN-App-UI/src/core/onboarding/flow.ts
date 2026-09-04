@@ -117,7 +117,7 @@ export const STEPS: Step[] = [
     id: 'encounter',
     labelKey: 'onboarding:steps.encounter',
     Component: lazyStep(() => import('./steps/encounter/EncounterStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: () => true
   },
   {
     id: 'report',
