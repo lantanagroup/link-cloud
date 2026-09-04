@@ -589,8 +589,10 @@
 .nhsn-link .k-input:focus,
 .nhsn-link .k-input:focus-within,
 .nhsn-link .k-input.k-focus {
+  /* Inset (negative offset) so the ring stays inside the input's own box and
+     is never clipped by a scrollable ancestor like .nhsn-link__repeatable-scroll. */
   outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 1px;
+  outline-offset: -2px;
   border-color: var(--kendo-color-border, #d0d7de);
   color: inherit;
   background: var(--kendo-color-app-surface, #ffffff);
@@ -1148,8 +1150,19 @@
 /* ---- repeatable list (core/fields/RepeatableList.tsx) */
 
 .nhsn-link__repeatable {
-  max-height: 230px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Scrolls on its own so the add button below it never scrolls out of reach.
+   Height tracks the viewport instead of a fixed pixel value, so it only
+   kicks in once rows actually run out of the space the screen has. */
+.nhsn-link__repeatable-scroll {
+  width: 100%;
+  max-height: 45vh;
   overflow-y: auto;
+  box-sizing: border-box;
   padding-right: 4px;
 }
 
@@ -1165,14 +1178,14 @@
 .nhsn-link__repeatable-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 4px;
   margin: 0;
 }
 
 .nhsn-link__repeatable-fields {
   display: flex;
   flex: 1 1 auto;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1180,6 +1193,10 @@
   flex: 1 1 0;
   min-width: 0;
   margin-bottom: 0;
+  /* The package's .k-form-field reserves 1rem for the next field in a
+     horizontal form row - redundant here since the row's own `gap` already
+     separates fields, and it otherwise reads as dead space before Remove. */
+  padding-right: 0;
 }
 
 /* Every row repeats the same labels, and the placeholder already carries them.
@@ -1475,6 +1492,13 @@
 .nhsn-link__location-org .page-header {
   padding: 0;
   border-bottom: none !important;
+}
+
+/* .nhsn-link__content has no top padding, so with the page-header's own padding
+   suppressed above, its border/shadow reads as missing along the top edge -
+   give the step back its own breathing room instead. */
+.nhsn-link__location-org.nhsn-link__content {
+  padding-top: 28px;
 }
 
 .nhsn-link__location-org .page-header-buttons {

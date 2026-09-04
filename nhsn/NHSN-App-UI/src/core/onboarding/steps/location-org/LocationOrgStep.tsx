@@ -89,7 +89,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
       {methods.length > 0 && (
         <div className="nhsn-link__field-group">
-          <FieldLabel tooltip={t('onboarding:locationOrg.methodTooltip')}>{t('onboarding:locationOrg.methodLabel')}</FieldLabel>
+          <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.methodTooltip')}>{t('onboarding:locationOrg.methodLabel')}</FieldLabel>
           <Tabs<LocationMethod>
             label={t('onboarding:locationOrg.methodLabel')}
             tabs={methods.map(method => ({id: method, label: t(METHOD_LABEL_KEYS[method])}))}
@@ -111,7 +111,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           </div>
 
           <div className="nhsn-link__field-group">
-            <FieldLabel tooltip={t('onboarding:locationOrg.locationType.tooltip')}>{t('onboarding:locationOrg.locationType.listLabel')}</FieldLabel>
+            <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.locationType.tooltip')}>{t('onboarding:locationOrg.locationType.listLabel')}</FieldLabel>
             <RepeatableList<LocationTypeEntry>
               items={locationTypes}
               onChange={rows => patch('locationOrg', {locationTypes: rows})}
@@ -144,7 +144,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
       {activeMethod === 'managing-org' && (
         <div className="nhsn-link__field-group">
-          <FieldLabel tooltip={t('onboarding:locationOrg.managingOrg.tooltip')}>{t('onboarding:locationOrg.managingOrg.listLabel')}</FieldLabel>
+          <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.managingOrg.tooltip')}>{t('onboarding:locationOrg.managingOrg.listLabel')}</FieldLabel>
           <RepeatableList<string>
             items={managingOrganizations}
             onChange={rows => patch('locationOrg', {managingOrganizationIds: rows})}
@@ -176,7 +176,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           )}
 
           <div className="nhsn-link__field-group">
-            <FieldLabel tooltip={t('onboarding:locationOrg.locationIdentifier.tooltip')}>{t('onboarding:locationOrg.locationIdentifier.listLabel')}</FieldLabel>
+            <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.locationIdentifier.tooltip')}>{t('onboarding:locationOrg.locationIdentifier.listLabel')}</FieldLabel>
             <RepeatableList<LocationIdentifierEntry>
               items={locationIdentifiers}
               onChange={rows => patch('locationOrg', {locationIdentifiers: rows})}
@@ -209,7 +209,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
       {(activeMethod === 'custom-fhir-path' || methods.length === 0) && (
         <div className="nhsn-link__field-group nhsn-link__field-group--labeled">
-          <FieldLabel tooltip={t('onboarding:locationOrg.customFhirPath.tooltip')}>{t('onboarding:locationOrg.customFhirPath.label')}</FieldLabel>
+          <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.customFhirPath.tooltip')}>{t('onboarding:locationOrg.customFhirPath.label')}</FieldLabel>
           <TextField
             id="custom-fhir-path"
             label={t('onboarding:locationOrg.customFhirPath.label')}

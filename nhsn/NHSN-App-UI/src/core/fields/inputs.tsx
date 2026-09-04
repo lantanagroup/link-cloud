@@ -23,6 +23,10 @@ export function TextField({placeholder, maxLength, type = 'text', ...base}: Text
       type,
       placeholder,
       maxLength,
+      // These values are never worth the browser re-suggesting - onboarding
+      // data, not something like a saved address - and its suggestion list
+      // overlaps a repeatable list's rows when one is open.
+      autoComplete: 'off',
       onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? '')
     })
   );
