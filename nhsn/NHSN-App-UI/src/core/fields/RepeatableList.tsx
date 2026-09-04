@@ -81,23 +81,25 @@ export function RepeatableList<T>({
       {items.length === 0 && emptyLabel && <p className="nhsn-link__hint-text">{emptyLabel}</p>}
 
       {items.length > 0 && (
-        <ul className="nhsn-link__repeatable-list">
-          {items.map((item, index) => (
-            <li className="nhsn-link__repeatable-row" key={ids.current[index]}>
-              <div className="nhsn-link__repeatable-fields">
-                {renderItem(item, index, next => handleItemChange(index, next))}
-              </div>
-              <button
-                type="button"
-                className="nhsn-link__repeatable-remove"
-                aria-label={`${removeLabel} ${index + 1}`}
-                disabled={disabled || atFloor}
-                onClick={() => handleRemove(index)}>
-                {removeLabel}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="nhsn-link__repeatable-scroll">
+          <ul className="nhsn-link__repeatable-list">
+            {items.map((item, index) => (
+              <li className="nhsn-link__repeatable-row" key={ids.current[index]}>
+                <div className="nhsn-link__repeatable-fields">
+                  {renderItem(item, index, next => handleItemChange(index, next))}
+                </div>
+                <button
+                  type="button"
+                  className="nhsn-link__repeatable-remove"
+                  aria-label={`${removeLabel} ${index + 1}`}
+                  disabled={disabled || atFloor}
+                  onClick={() => handleRemove(index)}>
+                  {removeLabel}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <AddButton label={addLabel} onClick={handleAdd} disabled={disabled || atCeiling} />
