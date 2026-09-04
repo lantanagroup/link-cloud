@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 
@@ -21,4 +22,7 @@ public interface IDataAcquisitionRawClient
 
     /// <summary>Clean-replace update — callers must send the complete record, not a sparse patch.</summary>
     Task UpdateFhirQueryConfigurationAsync(UpdateFhirQueryConfigurationPayload payload, CancellationToken cancellationToken = default);
+
+    /// <summary>Clean-replace update of every OrganizationLocationConfiguration the facility has.</summary>
+    Task UpdateOrganizationLocationConfigurationAsync(string facilityId, UpdateOrganizationLocationConfigurationPayload payload, CancellationToken cancellationToken = default);
 }

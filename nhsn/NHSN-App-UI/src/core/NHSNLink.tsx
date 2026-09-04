@@ -278,8 +278,18 @@ function useHintTooltips() {
       trigger.classList.toggle(openClass, !isOpen);
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeAllHintsExcept(null);
+      }
+    }
+
     document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 }
 

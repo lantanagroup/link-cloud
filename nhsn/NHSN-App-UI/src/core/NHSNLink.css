@@ -433,38 +433,45 @@
   margin-top: 24px;
 }
 
-.nhsn-link__step-actions .k-button.k-button-primary {
+/* core/fields Button, styled everywhere - not just in StepActions, or a standalone Button renders unstyled. */
+.nhsn-link .k-button.k-button-primary {
   background: var(--kendo-color-primary, #0057b7);
   border-color: var(--kendo-color-primary, #0057b7);
-  padding: 9px 18px;
+  color: var(--kendo-color-on-primary, #ffffff);
+  padding: 7px 14px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 8px;
 }
 
-.nhsn-link__step-actions .k-button.k-button-primary:hover {
+.nhsn-link .k-button.k-button-primary:hover:not(:disabled) {
   background: var(--kendo-color-primary-hover, #063f78);
   border-color: var(--kendo-color-primary-hover, #063f78);
 }
 
-.nhsn-link__step-actions .k-button.k-button-base {
+.nhsn-link .k-button.k-button-base {
   background: var(--kendo-color-app-surface, #ffffff);
   color: var(--kendo-color-primary, #0057b7);
   border: 1px solid var(--kendo-color-primary, #0057b7);
-  padding: 9px 18px;
+  padding: 7px 14px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 8px;
 }
 
-.nhsn-link__step-actions .k-button.k-button-base:hover {
+.nhsn-link .k-button.k-button-base:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #eef0f3);
   border-color: var(--kendo-color-primary, #0057b7);
 }
 
-.nhsn-link__step-actions .k-button:disabled {
+.nhsn-link .k-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.nhsn-link .k-button:focus,
+.nhsn-link .k-button.k-focus {
+  box-shadow: none;
 }
 
 .nhsn-link__step-panel .nhsn-link__step-actions {
@@ -549,6 +556,54 @@
 }
 
 /* ---------------------------------------------------------- form layout */
+
+/* core/fields' plain text/number inputs, styled everywhere - a bare `.k-input` has no usable default. */
+.nhsn-link .k-input,
+.nhsn-link .k-numerictextbox {
+  width: 100%;
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link .k-input,
+.nhsn-link .k-input *,
+.nhsn-link .k-numerictextbox,
+.nhsn-link .k-numerictextbox * {
+  font-family: 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.nhsn-link .k-input::placeholder {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  opacity: 1;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* Browser autofill (Chrome/Edge tint an input it thinks it can fill) overrides any background we
+   set - forced back to the app's own surface color and text color here. */
+.nhsn-link input.k-input:-webkit-autofill,
+.nhsn-link input.k-input:-webkit-autofill:hover,
+.nhsn-link input.k-input:-webkit-autofill:focus,
+.nhsn-link .k-input-inner:-webkit-autofill,
+.nhsn-link .k-input-inner:-webkit-autofill:hover,
+.nhsn-link .k-input-inner:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--kendo-color-app-text, #1f2328);
+  -webkit-box-shadow: 0 0 0 1000px var(--kendo-color-app-surface, #ffffff) inset;
+  box-shadow: 0 0 0 1000px var(--kendo-color-app-surface, #ffffff) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* The package's default focus style darkens text and adds a heavy glow - replaced with a plain outline. */
+.nhsn-link .k-input:focus,
+.nhsn-link .k-input:focus-within,
+.nhsn-link .k-input.k-focus {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 1px;
+  border-color: var(--kendo-color-border, #d0d7de);
+  color: inherit;
+  background: var(--kendo-color-app-surface, #ffffff);
+  box-shadow: none;
+}
 
 .nhsn-link__form-error {
   color: var(--kendo-color-error, #cc1b22);
@@ -1016,4 +1071,448 @@
     margin-top: 1.5rem;
     padding: 0;
   }
+}
+
+/* ------------------------------------------------------- shared step blocks
+   Written for Organization Identification and deliberately generic: the
+   mapping and report steps repeat the same tab row, repeatable list, picker
+   dialog and instruction box. Add to these rather than restating them under a
+   step-specific selector. */
+
+.nhsn-link__field-group {
+  margin-bottom: 18px;
+}
+
+.nhsn-link__field-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+/* core/fields/layout.tsx FieldLabel's decorative check badge. */
+.nhsn-link__field-check {
+  flex: 0 0 auto;
+  color: #0d7a4a;
+}
+
+.nhsn-link__field-check circle {
+  fill: #cfeee0;
+}
+
+/* Kendo's own label, visually hidden (never `display: none`) where FieldLabel already shows it. */
+.nhsn-link__field-group--labeled .k-label,
+.nhsn-link__repeatable-fields .k-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- tabs (core/fields/Tabs.tsx) */
+
+.nhsn-link__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.nhsn-link__tab {
+  padding: 7px 14px;
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nhsn-link__tab:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__tab--selected,
+.nhsn-link__tab--selected:hover:not(:disabled) {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-link__tab:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- repeatable list (core/fields/RepeatableList.tsx) */
+
+.nhsn-link__repeatable {
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.nhsn-link__repeatable-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+
+.nhsn-link__repeatable-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+
+.nhsn-link__repeatable-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nhsn-link__repeatable-fields > * {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* Every row repeats the same labels, and the placeholder already carries them.
+   Hidden visually, kept for assistive technology — never `display: none`. Rule
+   is above, grouped with `.nhsn-link__field-group--labeled .k-label`. */
+
+.nhsn-link__repeatable > .nhsn-link__hint-text {
+  margin-bottom: 10px;
+}
+
+.nhsn-link__repeatable-add,
+.nhsn-link__repeatable-remove {
+  border: 1px solid var(--kendo-color-primary, #0057b7);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.nhsn-link__repeatable-remove {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nhsn-link__repeatable-add:hover:not(:disabled),
+.nhsn-link__repeatable-remove:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__repeatable-add:disabled,
+.nhsn-link__repeatable-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- instruction box and document download (core/documents/) */
+
+.nhsn-link__instructions {
+  background: var(--kendo-color-surface, #f7f9fc);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.nhsn-link__instructions-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__document-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  /* An <a>, not a <button> - reset the anchor defaults the button variant
+     never needed. */
+  text-decoration: none;
+  cursor: pointer;
+  cursor: pointer;
+}
+
+.nhsn-link__document-link:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+.nhsn-link__document-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- inline spinner (core/fields/layout.tsx) */
+
+.nhsn-link__inline-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__inline-spinner-dial {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2.5px solid var(--kendo-color-border, #d0d7de);
+  border-top-color: var(--kendo-color-primary, #0057b7);
+  border-radius: 50%;
+  animation: nhsn-link__spin 0.7s linear infinite;
+}
+
+.nhsn-link__inline-spinner-label {
+  line-height: 1.4;
+}
+
+/* ---- info tooltip (core/fields/InfoTooltip.tsx) - click-pin owned by useHintTooltips() in NHSNLink.tsx ---- */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 50%;
+  background: var(--kendo-color-border, #d0d7de);
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+}
+
+.info-icon:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.info-icon.info-icon--open {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+  outline: none;
+}
+
+.info-icon .tooltip-bubble {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--kendo-color-app-text, #1f2328);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+}
+
+.info-icon .tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--kendo-color-app-text, #1f2328);
+}
+
+.info-icon:hover .tooltip-bubble,
+.info-icon:focus-visible .tooltip-bubble,
+.info-icon.info-icon--open .tooltip-bubble {
+  display: block;
+}
+
+/* ---- modal (core/fields/overlays.tsx) */
+
+.nhsn-link__modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 20, 30, 0.55);
+}
+
+.nhsn-link__modal {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 86vh;
+  padding: 26px 28px;
+  border-radius: 10px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.nhsn-link__modal--large {
+  width: 860px;
+  max-width: 95vw;
+  max-height: 94vh;
+}
+
+.nhsn-link__modal--small {
+  width: 340px;
+}
+
+.nhsn-link__modal-title {
+  flex: none;
+  margin: 0 0 10px 0;
+  font-size: 17px;
+}
+
+.nhsn-link__modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nhsn-link__modal-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ---- plain data table (pickers and reference tables) */
+
+.nhsn-link__table-scroll {
+  max-height: 52vh;
+  overflow-y: auto;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-link__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.nhsn-link__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 8px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  vertical-align: top;
+}
+
+.nhsn-link__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nhsn-link__table-select-column {
+  width: 36px;
+}
+
+/* A table cell's codings list - the Cerner site-location picker's own use. */
+.nhsn-link__plain-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.nhsn-link__plain-list li {
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------- organization identification */
+
+/* Suppresses the package's default page-header border/padding, like every other step does. */
+.nhsn-link__location-org .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__location-org .page-header-buttons {
+  display: none;
+}
+
+.nhsn-link__location-org .nhsn-link__subtitle {
+  max-width: none;
+}
+
+.nhsn-link__location-org .nhsn-link__field-group {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__location-org .nhsn-link__subtitle {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__location-org .nhsn-link__tabs {
+  gap: 14px;
+  margin-top: 2px;
+}
+
+/* The site-location picker is wider than it is tall — give its rows room
+   rather than the dialog's default scroll height. */
+.nhsn-link__location-org .nhsn-link__table-scroll {
+  max-height: 70vh;
 }

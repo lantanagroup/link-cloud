@@ -51,7 +51,7 @@ export interface StepTarget {
  * and add a migration in migrateDraft(). Browsers cache nhsn-link.js
  * independently of BFF deploys, so an older bundle may read a newer draft.
  */
-export const DRAFT_SCHEMA_VERSION = 1;
+export const DRAFT_SCHEMA_VERSION = 2;
 
 // ---------------------------------------------------------------- step slices
 
@@ -90,11 +90,24 @@ export interface CensusDraft {
   accuracyAcknowledged?: boolean;
 }
 
+/** One row of the Location Type / Location Alias list. */
+export interface LocationTypeEntry {
+  code: string;
+  alias: string;
+}
+
+/** One row of the Location Identifier System / Code list. */
+export interface LocationIdentifierEntry {
+  system: string;
+  code: string;
+}
+
 export interface LocationOrgDraft {
   method?: LocationMethod;
   managingOrganizationIds?: string[];
-  locationTypeCodes?: string[];
-  locationIdentifiers?: string[];
+  /** Schema version 2 — see migrateDraft for the version 1 shape. */
+  locationTypes?: LocationTypeEntry[];
+  locationIdentifiers?: LocationIdentifierEntry[];
   customFhirPath?: string;
 }
 
@@ -200,7 +213,7 @@ export function migrateDraft(raw: unknown): FacilityDraft {
     manualUpload: {...empty.manualUpload, ...incoming.manualUpload},
     fhir: {...empty.fhir, ...incoming.fhir},
     census: {...empty.census, ...incoming.census},
-    locationOrg: {...empty.locationOrg, ...incoming.locationOrg},
+    locationOrg: migrateLocationOrg(empty.locationOrg, incoming.locationOrg),
     hsloc: {...empty.hsloc, ...incoming.hsloc},
     encounter: {...empty.encounter, ...incoming.encounter},
     report: {...empty.report, ...incoming.report},
@@ -221,4 +234,32 @@ export function migrateDraft(raw: unknown): FacilityDraft {
   }
 
   return merged;
+}
+
+/** Schema version 1 -> 2: `locationTypeCodes`/`locationIdentifiers` (string[]) become pairs. */
+function migrateLocationOrg(
+  empty: LocationOrgDraft,
+  incoming: LocationOrgDraft | undefined
+): LocationOrgDraft {
+  const legacy = incoming as (LocationOrgDraft & {locationTypeCodes?: unknown}) | undefined;
+  const merged: LocationOrgDraft = {...empty, ...incoming};
+
+  const legacyTypeCodes = asStringList(legacy?.locationTypeCodes);
+  if (!merged.locationTypes && legacyTypeCodes) {
+    merged.locationTypes = legacyTypeCodes.map(code => ({code, alias: ''}));
+  }
+
+  const legacyIdentifiers = asStringList(legacy?.locationIdentifiers);
+  if (legacyIdentifiers) {
+    merged.locationIdentifiers = legacyIdentifiers.map(code => ({system: '', code}));
+  }
+
+  delete (merged as {locationTypeCodes?: unknown}).locationTypeCodes;
+  return merged;
+}
+
+function asStringList(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every(entry => typeof entry === 'string')
+    ? (value as string[])
+    : undefined;
 }

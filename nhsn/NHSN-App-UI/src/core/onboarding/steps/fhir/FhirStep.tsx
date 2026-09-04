@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, NHSNLoadingIndicator, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
+import {Button, InfoTooltip, NHSNLoadingIndicator, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
@@ -317,9 +317,10 @@ export function FhirStep({onNext, onBack}: StepProps) {
           <div className="form-group">
             <label>
               {t('onboarding:fhirServerInfo.fields.lagLabel')}
-              <span className="info-icon" aria-label={t('onboarding:fhirServerInfo.fields.lagLabel')}>
-                ?<span className="tooltip-bubble" role="tooltip">{t('onboarding:fhirServerInfo.fields.lagTooltip')}</span>
-              </span>
+              <InfoTooltip
+                label={t('onboarding:fhirServerInfo.fields.lagLabel')}
+                content={t('onboarding:fhirServerInfo.fields.lagTooltip')}
+              />
             </label>
             <div className="triplet">
               <NumberField

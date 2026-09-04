@@ -92,9 +92,25 @@ public sealed record LocationOrgSection
 {
     public string? Method { get; init; }
     public IReadOnlyList<string> ManagingOrganizationIds { get; init; } = [];
-    public IReadOnlyList<string> LocationTypeCodes { get; init; } = [];
-    public IReadOnlyList<string> LocationIdentifiers { get; init; } = [];
+
+    // Pairs, not bare codes: a type code says what kind of Location it is and the alias says which
+    // one, and Data Acquisition needs both halves to resolve a facility. Same for an identifier,
+    // which is only meaningful against the system that issued it. Draft schema version 2.
+    public IReadOnlyList<LocationTypeEntry> LocationTypes { get; init; } = [];
+    public IReadOnlyList<LocationIdentifierEntry> LocationIdentifiers { get; init; } = [];
     public string? CustomFhirPath { get; init; }
+}
+
+public sealed record LocationTypeEntry
+{
+    public string Code { get; init; } = string.Empty;
+    public string Alias { get; init; } = string.Empty;
+}
+
+public sealed record LocationIdentifierEntry
+{
+    public string System { get; init; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
 }
 
 // Contract-pending — held in DraftJson until Normalization owns it.

@@ -20,8 +20,12 @@
  */
 
 export * from './inputs';
+export * from './InfoTooltip';
 export * from './Select';
 export * from './DataTable';
 export * from './layout';
+export * from './overlays';
+export * from './RepeatableList';
+export * from './Tabs';
 export * from './upload';
 export type {BaseFieldProps} from './fieldProps';

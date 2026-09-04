@@ -34,6 +34,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IQueryDispatchGateway _queryDispatchGateway;
     private readonly IReportGateway _reportGateway;
     private readonly IAcknowledgementService _acknowledgementService;
+    private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
 
@@ -48,6 +49,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IQueryDispatchGateway queryDispatchGateway,
         IReportGateway reportGateway,
         IAcknowledgementService acknowledgementService,
+        IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
     {
@@ -61,6 +63,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _queryDispatchGateway = queryDispatchGateway;
         _reportGateway = reportGateway;
         _acknowledgementService = acknowledgementService;
+        _organizationLocationGateway = organizationLocationGateway;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -113,7 +116,10 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var reportTask = ReadSectionAsync("report", "Report",
             ct => _reportGateway.GetLatestScheduleAsync(facilityId, ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask);
+        var locationOrgTask = ReadSectionAsync("locationOrg", "DataAcquisition",
+            ct => _organizationLocationGateway.GetAsync(facilityId, ct), overall.Token, cancellationToken);
+
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask, locationOrgTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
@@ -122,16 +128,18 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var sftpConfig = await sftpConfigTask;
         var hasCredentials = await hasCredentialsTask;
         var report = await reportTask;
+        var locationOrg = await locationOrgTask;
 
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
         sources.Add(census.Source);
         sources.Add(report.Source);
+        sources.Add(locationOrg.Source);
 
         return new DraftEnvelopeResponse
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
-                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value),
+                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value, locationOrg.Value),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -147,7 +155,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         bool? censusAccuracyAcknowledged,
         SftpConfig? sftpConfig,
         bool? hasCredentials,
-        ReportScheduleSummary? report) => new()
+        ReportScheduleSummary? report,
+        LocationOrgSection? locationOrg) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -188,12 +197,11 @@ public sealed class OnboardingReadService : IOnboardingReadService
                 AccuracyAcknowledged = censusAccuracyAcknowledged
             },
 
-            // LocationOrg: Data Acquisition has read methods for both resources
-            // (GetOrganizationLocationConfigurationsAsync, GetOrganizationLocationMappingsAsync) —
-            // not wired yet.
+            // Reconstructed from Data Acquisition's FHIRPath conditions - see LocationOrgFhirPathParser.
+            LocationOrg = locationOrg ?? new LocationOrgSection(),
+
             // Encounter: owned by Normalization (SearchFacilityOperationsAsync), not Data
-            // Acquisition — also not wired yet.
-            LocationOrg = new LocationOrgSection(),
+            // Acquisition — not wired yet.
             Encounter = new EncounterSection(),
 
             Hsloc = new HslocSection { Mappings = stored.State.Hsloc.Mappings },

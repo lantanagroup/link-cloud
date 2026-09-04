@@ -31,7 +31,9 @@ public static class VendorProfileCatalog
         DisplayName = "Epic",
         CensusAcquisition = CensusAcquisition.PatientList,
         PatientListKeys = EpicPatientListKeys,
-        LocationMethods = ["managing-org", "location-identifier", "custom-fhir-path"],
+        // Two methods, matching the POC: an Epic facility resolves by Location.identifier, or by a
+        // custom FHIRPath where that is not enough.
+        LocationMethods = ["location-identifier", "custom-fhir-path"],
         DocumentKeys = new VendorDocumentKeys
         {
             CensusInstructions = "epic-census-instructions",
@@ -51,8 +53,9 @@ public static class VendorProfileCatalog
         // rendered at all rather than rendered and ignored.
         PatientListKeys = [],
 
-        // Cerner adds location-type, backed by its "Site" location search.
-        LocationMethods = ["managing-org", "location-identifier", "location-type", "custom-fhir-path"],
+        // Three methods, matching the POC. location-type leads and is backed by Cerner's "Site"
+        // location search; location-identifier is Epic's and is not offered here.
+        LocationMethods = ["location-type", "managing-org", "custom-fhir-path"],
         DocumentKeys = new VendorDocumentKeys
         {
             CensusInstructions = "cerner-census-instructions",
