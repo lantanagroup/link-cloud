@@ -30,11 +30,25 @@ Keeping these in one module means the reconciler and the check can never disagre
 """
 
 import json
+import os
 import re
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 JSON_CONTENT_TYPES = ("application/json",)
 EXCLUDED_CONTENT_TYPES = ("keyvaultref", "appconfig.ff")
+
+
+def default_config_dir() -> str:
+    """Where the App Configuration exports live: the private `link-cac` repository.
+
+    They were in this repository under `Config/` until LEGLINK-912 moved them out - this one
+    is public, and they are the deployed environments' real configuration. Everything that
+    reads them still runs from this repository root, so the default assumes link-cac is cloned
+    beside link-cloud. Set LINK_CAC_CONFIG_DIR, or pass --config-dir, when it is not.
+
+    CI supplies the path explicitly and relies on neither.
+    """
+    return os.environ.get("LINK_CAC_CONFIG_DIR") or os.path.join("..", "link-cac", "Config")
 
 
 def dotted_to_slash(key: str) -> str:
@@ -219,9 +233,9 @@ def environment_names(document: Dict[str, Any]) -> List[str]:
 
     Declared in one place because it was previously a tuple repeated in four scripts, and a
     fourth environment appearing meant finding all four. Each name is the suffix of its export:
-    `qa2` is Config/app-config.qa2.json. Callers should let a declared environment with no
-    export fail rather than skipping it - a check that silently covers three stores instead of
-    four still reports success.
+    `qa2` is app-config.qa2.json in link-cac's Config/. Callers should let a declared
+    environment with no export fail rather than skipping it - a check that silently covers three
+    stores instead of four still reports success.
     """
     return list((document.get("environments") or {}).keys())
 
@@ -234,17 +248,23 @@ def environment_store(document: Dict[str, Any], name: str) -> Optional[str]:
 
 def missing_export_hint(document: Dict[str, Any], name: str,
                         catalog: str = "app-config.yaml",
-                        config_dir: str = "Config") -> str:
+                        config_dir: Optional[str] = None) -> str:
     """What to do when a declared environment has no export.
 
     Every tool here loads the same set of exports, so all of them hit this together. Saying
-    only "file not found" leaves the reader to work out that the catalog is what expects it.
+    only "file not found" leaves the reader to work out that the catalog is what expects it -
+    and, since the exports moved to link-cac, that the path it is looking in may simply be the
+    wrong clone rather than a store nobody has exported.
     """
+    config_dir = default_config_dir() if config_dir is None else config_dir
     store = environment_store(document, name) or f"the {name} store"
     return (f"{name} is declared under 'environments' in {catalog}, so its export is "
-            f"required. Produce it with:\n"
+            f"required. The exports live in the private link-cac repository; this looked in "
+            f"{config_dir}. Either point at the right clone:\n"
+            f"    set LINK_CAC_CONFIG_DIR=<path-to>\\link-cac\\Config   (or pass --config-dir)\n"
+            f"Or produce the missing export:\n"
             f"    Scripts\\AzureAppConfig\\export-appconfigs.bat {store} "
-            f"{config_dir}\\app-config.{name}.json\n"
+            f"{os.path.join(config_dir, f'app-config.{name}.json')}\n"
             f"Or remove {name} from the catalog if it should not be checked.")
 
 
