@@ -245,19 +245,28 @@ export class MockApiClient implements ApiClient {
 
   async queryPatientList(key: C.CensusListKey): Promise<C.CensusListResult> {
     await tick();
-    return {listKey: key, patientCount: 3, patientIds: ids(3), simulated: true};
+    const count = 5 + Math.floor(Math.random() * 46);
+    return {listKey: key, patientCount: count, patientIds: ids(count), simulated: true};
   }
 
   async listSftpFiles(): Promise<C.SftpFile[]> {
     await tick();
-    return [
-      {
-        fileName: 'census-simulated-0001.csv',
-        queriedAt: '2026-01-01T00:00:00Z',
-        patients: [{patientId: 'SIMULATED-PATIENT-0001', patientName: 'Jane Doe'}],
+    const queriedAt = new Date().toISOString();
+    const fileCount = 2 + Math.floor(Math.random() * 4);
+    let patientSeq = 0;
+    return Array.from({length: fileCount}, (_, fileIndex) => {
+      const patientCount = 3 + Math.floor(Math.random() * 13);
+      const patientIds = Array.from({length: patientCount}, () => {
+        patientSeq += 1;
+        return `SIMULATED-PATIENT-${String(patientSeq).padStart(4, '0')}`;
+      });
+      return {
+        fileName: `census_extract_${fileIndex + 1}_${queriedAt.slice(0, 10)}.csv`,
+        queriedAt,
+        patientIds,
         simulated: true
-      }
-    ];
+      };
+    });
   }
 
   async testSftpConnection(): Promise<C.ConnectionResult> {

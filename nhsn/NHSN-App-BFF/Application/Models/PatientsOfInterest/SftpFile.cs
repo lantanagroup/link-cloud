@@ -8,12 +8,6 @@ public class SftpFile
 {
     public required string FileName { get; set; }
     public required DateTimeOffset QueriedAt { get; set; }
-    public required IReadOnlyList<SftpFilePatient> Patients { get; set; }
+    public required IReadOnlyList<string> PatientIds { get; set; }
     public bool Simulated { get; set; }
-}
-
-public class SftpFilePatient
-{
-    public required string PatientId { get; set; }
-    public required string PatientName { get; set; }
 }
