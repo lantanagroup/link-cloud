@@ -60,6 +60,7 @@ fi
 
 # The required-key check is deliberately NOT run here. It compares the catalog against every
 # store's export, which now means reading a second repository - and it would fail on gaps a
-# commit did not introduce and cannot fix. Both repositories' CI report it instead.
+# commit did not introduce and cannot fix. link-cac's CI reports it instead: this repository
+# never reads that one.
 
 exit 0

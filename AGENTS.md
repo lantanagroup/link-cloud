@@ -10,7 +10,7 @@ This system is a high-performing, big-data platform intended to support collecti
 
 ### Application Configuration
 
-The **catalog** — which keys exist and what they mean — is `/app-config.yaml` in this repository. The **values**, one export per environment, live in the private `lantanagroup/link-cac` repository under `Config/`. Everything in `Scripts/AzureAppConfig/` runs from this repository's root and looks for those exports at `../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR` or `--config-dir`.
+The **catalog** — which keys exist and what they mean — is `/app-config.yaml` in this repository. The **values**, one export per environment, live in the private `lantanagroup/link-cac` repository under `Config/`. Everything in `Scripts/AzureAppConfig/` runs from this repository's root and looks for those exports at `../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR`, or with `--config-dir` on the tools that accept it. `validate_aac_secrets.py` is the exception: it takes export paths positionally and has no `--config-dir`.
 
 * Any new configuration key that is **required** (has no safe default) must be added to `/app-config.yaml` in the same PR. Prefer shipping a working default in `appsettings.json` / `application.yml` and recording it as `required: false` with a `defaultValue` — requiring a key means provisioning one identical value into every environment.
 * **State `required` explicitly.** The schema declares `default: true`, but JSON Schema defaults are annotation only and are never applied during validation.
@@ -86,11 +86,11 @@ PR summaries/titles must begin with one of the following prefixes. This is enfor
 * DOCS: <brief_summary>
 * SNYK: <brief_summary>
 
-`Dops-` and `Bump ` are also accepted, for DevOps and dependency-update automation respectively. Do not use them for hand-written PRs.
+`Dops-` and `Bump` (with its trailing space) are also accepted, for DevOps and dependency-update automation respectively. Do not use them for hand-written PRs.
 
 Note the format is exact: the ticket prefix is upper-case, followed by a colon and a **space**. A title such as `LEGLINK-912:Fix the thing` fails the check.
 
-Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates, documentation (such as markdown files) and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must reference a JIRA ticket number in their summary, and include information on what testing was performed in the description of the PR.
+Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates and logging improvements. Documentation-only changes belong under `DOCS:`. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must reference a JIRA ticket number in their summary, and include information on what testing was performed in the description of the PR.
 
 The description of the PR must follow this template:
 

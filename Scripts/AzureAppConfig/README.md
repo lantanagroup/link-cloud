@@ -42,7 +42,8 @@ python Scripts/AzureAppConfig/extract_config_keys.py
 Producing `Scripts/AzureAppConfig/config-key-inventory.json` (machine-readable, consumed by the
 reconciler and the tagging tool) and `docs/config-key-inventory.md` (the human reference).
 
-Only the markdown is committed. Both JSON files are gitignored: a committed derived file
+Only the markdown is committed. Both JSON files above -- `config_symbols.json` and
+`config-key-inventory.json` -- are gitignored: a committed derived file
 drifts from the code it describes the moment someone adds a `GetSection` call, which is the
 exact failure this tooling exists to detect. Regenerate before using either.
 
