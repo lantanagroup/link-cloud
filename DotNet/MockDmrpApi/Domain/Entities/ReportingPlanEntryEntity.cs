@@ -3,25 +3,21 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 namespace LantanaGroup.Link.MockDmrpApi.Domain.Entities;
 
 /// <summary>
-/// The NHSN component a reporting plan entry belongs to. The two components differ in
-/// subject and in cadence, which is why the reporting period differs with them.
+/// The NHSN component a reporting plan entry belongs to. The two differ in subject, not in
+/// cadence: both are reported monthly.
 /// </summary>
 public static class ReportingComponents
 {
-    /// <summary>Medicine reports. Reported monthly, so entries carry a month.</summary>
+    /// <summary>Medicine reports.</summary>
     public const string Msc = "MSC";
 
-    /// <summary>Patient safety. Reported annually, so entries carry no month.</summary>
+    /// <summary>Patient safety.</summary>
     public const string Ps = "PS";
 
     public static readonly string[] All = [Msc, Ps];
 
     public static bool IsKnown(string? component) =>
         All.Contains(component, StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>True for components reported monthly, which are the ones that need a month.</summary>
-    public static bool RequiresReportingMonth(string? component) =>
-        string.Equals(component, Msc, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Returns the canonical casing of a known component, or the input unchanged if it is
@@ -42,10 +38,8 @@ public static class ReportingComponents
 /// facility is NOT enrolled in that measure. There is no negative representation, which is
 /// why <see cref="IsReporting"/> is currently always <c>"Y"</c> wherever a row exists.
 /// <para>
-/// <see cref="ReportingMonth"/> is nullable because the two components are reported on
-/// different cadences: MSC is monthly and carries a month, PS is annual and does not. That
-/// rule is conditional rather than structural, so the service enforces it rather than the
-/// column.
+/// Both components are reported monthly and carry a month. The "annual" in the patient-safety
+/// operation's path is part of its name, not a statement about its cadence.
 /// </para>
 /// <para>
 /// Kept separate from the generated contract types on purpose. Persisting a generated type
@@ -69,11 +63,8 @@ public class ReportingPlanEntryEntity : BaseEntityExtended
     /// <summary>NHSN measure short name, for example <c>HOB</c> or <c>HTCDI</c>.</summary>
     public string Measure { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The reporting month, for monthly components. Null for annual components, where a
-    /// month has no meaning.
-    /// </summary>
-    public int? ReportingMonth { get; set; }
+    /// <summary>The reporting month, 1-12. Required for every component.</summary>
+    public int ReportingMonth { get; set; }
 
     public int ReportingYear { get; set; }
 

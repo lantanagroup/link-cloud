@@ -299,5 +299,44 @@ class SensitiveFlagTests(unittest.TestCase):
         self.assertEqual([], checker.check_sensitive_flags(cat, {"dev": [item("A:Plain")]}))
 
 
+class ExportLocation(unittest.TestCase):
+    """Where the tooling looks for link-cac's exports.
+
+    Every script defaults its --config-dir through this one function, so a wrong answer here
+    silently repoints all of them - and the failure mode is a check that reads no exports at
+    all rather than one that reads the wrong ones.
+    """
+
+    def setUp(self):
+        self.saved = os.environ.pop("LINK_CAC_CONFIG_DIR", None)
+
+    def tearDown(self):
+        os.environ.pop("LINK_CAC_CONFIG_DIR", None)
+        if self.saved is not None:
+            os.environ["LINK_CAC_CONFIG_DIR"] = self.saved
+
+    def test_defaults_to_a_sibling_clone(self):
+        self.assertEqual(os.path.join("..", "link-cac", "Config"),
+                         matching.default_config_dir())
+
+    def test_environment_variable_wins(self):
+        os.environ["LINK_CAC_CONFIG_DIR"] = "D:/elsewhere/Config"
+        self.assertEqual("D:/elsewhere/Config", matching.default_config_dir())
+
+    def test_empty_environment_variable_falls_back(self):
+        # An exported-but-empty variable is the shape a CI step that forgot to set it takes.
+        # Honouring it would resolve every export path to a bare filename in the CWD.
+        os.environ["LINK_CAC_CONFIG_DIR"] = ""
+        self.assertEqual(os.path.join("..", "link-cac", "Config"),
+                         matching.default_config_dir())
+
+    def test_missing_export_hint_names_the_directory_it_looked_in(self):
+        catalog = {"environments": {"dev": {"store": "nhsnlink-ac-dev"}}}
+        hint = matching.missing_export_hint(catalog, "dev", config_dir="D:/elsewhere/Config")
+        self.assertIn("D:/elsewhere/Config", hint)
+        self.assertIn("LINK_CAC_CONFIG_DIR", hint)
+        self.assertIn("nhsnlink-ac-dev", hint)
+
+
 if __name__ == "__main__":
     unittest.main()

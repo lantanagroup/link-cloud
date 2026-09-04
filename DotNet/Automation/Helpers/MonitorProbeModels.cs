@@ -23,6 +23,9 @@ public sealed class MonitorProbeResult
     public string? StalledStage { get; init; }
     public int? MessageBusErrorCount { get; init; }
     public IReadOnlyCollection<string>? CompletedMilestones { get; init; }
+    public DateTime? LastProgressUtc { get; init; }
+    public int? AcquisitionResourcesAcquired { get; init; }
+    public bool? AcquisitionInFlight { get; init; }
     public List<MonitorIssue> Issues { get; init; } = [];
 }
 
@@ -41,6 +44,9 @@ public sealed class TestMonitorState
     public TimeSpan StallDuration { get; set; }
     public string? StalledStage { get; set; }
     public int MessageBusErrorCount { get; set; }
+    public DateTime LastProgressUtc { get; set; }
+    public int AcquisitionResourcesAcquired { get; set; }
+    public bool AcquisitionInFlight { get; set; }
 
     public IReadOnlyCollection<string> CompletedMilestones => _completedMilestones;
     public IReadOnlyList<MonitorIssue> Issues => _issues;
@@ -56,6 +62,9 @@ public sealed class TestMonitorState
         StallDuration = TimeSpan.Zero;
         StalledStage = null;
         MessageBusErrorCount = 0;
+        LastProgressUtc = default;
+        AcquisitionResourcesAcquired = 0;
+        AcquisitionInFlight = false;
         _completedMilestones.Clear();
         _issues.Clear();
     }
