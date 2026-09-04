@@ -176,7 +176,7 @@ public class ResponseDelayServiceTests
 
     [Theory]
     [InlineData("/msc")]
-    [InlineData("/ps/annual")]
+    [InlineData("/ps/annual/mrp")]
     [InlineData("/")]
     [InlineData("/some-future-contract-endpoint")]
     public void TheDelayReachesTheContractSurface(string path)
