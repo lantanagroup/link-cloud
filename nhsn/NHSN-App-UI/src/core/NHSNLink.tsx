@@ -5,7 +5,7 @@ import type {UserInfoResponse} from './api/contracts';
 import {NavigationItem, NavigationRail, NavigationSection} from './NavigationRail';
 import {ConfigurationScreen} from './ConfigurationScreen';
 import {OnboardingProvider} from './onboarding/OnboardingProvider';
-import {StepHost} from './onboarding/StepHost';
+import {OnboardingStepsNav, StepHost} from './onboarding/StepHost';
 import {normalizeBaseUrl} from './onboarding/navigation';
 import './NHSNLink.css';
 import {setAppLocale} from './localization/i18n';
@@ -87,13 +87,12 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
       return [];
     }
 
-    const facilityItems: NavigationItem[] = [{key: 'home', label: t('navigation.home')}];
-
-    if (!userInfo.isOnboarded) {
-      facilityItems.push({key: 'onboarding', label: t('navigation.onboarding')});
-    } else {
-      facilityItems.push({key: 'configuration', label: t('navigation.configuration')});
-    }
+    // Home stays out of the rail until the facility is onboarded — until
+    // then, onboarding is the only place to go, and it renders as the step
+    // rail below rather than as a plain button here.
+    const facilityItems: NavigationItem[] = userInfo.isOnboarded
+      ? [{key: 'home', label: t('navigation.home')}, {key: 'configuration', label: t('navigation.configuration')}]
+      : [{key: 'onboarding', label: t('navigation.onboarding')}];
 
     return [{heading: t('navigation.facility'), items: facilityItems}];
   }, [t, userInfo]);
@@ -147,28 +146,50 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
     setRoute(nextRoute);
   }
 
+  const showOnboarding = route === 'onboarding' && !userInfo.isOnboarded;
+
+  // Onboarding needs its provider in scope for the sidebar's step rail as
+  // well as the step panel, so both live under one OnboardingProvider here
+  // rather than the provider wrapping only the panel.
   return (
     <div className="nhsn-link">
-      <div className="nhsn-link__layout">
-        <NavigationRail
-          title={t('app.linkTitle')}
-          sections={navigationSections}
-          activeRoute={route}
-          onNavigate={navigateTo}
-          userName={userInfo.name}
-          userEmail={userInfo.email} />
+      {showOnboarding ? (
+        <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl} homeUrl={homeUrl}>
+          <div className="nhsn-link__layout">
+            <NavigationRail
+              title={t('app.linkTitle')}
+              sections={[]}
+              activeRoute={route}
+              onNavigate={navigateTo}
+              userName={userInfo.name}
+              userEmail={userInfo.email}
+              facilityName={userInfo.facilityName}
+              facilityId={userInfo.facilityId}
+              stepsSection={<OnboardingStepsNav />} />
 
-        <section className="nhsn-link__grid">
-          {route === 'home' && <HomePanels userInfo={userInfo} />}
-          {route === 'onboarding' && !userInfo.isOnboarded && (
-            <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl} homeUrl={homeUrl}>
+            <section className="nhsn-link__grid">
               <StepHost />
-            </OnboardingProvider>
-          )}
+            </section>
+          </div>
+        </OnboardingProvider>
+      ) : (
+        <div className="nhsn-link__layout">
+          <NavigationRail
+            title={t('app.linkTitle')}
+            sections={navigationSections}
+            activeRoute={route}
+            onNavigate={navigateTo}
+            userName={userInfo.name}
+            userEmail={userInfo.email}
+            facilityName={userInfo.facilityName}
+            facilityId={userInfo.facilityId} />
 
-          {route === 'configuration' && userInfo.isOnboarded && <ConfigurationScreen />}
-        </section>
-      </div>
+          <section className="nhsn-link__grid">
+            {route === 'home' && <HomePanels userInfo={userInfo} />}
+            {route === 'configuration' && userInfo.isOnboarded && <ConfigurationScreen />}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
