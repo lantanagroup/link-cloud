@@ -109,15 +109,25 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// Returns a report entry record for the given entry report schedule Id and patient Id.
+        /// Returns a report entry record for the given entry report schedule Id and patient Id, including
+        /// the evidence behind its mapping indicators.
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="patientId"></param>
+        /// <remarks>
+        /// Returns <see cref="ReportEntryDetailModel"/> rather than the EF entity. That is the repo rule --
+        /// responses expose only client-facing properties -- and here it is also the mechanism: the
+        /// indicators live in a different table, so they reach the client only because the projection puts
+        /// them there.
+        ///
+        /// A patient with no mapping outcome row still returns 200, with every indicator NotEvaluated. The
+        /// report entry exists; only the mapping outcome is missing, and 404 would deny the entry itself.
+        /// </remarks>
         [HttpGet("schedules/{reportScheduleId}/patients/{patientId}")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntryDetailModel))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportEntry>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
+        public async Task<ActionResult<ReportEntryDetailModel>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
         {
             if (string.IsNullOrWhiteSpace(reportScheduleId))
                 return BadRequest("ReportScheduleId is required.");
@@ -131,7 +141,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 if (schedule == null || schedule.IsDeleted == true)
                     return NotFound();
 
-                var reportEntry = (await _reportEntryManager.FindAsync(x => x.ReportScheduleId == parsedId && x.PatientId == patientId)).FirstOrDefault();
+                var reportEntry = await _reportEntryManager.GetEntryDetail(parsedId, patientId);
 
                 if (reportEntry == null)
                 {
@@ -260,9 +270,9 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="pageSize">Number of records per page (default: 10)</param>
         /// <param name="pageNumber">Page number (default: 1)</param>
         [HttpGet("search")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportEntry>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportEntryModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<ReportEntry>>> Search(
+        public async Task<ActionResult<PagedConfigModel<ReportEntryModel>>> Search(
             string? facilityId = null,
             string? patientId = null,
             string? reportScheduleId = null,

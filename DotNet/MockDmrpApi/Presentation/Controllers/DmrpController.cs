@@ -65,15 +65,14 @@ public class DmrpController : DmrpControllerBase
         CancellationToken cancellationToken = default)
     {
         return await GetPlanAsync(
-            ReportingComponents.Msc, nhsnorgid, name, year, month,
-            monthNarrowsTheResult: true, cancellationToken);
+            ReportingComponents.Msc, nhsnorgid, name, year, month, cancellationToken);
     }
 
-    /// <summary>Annual patient-safety reporting plan. Placeholder shape.</summary>
+    /// <summary>Patient-safety reporting plan. Placeholder shape.</summary>
     /// <remarks>
-    /// <paramref name="month"/> is accepted for symmetry with the monthly plan and then
-    /// ignored. Annual entries carry no month, so passing one into the query would match
-    /// nothing and turn a perfectly good request into an empty plan.
+    /// Reported monthly, like the medicine plan, and narrowed by <paramref name="month"/> the
+    /// same way. The "annual" in this operation's path is part of its name rather than a
+    /// statement about its cadence.
     /// </remarks>
     public override async Task<ActionResult<ReportingPlanResponse>> GetPatientSafetyAnnualReportingPlan(
         string nhsnorgid,
@@ -83,8 +82,7 @@ public class DmrpController : DmrpControllerBase
         CancellationToken cancellationToken = default)
     {
         return await GetPlanAsync(
-            ReportingComponents.Ps, nhsnorgid, name, year, month,
-            monthNarrowsTheResult: false, cancellationToken);
+            ReportingComponents.Ps, nhsnorgid, name, year, month, cancellationToken);
     }
 
     private async Task<ActionResult<ReportingPlanResponse>> GetPlanAsync(
@@ -93,7 +91,6 @@ public class DmrpController : DmrpControllerBase
         string? name,
         string? year,
         string? month,
-        bool monthNarrowsTheResult,
         CancellationToken cancellationToken)
     {
         if (!_tokens.TryValidate(Request.Headers.Authorization.ToString(), out _))
@@ -123,14 +120,11 @@ public class DmrpController : DmrpControllerBase
         var facility = nhsnOrgId.SanitizeAndRemove();
         var measure = string.IsNullOrWhiteSpace(name) ? null : name.SanitizeAndRemove();
 
-        // The month is dropped entirely for an annual component rather than passed as-is.
-        var narrowingMonth = monthNarrowsTheResult ? reportingMonth : null;
-
         var entries = await _reportingPlans.GetReportingPlanAsync(
-            component, facility, measure, narrowingMonth, reportingYear, cancellationToken);
+            component, facility, measure, reportingMonth, reportingYear, cancellationToken);
 
         return Ok(EntryMapper.ToReportingPlan(
-            facility, narrowingMonth, reportingYear, entries, DateTimeOffset.UtcNow));
+            facility, reportingMonth, reportingYear, entries, DateTimeOffset.UtcNow));
     }
 
     /// <summary>

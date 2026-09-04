@@ -197,9 +197,15 @@ public static class ApiEndPointLibrary
             [DmrpSteps.PlanPost409Duplicate] = new EndpointMeta("Refuses a second plan for the same facility, mapping and period.", $"POST {plans}"),
             [DmrpSteps.PlanPost400UnknownFacility] = new EndpointMeta("Refuses a plan for a facility that does not exist.", $"POST {plans}"),
             [DmrpSteps.PlanPost400UnknownMapping] = new EndpointMeta("Refuses a plan for a measure mapping that does not exist.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownComponent] = new EndpointMeta("Refuses a plan whose NHSN component is neither MSC nor PS. The component is part of the natural key, so a value that describes nothing would take a slot in it.", $"POST {plans}"),
             [DmrpSteps.PlanGet200] = new EndpointMeta("Reads a reporting plan by id.", $"GET {plans}/{{id}}"),
             [DmrpSteps.PlanGet404] = new EndpointMeta("Answers not-found for an unknown id.", $"GET {plans}/{{id}}"),
             [DmrpSteps.PlansForFacilityGet200] = new EndpointMeta("Lists a facility's reporting plans.", $"GET {plans}/facilities/{{facilityId}}"),
+            [DmrpSteps.PlansForFacilityGet200LookAhead] = new EndpointMeta("Lists a facility's plans within a six-month window. The flat read takes the same window as the periods read, and answers against the same current period.", $"GET {plans}/facilities/{{facilityId}}?monthsAhead=6"),
+            [DmrpSteps.PlansForFacilityGet400MonthsAhead] = new EndpointMeta("Refuses a look-ahead window outside 1 to 24 on the flat read as well.", $"GET {plans}/facilities/{{facilityId}}?monthsAhead=0"),
+            [DmrpSteps.PlanPeriodsGet200] = new EndpointMeta("Reads a facility's plan as periods, each with its measures and schedule.", $"GET {plans}/facilities/{{facilityId}}/periods"),
+            [DmrpSteps.PlanPeriodsGet200LookAhead] = new EndpointMeta("Answers a six-month look-ahead, projecting months with no plan on record.", $"GET {plans}/facilities/{{facilityId}}/periods?monthsAhead=6"),
+            [DmrpSteps.PlanPeriodsGet400MonthsAhead] = new EndpointMeta("Refuses a look-ahead window outside 1 to 24.", $"GET {plans}/facilities/{{facilityId}}/periods?monthsAhead=0"),
             [DmrpSteps.MappingDelete409InUse] = new EndpointMeta("Refuses to delete a mapping a reporting plan still references.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.PlanDelete204] = new EndpointMeta("Deletes a reporting plan.", $"DELETE {plans}/{{id}}"),
             [DmrpSteps.PlanDelete404] = new EndpointMeta("Answers not-found when deleting a plan twice.", "DELETE /api/dmrp/reporting-plans/{id}"),
@@ -669,9 +675,15 @@ public static class ApiEndPointLibrary
         public const string PlanPost409Duplicate = "ReportingPlan POST → 409 (duplicate period)";
         public const string PlanPost400UnknownFacility = "ReportingPlan POST → 400 (non-existent facility)";
         public const string PlanPost400UnknownMapping = "ReportingPlan POST → 400 (non-existent measure mapping)";
+        public const string PlanPost400UnknownComponent = "ReportingPlan POST → 400 (unknown NHSN component)";
         public const string PlanGet200 = "ReportingPlan GET → 200";
         public const string PlanGet404 = "ReportingPlan GET → 404";
         public const string PlansForFacilityGet200 = "ReportingPlans for facility GET → 200";
+        public const string PlansForFacilityGet200LookAhead = "ReportingPlans for facility GET → 200 (monthsAhead=6)";
+        public const string PlansForFacilityGet400MonthsAhead = "ReportingPlans for facility GET → 400 (monthsAhead out of range)";
+        public const string PlanPeriodsGet200 = "ReportingPlan periods GET → 200";
+        public const string PlanPeriodsGet200LookAhead = "ReportingPlan periods GET → 200 (monthsAhead=6)";
+        public const string PlanPeriodsGet400MonthsAhead = "ReportingPlan periods GET → 400 (monthsAhead out of range)";
         public const string MappingDelete409InUse = "MeasureMapping DELETE → 409 (referenced by a reporting plan)";
         public const string PlanDelete204 = "ReportingPlan DELETE → 204";
         public const string PlanDelete404 = "ReportingPlan DELETE → 404";
