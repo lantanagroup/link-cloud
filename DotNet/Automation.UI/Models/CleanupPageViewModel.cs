@@ -1,3 +1,4 @@
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -18,6 +19,7 @@ public sealed class CleanupPageViewModel
 
     public DateTime FromDate { get; set; }
     public DateTime ToDate { get; set; }
+    public CleanupActivity CurrentActivity { get; set; } = CleanupActivity.Idle;
 }
 
 public sealed class CleanupSettingsForm

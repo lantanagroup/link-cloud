@@ -13,7 +13,7 @@ public static class PipelineAbortRegistryExtensions
 {
     public static IServiceCollection AddPipelineAbortRegistry(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = ResolveRedisConnectionString(configuration);
+        var connectionString = BuildRedisConfiguration(configuration);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             services.TryAddSingleton<IPipelineAbortRegistry, InMemoryPipelineAbortRegistry>();
@@ -25,7 +25,13 @@ public static class PipelineAbortRegistryExtensions
             var logger = sp.GetRequiredService<ILogger<RedisPipelineAbortRegistry>>();
             try
             {
-                var multiplexer = ConnectionMultiplexer.Connect(connectionString);
+                var options = ConfigurationOptions.Parse(connectionString);
+                options.AbortOnConnectFail = false;
+                if (options.ConnectTimeout <= 0 || options.ConnectTimeout > 2000)
+                    options.ConnectTimeout = 2000;
+                if (options.AsyncTimeout <= 0 || options.AsyncTimeout > 2000)
+                    options.AsyncTimeout = 2000;
+                var multiplexer = ConnectionMultiplexer.Connect(options);
                 return new RedisPipelineAbortRegistry(multiplexer, logger);
             }
             catch (Exception ex)
@@ -40,12 +46,29 @@ public static class PipelineAbortRegistryExtensions
         return services;
     }
 
-    private static string? ResolveRedisConnectionString(IConfiguration configuration)
+    /// <summary>
+    /// Compose Redis is password-protected. ConnectionStrings:Redis usually has the host only;
+    /// the password lives on Redis:Password or ResourceCache:Redis:Password.
+    /// </summary>
+    public static string? BuildRedisConfiguration(IConfiguration configuration)
     {
-        var fromConnectionStrings = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.RedisConnection);
-        if (!string.IsNullOrWhiteSpace(fromConnectionStrings))
-            return fromConnectionStrings;
+        var connectionString = configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.RedisConnection);
+        if (string.IsNullOrWhiteSpace(connectionString))
+            connectionString = configuration["ResourceCache:Redis:ConnectionString"];
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return null;
 
-        return configuration["ResourceCache:Redis:ConnectionString"];
+        var password = configuration[ConfigurationConstants.AppSettings.RedisPassword]
+            ?? configuration["ResourceCache:Redis:Password"]
+            ?? configuration["REDIS_PASS"];
+        return ApplyRedisPassword(connectionString, password);
+    }
+
+    public static string ApplyRedisPassword(string connectionString, string? password)
+    {
+        var options = ConfigurationOptions.Parse(connectionString);
+        if (!string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(options.Password))
+            options.Password = password;
+        return options.ToString(includePassword: true);
     }
 }

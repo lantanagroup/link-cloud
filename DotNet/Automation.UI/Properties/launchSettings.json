@@ -55,7 +55,8 @@
         "Automation__Kafka__RestProxyBaseUrl": "http://localhost:8082",
         "pre-qualification.write-pre-qual-operation-outcome": "false",
         "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
-        "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles"
+        "InternalBlobStorage__GeneratedTemplateBlobRoot": "automation/generated-bundles",
+        "ConnectionStrings__Redis": "localhost:6379,abortConnect=false,allowAdmin=true"
       }
     }
   }

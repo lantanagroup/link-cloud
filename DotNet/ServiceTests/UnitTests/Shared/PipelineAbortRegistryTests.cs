@@ -1,5 +1,7 @@
 using FluentAssertions;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services;
+using Microsoft.Extensions.Configuration;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Shared;
@@ -55,5 +57,75 @@ public class PipelineAbortRegistryTests
         await registry.AbortAsync(" ", " ", TimeSpan.FromDays(1));
         (await registry.IsAbortedAsync(null, null)).Should().BeFalse();
         (await registry.IsAbortedAsync("", "")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ApplyRedisPassword_AddsPasswordWhenConnectionStringHasNone()
+    {
+        var result = PipelineAbortRegistryExtensions.ApplyRedisPassword(
+            "redis_cache:6379,abortConnect=false",
+            "s3cret");
+
+        result.Should().Contain("password=s3cret");
+        result.Should().Contain("redis_cache:6379");
+    }
+
+    [Fact]
+    public void ApplyRedisPassword_DoesNotOverwriteExistingPassword()
+    {
+        var result = PipelineAbortRegistryExtensions.ApplyRedisPassword(
+            "localhost:6379,password=already-set",
+            "other");
+
+        result.Should().Contain("password=already-set");
+        result.Should().NotContain("other");
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_UsesRedisPasswordSection()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "redis_cache:6379,abortConnect=false",
+                ["Redis:Password"] = "from-redis-section"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-redis-section");
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_FallsBackToResourceCachePassword()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "redis_cache:6379",
+                ["ResourceCache:Redis:Password"] = "from-cache"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-cache");
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_FallsBackToRedisPassEnvName()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["REDIS_PASS"] = "from-env"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-env");
     }
 }

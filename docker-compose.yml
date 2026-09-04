@@ -717,6 +717,7 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Redis__Password: ${REDIS_PASS}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -734,6 +735,8 @@ services:
       mongo:
         condition: service_healthy
       admin-bff:
+        condition: service_healthy
+      redis_cache:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Automation.UI.Controllers;
 
 public class CleanupController(
-    LeftoverRunCleanupService leftoverRunCleanup,
+    ILeftoverRunCleanup leftoverRunCleanup,
     ICleanupSettingsStore settingsStore,
     TimeProvider time,
     ILogger<CleanupController> logger) : Controller
@@ -26,17 +26,112 @@ public class CleanupController(
                 ? $"quiesced {quiesce.QuiescedFacilityIds.Count}/{quiesce.QuiesceCandidateCount}"
                 : null,
             FromDate = now.UtcDateTime.Date.AddDays(-settings.TeardownRetention.TotalDays),
-            ToDate = now.UtcDateTime.Date
+            ToDate = now.UtcDateTime.Date,
+            CurrentActivity = leftoverRunCleanup.CurrentActivity
         };
         return View(vm);
     }
 
+    [HttpGet]
+    public IActionResult Progress()
+        => Json(leftoverRunCleanup.CurrentActivity);
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSettings(CleanupSettingsForm form, CancellationToken cancellationToken)
+    public async Task<IActionResult> SaveSettings(CleanupSettingsForm form, string? runKind, CancellationToken cancellationToken)
     {
         var current = await settingsStore.GetEffectiveAsync(cancellationToken);
-        var settings = new LeftoverRunCleanupSettings
+        var settings = ApplyForm(form, current);
+        await settingsStore.SaveAsync(settings, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(runKind))
+            return Finish("Cleanup schedule and retention settings saved. The sweeper picks them up within 30 seconds.", started: false);
+
+        return StartRun(runKind);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunCustomRange(CleanupCustomRangeForm form, CancellationToken cancellationToken)
+    {
+        var from = DateTime.SpecifyKind(form.FromDate.Date, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(form.ToDate.Date, DateTimeKind.Utc).AddDays(1);
+        if (to <= from)
+            return Finish("Custom range To date must be on or after From date.", started: false, error: true);
+
+        if (!form.TeardownFacilities && !form.PurgeHistory)
+            return Finish("Choose leftover facility teardown and/or run-history purge for the custom range.", started: false, error: true);
+
+        await Task.CompletedTask;
+        return StartRun("custom-range", () => leftoverRunCleanup.StartCustomRangeInBackground(
+            from, to, form.TeardownFacilities, form.PurgeHistory));
+    }
+
+    private IActionResult StartRun(string runKind, Action? start = null)
+    {
+        if (leftoverRunCleanup.IsRunning)
+            return Finish("A cleanup pass is already running. Watch the activity panel; you can start another when it finishes.", started: false, error: true);
+
+        try
+        {
+            if (start is not null)
+            {
+                start();
+            }
+            else
+            {
+                switch (runKind)
+                {
+                    case "quiesce":
+                        leftoverRunCleanup.StartQuiesceInBackground();
+                        break;
+                    case "teardown":
+                        leftoverRunCleanup.StartTeardownInBackground();
+                        break;
+                    case "history-purge":
+                        leftoverRunCleanup.StartHistoryPurgeInBackground();
+                        break;
+                    default:
+                        return Finish($"Unknown cleanup type '{runKind}'.", started: false, error: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to start leftover cleanup {RunKind}.", runKind);
+            return Finish($"Could not start cleanup: {ex.Message}", started: false, error: true);
+        }
+
+        var label = runKind switch
+        {
+            "quiesce" => "Quiesce leftover hot work",
+            "teardown" => "Off-hours leftover teardown",
+            "history-purge" => "Weekly history purge",
+            "custom-range" => "Custom range cleanup",
+            _ => "Cleanup"
+        };
+        return Finish($"{label} started. Progress updates live on this page.", started: true, mode: runKind);
+    }
+
+    private IActionResult Finish(string message, bool started, bool error = false, string? mode = null)
+    {
+        if (WantsJson())
+        {
+            if (error)
+                return Conflict(new { error = message, started, mode, activity = leftoverRunCleanup.CurrentActivity });
+            return Json(new { message, started, mode, activity = leftoverRunCleanup.CurrentActivity });
+        }
+
+        TempData[error ? "CleanupError" : "Cleanup"] = message;
+        return RedirectToAction(nameof(Index));
+    }
+
+    private bool WantsJson()
+        => Request.Headers.Accept.Any(value => value?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true)
+           || string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+
+    internal static LeftoverRunCleanupSettings ApplyForm(CleanupSettingsForm form, LeftoverRunCleanupSettings current)
+        => new()
         {
             Enabled = form.Enabled,
             QuiesceEnabled = form.QuiesceEnabled,
@@ -52,82 +147,4 @@ public class CleanupController(
             WeeklyHistoryPurgeTimeUtc = CleanupSchedule.ParseTimeUtc(form.WeeklyHistoryPurgeTimeUtc, current.WeeklyHistoryPurgeTimeUtc),
             CatchUpWindow = TimeSpan.FromHours(Math.Clamp(form.CatchUpWindowHours, 1, 12))
         };
-
-        await settingsStore.SaveAsync(settings, cancellationToken);
-        TempData["Cleanup"] = "Cleanup schedule and retention settings saved. The sweeper picks them up within 30 seconds.";
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunQuiesce(CancellationToken cancellationToken)
-        => await RunAsync(
-            "Quiesce leftover hot work",
-            () => leftoverRunCleanup.RunQuiesceNowAsync(cancellationToken));
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunTeardown(CancellationToken cancellationToken)
-        => await RunAsync(
-            "Off-hours leftover teardown",
-            () => leftoverRunCleanup.RunTeardownNowAsync(cancellationToken));
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunHistoryPurge(CancellationToken cancellationToken)
-        => await RunAsync(
-            "Weekly history purge",
-            () => leftoverRunCleanup.RunHistoryPurgeNowAsync(cancellationToken));
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunCustomRange(CleanupCustomRangeForm form, CancellationToken cancellationToken)
-    {
-        var from = DateTime.SpecifyKind(form.FromDate.Date, DateTimeKind.Utc);
-        var to = DateTime.SpecifyKind(form.ToDate.Date, DateTimeKind.Utc).AddDays(1);
-        if (to <= from)
-        {
-            TempData["CleanupError"] = "Custom range To date must be on or after From date.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        if (!form.TeardownFacilities && !form.PurgeHistory)
-        {
-            TempData["CleanupError"] = "Choose leftover facility teardown and/or run-history purge for the custom range.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        return await RunAsync(
-            $"Custom range {from:yyyy-MM-dd} to {form.ToDate:yyyy-MM-dd} UTC",
-            () => leftoverRunCleanup.RunCustomRangeAsync(
-                from, to, form.TeardownFacilities, form.PurgeHistory, cancellationToken));
-    }
-
-    private async Task<IActionResult> RunAsync(string label, Func<Task<LeftoverCleanupResult>> action)
-    {
-        try
-        {
-            var result = await action();
-            TempData["Cleanup"] = Format(label, result);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "{Label} failed.", label);
-            TempData["CleanupError"] = $"{label} failed: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(Index));
-    }
-
-    private static string Format(string label, LeftoverCleanupResult result)
-    {
-        var message = $"{label}: stopped {result.QuiescedFacilityIds.Count} of {result.QuiesceCandidateCount} leftover facilit{(result.QuiesceCandidateCount == 1 ? "y" : "ies")}, torn down {result.TornDownFacilityIds.Count}, purged {result.PurgedRunIds.Count} run record{(result.PurgedRunIds.Count == 1 ? "" : "s")}.";
-        if (result.FailedFacilityIds.Count > 0)
-            message += $" Failed facilities: {string.Join(", ", result.FailedFacilityIds)}.";
-        if (result.FailedRunIds.Count > 0)
-            message += $" Failed runs: {string.Join(", ", result.FailedRunIds)}.";
-        if (result.QuiesceCandidateCount == 0 && result.TeardownCandidateCount == 0 && result.HistoryPurgeCandidateCount == 0)
-            message = $"{label}: nothing matched.";
-        return message;
-    }
 }

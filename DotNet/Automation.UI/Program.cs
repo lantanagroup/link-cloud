@@ -322,6 +322,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchest
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 builder.Services.AddSingleton<LeftoverRunCleanupService>();
+builder.Services.AddSingleton<ILeftoverRunCleanup>(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
@@ -391,6 +392,7 @@ app.MapControllerRoute(
     pattern: "{controller=Runs}/{action=Index}/{id?}");
 
 app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<CleanupHub>("/hubs/cleanup");
 app.MapHealthChecks("/health");
 
 app.Run();
