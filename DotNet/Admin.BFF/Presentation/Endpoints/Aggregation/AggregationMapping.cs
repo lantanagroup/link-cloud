@@ -65,6 +65,23 @@ public static class AggregationMapping
                               "If the acquisition log deletion fails, the report soft-delete is rolled back and 500 is returned."
             });
 
+        routes.MapPost("/reports/{reportScheduleId}/abort", AbortReport.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Abort In-Progress Report",
+                Description = "Stops an in-progress report (New or EndOfPeriod) without affecting other reports for the facility. " +
+                              "Queued Data Acquisition and Normalization work for this report is dropped; census jobs are left running. " +
+                              "The report schedule is then soft-deleted so it can be restored later. " +
+                              "Returns 409 if the report is not in progress."
+            });
+
         routes.MapPatch("/reports/{reportScheduleId}/restore", RestoreReport.Handle)
             .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
             .Produces(StatusCodes.Status204NoContent)

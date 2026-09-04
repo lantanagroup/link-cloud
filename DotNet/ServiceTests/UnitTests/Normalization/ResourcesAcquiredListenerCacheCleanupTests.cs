@@ -113,8 +113,12 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
+        var services = new ServiceCollection();
+        var serviceProvider = services.BuildServiceProvider();
+        var scope = new Mock<IServiceScope>();
+        scope.SetupGet(item => item.ServiceProvider).Returns(serviceProvider);
         var scopeFactory = new Mock<IServiceScopeFactory>();
-        scopeFactory.Setup(item => item.CreateScope()).Returns(Mock.Of<IServiceScope>());
+        scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
         return new ResourcesAcquiredListener(
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),

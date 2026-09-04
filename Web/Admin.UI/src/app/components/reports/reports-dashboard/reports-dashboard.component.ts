@@ -354,6 +354,47 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     this.loadReportSchedules();
   }
 
+  onAbortReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '480px',
+      data: {
+        title: 'Abort In-Progress Report',
+        message: 'Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.',
+        icon: 'cancel',
+        iconColor: 'warn',
+        confirmButtonText: 'Abort report'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Aborting report, please wait...', 'Close');
+
+      this.aggregationService.abortReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report aborted. In-flight work for this report will stop.', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Abort Failed',
+              message: detail || 'Failed to abort the report. Please try again.',
+              icon: 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
   onSoftDeleteReport(reportScheduleId: string, status: string): void {
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',

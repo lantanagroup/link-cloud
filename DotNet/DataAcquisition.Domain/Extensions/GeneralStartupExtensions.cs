@@ -96,6 +96,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.RegisterCacheService();
+        builder.Services.AddPipelineAbortRegistry(builder.Configuration);
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();

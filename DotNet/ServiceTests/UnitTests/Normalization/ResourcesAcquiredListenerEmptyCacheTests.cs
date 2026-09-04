@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Microsoft.Extensions.DependencyInjection;
@@ -209,9 +210,38 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task ProcessMessageAsync_AbortedFacility_PurgesCacheAndDoesNotProduce()
+    {
+        var abort = new InMemoryPipelineAbortRegistry();
+        await abort.AbortAsync(FacilityId, reportId: null, TimeSpan.FromDays(14));
+
+        var purger = new Mock<IResourceCachePurger>();
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var resourceCache = new Mock<IResourceCache>();
+        var listener = BuildListener(resourceCache, producer, abort, purger.Object);
+
+        await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
+
+        purger.Verify(
+            item => item.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), "pipeline aborted", It.IsAny<CancellationToken>()),
+            Times.Once);
+        producer.Verify(
+            item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        resourceCache.Verify(
+            item => item.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
         Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
+        IPipelineAbortRegistry? abortRegistry = null,
+        IResourceCachePurger? purger = null,
         Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
     {
         mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
@@ -225,6 +255,8 @@ public class ResourcesAcquiredListenerEmptyCacheTests
 
         var services = new ServiceCollection();
         services.AddSingleton(sequenceQueries.Object);
+        if (abortRegistry != null)
+            services.AddSingleton(abortRegistry);
         var serviceProvider = services.BuildServiceProvider();
 
         var scope = new Mock<IServiceScope>();
@@ -257,7 +289,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
-            Mock.Of<IResourceCachePurger>(),
+            purger ?? Mock.Of<IResourceCachePurger>(),
             mappingOutcomeProducer.Object);
     }
 
