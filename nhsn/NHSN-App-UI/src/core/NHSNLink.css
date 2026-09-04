@@ -88,12 +88,16 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  background: linear-gradient(180deg, #063f78, #0b5cab);
+  color: #ffffff;
+  --nhsn-scrollbar-thumb: rgba(255, 255, 255, 0.4);
+  --nhsn-scrollbar-thumb-hover: rgba(255, 255, 255, 0.65);
 }
 
 .nhsn-link__nav-title {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.75rem 0;
   font-size: 1.5rem;
+  color: #ffffff;
 }
 
 .nhsn-link__nav ul,
@@ -107,6 +111,22 @@
   margin: 0;
 }
 
+/* Identity header: title, signed-in user, facility. Sits outside the
+   scrolling body below so it stays visible however far the step rail (or the
+   nav buttons) scroll. */
+.nhsn-link__nav-header {
+  flex: none;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nhsn-link__nav-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .nhsn-link__nav-sections {
   display: grid;
   gap: 1rem;
@@ -115,21 +135,15 @@
 .nhsn-link__nav-section-heading {
   margin: 0 0 0.5rem 0;
   font-size: 1rem;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .nhsn-link__nav li {
   margin-bottom: 0.5rem;
 }
 
-.nhsn-link__nav-footer {
-  margin-top: auto;
-}
-
 .nhsn-link__nav-userinfo {
-  padding-top: 1rem;
-  border-top: 1px solid var(--kendo-color-border, #d0d7de);
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .nhsn-link__nav-userinfo p {
@@ -139,19 +153,23 @@
 
 .nhsn-link__nav-button {
   width: 100%;
-  border: 1px solid var(--kendo-color-border, #d0d7de);
-  background: var(--kendo-color-app-surface, #ffffff);
-  color: var(--kendo-color-app-text, #1f2328);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #ffffff;
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
   text-align: left;
   cursor: pointer;
 }
 
+.nhsn-link__nav-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .nhsn-link__nav-button--active {
-  background: var(--kendo-color-primary, #0057b7);
-  color: var(--kendo-color-on-primary, #ffffff);
-  border-color: var(--kendo-color-primary, #0057b7);
+  background: #ffffff;
+  color: var(--kendo-color-primary, #0057b7);
+  border-color: #ffffff;
 }
 
 .nhsn-link__state {
@@ -186,57 +204,9 @@
 
 /* ---------------------------------------------------------- step machine */
 
-.nhsn-link__onboarding {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: stretch;
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.nhsn-link__step-nav {
-  background: linear-gradient(180deg, #063f78, #0b5cab);
-  border-radius: 8px;
-  padding: 24px 18px;
-  color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  box-sizing: border-box;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  --nhsn-scrollbar-thumb: rgba(255, 255, 255, 0.4);
-  --nhsn-scrollbar-thumb-hover: rgba(255, 255, 255, 0.65);
-}
-
-.nhsn-link__step-nav-title {
-  flex: none;
-  margin: 0 0 2px 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.nhsn-link__step-nav-subtitle {
-  flex: none;
-  display: block;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.8;
-  color: #ffffff;
-}
-
 .nhsn-link__step-nav-facility {
-  flex: none;
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: 12px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   font-size: 12.5px;
@@ -244,13 +214,14 @@
 }
 
 .nhsn-link__step-nav-facility-name {
-  font-weight: 600;
-  font-size: 13.5px;
-  color: #ffffff;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .nhsn-link__step-nav-facility-id {
-  opacity: 0.75;
   font-family: Consolas, monospace;
   color: #ffffff;
 }
@@ -260,14 +231,11 @@
      completion state, so the list must not also draw its own markers —
      otherwise every row reads "1. 1 Welcome". */
   list-style: none;
-  margin: 22px 0 0 0;
-  padding: 0 6px 0 0;
+  margin: 0;
+  padding: 0 4px 0 0;
   display: grid;
   align-content: start;
   gap: 2px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .nhsn-link__step {
@@ -1058,21 +1026,12 @@
     overflow: visible;
   }
 
-  .nhsn-link__onboarding {
-    grid-template-columns: 1fr;
-    height: auto;
-    overflow: visible;
-  }
-
-  .nhsn-link__step-nav,
   .nhsn-link__step-panel {
     height: auto;
     overflow: visible;
   }
 
-  .nhsn-link__steps {
-    flex: none;
-    max-height: none;
+  .nhsn-link__nav-scroll {
     overflow: visible;
   }
 

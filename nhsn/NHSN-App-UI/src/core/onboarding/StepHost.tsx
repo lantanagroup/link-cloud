@@ -6,14 +6,60 @@ import {isUnlocked} from './gating';
 import {useOnboarding} from './OnboardingProvider';
 
 /**
- * Renders the current step and the step rail beside it.
+ * The onboarding step rail: lives inside the app's single sidebar (see
+ * `NavigationRail`'s `stepsSection`) rather than drawing a nav surface of its
+ * own, so onboarding progress and app navigation never compete for space.
+ */
+export function OnboardingStepsNav() {
+  const {t} = useTranslation(['onboarding', 'common']);
+  const {draft, user, target, goTo, saving} = useOnboarding();
+  const steps = visibleSteps(draft, user);
+
+  return (
+    <div className="nhsn-link__nav-section">
+      <h3 className="nhsn-link__nav-section-heading">{t('common:navigation.onboarding')}</h3>
+
+      <ol className="nhsn-link__steps">
+        {steps.map((entry, index) => {
+          const unlocked = isUnlocked(entry.id, draft, user);
+          const complete = entry.isComplete(draft) && unlocked && entry.id !== target.stepId;
+          return (
+            <li
+              key={entry.id}
+              className={[
+                'nhsn-link__step',
+                unlocked ? 'nhsn-link__step--unlocked' : '',
+                entry.id === target.stepId ? 'nhsn-link__step--current' : '',
+                complete ? 'nhsn-link__step--done' : ''
+              ]
+                .filter(Boolean)
+                .join(' ')}>
+              <button
+                type="button"
+                className="nhsn-link__step-button"
+                disabled={!unlocked || saving}
+                onClick={() => goTo(entry.id)}>
+                <span className="nhsn-link__step-index">{index + 1}</span>
+                <span className="nhsn-link__step-label">{t(entry.labelKey)}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/**
+ * Renders the current step's panel. The step rail beside it now lives in the
+ * app's single sidebar (`OnboardingStepsNav`) rather than here.
  *
  * Steps are code-split, so the initial artifact carries the machine and the
  * first screen rather than all thirteen.
  */
 export function StepHost() {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {loadState, error, draft, user, target, goTo, saving} = useOnboarding();
+  const {loadState, error, target} = useOnboarding();
 
   if (loadState === 'loading') {
     return <NHSNLoadingIndicator />;
@@ -28,66 +74,18 @@ export function StepHost() {
   }
 
   const step = getStep(target.stepId);
-  const steps = visibleSteps(draft, user);
 
   return (
-    <div className="nhsn-link__onboarding">
-      <aside className="nhsn-link__step-nav">
-        <h1 className="nhsn-link__step-nav-title">{t('common:app.linkTitle')}</h1>
-        <p className="nhsn-link__step-nav-subtitle">{t('common:navigation.onboarding')}</p>
-
-        {(user.facilityName || user.facilityId) && (
-          <div className="nhsn-link__step-nav-facility">
-            {user.facilityName && (
-              <div className="nhsn-link__step-nav-facility-name">{user.facilityName}</div>
-            )}
-            {user.facilityId && (
-              <div className="nhsn-link__step-nav-facility-id">{user.facilityId}</div>
-            )}
-          </div>
-        )}
-
-        <ol className="nhsn-link__steps">
-          {steps.map((entry, index) => {
-            const unlocked = isUnlocked(entry.id, draft, user);
-            const complete = entry.isComplete(draft) && unlocked && entry.id !== target.stepId;
-            return (
-              <li
-                key={entry.id}
-                className={[
-                  'nhsn-link__step',
-                  unlocked ? 'nhsn-link__step--unlocked' : '',
-                  entry.id === target.stepId ? 'nhsn-link__step--current' : '',
-                  complete ? 'nhsn-link__step--done' : ''
-                ]
-                  .filter(Boolean)
-                  .join(' ')}>
-                <button
-                  type="button"
-                  className="nhsn-link__step-button"
-                  disabled={!unlocked || saving}
-                  onClick={() => goTo(entry.id)}>
-                  <span className="nhsn-link__step-index">{index + 1}</span>
-                  <span className="nhsn-link__step-label">{t(entry.labelKey)}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </aside>
-
-      {/* No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict. */}
-      <section className="nhsn-link__step-panel" aria-live="polite">
-
-        {step ? (
-          <Suspense fallback={<NHSNLoadingIndicator />}>
-            <StepBody />
-          </Suspense>
-        ) : (
-          <div className="nhsn-link__state">{t('onboarding:messages.stepUnavailable')}</div>
-        )}
-      </section>
-    </div>
+    // No conflict banner - the BFF scopes each save to its own step, so there's nothing to conflict.
+    <section className="nhsn-link__step-panel" aria-live="polite">
+      {step ? (
+        <Suspense fallback={<NHSNLoadingIndicator />}>
+          <StepBody />
+        </Suspense>
+      ) : (
+        <div className="nhsn-link__state">{t('onboarding:messages.stepUnavailable')}</div>
+      )}
+    </section>
   );
 }
 
