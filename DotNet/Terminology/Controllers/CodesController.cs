@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace LantanaGroup.Link.Terminology.Controllers;
@@ -44,16 +45,11 @@ public class CodesController(ICodeSearchService codeSearchService, ILogger<Codes
     {
         query ??= new CodeSearchQuery();
 
-        ModelState.Merge(query.Validate());
+        var errors = query.Validate();
 
-        if (!ModelState.IsValid)
+        if (!errors.IsValid)
         {
-            return ValidationProblem(
-                title: "Bad Request",
-                type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
-                detail: "One or more parameters were invalid.",
-                statusCode: (int)HttpStatusCode.BadRequest,
-                modelStateDictionary: ModelState);
+            return BadRequestProblem(errors);
         }
 
         try
@@ -66,14 +62,10 @@ public class CodesController(ICodeSearchService codeSearchService, ILogger<Codes
             // The service rejects a code system, value set or version that is not loaded, naming the
             // parameter in ParamName. That is client input that failed validation, so it is a 400: 404 is
             // reserved for a single resource fetched by id, and these are filters on a search.
-            ModelState.AddModelError(ex.ParamName ?? CodeSearchParameters.Search, ex.Message);
+            var notLoaded = new ModelStateDictionary();
+            notLoaded.AddModelError(ex.ParamName ?? CodeSearchParameters.Search, WithoutParameterSuffix(ex));
 
-            return ValidationProblem(
-                title: "Bad Request",
-                type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
-                detail: "One or more parameters were invalid.",
-                statusCode: (int)HttpStatusCode.BadRequest,
-                modelStateDictionary: ModelState);
+            return BadRequestProblem(notLoaded);
         }
         catch (OperationCanceledException)
         {
@@ -87,6 +79,32 @@ public class CodesController(ICodeSearchService codeSearchService, ILogger<Codes
             return InternalServerErrorProblem(ex.Message);
         }
     }
+
+    /// <summary>
+    /// Builds the 400 for a query the caller has to correct, keyed by query parameter name.
+    /// </summary>
+    /// <remarks>
+    /// The errors are carried in their own <see cref="ModelStateDictionary"/> rather than merged into the
+    /// controller's. <see cref="ModelStateDictionary"/> compares keys case-insensitively and keeps the
+    /// casing of the first entry, and model binding has already registered one per bound property under
+    /// its PascalCase property name — so merging would report a supplied parameter as "CodeSystem" and an
+    /// omitted one as "codeSystem", leaving a client no reliable key to match on.
+    /// </remarks>
+    private ActionResult BadRequestProblem(ModelStateDictionary errors) => ValidationProblem(
+        title: "Bad Request",
+        type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
+        detail: "One or more parameters were invalid.",
+        statusCode: (int)HttpStatusCode.BadRequest,
+        modelStateDictionary: errors);
+
+    /// <summary>
+    /// Strips the " (Parameter 'x')" that <see cref="ArgumentException"/> appends to its message, which is
+    /// framework detail rather than something to show a caller — the parameter is already the error's key.
+    /// </summary>
+    private static string WithoutParameterSuffix(ArgumentException ex) =>
+        ex.ParamName is null
+            ? ex.Message
+            : ex.Message.Replace($" (Parameter '{ex.ParamName}')", string.Empty);
 
     /// <summary>
     /// Builds an RFC 9457 Problem Details result, matching the shape <see cref="FhirController"/> and
