@@ -87,7 +87,40 @@ public sealed class ScenarioSeedService : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static List<TestScenarioDefinition> BuildSystemScenarios() =>
+    private static List<TestScenarioDefinition> BuildSystemScenarios()
+    {
+        var scenarios = BuildSystemScenarioList();
+        foreach (var scenario in scenarios)
+        {
+            foreach (var cohort in scenario.PatientCohorts)
+            {
+                if (cohort.PatientConfigurationId.HasValue)
+                    continue;
+                cohort.PatientConfigurationId = ResolveSystemPatientConfigurationId(cohort);
+            }
+        }
+
+        return scenarios;
+    }
+
+    private static Guid ResolveSystemPatientConfigurationId(PatientCohortDefinition cohort)
+    {
+        if (string.Equals(cohort.Intent?.EncounterClass, "AMB", StringComparison.OrdinalIgnoreCase))
+            return SystemPatientConfigurationIds.PneumoniaAmbulatory;
+
+        if (cohort.Intent?.IncludeHypoglycemicInsulin == true)
+            return SystemPatientConfigurationIds.DiabeticHypoglycemia;
+
+        if (cohort.EligibleClinicalScenarioIds.Count == 1
+            && cohort.EligibleClinicalScenarioIds[0] == ClinicalScenarioIds.DiabeticHypoglycemia.ToString())
+        {
+            return SystemPatientConfigurationIds.DiabeticHypoglycemia;
+        }
+
+        return SystemPatientConfigurationIds.PneumoniaInpatient;
+    }
+
+    private static List<TestScenarioDefinition> BuildSystemScenarioList() =>
     [
         // --- Adhoc Report Test (ad-hoc, ACH Monthly, 1 patient, 1000 resources) ---
         new TestScenarioDefinition

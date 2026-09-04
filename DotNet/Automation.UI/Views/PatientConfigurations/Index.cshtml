@@ -24,7 +24,7 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul me-2"></i>All Patient Configurations</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewPc">
+            <button type="button" class="btn btn-sm btn-success" id="btnNewPc" title="New configuration" aria-label="New configuration">
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
@@ -99,7 +99,7 @@
                                     </span>
                                 }
                             </td>
-                            <td><small>@((t.ScheduledInpatientPattern ?? ScheduledStayWindow.DefaultPattern).GetUiShortLabel())</small></td>
+                            <td class="text-nowrap"><small>@((t.ScheduledInpatientPattern ?? ScheduledStayWindow.DefaultPattern).GetUiShortLabel())</small></td>
                             <td><small>@t.ResourcesPerPatientMin–@t.ResourcesPerPatientMax</small></td>
                             <td>
                                 @if (t.IsSystem)

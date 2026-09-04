@@ -298,12 +298,12 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddScoped<PipelineDataReader>();
 
 // -- Seed system scenarios and query plan templates --
+builder.Services.AddHostedService<PatientConfigurationSeedService>();
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<MeasureTemplateSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
-builder.Services.AddHostedService<PatientConfigurationSeedService>();
 builder.Services.AddHostedService<GenerationCatalogSeedService>();
 
 // Allow large imported-patient bundle uploads in the Automation UI.

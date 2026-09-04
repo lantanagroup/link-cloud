@@ -792,12 +792,12 @@
         };
 
         const scheduledPatternShortNames = {
-            AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → Remains after',
-            AdmittedBeforePeriodDischargedDuringPeriod: 'Before → Discharged during',
-            AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → Remains after',
-            AdmittedDuringPeriodDischargedDuringPeriod: 'During → Discharged during',
-            AdmittedAndDischargedBeforePeriod: 'Before → Before',
-            AdmittedAndDischargedAfterPeriod: 'After → After'
+            AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → after',
+            AdmittedBeforePeriodDischargedDuringPeriod: 'Before → during',
+            AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → after',
+            AdmittedDuringPeriodDischargedDuringPeriod: 'During → during',
+            AdmittedAndDischargedBeforePeriod: 'Entirely before',
+            AdmittedAndDischargedAfterPeriod: 'Entirely after'
         };
         const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
 
@@ -1250,18 +1250,18 @@
         function patternLabel(value) {
             if (value === null || value === undefined || value === '') return '';
             const labels = {
-                0: 'Before -> Remains after',
-                1: 'Before -> Discharged during',
-                2: 'During -> Remains after',
-                3: 'During -> Discharged during',
-                4: 'Before -> Before',
-                5: 'After -> After',
-                'AdmittedBeforePeriodRemainsInpatientAfterPeriod': 'Before -> Remains after',
-                'AdmittedBeforePeriodDischargedDuringPeriod': 'Before -> Discharged during',
-                'AdmittedDuringPeriodRemainsInpatientAfterPeriod': 'During -> Remains after',
-                'AdmittedDuringPeriodDischargedDuringPeriod': 'During -> Discharged during',
-                'AdmittedAndDischargedBeforePeriod': 'Before -> Before',
-                'AdmittedAndDischargedAfterPeriod': 'After -> After'
+                0: 'Before → after',
+                1: 'Before → during',
+                2: 'During → after',
+                3: 'During → during',
+                4: 'Entirely before',
+                5: 'Entirely after',
+                'AdmittedBeforePeriodRemainsInpatientAfterPeriod': 'Before → after',
+                'AdmittedBeforePeriodDischargedDuringPeriod': 'Before → during',
+                'AdmittedDuringPeriodRemainsInpatientAfterPeriod': 'During → after',
+                'AdmittedDuringPeriodDischargedDuringPeriod': 'During → during',
+                'AdmittedAndDischargedBeforePeriod': 'Entirely before',
+                'AdmittedAndDischargedAfterPeriod': 'Entirely after'
             };
             return labels[value] || String(value);
         }

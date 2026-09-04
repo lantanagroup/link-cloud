@@ -62,7 +62,7 @@
         </div>
         <div class="col-6 col-md-3">
             <div class="au-kpi-card">
-                <div class="au-kpi-value @(stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@stats.SuccessRate%</div>
+                <div class="au-kpi-value @((stats.Succeeded + stats.Failed) == 0 ? "" : stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@((stats.Succeeded + stats.Failed) == 0 ? "—" : $"{stats.SuccessRate}%")</div>
                 <div class="au-kpi-label">Success Rate</div>
             </div>
         </div>
@@ -79,8 +79,9 @@
         <div class="col-md-4">
             <div class="au-card h-100">
                 <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
-                <div class="card-body d-flex align-items-center justify-content-center" style="min-height:240px;">
-                    <canvas id="statusDoughnut"></canvas>
+                <div class="card-body d-flex align-items-center justify-content-center position-relative" style="min-height:240px;">
+                    <canvas id="statusDoughnut" style="@(stats.TotalRuns == 0 ? "display:none" : "")"></canvas>
+                    <div id="statusDoughnutEmpty" class="text-muted small text-center px-3" style="@(stats.TotalRuns == 0 ? "" : "display:none")">No runs yet</div>
                 </div>
             </div>
         </div>
@@ -522,9 +523,20 @@
         kpiActive.className = 'au-kpi-value' + (active > 0 ? ' text-primary' : '');
         kpiTotal.textContent = s.totalRuns || 0;
 
-        var rate = s.successRate || 0;
-        kpiSuccessRate.textContent = rate + '%';
-        kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
+        var completed = (s.succeeded || 0) + (s.failed || 0);
+        if (!completed) {
+            kpiSuccessRate.textContent = '—';
+            kpiSuccessRate.className = 'au-kpi-value';
+        } else {
+            var rate = s.successRate || 0;
+            kpiSuccessRate.textContent = rate + '%';
+            kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
+        }
+        var empty = document.getElementById('statusDoughnutEmpty');
+        var doughnut = document.getElementById('statusDoughnut');
+        var noRuns = (s.totalRuns || 0) === 0;
+        if (empty) empty.style.display = noRuns ? '' : 'none';
+        if (doughnut) doughnut.style.display = noRuns ? 'none' : '';
 
         kpiAvgDuration.textContent = formatDuration(s.avgDurationSeconds);
     }

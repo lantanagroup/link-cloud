@@ -4,14 +4,21 @@ using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Services;
 
+internal static class SystemPatientConfigurationIds
+{
+    public static readonly Guid PneumoniaInpatient = new("00000000-0000-0000-3000-000000000001");
+    public static readonly Guid DiabeticHypoglycemia = new("00000000-0000-0000-3000-000000000002");
+    public static readonly Guid PneumoniaAmbulatory = new("00000000-0000-0000-3000-000000000004");
+}
+
 public sealed class PatientConfigurationSeedService(
     IPatientConfigurationStore store,
     ILogger<PatientConfigurationSeedService> logger) : IHostedService
 {
-    private static readonly Guid PneumoniaId = new("00000000-0000-0000-3000-000000000001");
-    private static readonly Guid DiabeticHypoId = new("00000000-0000-0000-3000-000000000002");
+    private static readonly Guid PneumoniaId = SystemPatientConfigurationIds.PneumoniaInpatient;
+    private static readonly Guid DiabeticHypoId = SystemPatientConfigurationIds.DiabeticHypoglycemia;
     private static readonly Guid AchQualifyingAllStoriesId = new("00000000-0000-0000-3000-000000000003");
-    private static readonly Guid PneumoniaNqId = new("00000000-0000-0000-3000-000000000004");
+    private static readonly Guid PneumoniaNqId = SystemPatientConfigurationIds.PneumoniaAmbulatory;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -20,7 +27,7 @@ public sealed class PatientConfigurationSeedService(
         await UpsertAsync(Build(
             PneumoniaId,
             "Pneumonia (inpatient)",
-            "Inpatient pneumonia. Predicted qualifying for ACH from encounter class.",
+            "Inpatient pneumonia.",
             ClinicalScenarioIds.Pneumonia,
             inpatient: true,
             hypo: false), cancellationToken);
@@ -28,7 +35,7 @@ public sealed class PatientConfigurationSeedService(
         await UpsertAsync(Build(
             DiabeticHypoId,
             "Diabetic hypoglycemia (inpatient + insulin)",
-            "Inpatient diabetic hypoglycemia with the hypoglycemic insulin pair. Predicted qualifying for ACH and Hypo.",
+            "Inpatient diabetic hypoglycemia with insulin.",
             ClinicalScenarioIds.DiabeticHypoglycemia,
             inpatient: true,
             hypo: true), cancellationToken);
@@ -36,7 +43,7 @@ public sealed class PatientConfigurationSeedService(
         await UpsertAsync(Build(
             PneumoniaNqId,
             "Pneumonia (ambulatory)",
-            "Ambulatory pneumonia. Predicted non-qualifying for ACH because the encounter class is not an initial-population class.",
+            "Ambulatory pneumonia.",
             ClinicalScenarioIds.Pneumonia,
             inpatient: false,
             hypo: false), cancellationToken);

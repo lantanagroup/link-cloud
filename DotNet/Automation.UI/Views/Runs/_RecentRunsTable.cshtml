@@ -55,6 +55,12 @@
                 </tr>
             </thead>
             <tbody id="recentRunsBody">
+            @if (Model.Runs == null || !Model.Runs.Any())
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No runs yet. Pick a scenario in Quick Launch to start one.</td>
+                </tr>
+            }
             @foreach (var run in Model.Runs)
             {
                 <tr>

@@ -66,8 +66,8 @@ public class PatientConfigurationHydratorTests
         Assert.Equal("snf", cohort.Intent.DischargeDisposition);
         Assert.Equal(70, cohort.Intent.MinAge);
         Assert.Equal(ClinicalScenarioIds.Pneumonia.ToString(), Assert.Single(cohort.EligibleClinicalScenarioIds));
-        Assert.Equal(20, cohort.ResourcesPerPatientMin);
-        Assert.Equal(30, cohort.ResourcesPerPatientMax);
+        Assert.Equal(50, cohort.ResourcesPerPatientMin);
+        Assert.Equal(100, cohort.ResourcesPerPatientMax);
         Assert.Equal(ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod, cohort.ScheduledInpatientPattern);
 
         var profile = Assert.Single(hydrated.PatientProfiles);

@@ -149,11 +149,13 @@
         });
         var cap = 150;
         var shown = matches.slice(0, cap);
-        selected.forEach(function (code) {
-            if (shown.some(function (i) { return String(i.code) === String(code); })) return;
-            var hit = items.find(function (i) { return String(i.code) === String(code); });
-            if (hit) shown.unshift(hit);
-        });
+        if (!qLower) {
+            selected.forEach(function (code) {
+                if (shown.some(function (i) { return String(i.code) === String(code); })) return;
+                var hit = items.find(function (i) { return String(i.code) === String(code); });
+                if (hit) shown.unshift(hit);
+            });
+        }
         var list = shown.map(function (item) {
             var code = String(item.code);
             var checked = selected.indexOf(code) >= 0 ? ' checked' : '';
@@ -487,7 +489,7 @@
         var current = selected || sel.value || DEFAULT_STAY_PATTERN;
         var opts = stayPatterns();
         if (!opts.length) {
-            opts = [{ value: DEFAULT_STAY_PATTERN, label: 'Before -> Remains after', hint: 'Admitted before report period; remains inpatient after report period.', expectedInReport: true }];
+            opts = [{ value: DEFAULT_STAY_PATTERN, label: 'Before → after', hint: 'Admitted before report period; remains inpatient after report period.', expectedInReport: true }];
         }
         sel.innerHTML = opts.map(function (p) {
             return '<option value="' + esc(p.value) + '" title="' + esc(p.hint || p.label) + '"'
