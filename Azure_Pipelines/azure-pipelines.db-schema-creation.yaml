@@ -32,7 +32,7 @@ parameters:
       artifact: account-db
       file: accountDb.sql
     - name: app-bff
-      alias: app-bff
+      alias: app_bff
       artifact: app-bff-db
       file: app-bffDb.sql
     - name: audit
@@ -206,7 +206,7 @@ stages:
          publishLocation: 'container'
         displayName: Publish Account SQL Script
   # App-BFF
-  - job: App-BFF
+  - job: App_BFF
     displayName: "Generate App-BFF Schema Script"
     steps:
       - checkout: self
@@ -236,7 +236,7 @@ stages:
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
-         ArtifactName: app-bff-db'
+         ArtifactName: 'app-bff-db'
          publishLocation: 'container'
         displayName: Publish App-BFF SQL Script  
   ###
