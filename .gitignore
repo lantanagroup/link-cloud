@@ -430,6 +430,12 @@ Scripts/AzureAppConfig/config-key-inventory.json
 .tmp*/
 .tmp-*/
 
+# The per-environment App Configuration exports. LEGLINK-912 moved these to the private
+# link-cac repository; this entry keeps `git add .` from quietly re-adding a copy here. It is
+# a deterrent, not the control -- `git add -f` still works, and the server-side push rule and
+# .githooks/pre-push are what actually stop a reintroduction.
+/Config/app-config.*.json
+
 # A local clone of the private link-cac repository, if one is put here. The tooling defaults
 # to a sibling ../link-cac instead; override with LINK_CAC_CONFIG_DIR or --config-dir.
 .link-cac/

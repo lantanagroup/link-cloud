@@ -434,12 +434,22 @@ def load_java_audit(path: Optional[str]) -> List[Dict[str, Any]]:
 
 def store_presence(environments: List[str],
                    config_dir: Optional[str] = None) -> Dict[str, List[str]]:
-    """Which environments hold each key, for the human-facing table."""
+    """Which environments hold each key, for the human-facing table.
+
+    A missing export is skipped rather than fatal -- this generates documentation, not a
+    gate -- but it is announced. The exports live in another repository now, so the usual
+    reason for one to be absent is that link-cac was never cloned, and a silent skip would
+    publish a "stores" column that quietly covers three environments instead of four.
+    """
     config_dir = matching.default_config_dir() if config_dir is None else config_dir
     presence: Dict[str, List[str]] = defaultdict(list)
     for env in environments:
         path = os.path.join(config_dir, "app-config." + env + ".json")
         if not os.path.exists(path):
+            print(f"Warning: no export for '{env}' at {path}, so it will be absent from the "
+                  f"'stores' column rather than reported as missing the key. Clone link-cac "
+                  f"beside this repository, or point at it with LINK_CAC_CONFIG_DIR.",
+                  file=sys.stderr)
             continue
         with open(path, "r", encoding="utf-8") as handle:
             for item in json.load(handle).get("items", []):
