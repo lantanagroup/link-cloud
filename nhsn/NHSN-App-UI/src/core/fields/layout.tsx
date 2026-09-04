@@ -17,7 +17,11 @@ export interface ButtonProps {
   onClick?: () => void;
   type?: 'button' | 'submit';
   variant?: 'primary' | 'secondary';
+  size?: 'default' | 'sm';
   disabled?: boolean;
+  loading?: boolean;
+  /** Overrides the accessible name when the visible label alone doesn't identify which item this button acts on (e.g. a "Remove" button repeated per row). */
+  'aria-label'?: string;
 }
 
 export function Button({
@@ -25,14 +29,23 @@ export function Button({
   onClick,
   type = 'button',
   variant = 'primary',
-  disabled
+  size = 'default',
+  disabled,
+  loading,
+  'aria-label': ariaLabel
 }: ButtonProps) {
+  const {t} = useTranslation('common');
   return (
     <KendoButton
       type={type}
       themeColor={variant === 'primary' ? 'primary' : 'base'}
-      disabled={disabled}
+      className={size === 'sm' ? 'nhsn-link__button--sm' : undefined}
+      disabled={disabled || loading}
+      aria-label={ariaLabel}
       onClick={onClick}>
+      {loading && (
+        <span className="nhsn-link__button-spinner" role="status" aria-label={t('status.saving')} />
+      )}
       {children}
     </KendoButton>
   );
@@ -45,13 +58,9 @@ export interface StepActionsProps {
 
 /** The Back/Continue row every step ends with. */
 export function StepActions({children, saving}: StepActionsProps) {
-  const {t} = useTranslation('common');
   return (
     <div className="nhsn-link__step-actions" aria-busy={saving || undefined}>
       {children}
-      {saving && (
-        <span className="nhsn-link__saving" role="status" aria-label={t('status.saving')} />
-      )}
     </div>
   );
 }

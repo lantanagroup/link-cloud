@@ -200,9 +200,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
             // Reconstructed from Data Acquisition's FHIRPath conditions - see LocationOrgFhirPathParser.
             LocationOrg = locationOrg ?? new LocationOrgSection(),
 
-            // Encounter: owned by Normalization (SearchFacilityOperationsAsync), not Data
-            // Acquisition — not wired yet.
-            Encounter = new EncounterSection(),
+            Encounter = new EncounterSection { CodeSystems = stored.State.Encounter.CodeSystems },
 
             Hsloc = new HslocSection { Mappings = stored.State.Hsloc.Mappings },
 

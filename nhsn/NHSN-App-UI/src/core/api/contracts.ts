@@ -130,6 +130,8 @@ export interface EncounterCode {
   system: string;
   code: string;
   display: string;
+  category?: string;
+  categoryName?: string;
 }
 
 // ---------------------------------------------------------------- fhir server

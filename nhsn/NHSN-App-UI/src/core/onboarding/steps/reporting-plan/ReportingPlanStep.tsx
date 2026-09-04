@@ -124,7 +124,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
         <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={onNext} disabled={saving || !hasSchedule}>
+        <Button onClick={onNext} disabled={saving || !hasSchedule} loading={saving}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

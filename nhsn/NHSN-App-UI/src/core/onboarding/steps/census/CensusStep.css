@@ -137,7 +137,7 @@
 
 .census-poi .card .nhsn-link__step-actions {
   position: static;
-  margin-top: 0;
+  margin: 0;
   padding: 16px 32px 28px;
 }
 

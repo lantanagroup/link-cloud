@@ -279,7 +279,56 @@
     "title": "Location Identification (HSLOC)"
   },
   "encounter": {
-    "title": "Encounter Mapping"
+    "title": "Encounter Mapping",
+    "subtitle": "The NHSN measures evaluated by Link conform to the FHIR <uscore>US Core</uscore> implementation guide. This guide is a set of rules and best practices that help healthcare providers share patient information accross the United States. In this rule set, all patient FHIR <encounters>Encounters</encounters> must have an Encounter Type (e.g. e-mail consultation, surgical day-care, skilled nursing, rehabilitation) that maps to Patient Encounter Procedure SNOMED or CPT codes. More information on those requirements can be found <valueset>here</valueset>. Below is a form to associate your local Encounter.type codes to their corresponding SMOMED or CPT codes.",
+    "tabs": {
+      "mapping": "Encounter Mapping",
+      "reference": "CPT / SNOMED Reference Table"
+    },
+    "fields": {
+      "codeSystemsLabel": "Encounter.type Code Systems",
+      "codeSystemsHint": "Add each source code system your facility's local Encounter.type codes come from. Within each code system, map its local codes to the corresponding CPT or SNOMED reference code.",
+      "codeSystemLabel": "Encounter.type Code System",
+      "codeSystemPlaceholder": "e.g. http://mysite.org/fhir/encounter-type",
+      "noCodeSystems": "No code systems added yet.",
+      "addCodeSystem": "+ Add Code System",
+      "removeCodeSystem": "Remove System",
+      "removeCodeSystemAriaLabel": "Remove code system {{system}}",
+      "mappingListLabel": "Local Encounter.type Code Mappings",
+      "noMappings": "None added yet.",
+      "addMapping": "+ Add Mapping",
+      "removeMapping": "Remove",
+      "removeMappingAriaLabel": "Remove mapping {{code}}",
+      "localCodeLabel": "Encounter.type code",
+      "localCodePlaceholder": "Encounter.type code",
+      "targetCodeLabel": "CPT or SNOMED code",
+      "targetCodePlaceholder": "Search CPT or SNOMED code…",
+      "targetCodeNoMatches": "No matching codes.",
+      "incompleteRowHint": "This mapping is missing a local code or a CPT/SNOMED code."
+    },
+    "reference": {
+      "searchLabel": "Search reference codes",
+      "searchPlaceholder": "Search code system, category, code, description…",
+      "systemFilterLabel": "Code system",
+      "systemFilterAll": "All Code Systems",
+      "categoryFilterLabel": "Category",
+      "categoryFilterAll": "All Categories",
+      "resultCount": "{{count}} of {{total}} codes",
+      "noResults": "No matching codes.",
+      "columns": {
+        "system": "System",
+        "category": "Category",
+        "code": "Code",
+        "description": "Description"
+      },
+      "detailNoSelection": "No matching codes to display.",
+      "detailMappedTitle": "Your Mapped Encounter.type Codes",
+      "detailNoMappedCodes": "No Encounter.type codes you've entered map to this code yet."
+    },
+    "messages": {
+      "loadError": "Unable to load encounter mapping data.",
+      "saveError": "Unable to save encounter mappings."
+    }
   },
   "report": {
     "title": "Generate Test Report"

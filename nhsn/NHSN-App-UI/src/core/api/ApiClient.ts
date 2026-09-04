@@ -75,7 +75,7 @@ export interface ApiClient {
   getTimezones(): Promise<Timezone[]>;
   getMeasures(): Promise<Measure[]>;
   getHslocCodes(): Promise<HslocCode[]>;
-  getEncounterCodes(query: string): Promise<EncounterCode[]>;
+  getEncounterCodes(query?: string): Promise<EncounterCode[]>;
   /** Authenticated fetch — a plain <a href> will not work. Key from the vendor profile. */
   getDocument(documentKey: string): Promise<Blob>;
 

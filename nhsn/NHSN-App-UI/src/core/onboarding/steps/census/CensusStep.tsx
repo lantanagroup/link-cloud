@@ -761,7 +761,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
             <Button variant="secondary" onClick={onBack} disabled={saving}>
               {t("common:actions.back")}
             </Button>
-            <Button onClick={handleNext} disabled={saving}>
+            <Button onClick={handleNext} disabled={saving} loading={saving}>
               {t("common:actions.continue")}
             </Button>
           </StepActions>

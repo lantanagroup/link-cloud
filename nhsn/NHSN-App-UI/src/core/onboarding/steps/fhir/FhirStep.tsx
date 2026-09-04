@@ -251,7 +251,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
                   target="_blank"
                   rel="noopener">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 3v12" />
                     <path d="M7 10l5 5 5-5" />
                     <path d="M5 21h14" />
@@ -365,11 +365,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
           )}
 
           {(testing || testResult) && (
-            <div className="fhir-test-result">
+            <div className="fhir-test-result" role="status">
               {testing ? (
-                <span className="result-spinner" />
+                <span className="result-spinner" aria-hidden="true" />
               ) : (
-                <span className={`result-icon ${testResult!.success ? 'result-icon-success' : 'result-icon-failed'}`}>
+                <span
+                  className={`result-icon ${testResult!.success ? 'result-icon-success' : 'result-icon-failed'}`}
+                  aria-hidden="true">
                   {testResult!.success ? '✓' : '!'}
                 </span>
               )}
@@ -385,7 +387,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
           <Button onClick={handleTestConnection} disabled={testing}>
             {t('common:actions.testConnection')}
           </Button>
-          <Button onClick={handleNext} disabled={saving}>
+          <Button onClick={handleNext} disabled={saving} loading={saving}>
             {t('common:actions.continue')}
           </Button>
         </StepActions>
