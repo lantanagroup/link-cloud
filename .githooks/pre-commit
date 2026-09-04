@@ -1,9 +1,13 @@
 #!/bin/sh
 #
-# Guards the App Configuration exports and the catalog that describes them.
+# Validates the App Configuration catalog:
 #
-#   Config/*.json      scanned for credentials
-#   app-config.yaml    validated against its own embedded schema
+#   app-config.yaml    checked against its own embedded schema
+#
+# The per-environment exports it describes used to be scanned here too. LEGLINK-912 moved them
+# to the private link-cac repository, so nothing under Config/ can be staged in this one any
+# more. That repository has no hook of its own - scanning there would need a clone of this one
+# on every machine - so its CI is what runs validate_aac_secrets.py against them.
 #
 # Enable for your clone with:
 #     git config core.hooksPath .githooks
@@ -11,16 +15,14 @@
 # Validates the STAGED content, not the working tree, so a problem cannot slip through by
 # being fixed in the file after `git add`.
 #
-# Bypass with `git commit --no-verify`. CI runs the same checks either way.
+# Bypass with `git commit --no-verify`. CI runs the same check either way.
 
 set -e
 
-staged_exports=$(git diff --cached --name-only --diff-filter=ACM \
-    | grep -E '^Config/.*\.json$' || true)
 staged_catalog=$(git diff --cached --name-only --diff-filter=ACM \
     | grep -E '^app-config\.yaml$' || true)
 
-if [ -z "$staged_exports" ] && [ -z "$staged_catalog" ]; then
+if [ -z "$staged_catalog" ]; then
     exit 0
 fi
 
@@ -37,59 +39,28 @@ for candidate in python3 python py; do
 done
 
 if [ -z "$PYTHON" ]; then
-    echo "pre-commit: no working python found, skipping App Config checks."
-    echo "pre-commit: CI will still run them."
+    echo "pre-commit: no working python found, skipping the App Config catalog check."
+    echo "pre-commit: CI will still run it."
     exit 0
 fi
 
-# Materialize staged blobs so the checks see exactly what is being committed.
+# Materialize the staged blob so the check sees exactly what is being committed.
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-stage_blob() {
-    dest="$tmpdir/$(basename "$1")"
-    git show ":$1" > "$dest"
-    echo "$dest"
-}
+catalog="$tmpdir/$(basename "$staged_catalog")"
+git show ":$staged_catalog" > "$catalog"
 
-if [ -n "$staged_exports" ]; then
-    files=""
-    for path in $staged_exports; do
-        files="$files $(stage_blob "$path")"
-    done
-
-    # --strict matches appconfig-secret-scan.yml, so the hook cannot pass something CI will
-    # reject. Errors block either way; --strict is only about warnings - a secret-shaped key
-    # holding a literal, a duplicate (key, label), a malformed entry. Those are worth stopping
-    # for here because these files go to a public repository, where a false positive costs a
-    # --no-verify and a false negative costs a rotated credential and permanent git history.
-    #
-    # It does not make the two identical: this scans the staged blob, CI scans all three files
-    # on disk. A warning in a file you did not stage still passes here and fails there.
-    # shellcheck disable=SC2086
-    if ! "$PYTHON" Scripts/AzureAppConfig/validate_aac_secrets.py --strict $files; then
-        echo ""
-        echo "pre-commit: BLOCKED -- staged App Config export failed the secret scan."
-        echo "pre-commit: An ERROR is a credential: move it into Key Vault and reference it,"
-        echo "pre-commit: then re-stage. A WARNING is something worth a look rather than"
-        echo "pre-commit: certainly wrong; it blocks here because CI runs --strict too."
-        echo "pre-commit: If the finding is wrong, commit with --no-verify."
-        exit 1
-    fi
+if ! "$PYTHON" Scripts/AzureAppConfig/validate_app_config_schema.py "$catalog"; then
+    echo ""
+    echo "pre-commit: BLOCKED -- staged app-config.yaml does not match its own schema."
+    echo "pre-commit: Fix the entries above, or commit with --no-verify."
+    exit 1
 fi
 
-if [ -n "$staged_catalog" ]; then
-    catalog=$(stage_blob "$staged_catalog")
-    if ! "$PYTHON" Scripts/AzureAppConfig/validate_app_config_schema.py "$catalog"; then
-        echo ""
-        echo "pre-commit: BLOCKED -- staged app-config.yaml does not match its own schema."
-        echo "pre-commit: Fix the entries above, or commit with --no-verify."
-        exit 1
-    fi
-fi
-
-# The required-key check is deliberately NOT run here. It compares the catalog against all
-# three stores, so it would fail on gaps a commit did not introduce and cannot fix. CI reports
-# it instead.
+# The required-key check is deliberately NOT run here. It compares the catalog against every
+# store's export, which now means reading a second repository - and it would fail on gaps a
+# commit did not introduce and cannot fix. link-cac's CI reports it instead: this repository
+# never reads that one.
 
 exit 0
