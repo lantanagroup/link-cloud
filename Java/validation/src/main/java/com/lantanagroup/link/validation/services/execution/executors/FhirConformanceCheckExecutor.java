@@ -19,15 +19,19 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PreDestroy;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Component
@@ -39,12 +43,20 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
 
     /**
      * Max concurrent Bundle-entry validations. Configured value of 0 (the default) means "auto":
-     * match {@link ForkJoinPool#commonPool()}'s own parallelism, since that is the pool entry
-     * validations actually run on -- this avoids a hardcoded number going stale if the pool's
-     * parallelism ever changes (e.g. via the java.util.concurrent.ForkJoinPool.common.parallelism
-     * system property).
+     * match {@link ForkJoinPool#commonPool()}'s own parallelism -- this avoids a hardcoded number
+     * going stale if the pool's parallelism ever changes (e.g. via the
+     * java.util.concurrent.ForkJoinPool.common.parallelism system property). Also sizes
+     * {@link #bundleValidationExecutor}.
      */
     private final int batchSize;
+
+    /**
+     * Dedicated, fixed-size pool for Bundle-entry validations -- isolated from
+     * {@link ForkJoinPool#commonPool()} so this (CPU-heavy) work never competes with, or gets
+     * starved by, unrelated parallel-stream/CompletableFuture work elsewhere in the app.
+     * Concurrency is capped by the pool's fixed size itself, so no separate semaphore is needed.
+     */
+    private final ExecutorService bundleValidationExecutor;
 
     public FhirConformanceCheckExecutor(
             FhirValidator fhirValidator,
@@ -53,6 +65,13 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
         this.fhirValidator = fhirValidator;
         this.objectMapper = objectMapper;
         this.batchSize = configuredBatchSize > 0 ? configuredBatchSize : ForkJoinPool.commonPool().getParallelism();
+        this.bundleValidationExecutor = new ThreadPoolExecutor(
+                batchSize, batchSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    }
+
+    @PreDestroy
+    void shutdownBundleValidationExecutor() {
+        bundleValidationExecutor.shutdown();
     }
 
     @Override
@@ -88,36 +107,20 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
     }
 
     /**
-     * Validates each Bundle entry as its own independent resource, capping concurrent validations at
-     * {@link #batchSize} via a {@link Semaphore}. All entries are submitted up front (no batch/wave
-     * joins in between) so a slow resource never delays the start of the next one -- only the number
-     * of validations actually running at once is bounded.
+     * Validates each Bundle entry as its own independent resource on {@link #bundleValidationExecutor},
+     * which caps concurrent validations at {@link #batchSize}. All entries are submitted up front (no
+     * batch/wave joins in between) so a slow resource never delays the start of the next one -- excess
+     * entries simply queue on the executor until a pool thread frees up.
      */
     private List<RawFinding> executeBundle(RubricCheck check, ExecutionContext context, ValidationOptions options) {
-        Semaphore semaphore = new Semaphore(batchSize);
         List<CompletableFuture<List<RawFinding>>> futures = context.getBundleEntries().stream()
-                .map(entry -> CompletableFuture.supplyAsync(() -> validateThrottled(check, entry, options, semaphore),
-                        ForkJoinPool.commonPool()))
+                .map(entry -> CompletableFuture.supplyAsync(() -> validate(check, entry, options), bundleValidationExecutor))
                 .collect(Collectors.toList());
 
         return futures.stream()
                 .map(CompletableFuture::join)
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
-    }
-
-    private List<RawFinding> validateThrottled(RubricCheck check, IBaseResource resource, ValidationOptions options, Semaphore semaphore) {
-        try {
-            semaphore.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new CompletionException(e);
-        }
-        try {
-            return validate(check, resource, options);
-        } finally {
-            semaphore.release();
-        }
     }
 
     private List<RawFinding> validate(RubricCheck check, IBaseResource resource, ValidationOptions options) {
