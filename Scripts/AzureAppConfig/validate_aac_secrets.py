@@ -1,9 +1,20 @@
 """Validate Azure App Configuration JSON exports for leaked secrets.
 
-The files under Config/ are exports of the Azure App Configuration stores and are
-committed to a PUBLIC repository. App Configuration does not prevent anyone from
-storing a literal credential, so an export can silently carry one into permanent
-git history. This script is the gate in front of that.
+The files it reads are exports of the Azure App Configuration stores, committed to
+the private `link-cac` repository (LEGLINK-912 moved them out of this public one).
+App Configuration does not prevent anyone from storing a literal credential, so an
+export can silently carry one into permanent git history - which no repository's
+visibility undoes. This script is the gate in front of that.
+
+It is stdlib-only so it can run anywhere, but in CI it runs only in link-cac,
+which checks this repository out for the script. It must NOT be wired into this
+repository's CI: two of its warnings quote the offending value, and Actions logs
+on a public repository are world-readable, so a finding would publish the very
+value it is complaining about. A pull request here cannot change link-cac's
+exports in any case.
+
+link-cac has no pre-commit hook, so this is the only gate on that side and it
+first fires when a pull request opens.
 
 Three classes of finding:
 
@@ -31,9 +42,9 @@ Three classes of finding:
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
 Usage:
-    python Scripts/AzureAppConfig/validate_aac_secrets.py Config/app-config.dev.json
-    python Scripts/AzureAppConfig/validate_aac_secrets.py Config/*.json --strict
-    python Scripts/AzureAppConfig/validate_aac_secrets.py            # defaults to Config/*.json
+    python Scripts/AzureAppConfig/validate_aac_secrets.py            # link-cac cloned as a sibling
+    python Scripts/AzureAppConfig/validate_aac_secrets.py --strict
+    python Scripts/AzureAppConfig/validate_aac_secrets.py <path-to>/link-cac/Config/app-config.dev.json
 """
 
 import argparse
@@ -45,6 +56,7 @@ import sys
 from typing import Any, Dict, List, Tuple
 
 import config_findings as findings_mod
+import config_key_matching as matching
 from config_findings import ERROR, WARN, Finding, entry_location
 
 KEY_VAULT_REF_CONTENT_TYPE = "application/vnd.microsoft.appconfig.keyvaultref+json"
@@ -300,18 +312,30 @@ def resolve_paths(patterns: List[str]) -> List[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Validate Azure App Config exports for leaked secrets.")
+    # app-config.*.json rather than *.json: link-cac's Config/ also holds the derived
+    # config-key-inventory.json, which is not an export and is gitignored, so a bare *.json
+    # makes a local run scan a different set of files than CI does.
+    default_glob = os.path.join(matching.default_config_dir(), "app-config.*.json")
     parser.add_argument(
-        "paths", nargs="*", default=["Config/*.json"],
-        help="Export files to validate (default: Config/*.json)")
+        "paths", nargs="*", default=[default_glob],
+        help=f"Export files to validate (default: {default_glob}; the directory is also "
+             f"settable with LINK_CAC_CONFIG_DIR)")
     parser.add_argument(
         "--strict", action="store_true",
         help="Treat warnings as errors")
     args = parser.parse_args()
 
-    paths = resolve_paths(args.paths or ["Config/*.json"])
-    if not paths:
-        print("No files to validate.")
-        return 0
+    requested = args.paths or [default_glob]
+    # resolve_paths hands an unmatched pattern straight back, so validate_file reports it as a
+    # missing file. That is the right answer for a mistyped path, but not for the default: it
+    # now points at a different repository, and the overwhelmingly likely cause is that link-cac
+    # is not checked out beside this one - a gate that did not run rather than one that passed.
+    paths = resolve_paths(requested)
+    if requested == [default_glob] and not any(os.path.exists(p) for p in paths):
+        print(f"Error: no App Configuration exports found at {default_glob}.", file=sys.stderr)
+        print("They live in the private link-cac repository. Clone it beside link-cloud, set "
+              "LINK_CAC_CONFIG_DIR, or pass the paths explicitly.", file=sys.stderr)
+        return findings_mod.EXIT_UNUSABLE
 
     all_findings: List[Finding] = []
     for path in paths:
@@ -323,8 +347,8 @@ def main() -> int:
                   f"{', '.join(os.path.basename(p) for p in paths)}"),
         all_clear="OK: no secrets or malformed entries found.",
         strict=args.strict,
-        epilogue=("A credential in a public repository must be rotated, not just "
-                  "deleted -- git history is permanent."))
+        epilogue=("A leaked credential must be rotated, not just deleted -- git history is "
+                  "permanent, and link-cac being private does not change that."))
 
 
 if __name__ == "__main__":

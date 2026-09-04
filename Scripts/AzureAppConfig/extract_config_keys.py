@@ -60,6 +60,10 @@ import sys
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# Imported for default_config_dir alone, so this stays runnable without PyYAML - which the
+# fallbacks below deliberately support. config_key_matching imports nothing beyond the stdlib.
+import config_key_matching as matching
+
 # ---------------------------------------------------------------------------
 # Scanning helpers
 # ---------------------------------------------------------------------------
@@ -429,12 +433,23 @@ def load_java_audit(path: Optional[str]) -> List[Dict[str, Any]]:
 
 
 def store_presence(environments: List[str],
-                   config_dir: str = "Config") -> Dict[str, List[str]]:
-    """Which environments hold each key, for the human-facing table."""
+                   config_dir: Optional[str] = None) -> Dict[str, List[str]]:
+    """Which environments hold each key, for the human-facing table.
+
+    A missing export is skipped rather than fatal -- this generates documentation, not a
+    gate -- but it is announced. The exports live in another repository now, so the usual
+    reason for one to be absent is that link-cac was never cloned, and a silent skip would
+    publish a "stores" column that quietly covers three environments instead of four.
+    """
+    config_dir = matching.default_config_dir() if config_dir is None else config_dir
     presence: Dict[str, List[str]] = defaultdict(list)
     for env in environments:
         path = os.path.join(config_dir, "app-config." + env + ".json")
         if not os.path.exists(path):
+            print(f"Warning: no export for '{env}' at {path}, so it will be absent from the "
+                  f"'stores' column rather than reported as missing the key. Clone link-cac "
+                  f"beside this repository, or point at it with LINK_CAC_CONFIG_DIR.",
+                  file=sys.stderr)
             continue
         with open(path, "r", encoding="utf-8") as handle:
             for item in json.load(handle).get("items", []):
@@ -471,13 +486,13 @@ def service_owns(service: str, file_path: str) -> bool:
 
 
 def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str],
-                   environments: List[str]) -> None:
+                   environments: List[str], config_dir: Optional[str] = None) -> None:
     """Emit the human-readable inventory.
 
     app-config.yaml stays curated and scannable as the deployment hand-off artifact, so the
     exhaustive picture lives here instead. Generated from the same data, so it cannot drift.
     """
-    presence = store_presence(environments)
+    presence = store_presence(environments, config_dir)
     by_service: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for entry in keys:
         for service in entry["consumers"] or ["(unattributed)"]:
@@ -546,14 +561,16 @@ def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str]
         handle.write("\n".join(lines))
 
 
-def catalog_environments(path: str) -> List[str]:
+def catalog_environments(path: str, config_dir: Optional[str] = None) -> List[str]:
     """Environments the catalog declares, for the "stores" column.
 
-    Falls back to whichever exports are committed. That is a weaker answer than the catalog -
-    it cannot tell a declared environment apart from a forgotten one - but for a documentation
+    Falls back to whichever exports are present in link-cac. That is a weaker answer than the
+    catalog - it cannot tell a declared environment apart from a forgotten one, and it reads
+    empty when link-cac is not checked out beside this repository - but for a documentation
     column it is still the right question, and it keeps the inventory generatable without
     PyYAML installed.
     """
+    config_dir = matching.default_config_dir() if config_dir is None else config_dir
     try:
         import yaml
         with open(path, "r", encoding="utf-8") as handle:
@@ -570,7 +587,7 @@ def catalog_environments(path: str) -> List[str]:
               file=sys.stderr)
 
     found = sorted(re.sub(r"^app-config\.|\.json$", "", os.path.basename(p))
-                   for p in glob.glob(os.path.join("Config", "app-config.*.json")))
+                   for p in glob.glob(os.path.join(config_dir, "app-config.*.json")))
     return found
 
 
@@ -611,7 +628,10 @@ def main() -> int:
                         help="Roslyn symbol dump from Scripts/AzureAppConfig/dump_config_symbols.cs")
     parser.add_argument("--java-audit", default="Scripts/AzureAppConfig/java_config_audit.json",
                         help="Hand-maintained Java binding audit to fold in")
-    parser.add_argument("--json", default="Config/config-key-inventory.json",
+    parser.add_argument("--config-dir", default=matching.default_config_dir(),
+                        help="Where link-cac's exports are, for the 'stores' column "
+                             "(default: %(default)s; also settable with LINK_CAC_CONFIG_DIR)")
+    parser.add_argument("--json", default="Scripts/AzureAppConfig/config-key-inventory.json",
                         help="Where to write the machine-readable inventory")
     parser.add_argument("--markdown", default="docs/config-key-inventory.md",
                         help="Where to write the human-readable inventory")
@@ -659,7 +679,7 @@ def main() -> int:
     if args.markdown:
         os.makedirs(os.path.dirname(args.markdown) or ".", exist_ok=True)
         write_markdown(keys, args.markdown, catalog_key_set(args.catalog),
-                       catalog_environments(args.catalog))
+                       catalog_environments(args.catalog, args.config_dir), args.config_dir)
         print(f"Wrote {args.markdown}")
     return 0
 
