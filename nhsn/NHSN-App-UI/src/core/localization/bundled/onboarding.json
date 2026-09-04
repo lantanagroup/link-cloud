@@ -136,7 +136,87 @@
     }
   },
   "census": {
-    "title": "Patients of Interest Configuration"
+    "title": "Patients of Interest Configuration",
+    "intro1": "Patients of Interest (POI) are the patients included for NHSN ACH dQM surveillance and measure evaluation. POI includes patients receiving care in inpatient, emergency department, observation, and short-stay settings during the surveillance measurement period.",
+    "intro2": "NHSNLink must identify the POI before retrieving the FHIR resources needed for measure evaluation. How the POI is identified depends on your EHR and configuration. The following steps will guide you through configuring how NHSNLink identifies your facility's POI.",
+    "epic": {
+      "sectionTitle": "Epic Patient Lists",
+      "subtitle": "For Epic facilities using automated POI acquisition, NHSNLink uses configured Epic system patient lists to identify currently admitted and recently discharged patients. The Epic List API has a limit of 1500 patients returned with any one query, so building six separate system lists is recommended to keep daily queries well under the 1500 limit threshold and to avoid missing patients with short admissions.",
+      "downloadInstructions": "Download PDF Instructions",
+      "instructionsHint": "If Epic FHIR List Id's have not been created by your facility for census management, the following instructions can be downloaded for your technical team to generate them.",
+      "lists": {
+        "admitLt24": "Admit - Within 24 Hours",
+        "admit24to48": "Admit - Between 24 and 48 hours",
+        "admitGt48": "Admit - Over 48 hours",
+        "dischargeLt24": "Discharge - Where lookback of admission is within past 24 hours",
+        "discharge24to48": "Discharge - Where lookback of admission is between 24 and 48 hours",
+        "dischargeGt48": "Discharge - Where lookback of admission is over 48 hours"
+      },
+      "validateButton": "Validate Census Results",
+      "validating": "Validating…",
+      "viewResultsAria": "View results for {{list}}",
+      "queryError": "Unable to query this patient list.",
+      "resultsTitle": "List Results Preview",
+      "summary": {
+        "listName": "Patient List Name",
+        "listId": "List Id",
+        "queriedAt": "Queried At",
+        "patientCount": "Patient Count"
+      },
+      "columns": {
+        "patientId": "FHIR Patient Id"
+      }
+    },
+    "cerner": {
+      "sectionTitle": "Cerner SFTP Configuration",
+      "downloadInstructions": "Download PDF Instructions",
+      "instructionsHint": "If an SFTP endpoint or file extraction has not been disclosed for NHSNLink usage, the following instructions can be downloaded for your technical team to use to set up Cerner census extracts.",
+      "fields": {
+        "hostLabel": "SFTP Host URL",
+        "portLabel": "SFTP Host URL Port",
+        "usernameLabel": "Username",
+        "passwordLabel": "Password",
+        "credentialsHint": "Only needed if your facility's SFTP server requires basic authentication.",
+        "credentialsOnFile": "Credentials are on file. Enter new values to replace them.",
+        "remoteDirectoryLabel": "Remote Directory",
+        "remoteDirectoryHint": "Path to the directory on the SFTP server (use '/' for root)",
+        "removeAfterProcessingLabel": "Remove files after processing"
+      },
+      "testConnection": "Test Connection",
+      "testing": "Testing connection…",
+      "testSuccess": "Connection test succeeded.",
+      "testFailure": "Connection test failed.",
+      "testError": "Unable to test the connection.",
+      "filesTitle": "SFTP Acquisition Results",
+      "noFiles": "No files found.",
+      "columns": {
+        "fileName": "SFTP File Name",
+        "queriedAt": "Queried At",
+        "patientCount": "Patient Count",
+        "patients": "Patients"
+      }
+    },
+    "fields": {
+      "frequencyLabel": "Census Acquisition Frequency",
+      "frequencyTooltip": "This setting determines the frequency in which NHSNLink will attempt to get the latest patients of interest results.",
+      "hoursLabel": "Hours",
+      "minutesLabel": "Minutes",
+      "exportResults": "Export Results",
+      "accuracyAck": "I acknowledge that the patients of interest results are accurate."
+    },
+    "messages": {
+      "incomplete": "Please complete all required fields before continuing.",
+      "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
+      "vendorRequired": "Complete Facility Information before configuring patients of interest.",
+      "ackError": "Unable to record the acknowledgement."
+    },
+    "errors": {
+      "listIdRequired": "This field is required.",
+      "hostRequired": "SFTP Host URL is required.",
+      "portRequired": "SFTP Host URL Port is required.",
+      "portInvalid": "Enter a valid port between 1 and 65535.",
+      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes."
+    }
   },
   "locationOrg": {
     "title": "Organization Identification"

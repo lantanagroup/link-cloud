@@ -60,7 +60,8 @@ export class MockApiClient implements ApiClient {
       // render their "not yet connected" state rather than showing fixtures.
       capabilities: {
         patientListWithNames: false,
-        fhirConnectionProbe: false
+        fhirConnectionProbe: false,
+        sftpFileListing: false
       }
     };
   }

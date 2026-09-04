@@ -41,6 +41,7 @@ export type OnboardingStatus =
 export interface Capabilities {
   patientListWithNames: boolean;
   fhirConnectionProbe: boolean;
+  sftpFileListing: boolean;
 }
 
 export interface UserInfoResponse {

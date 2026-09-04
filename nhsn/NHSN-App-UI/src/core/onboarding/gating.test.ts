@@ -56,7 +56,19 @@ describe('resolveStep', () => {
       {
         facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
         manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
-        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true}
+        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        census: {
+          patientListIds: {
+            'admit-lt-24': 'list-1',
+            'admit-24-to-48': 'list-2',
+            'admit-gt-48': 'list-3',
+            'discharge-lt-24': 'list-4',
+            'discharge-24-to-48': 'list-5',
+            'discharge-gt-48': 'list-6'
+          },
+          acquisitionFrequency: 'PT0H15M',
+          accuracyAcknowledged: true
+        }
       }
     );
     const target = {

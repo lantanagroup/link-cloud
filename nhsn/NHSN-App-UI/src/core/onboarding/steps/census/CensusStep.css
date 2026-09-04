@@ -1,0 +1,440 @@
+/*
+ * Mirrors FhirStep.css's card/card-scroll/page-header treatment so the two
+ * longer, multi-section steps share one visual language rather than each
+ * inventing its own. See FhirStep.css for the rules this is intentionally
+ * kept in step with.
+ */
+
+.census-poi {
+  --census-blue: var(--kendo-color-primary, #0057b7);
+  --census-blue-dark: var(--kendo-color-primary-hover, #032659);
+  --census-gray-50: var(--kendo-color-surface, #f7f9fc);
+  --census-gray-100: var(--kendo-color-base-hover, #f2f4f7);
+  --census-gray-200: var(--kendo-color-border, #d0d7de);
+  --census-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
+  --census-gray-800: var(--kendo-color-app-text, #1f2328);
+  --census-red: var(--kendo-color-error, #cc1b22);
+  --census-radius: 8px;
+
+  color: var(--census-gray-800);
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/*
+ * The panel chrome itself (border, layout, section-title/summary-list accents)
+ * lives in the shared SidePanel component - see NHSNLink.css. Only the
+ * census-table-scroll's panel-tinted header is specific enough to stay here.
+ */
+.census-poi .nhsn-link__side-panel .census-table-scroll {
+  border-color: #cfe0f5;
+}
+
+.census-poi .nhsn-link__side-panel .census-table-scroll th {
+  background: #eaf2fc;
+  color: var(--census-blue-dark);
+}
+
+.census-poi .card {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--census-gray-200);
+  border-radius: var(--census-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.census-poi .card-scroll {
+  padding: 0 32px 28px;
+  border-radius: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.census-poi .card-scroll > * {
+  flex-shrink: 0;
+}
+
+.census-poi .page-header {
+  padding: 0;
+  border-bottom: none !important;
+  display: block;
+}
+
+.census-poi .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.census-poi .page-header-title:focus {
+  outline: none;
+}
+
+.census-poi .page-header-buttons {
+  display: none;
+}
+
+.census-poi .subtitle {
+  color: var(--census-gray-600);
+  margin: 0 0 22px;
+  font-size: 14px;
+}
+
+.census-poi .section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--census-gray-600);
+  margin: 26px 0 10px;
+  font-weight: 600;
+}
+
+.census-poi .census-section-heading {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 14px;
+  color: var(--census-gray-800);
+}
+
+.census-poi .census-instructions-box {
+  background: var(--census-gray-50);
+  border: 1px solid var(--census-gray-200);
+  border-radius: var(--census-radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.census-poi .census-instructions-box p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--census-gray-600);
+}
+
+.census-poi .census-instructions-box .nhsn-link__download-field {
+  margin: 0;
+}
+
+.census-poi .form-group {
+  margin-bottom: 18px;
+}
+
+.census-poi .form-hint {
+  color: var(--census-gray-600);
+  font-size: 13px;
+  margin: -8px 0 18px;
+}
+
+.census-poi .card .nhsn-link__step-actions {
+  position: static;
+  margin-top: 0;
+  padding: 16px 32px 28px;
+}
+
+.census-poi .k-form-field {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.census-poi div:has(> .k-checkbox-wrap) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.census-poi .k-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--census-gray-800);
+}
+
+.census-poi .k-label.k-checkbox-label {
+  margin-bottom: 0;
+}
+
+.census-poi .k-label svg {
+  display: none;
+}
+
+.census-poi .k-input,
+.census-poi .k-numerictextbox {
+  width: 100%;
+  border-radius: var(--census-radius);
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.census-poi .k-input::placeholder {
+  color: var(--census-gray-600);
+  opacity: 1;
+}
+
+.census-poi .k-input:focus-within {
+  outline: 2px solid var(--census-blue);
+  outline-offset: 1px;
+}
+
+.census-poi .k-input.k-invalid,
+.census-poi .k-numerictextbox.k-invalid {
+  border-color: var(--census-red);
+}
+
+.census-poi .k-input.k-invalid:focus-within,
+.census-poi .k-numerictextbox.k-invalid:focus-within {
+  outline-color: var(--census-red);
+}
+
+.census-poi .k-form-error {
+  color: var(--census-red);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+
+.census-poi .k-form-field:has(.k-form-hint) .k-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.census-poi .k-form-field:has(.k-form-hint) .k-label::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border-radius: 50%;
+  background: var(--census-gray-200);
+  color: var(--census-gray-600);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  anchor-name: --census-hint-badge;
+}
+
+.census-poi .k-form-field--hint-open .k-label::after {
+  background: var(--census-blue);
+  color: var(--kendo-color-on-inverse, #ffffff);
+}
+
+@supports (position-anchor: --census-hint-badge) {
+  .census-poi .k-form-hint {
+    position-anchor: --census-hint-badge;
+    left: anchor(center);
+    bottom: calc(anchor(top) + 9px);
+    transform: translateX(-50%);
+  }
+
+  .census-poi .k-form-hint::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+.census-poi .k-form-field--hint-open .k-form-hint {
+  display: block;
+}
+
+.census-poi .census-list-field {
+  max-width: 640px;
+  margin-bottom: 18px;
+}
+
+.census-poi .census-list-field.is-validated .k-label::after {
+  content: '\2713';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--kendo-color-success, #1e5f25);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.census-poi .census-list-field.is-querying .k-label::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  border: 2px solid var(--census-gray-200);
+  border-top-color: var(--census-blue);
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: census-spin 0.7s linear infinite;
+}
+
+@keyframes census-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.census-poi .census-list-input-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.census-poi .census-list-input-row .k-form-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.census-poi .census-view-btn {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Bottom-aligning to the field would chase the field's height, including any
+     error text below the input - offset from the top by the label's height instead. */
+  margin-top: 26px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--census-blue);
+  border: 1.5px solid var(--census-gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.census-poi .census-view-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--census-blue);
+  background: var(--census-gray-50);
+}
+
+.census-poi .census-view-btn:disabled {
+  color: var(--census-gray-600);
+  border-color: var(--census-gray-200);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.census-poi .census-view-btn.active {
+  border-color: var(--census-blue);
+  background: var(--census-blue);
+  color: var(--kendo-color-on-inverse, #ffffff);
+}
+
+.census-poi .census-triplet {
+  display: flex;
+  gap: 1rem;
+  max-width: 420px;
+}
+
+.census-poi .census-triplet .k-form-field {
+  flex: 1;
+}
+
+.census-poi .census-field-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--census-gray-800);
+}
+
+.census-poi .census-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.census-poi .census-inline-actions .nhsn-link__download-field {
+  margin: 0;
+}
+
+.census-poi .census-results {
+  margin: 16px 0 24px;
+  max-width: 900px;
+}
+
+.census-poi .census-table-scroll {
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid var(--census-gray-200);
+  border-radius: 8px;
+}
+
+.census-poi .census-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.census-poi .census-table-scroll th {
+  position: sticky;
+  top: 0;
+  background: var(--census-gray-50);
+  z-index: 1;
+}
+
+.census-poi .census-table-scroll th,
+.census-poi .census-table-scroll td {
+  text-align: left;
+  white-space: nowrap;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--census-gray-100);
+}
+
+.census-poi .census-test-success {
+  color: var(--kendo-color-success, #1e5f25);
+  font-weight: 600;
+}
+
+/*
+ * The app-wide button chrome (NHSNLink.css) is scoped to
+ * .nhsn-link__step-actions, since every other step's buttons only ever sit in
+ * that one Back/Continue row. Census also has the inline Validate/Test
+ * Connection buttons outside it, so that chrome is repeated here.
+ */
+.census-poi .census-inline-actions .k-button {
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.census-poi .census-inline-actions .k-button.k-button-primary {
+  background: var(--census-blue);
+  border-color: var(--census-blue);
+}
+
+.census-poi .census-inline-actions .k-button.k-button-primary:hover:not(:disabled) {
+  background: var(--kendo-color-primary-hover, #032659);
+  border-color: var(--kendo-color-primary-hover, #032659);
+}
+
+.census-poi .census-inline-actions .k-button.k-button-base {
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--census-blue);
+  border: 1px solid var(--census-blue);
+}
+
+.census-poi .census-inline-actions .k-button.k-button-base:hover:not(:disabled) {
+  background: var(--census-gray-100);
+}
+
+.census-poi .census-inline-actions .k-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

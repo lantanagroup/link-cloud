@@ -55,4 +55,26 @@ export function StepActions({children, saving}: StepActionsProps) {
   );
 }
 
+export interface SidePanelLayoutProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Places a step's main content beside an optional SidePanel. Pass the step's
+ * card as the first child and, conditionally, a SidePanel as the second -
+ * omit the SidePanel entirely when there's nothing to preview yet.
+ */
+export function SidePanelLayout({children}: SidePanelLayoutProps) {
+  return <div className="nhsn-link__side-panel-layout">{children}</div>;
+}
+
+export interface SidePanelProps {
+  children: React.ReactNode;
+}
+
+/** The blue-bordered detail/results panel that docks beside a step's main card. */
+export function SidePanel({children}: SidePanelProps) {
+  return <aside className="nhsn-link__side-panel">{children}</aside>;
+}
+
 export {Badge, FormSection, MessageContainer, NHSNLoadingIndicator, NoData, PageHeader, RequiredFieldNotice};
