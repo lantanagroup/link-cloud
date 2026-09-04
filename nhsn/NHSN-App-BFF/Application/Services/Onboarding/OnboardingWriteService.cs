@@ -38,6 +38,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly ICensusConfigurationGateway _censusGateway;
     private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IFacilityAdministrationService _facilityAdministrationService;
+    private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -50,6 +51,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         ICensusConfigurationGateway censusGateway,
         ISftpConfigurationGateway sftpConfigurationGateway,
         IFacilityAdministrationService facilityAdministrationService,
+        IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -61,6 +63,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _censusGateway = censusGateway;
         _sftpConfigurationGateway = sftpConfigurationGateway;
         _facilityAdministrationService = facilityAdministrationService;
+        _organizationLocationGateway = organizationLocationGateway;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -233,9 +236,11 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 break;
 
             case "location-org":
-                _logger.LogWarning(
-                    "Step {StepId} for facility {FacilityId}: configuration not written. Data Acquisition writes are unavailable until the SDK exposes an update operation.",
-                    stepId, facility.FacilityId);
+                await _organizationLocationGateway.SaveAsync(new OrganizationLocationConfigurationSave
+                {
+                    FacilityId = facility.FacilityId,
+                    LocationOrg = draft.LocationOrg
+                }, cancellationToken);
                 break;
 
             case "encounter":

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Flurl.Http;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -73,6 +74,18 @@ internal sealed class DataAcquisitionRawClient : LinkApiClientBase, IDataAcquisi
         if (!response.IsSuccessStatusCode && response.StatusCode != (int)HttpStatusCode.NotModified)
         {
             throw new LinkServiceException(ServiceName, nameof(UpdateFhirQueryConfigurationAsync), response.StatusCode,
+                response.TraceId, response.RawBody, response.RequestUrl);
+        }
+    }
+
+    public async Task UpdateOrganizationLocationConfigurationAsync(string facilityId, UpdateOrganizationLocationConfigurationPayload payload, CancellationToken cancellationToken = default)
+    {
+        var response = await SendAsync(() => Request($"data/location-config/facility/{facilityId}")
+            .PutJsonAsync(payload, cancellationToken: cancellationToken));
+
+        if (!response.IsSuccessStatusCode && response.StatusCode != (int)HttpStatusCode.NotModified)
+        {
+            throw new LinkServiceException(ServiceName, nameof(UpdateOrganizationLocationConfigurationAsync), response.StatusCode,
                 response.TraceId, response.RawBody, response.RequestUrl);
         }
     }

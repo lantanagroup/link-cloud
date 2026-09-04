@@ -131,7 +131,7 @@ export class MockApiClient implements ApiClient {
           'discharge-24-to-48',
           'discharge-gt-48'
         ],
-        locationMethods: ['managing-org', 'location-identifier', 'custom-fhir-path'],
+        locationMethods: ['location-identifier', 'custom-fhir-path'],
         documentKeys: {
           censusInstructions: 'epic-census-instructions',
           jwksInstructions: 'epic-jwks-instructions',
@@ -144,12 +144,7 @@ export class MockApiClient implements ApiClient {
         displayName: 'Cerner',
         censusAcquisition: 'Sftp',
         patientListKeys: [],
-        locationMethods: [
-          'managing-org',
-          'location-identifier',
-          'location-type',
-          'custom-fhir-path'
-        ],
+        locationMethods: ['location-type', 'managing-org', 'custom-fhir-path'],
         documentKeys: {
           censusInstructions: 'cerner-census-instructions',
           jwksInstructions: 'cerner-jwks-instructions',
@@ -268,10 +263,35 @@ export class MockApiClient implements ApiClient {
 
   // ------------------------------------------------------------ mapping steps
 
-  async getLocationCandidates(): Promise<C.LocationCandidate[]> {
+  async getLocationCandidates(method: C.LocationMethod): Promise<C.LocationCandidate[]> {
     await tick();
+    if (method === 'location-type') {
+      const typeCodings: C.LocationTypeCoding[] = [
+        {system: 'https://fhir.cerner.com/ecosystem/codeSet/72', code: '783', display: 'Facility(s)'}
+      ];
+      // Matches the POC's fixture (MOCK_CERNER_SITE_LOCATION_NAMES) exactly - the reference this
+      // screen was built against - so the full set of results shows, not a shortened stand-in.
+      const names = [
+        this.facilityName || 'Unnamed Facility',
+        'Resurrection Medical Center',
+        'UI Health',
+        'Endeavor Health',
+        'Gottlieb Memorial',
+        'Loretto Hospital',
+        'Community First Medical',
+        'Humboldt Health'
+      ];
+      return names.map((display, index) => ({
+        id: `SIMULATED-LOC-${String(index + 1).padStart(3, '0')}`,
+        display,
+        typeText: 'Facility(s)',
+        typeCodings
+      }));
+    }
+
     return [{id: 'SIMULATED-LOC-1', display: 'Simulated Location 1'}];
   }
+
 
   async getHslocMappings(): Promise<C.HslocMapping[]> {
     await tick();
@@ -403,6 +423,11 @@ export class MockApiClient implements ApiClient {
 
   getJwksInstructionsUrl(vendor: string): string {
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
+    return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
+  }
+
+  getLocationOrgResolutionUrl(): string {
+    const body = 'Simulated Location Org Resolution PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.';
     return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
   }
 

@@ -219,7 +219,61 @@
     }
   },
   "locationOrg": {
-    "title": "Organization Identification"
+    "title": "Organization Identification",
+    "intro": "If your health system uses multiple FHIR endpoints, NHSNLink needs to determine which facility in the health system each patient encounter belongs to. Use the form below to help identify your specific facility in the FHIR data. No additional configuration is needed if your facility's FHIR data is not shared with other facilities in your health system.",
+    "methodLabel": "Resolution Method",
+    "noneAdded": "None added yet.",
+    "methods": {
+      "managingOrg": "Managing Organization",
+      "locationIdentifier": "Location Identifier",
+      "locationType": "Location Type",
+      "customFhirPath": "Custom FHIRPath"
+    },
+    "managingOrg": {
+      "listLabel": "Managing Organizations",
+      "placeholder": "Managing Organization",
+      "add": "+ Add Managing Organization",
+      "tooltip": "Add the identifiers of the FHIR Organization resources that manage your facility's Locations. NHSNLink uses these to determine which Locations belong to your facility."
+    },
+    "locationType": {
+      "intro": "Cerner Millennium supports querying Locations by physical type. NHSNLink can use this capability to search for Locations tagged as \"Site\" which typically can be used to correlate Location resources that represent your reporting facility organization. The search button below can assist in applying these mappings.",
+      "search": "Search {{vendor}} Site Locations",
+      "searchTitle": "{{vendor}} Site Locations",
+      "searching": "Searching for Site locations…",
+      "noCandidates": "No Site locations were returned.",
+      "addSelected": "Add",
+      "listLabel": "Location Type Code / Location Alias",
+      "codeLabel": "Location Type Code",
+      "aliasLabel": "Location Alias",
+      "add": "+ Add Location Type",
+      "columns": {
+        "id": "Location Id",
+        "alias": "Location Alias",
+        "type": "Location Type",
+        "codings": "Location Type Coding(s)"
+      },
+      "tooltip": "Add the Location.type code and alias values that identify your facility's Locations. Use Search Cerner Site Locations to find and add these automatically."
+    },
+    "locationIdentifier": {
+      "instructions": "Instructions are available to download here with more information on how to identify the FHIR Location resource that represents your reporting facility.",
+      "downloadPdf": "Download PDF Instructions",
+      "listLabel": "Location Identifier System / Location Identifier Code",
+      "systemLabel": "Location Identifier System",
+      "codeLabel": "Location Identifier Code",
+      "add": "+ Add Location Identifier",
+      "tooltip": "Add the identifier system and code that uniquely identify your facility's Location resource in the FHIR data."
+    },
+    "customFhirPath": {
+      "label": "Custom FHIR Path",
+      "placeholder": "e.g. Location.extension.where(url='...')",
+      "tooltip": "Enter a FHIRPath expression NHSNLink can evaluate against a Location resource to determine whether it belongs to your reporting facility."
+    },
+    "messages": {
+      "searchError": "Unable to search for Site locations.",
+      "candidatesAdded": "Added {{count}} location to Location Type.",
+      "candidatesAdded_other": "Added {{count}} locations to Location Type."
+    },
+    "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },
   "hsloc": {
     "title": "Location Identification (HSLOC)"

@@ -96,69 +96,7 @@
   color: var(--fhir-gray-800);
 }
 
-.fhir-server-info .info-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--fhir-gray-200);
-  color: var(--fhir-gray-600);
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  position: relative;
-  vertical-align: middle;
-}
-
-.fhir-server-info .info-icon:focus-visible {
-  outline: 2px solid var(--fhir-blue);
-  outline-offset: 2px;
-}
-
-.fhir-server-info .info-icon.info-icon--open {
-  background: var(--fhir-blue);
-  color: var(--kendo-color-on-inverse, #ffffff);
-  outline: none;
-}
-
-.fhir-server-info .info-icon .tooltip-bubble {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 9px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--fhir-gray-800);
-  color: var(--kendo-color-on-inverse, #ffffff);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-  text-align: left;
-  white-space: normal;
-  width: max-content;
-  max-width: 280px;
-  padding: 9px 11px;
-  border-radius: var(--fhir-radius);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  z-index: 200;
-}
-
-.fhir-server-info .info-icon .tooltip-bubble::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--fhir-gray-800);
-}
-
-.fhir-server-info .info-icon.info-icon--open .tooltip-bubble {
-  display: block;
-}
+/* .info-icon / .tooltip-bubble are now shared, generalized rules in NHSNLink.css. */
 
 .fhir-server-info .instructions-box {
   background: var(--fhir-gray-50);

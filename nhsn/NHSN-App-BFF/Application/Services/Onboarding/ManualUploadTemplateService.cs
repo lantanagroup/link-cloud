@@ -143,13 +143,17 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         Add("Organization Identification Method", d => d.LocationOrg.Method, ValidateLocationMethod);
         Add("Custom FHIR Path", d => d.LocationOrg.CustomFhirPath);
         Add("Managing Organization Ids", d => JoinList(d.LocationOrg.ManagingOrganizationIds));
-        Add("Location Type Codes", d => JoinList(d.LocationOrg.LocationTypeCodes));
-        Add("Location Identifiers", d => JoinList(d.LocationOrg.LocationIdentifiers));
+        Add("Location Types", d => JoinList(d.LocationOrg.LocationTypes.Select(e => $"{e.Code}|{e.Alias}")));
+        Add("Location Identifiers", d => JoinList(d.LocationOrg.LocationIdentifiers.Select(e => $"{e.System}|{e.Code}")));
 
         return fields;
     }
 
-    private static string? JoinList(IReadOnlyList<string> values) => values.Count == 0 ? null : string.Join(";", values);
+    private static string? JoinList(IEnumerable<string> values)
+    {
+        var joined = string.Join(";", values);
+        return joined.Length == 0 ? null : joined;
+    }
 
     private static string? ValidateVendor(string value) =>
         Enum.TryParse<EhrVendor>(value, ignoreCase: true, out _)

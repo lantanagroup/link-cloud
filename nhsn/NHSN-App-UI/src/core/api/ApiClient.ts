@@ -118,4 +118,5 @@ export interface ApiClient {
 
   getFhirServerInfo(): Promise<FhirServerInfoResponse>;
   getJwksInstructionsUrl(vendor: string): string;
+  getLocationOrgResolutionUrl(): string;
 }

@@ -302,6 +302,10 @@ export class BffApiClient implements ApiClient {
   getJwksInstructionsUrl(vendor: string): string {
     return `${this.bffBaseUrl}/static/jwks-instructions/${encodeURIComponent(vendor)}`;
   }
+
+  getLocationOrgResolutionUrl(): string {
+    return `${this.bffBaseUrl}/static/location-org-resolution`;
+  }
 }
 
 function isReportSettled(value: unknown): boolean {

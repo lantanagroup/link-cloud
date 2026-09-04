@@ -205,11 +205,20 @@ export interface Acknowledgement {
 
 // ---------------------------------------------------------------- mapping steps
 
+/** One coding of a Location.type CodeableConcept - a Location commonly carries more than one. */
+export interface LocationTypeCoding {
+  system?: string;
+  code?: string;
+  display?: string;
+}
+
 export interface LocationCandidate {
   id: string;
   display: string;
   system?: string;
   code?: string;
+  typeText?: string;
+  typeCodings?: LocationTypeCoding[];
 }
 
 export interface HslocMapping {

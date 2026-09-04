@@ -33,5 +33,18 @@ public sealed class StaticAssetEndpoints : IApi
             .WithName("GetJwksInstructionsPdf")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
+
+        // One PDF, not per-vendor.
+        group.MapGet("/location-org-resolution", (IWebHostEnvironment environment) =>
+            {
+                var filePath = Path.Combine(environment.ContentRootPath, "StaticAssets", "location-org-resolution", "Location_Org_Resolution.pdf");
+
+                return File.Exists(filePath)
+                    ? Results.File(filePath, "application/pdf")
+                    : Results.NotFound();
+            })
+            .WithName("GetLocationOrgResolutionPdf")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
     }
 }

@@ -104,7 +104,8 @@ export const STEPS: Step[] = [
     id: 'location-org',
     labelKey: 'onboarding:steps.locationOrg',
     Component: lazyStep(() => import('./steps/location-org/LocationOrgStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    // Nothing here is mandatory, matching the POC.
+    isComplete: () => true
   },
   {
     id: 'hsloc',
