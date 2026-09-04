@@ -1,7 +1,9 @@
 import React from 'react';
 import type {UserInfoResponse} from '../api/contracts';
+import {parseHoursMinutesDuration} from '../shared/duration';
 import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
+import {CENSUS_LIST_KEYS} from './steps/census/validate';
 import {WelcomeStep} from './steps/welcome/WelcomeStep';
 
 export interface StepProps {
@@ -82,7 +84,21 @@ export const STEPS: Step[] = [
     id: 'census',
     labelKey: 'onboarding:steps.census',
     Component: lazyStep(() => import('./steps/census/CensusStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: draft => {
+      const c = draft.census;
+      if (!c.accuracyAcknowledged) {
+        return false;
+      }
+      // No vendor name here - which branch is required is inferred from which
+      // config the draft actually carries, since isComplete has no vendorProfile.
+      const epicConfigured = CENSUS_LIST_KEYS.every(key => Boolean(c.patientListIds?.[key]?.trim()));
+      const cernerConfigured = Boolean(c.sftpHost?.trim()) && c.sftpPort !== undefined;
+      if (!epicConfigured && !cernerConfigured) {
+        return false;
+      }
+      const frequency = parseHoursMinutesDuration(c.acquisitionFrequency);
+      return Boolean(frequency) && frequency!.hours * 60 + frequency!.minutes >= 15;
+    }
   },
   {
     id: 'location-org',

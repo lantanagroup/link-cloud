@@ -45,9 +45,14 @@ internal static class FhirConfigurationMapper
         FhirServerBaseUrl = source.FhirServerBaseUrl,
         MaxConcurrentRequests = source.MaxConcurrentRequests,
         MaxRetries = source.MaxRetries,
-        MinAcquisitionPullTime = source.MinAcquisitionPullTime,
-        MaxAcquisitionPullTime = source.MaxAcquisitionPullTime
+        MinAcquisitionPullTime = NormalizePullTime(source.MinAcquisitionPullTime),
+        MaxAcquisitionPullTime = NormalizePullTime(source.MaxAcquisitionPullTime)
         // ConnectionTested and LagDuration are merged in by the assembler: the first is a UI flag
         // from DraftJson, the second belongs to Query Dispatch.
     };
+
+    private static string? NormalizePullTime(string? value) =>
+        TimeSpan.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? parsed.ToString(@"hh\:mm", System.Globalization.CultureInfo.InvariantCulture)
+            : value;
 }
