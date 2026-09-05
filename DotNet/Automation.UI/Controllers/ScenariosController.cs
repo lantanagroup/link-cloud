@@ -636,6 +636,13 @@ public class ScenariosController(
             OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,
             CleanupServiceData = source.CleanupServiceData,
             CleanupFhirData = source.CleanupFhirData,
+            IsMetricsRun = source.IsMetricsRun,
+            BenchmarkKey = source.BenchmarkKey,
+            TargetDurationSeconds = source.TargetDurationSeconds,
+            Concurrency = source.Concurrency,
+            FailRunOnBenchmark = source.FailRunOnBenchmark,
+            IsLiveSimulation = source.IsLiveSimulation,
+            ReportingWindowMinutes = source.ReportingWindowMinutes,
             ReportPeriodStart = source.ReportPeriodStart,
             ReportPeriodEnd = source.ReportPeriodEnd,
             ImportedPatientIds = source.ImportedPatientIds

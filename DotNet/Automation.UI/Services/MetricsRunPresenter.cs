@@ -82,7 +82,7 @@ public sealed class MetricsRunPresenter
             ScenarioCount = scenarios.Count,
             RecentRunCount = last14.Count,
             Services = BuildServiceStrip(last14),
-            ScenarioCards = BuildScenarioCards(recent, names, uniqueNameToId),
+            ScenarioCards = BuildScenarioCards(recent, names, uniqueNameToId, scenarios),
             Runs = records,
             Metadata = metadata,
             MetricsScenarios = scenarios,
@@ -425,9 +425,10 @@ public sealed class MetricsRunPresenter
     private static IReadOnlyList<MetricsScenarioCardViewModel> BuildScenarioCards(
         IReadOnlyList<AutomationRunMetricsDocument> recent,
         IReadOnlyDictionary<Guid, string> names,
-        IReadOnlyDictionary<string, Guid>? uniqueNameToId = null)
+        IReadOnlyDictionary<string, Guid>? uniqueNameToId = null,
+        IReadOnlyList<TestScenarioDefinition>? metricsScenarios = null)
     {
-        return recent
+        var cards = recent
             .Select(d => (Doc: d, ScenarioId: ResolveScenarioId(d, uniqueNameToId)))
             .Where(x => x.ScenarioId is Guid id && id != Guid.Empty)
             .GroupBy(x => x.ScenarioId!.Value, x => x.Doc)
@@ -454,7 +455,30 @@ public sealed class MetricsRunPresenter
                     Sparkline = ordered.TakeLast(12).Select(d => d.E2eDurationSeconds).ToList()
                 };
             })
-            .OrderByDescending(c => c.LastFinishedAt)
+            .ToList();
+
+        var seen = cards.Select(c => c.ScenarioId).ToHashSet();
+        if (metricsScenarios != null)
+        {
+            foreach (var scenario in metricsScenarios)
+            {
+                if (!seen.Add(scenario.Id))
+                    continue;
+                cards.Add(new MetricsScenarioCardViewModel
+                {
+                    ScenarioId = scenario.Id,
+                    Name = scenario.Name,
+                    SetupSummary = "Not run yet",
+                    RunCount = 0,
+                    Outcome = "Not run yet"
+                });
+            }
+        }
+
+        return cards
+            .OrderByDescending(c => c.LastFinishedAt.HasValue)
+            .ThenByDescending(c => c.LastFinishedAt)
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 

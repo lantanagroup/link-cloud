@@ -215,7 +215,7 @@
         var html = pickerResultsHtml(host, keepQuery);
         host.innerHTML =
             '<div class="dropdown">' +
-                '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside"></button>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static"></button>' +
                 '<div class="dropdown-menu p-2 pc-picker-menu">' +
                     '<input type="text" class="form-control form-control-sm mb-2 pc-picker-search" autocomplete="off" placeholder="' + esc(placeholder) + '" value="' + esc(keepQuery) + '" />' +
                     '<div class="mb-1"><button type="button" class="btn btn-link btn-sm p-0 pc-picker-clear">Clear</button></div>' +

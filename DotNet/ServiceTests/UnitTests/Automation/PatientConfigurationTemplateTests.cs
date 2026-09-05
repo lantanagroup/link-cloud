@@ -34,6 +34,8 @@ public class PatientConfigurationTemplateTests
         var intent = PatientConfigurationTemplate.FromClinicalProfile(scenario, hypo: true);
 
         Assert.True(intent.IncludeHypoglycemicInsulin);
+        Assert.Equal("1116635", intent.MedicationAdministrationRxNorm);
+        Assert.Contains("Insulin", intent.MedicationAdministrationDisplay ?? "", StringComparison.OrdinalIgnoreCase);
         Assert.Equal(scenario.PrimaryDxSnomed, intent.PrimaryConditionSnomed);
     }
 

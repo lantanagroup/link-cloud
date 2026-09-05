@@ -60,7 +60,7 @@ public static class PatientSpecFactory
         var procedurePalette = BuildProcedurePalette(scenarioIdx);
         var (srLoinc, srDisplay) = FirstLabServiceRequest(scenarioIdx);
         var (specimenCode, specimenDisplay) = FirstSpecimen(scenarioIdx);
-        var (adminRx, adminDisplay) = FirstMedication(scenarioIdx);
+        var (adminRx, adminDisplay) = hypo ? InsulinMedication() : FirstMedication(scenarioIdx);
 
         var observationCount = Count("Observation", 10);
         var conditionCount = Count("Condition");
@@ -447,6 +447,20 @@ public static class PatientSpecFactory
         }
 
         return ("58410-2", "CBC panel - Blood by Automated count");
+    }
+
+    private static (string RxNorm, string Display) InsulinMedication()
+    {
+        foreach (var med in FhirGenerationCodes.Medications)
+        {
+            if (string.Equals(med.RxCode, "1116635", StringComparison.Ordinal)
+                || med.Display.Contains("Insulin glargine", StringComparison.OrdinalIgnoreCase))
+            {
+                return (med.RxCode, med.Display);
+            }
+        }
+
+        return ("1116635", "Insulin glargine 100 UNT/ML Injectable Solution");
     }
 
     private static (string? RxNorm, string? Display) FirstMedication(int scenarioIdx)

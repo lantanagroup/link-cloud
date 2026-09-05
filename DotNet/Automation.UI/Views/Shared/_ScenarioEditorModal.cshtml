@@ -29,6 +29,15 @@
             };
         })
         .ToList();
+    string FormatTemplateOption(string name, bool isDefault, bool isSystem)
+    {
+        var extras = new List<string>();
+        if (isDefault && name.IndexOf("Default", StringComparison.OrdinalIgnoreCase) < 0)
+            extras.Add("Default");
+        if (isSystem && name.IndexOf("System", StringComparison.OrdinalIgnoreCase) < 0)
+            extras.Add("System");
+        return extras.Count == 0 ? name : $"{name} ({string.Join(", ", extras)})";
+    }
 }
 
 @* ========== Scenario Editor Modal ========== *@
@@ -59,7 +68,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="ScenarioDescription">Description</label>
-                            <input class="form-control" id="ScenarioDescription" maxlength="500" />
+                            <textarea class="form-control" id="ScenarioDescription" maxlength="500" rows="2"></textarea>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label" for="ReportMethod">Report Method</label>
@@ -121,9 +130,7 @@
                             <select class="form-select" id="QueryPlanTemplate">
                                 @foreach (var qp in queryPlanTemplates)
                                 {
-                                    var defaultLabel = qp.IsDefault ? " (Default)" : "";
-                                    var systemLabel = qp.IsSystem ? " [System]" : "";
-                                    <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@qp.Name@defaultLabel@systemLabel</option>
+                                    <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@FormatTemplateOption(qp.Name, qp.IsDefault, qp.IsSystem)</option>
                                 }
                             </select>
                         </div>
@@ -132,9 +139,7 @@
                             <select class="form-select" id="NormalizationSuite">
                                 @foreach (var ns in normalizationSuites)
                                 {
-                                    var nsDefaultLabel = ns.IsDefault ? " (Default)" : "";
-                                    var nsSystemLabel = ns.IsSystem ? " [System]" : "";
-                                    <option value="@ns.Id" data-name="@ns.Name" data-is-default="@ns.IsDefault.ToString().ToLower()">@ns.Name@nsDefaultLabel@nsSystemLabel</option>
+                                    <option value="@ns.Id" data-name="@ns.Name" data-is-default="@ns.IsDefault.ToString().ToLower()">@FormatTemplateOption(ns.Name, ns.IsDefault, ns.IsSystem)</option>
                                 }
                             </select>
                         </div>
@@ -143,9 +148,7 @@
                             <select class="form-select" id="OrganizationResourceMap">
                                 @foreach (var orm in organizationResourceMaps)
                                 {
-                                    var ormDefaultLabel = orm.IsDefault ? " (Default)" : "";
-                                    var ormSystemLabel = orm.IsSystem ? " [System]" : "";
-                                    <option value="@orm.Id" data-name="@orm.Name" data-is-default="@orm.IsDefault.ToString().ToLower()">@orm.Name@ormDefaultLabel@ormSystemLabel</option>
+                                    <option value="@orm.Id" data-name="@orm.Name" data-is-default="@orm.IsDefault.ToString().ToLower()">@FormatTemplateOption(orm.Name, orm.IsDefault, orm.IsSystem)</option>
                                 }
                             </select>
                         </div>
@@ -696,11 +699,29 @@
         backdrop.addEventListener('click', closeModal);
 
         function setEditable(e) {
-            overlay.style.display = e ? 'none' : '';
+            overlay.style.display = 'none';
             cohortActions.style.display = e ? '' : 'none';
             var ia = document.getElementById('importedActions');
             if (ia) ia.style.display = e ? '' : 'none';
             btnSave.style.display = e ? '' : 'none';
+            document.querySelectorAll('#scenarioConfigArea input, #scenarioConfigArea select, #scenarioConfigArea textarea, #scenarioConfigArea button').forEach(function (el) {
+                if (el.id === 'ScenarioId' || el.id === 'IsSystemScenario') return;
+                if (el.classList.contains('accordion-button') || el.classList.contains('au-info-toggle')
+                    || el.classList.contains('pc-picker-toggle') || el.classList.contains('pc-picker-search')
+                    || el.classList.contains('pc-picker-clear')
+                    || el.classList.contains('btn-cohort-customize')) {
+                    return;
+                }
+                if (el.id === 'PatientCount') {
+                    el.readOnly = true;
+                    return;
+                }
+                el.disabled = !e;
+                if (el.classList && (el.classList.contains('form-control') || el.classList.contains('form-select'))) {
+                    if (e) el.classList.remove('bg-light');
+                    else el.classList.add('bg-light');
+                }
+            });
         }
 
         // ---- Error display ----
