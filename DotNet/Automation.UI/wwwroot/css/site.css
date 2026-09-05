@@ -4,23 +4,33 @@
 
 /* --- Tokens --- */
 :root {
-  --au-dark:       #111;
-  --au-dark-soft:  #1a1a1a;
-  --au-accent:     #4da3ff;       /* light-blue actions */
-  --au-success:    #28a745;
-  --au-danger:     #dc3545;
-  --au-warning:    #ffc107;
-  --au-muted:      #6c757d;
-  --au-bg:         #f5f6f8;
-  --au-card-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.06);
-  --au-radius:     .5rem;
+  --au-dark:        #111;
+  --au-dark-soft:   #1a1a1a;
+  --au-accent:      #4da3ff;
+  --au-accent-soft: #e8f3ff;
+  --au-success:     #28a745;
+  --au-danger:      #dc3545;
+  --au-warning:     #ffc107;
+  --au-muted:       #6c757d;
+  --au-bg:          #f3f5f8;
+  --au-text:        #1c2430;
+  --au-border:      #e2e6ec;
+  --au-card-shadow: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
+  --au-radius:      .5rem;
 }
 
 /* --- Base --- */
 html { font-size: 14px; position: relative; min-height: 100%; }
 @media (min-width: 768px) { html { font-size: 15px; } }
 
-body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
+body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
+
+/* Nested page containers sit inside _Layout's container-xl — drop the extra gutters. */
+.container .container {
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
 
 /* --- Focus ring --- */
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
@@ -37,10 +47,31 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-navbar {
   background: var(--au-dark) !important;
   box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
 }
 .au-navbar .navbar-brand,
 .au-navbar .nav-link { color: #fff !important; font-weight: 500; }
 .au-navbar .nav-link:hover { color: var(--au-accent) !important; }
+.au-navbar .nav-link.active,
+.au-navbar .nav-link.active:hover,
+.au-navbar .nav-item.dropdown.show > .nav-link {
+  color: var(--au-accent) !important;
+}
+.au-navbar .nav-link.active {
+  position: relative;
+}
+.au-navbar .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: .7rem;
+  right: .7rem;
+  bottom: .15rem;
+  height: 2px;
+  background: var(--au-accent);
+  border-radius: 2px;
+}
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
 
 .au-navbar .au-nav-dropdown-menu {
@@ -126,6 +157,9 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   border: none;
   white-space: nowrap;
   padding: .55rem .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .au-table tbody td {
   vertical-align: middle;
@@ -225,6 +259,9 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 
 .au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
+}
+.au-modal-panel.au-scenario-modal-dialog {
   max-width: min(96vw, 1360px);
 }
 
@@ -633,20 +670,21 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   background: #fff;
   border-radius: var(--au-radius);
   box-shadow: var(--au-card-shadow);
-  padding: 1.25rem 1rem;
-  text-align: center;
+  padding: 1rem 1.1rem;
+  text-align: left;
+  border-top: 3px solid var(--au-accent);
 }
 .au-kpi-value {
-  font-size: 1.8rem;
+  font-size: 1.7rem;
   font-weight: 700;
   line-height: 1.1;
 }
 .au-kpi-label {
-  font-size: .78rem;
+  font-size: .75rem;
   color: var(--au-muted);
   text-transform: uppercase;
   letter-spacing: .04em;
-  margin-top: .3rem;
+  margin-top: .25rem;
 }
 
 .au-service-chip {
@@ -823,4 +861,463 @@ a.au-scenario-card:hover {
 }
 .au-cohort-table {
   min-width: 1280px;
+}
+
+/* ===================================================================
+   Page chrome
+   =================================================================== */
+.au-page-head { margin-bottom: 1rem; }
+.au-page-head h2 { letter-spacing: -.015em; }
+.au-page-head p { max-width: 52rem; }
+
+.form-control, .form-select {
+  border-color: var(--au-border);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--au-accent);
+  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
+}
+
+.nav-tabs .nav-link {
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.nav-tabs .nav-link.active {
+  color: var(--au-text);
+  border-color: var(--au-border) var(--au-border) #fff;
+}
+
+.au-empty {
+  text-align: center;
+  padding: 2.4rem 1rem;
+  color: var(--au-muted);
+}
+
+/* ===================================================================
+   Modals — shared overlay / panel (replaces repeated inline styles)
+   =================================================================== */
+.au-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  overflow-y: auto;
+  background: rgba(17, 17, 17, .48);
+}
+.au-modal-frame {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.au-modal-panel {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,.3);
+  width: 100%;
+  max-width: 980px;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.au-modal-header {
+  background: var(--au-dark);
+  color: #fff;
+  padding: .75rem 1rem;
+  border-radius: var(--au-radius) var(--au-radius) 0 0;
+  flex-shrink: 0;
+}
+.au-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+/* ===================================================================
+   Data tables — search, sort, filter, dense scrolling
+   =================================================================== */
+.au-table-shell,
+.au-card .table-responsive {
+  max-height: min(70vh, 740px);
+  overflow: auto;
+}
+.au-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem .65rem;
+  align-items: center;
+  padding: .7rem .9rem;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--au-border);
+}
+.au-table-toolbar .form-control,
+.au-table-toolbar .form-select {
+  max-width: 16rem;
+}
+.au-table-count {
+  margin-left: auto;
+  font-size: .78rem;
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-table thead th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+.au-table thead th[data-sort]:hover {
+  filter: brightness(1.12);
+}
+.au-table thead th[data-sort]::after {
+  content: ' \2195';
+  font-size: .7em;
+  opacity: .45;
+  font-weight: 400;
+}
+.au-table thead th[data-sort-dir='asc']::after { content: ' \2191'; opacity: 1; }
+.au-table thead th[data-sort-dir='desc']::after { content: ' \2193'; opacity: 1; }
+.au-table tbody tr.au-row-hidden { display: none; }
+
+/* ===================================================================
+   Live service pulse (Performance dashboard)
+   =================================================================== */
+.au-pulse {
+  background: linear-gradient(180deg, #171a20 0%, #111 100%);
+  color: #e8edf4;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  overflow: hidden;
+}
+.au-pulse-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .55rem .9rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.au-pulse-kicker {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.5);
+}
+.au-pulse-title {
+  font-weight: 700;
+  font-size: .95rem;
+  line-height: 1.2;
+}
+.au-pulse-status {
+  font-size: .75rem;
+  color: rgba(255,255,255,.55);
+}
+.au-pulse-hottest {
+  font-size: .78rem;
+  color: #ffd39a;
+  font-weight: 600;
+}
+.au-pulse-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+}
+.au-pulse-seg {
+  display: inline-flex;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 999px;
+  padding: .12rem;
+}
+.au-pulse-seg button {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.7);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: .22rem .65rem;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+.au-pulse-seg button.is-on {
+  background: var(--au-accent);
+  color: #fff;
+}
+.au-pulse-seg button:focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 1px;
+}
+.au-pulse-strip {
+  display: flex;
+  gap: .35rem;
+  padding: .7rem .75rem .8rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.au-pulse-cell {
+  flex: 1 0 54px;
+  min-width: 54px;
+  max-width: 92px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: .4rem;
+  padding: .4rem .28rem .35rem;
+  cursor: pointer;
+  text-align: center;
+  color: inherit;
+}
+.au-pulse-cell:hover,
+.au-pulse-cell.is-selected {
+  border-color: var(--au-accent);
+  background: rgba(77,163,255,.14);
+}
+.au-pulse-cell.is-pipeline {
+  border-color: rgba(77,163,255,.28);
+}
+.au-pulse-cell.is-hot {
+  box-shadow: 0 0 0 1px rgba(220,53,69,.5), 0 0 14px rgba(220,53,69,.28);
+  animation: au-pulse-glow 1.8s ease-in-out infinite;
+}
+@keyframes au-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(220,53,69,.4), 0 0 10px rgba(220,53,69,.18); }
+  50% { box-shadow: 0 0 0 1px rgba(255,120,130,.7), 0 0 18px rgba(220,53,69,.4); }
+}
+.au-pulse-meters {
+  display: flex;
+  justify-content: center;
+  gap: .22rem;
+  height: 52px;
+  align-items: flex-end;
+  margin-bottom: .28rem;
+}
+.au-pulse-bar {
+  width: 9px;
+  height: 100%;
+  background: rgba(255,255,255,.08);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+.au-pulse-bar > i {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--h, 0%);
+  background: var(--c, var(--au-success));
+  border-radius: 99px;
+  transition: height .45s ease, background .45s ease;
+}
+.au-pulse-label {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.au-pulse-read {
+  font-size: .62rem;
+  color: rgba(255,255,255,.45);
+  font-variant-numeric: tabular-nums;
+}
+.au-pulse-detail {
+  background: #fff;
+  color: var(--au-text);
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: .85rem 1rem 1rem;
+}
+.au-pulse-detail-empty {
+  font-size: .82rem;
+  color: var(--au-muted);
+  margin: 0;
+}
+.au-pulse-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: .9rem 1.25rem;
+  align-items: center;
+}
+@media (max-width: 767.98px) {
+  .au-pulse-detail-grid { grid-template-columns: 1fr; }
+}
+.au-pulse-h-meter {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 4.2rem;
+  gap: .45rem;
+  align-items: center;
+  margin-bottom: .4rem;
+  font-size: .78rem;
+}
+.au-pulse-h-meter .au-pulse-h-track {
+  height: 8px;
+  background: #e8eaef;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.au-pulse-h-meter .au-pulse-h-fill {
+  height: 100%;
+  width: var(--h, 0%);
+  background: var(--c, var(--au-success));
+  border-radius: 99px;
+  transition: width .45s ease, background .45s ease;
+}
+.au-pulse-spark {
+  color: var(--au-accent);
+  width: 100%;
+  height: 36px;
+}
+.au-pulse-expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: .55rem;
+  padding: .75rem;
+  background: #f7f8fa;
+}
+.au-pulse-mini {
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  padding: .55rem .65rem .5rem;
+  cursor: pointer;
+  text-align: left;
+}
+.au-pulse-mini:hover,
+.au-pulse-mini.is-selected { border-color: var(--au-accent); }
+.au-pulse-mini.is-hot { border-color: var(--au-danger); }
+.au-pulse-mini-name {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--au-muted);
+  margin-bottom: .35rem;
+}
+
+/* ===================================================================
+   Patient configuration — shape strip + intent chips
+   =================================================================== */
+.pc-shape {
+  background: linear-gradient(180deg, #f7fbff 0%, #fff 100%);
+  border: 1px solid #d7e6f7;
+  border-radius: var(--au-radius);
+  padding: .75rem .9rem;
+  margin: 1rem 0 .75rem;
+}
+.pc-shape-top {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.pc-shape-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+.pc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: 999px;
+  padding: .18rem .55rem;
+  font-size: .75rem;
+  font-weight: 600;
+}
+.pc-fact .au-muted, .pc-fact-k {
+  color: var(--au-muted);
+  font-weight: 600;
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.pc-intents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: .65rem;
+}
+.pc-intent-chip {
+  border: 1px solid #c9daf0;
+  background: #fff;
+  color: #234;
+  font-size: .75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: .28rem .7rem;
+  line-height: 1.2;
+}
+.pc-intent-chip:hover:not(:disabled) {
+  border-color: var(--au-accent);
+  color: #0b5cab;
+  background: var(--au-accent-soft);
+}
+.pc-intent-chip.is-on {
+  background: var(--au-accent);
+  border-color: var(--au-accent);
+  color: #fff;
+}
+.pc-intent-chip:disabled { opacity: .55; cursor: not-allowed; }
+.pc-intent-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+  margin-right: .15rem;
+  align-self: center;
+}
+
+/* ===================================================================
+   API Health accordion (shared with page-level styles)
+   =================================================================== */
+.au-health-accordion {
+  border: none;
+  border-radius: var(--au-radius);
+  overflow: hidden;
+  box-shadow: var(--au-card-shadow);
+}
+.au-health-header { background: #fff; padding: 0; }
+.au-health-toggle {
+  background: #fff !important;
+  color: #111 !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: none !important;
+  padding: .65rem 1rem;
+}
+.au-health-toggle:not(.collapsed) { background: #fff !important; color: #111 !important; }
+.au-health-table { font-size: .875rem; }
+.au-health-table thead th {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+  padding: .45rem .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.au-health-table tbody td { vertical-align: middle; padding: .45rem .75rem; }
+.au-health-table tbody tr:hover { background: rgba(77,163,255,.06); }
+
+/* ===================================================================
+   Accordion polish (patient config + elsewhere)
+   =================================================================== */
+.accordion-item {
+  border-color: var(--au-border);
+}
+.accordion-button:not(.collapsed) {
+  background: var(--au-accent-soft);
+  color: var(--au-text);
+  box-shadow: none;
+}
+.accordion-button:focus {
+  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
 }

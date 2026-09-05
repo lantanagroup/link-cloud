@@ -52,6 +52,23 @@
         </div>
     </div>
 
+    <div class="pc-shape" id="pcShapeStrip">
+        <div class="pc-shape-top">
+            <div>
+                <div class="small text-muted fw-semibold text-uppercase" style="letter-spacing:.06em;">This patient</div>
+                <div class="pc-shape-facts" id="pcShapeFacts"></div>
+            </div>
+            <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary pc-keep-enabled" data-pc-jump="pcEnc">Encounter</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary pc-keep-enabled" data-pc-jump="pcClinical">Clinical</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary pc-keep-enabled" data-pc-jump="pcMix">Volume</button>
+            </div>
+        </div>
+        <div class="pc-intents" id="pcIntentChips">
+            <span class="pc-intent-label">I need</span>
+        </div>
+    </div>
+
     <div class="accordion mt-3" id="pcCustomize">
         <div class="accordion-item">
             <h2 class="accordion-header">

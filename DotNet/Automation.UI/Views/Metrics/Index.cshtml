@@ -74,16 +74,36 @@
         </div>
     </div>
 
-    <div class="au-card mb-4" id="liveUtilizationCard">
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="bi bi-activity me-2"></i>Live CPU and RAM</span>
-            <span class="small text-muted" id="liveUtilizationStatus">Watching while this page is open. Not saved.</span>
-        </div>
-        <div class="card-body">
-            <p class="small text-muted mb-3">Current process use across Link services. CPU is percent of this machine (like Task Manager), not cores busy. Polls Prometheus about every five seconds while you are looking at this page. Not saved.</p>
-            <div id="liveUtilizationGrid" class="row g-3">
-                <div class="col-12 text-muted small" id="liveUtilizationEmpty">Connecting to Prometheus…</div>
+    <div class="au-pulse mb-4" id="liveUtilizationCard" data-url="@Url.Action("LiveUtilization", "Metrics")" title="CPU is percent of this machine (like Task Manager), not cores busy. Polls Prometheus about every five seconds while this page is open. Not saved.">
+        <div class="au-pulse-head">
+            <div>
+                <div class="au-pulse-kicker">Live fleet</div>
+                <div class="au-pulse-title"><i class="bi bi-activity me-1"></i>CPU and RAM pulse</div>
+                <div class="au-pulse-status" id="liveUtilizationStatus">Watching while this page is open. Not saved.</div>
+                <div class="au-pulse-hottest" id="livePulseHottest"></div>
             </div>
+            <div class="au-pulse-controls">
+                <div class="au-pulse-seg" role="group" aria-label="View">
+                    <button type="button" data-pulse-group="view" data-pulse-value="compact" class="is-on">Pulse</button>
+                    <button type="button" data-pulse-group="view" data-pulse-value="expanded">Cards</button>
+                </div>
+                <div class="au-pulse-seg" role="group" aria-label="Filter">
+                    <button type="button" data-pulse-group="filter" data-pulse-value="all" class="is-on">All</button>
+                    <button type="button" data-pulse-group="filter" data-pulse-value="pipeline">Pipeline</button>
+                    <button type="button" data-pulse-group="filter" data-pulse-value="hot">Hot</button>
+                </div>
+                <div class="au-pulse-seg" role="group" aria-label="Sort">
+                    <button type="button" data-pulse-group="sort" data-pulse-value="heat" class="is-on">Hottest</button>
+                    <button type="button" data-pulse-group="sort" data-pulse-value="name">A–Z</button>
+                </div>
+            </div>
+        </div>
+        <div id="livePulseStrip" class="au-pulse-strip">
+            <div class="small px-2 py-2" style="color:rgba(255,255,255,.6)">Connecting to Prometheus…</div>
+        </div>
+        <div id="livePulseExpanded" class="au-pulse-expanded" hidden></div>
+        <div class="au-pulse-detail" id="livePulseDetail">
+            <p class="au-pulse-detail-empty mb-0">Click a service to pin CPU, RAM, and API p95. Hot services glow. Compact pulse keeps the rest of Performance in sight.</p>
         </div>
     </div>
 
@@ -110,7 +130,10 @@
 
     <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-2">
         <h3 class="h5 fw-semibold mb-0">Use cases</h3>
-        <span class="small text-muted">One card per metrics scenario. Newer runs sit to the right on the sparkline.</span>
+        <div class="d-flex align-items-center gap-2">
+            <input type="search" id="useCaseSearch" class="form-control form-control-sm" style="max-width:16rem;" placeholder="Filter use cases…" aria-label="Filter use cases" />
+            <span class="small text-muted">Newer runs sit to the right on the sparkline.</span>
+        </div>
     </div>
 
     @if (Model.ScenarioCards.Count == 0 && Model.Runs.Count == 0)
@@ -210,16 +233,16 @@
             <span><i class="bi bi-clock-history me-2"></i>Recent metrics runs</span>
             <span class="small" style="opacity:.75;">@Model.Metadata.TotalCount total</span>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-au-table>
             <div class="table-responsive">
                 <table class="table au-table mb-0">
                     <thead>
                         <tr>
-                            <th>Scenario</th>
-                            <th>Result</th>
-                            <th>Total time</th>
-                            <th>Patients / min</th>
-                            <th>Finished</th>
+                            <th data-sort="name">Scenario</th>
+                            <th data-sort="result">Result</th>
+                            <th data-sort="seconds" data-sort-type="number" data-sort-default="desc">Total time</th>
+                            <th data-sort="ppm" data-sort-type="number" data-sort-default="desc">Patients / min</th>
+                            <th data-sort="finished" data-sort-default="desc">Finished</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -232,7 +255,11 @@
                     {
                         foreach (var run in Model.Runs)
                         {
-                            <tr>
+                            <tr data-name="@run.ScenarioName"
+                                data-result="@(run.Outcome == "Succeeded" ? "Passed" : run.Outcome)"
+                                data-seconds="@run.E2eDurationSeconds"
+                                data-ppm="@(run.PatientsPerMinute?.ToString("0.0") ?? "")"
+                                data-finished="@FormatWhen(run.FinishedAt)">
                                 <td>
                                     @run.ScenarioName
                                     @if (run.ScenarioVersion > 1)
@@ -284,134 +311,17 @@
     </div>
 </div>
 
+<script src="~/js/live-utilization.js" asp-append-version="true"></script>
 <script>
     (function () {
-        const url = '@Url.Action("LiveUtilization", "Metrics")';
-        const grid = document.getElementById('liveUtilizationGrid');
-        const status = document.getElementById('liveUtilizationStatus');
-        const ramMaxBytes = 2 * 1024 * 1024 * 1024;
-        let timer = null;
-        let inFlight = false;
-
-        function formatPercent(percent) {
-            if (percent == null || Number.isNaN(percent)) return '—';
-            if (percent < 0.1) return '< 0.1%';
-            if (percent < 10) return percent.toFixed(1) + '%';
-            return Math.round(percent) + '%';
-        }
-
-        function formatRam(bytes) {
-            if (bytes == null || bytes <= 0) return '—';
-            if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-            return Math.round(bytes / (1024 * 1024)) + ' MB';
-        }
-
-        function formatApi(ms) {
-            if (ms == null || Number.isNaN(ms)) return 'API p95 · —';
-            if (ms >= 1000) return 'API p95 · ' + (ms / 1000).toFixed(1) + ' sec';
-            if (ms < 1) return 'API p95 · < 1 ms';
-            return 'API p95 · ' + Math.round(ms) + ' ms';
-        }
-
-        function gaugeColor(pct) {
-            if (pct >= 0.8) return 'var(--au-danger)';
-            if (pct >= 0.5) return '#e38b00';
-            return 'var(--au-success)';
-        }
-
-        function gaugeSvg(percent, color) {
-            const pct = Math.max(0, Math.min(1, percent || 0));
-            const offset = 100 - (pct * 100);
-            return `<svg class="au-gauge-svg" viewBox="0 0 100 58" aria-hidden="true">
-                <path class="au-gauge-track" d="M 10 50 A 40 40 0 1 1 90 50" fill="none" pathLength="100"></path>
-                <path class="au-gauge-arc" d="M 10 50 A 40 40 0 1 1 90 50" fill="none" pathLength="100"
-                      style="stroke:${color};stroke-dasharray:100;stroke-dashoffset:${offset};"></path>
-            </svg>`;
-        }
-
-        function render(payload) {
-            if (!payload || payload.reachable === false) {
-                grid.innerHTML = '<div class="col-12 text-muted small">Prometheus is not reachable. Gauges will retry while this page stays open.</div>';
-                status.textContent = 'Prometheus unreachable';
-                return;
-            }
-            const services = payload.services || [];
-            if (services.length === 0) {
-                grid.innerHTML = '<div class="col-12 text-muted small">No process CPU/RAM series yet.</div>';
-                status.textContent = 'Watching while this page is open. Not saved.';
-                return;
-            }
-            const sampled = payload.sampledAt ? new Date(payload.sampledAt) : new Date();
-            status.textContent = 'Live · ' + sampled.toLocaleTimeString() + ' · not saved';
-            grid.innerHTML = services.map(function (svc) {
-                const cpu = svc.cpuPercent;
-                const ram = svc.memoryBytes;
-                const cpuPct = cpu == null ? 0 : cpu / 100;
-                const ramPct = ram == null ? 0 : ram / ramMaxBytes;
-                const pipeline = svc.group === 'pipeline';
-                return `<div class="col-6 col-md-4 col-xl-3">
-                    <div class="au-live-gauge-card ${pipeline ? 'au-live-gauge-pipeline' : ''}">
-                        <div class="au-live-gauge-name">${escapeHtml(svc.name || svc.key)}</div>
-                        <div class="au-live-gauge-row">
-                            <div class="au-gauge">
-                                ${gaugeSvg(cpuPct, gaugeColor(cpuPct))}
-                                <div class="au-gauge-readout">${escapeHtml(formatPercent(cpu))}</div>
-                                <div class="au-gauge-unit">CPU</div>
-                            </div>
-                            <div class="au-gauge">
-                                ${gaugeSvg(ramPct, gaugeColor(ramPct))}
-                                <div class="au-gauge-readout">${escapeHtml(formatRam(ram))}</div>
-                                <div class="au-gauge-unit">RAM</div>
-                            </div>
-                        </div>
-                        <div class="au-live-api">${escapeHtml(formatApi(svc.apiP95Ms))}</div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function escapeHtml(value) {
-            return String(value)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-        }
-
-        async function poll() {
-            if (inFlight || document.hidden) return;
-            inFlight = true;
-            try {
-                const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-                if (!response.ok) {
-                    render({ reachable: false, services: [] });
-                    return;
-                }
-                render(await response.json());
-            } catch (e) {
-                render({ reachable: false, services: [] });
-            } finally {
-                inFlight = false;
-            }
-        }
-
-        function start() {
-            if (timer) return;
-            poll();
-            timer = setInterval(poll, 5000);
-        }
-
-        function stop() {
-            if (!timer) return;
-            clearInterval(timer);
-            timer = null;
-        }
-
-        document.addEventListener('visibilitychange', function () {
-            if (document.hidden) stop();
-            else start();
+        var search = document.getElementById('useCaseSearch');
+        if (!search) return;
+        search.addEventListener('input', function () {
+            var q = search.value.trim().toLowerCase();
+            document.querySelectorAll('.au-scenario-card').forEach(function (card) {
+                var col = card.closest('[class*="col-"]') || card;
+                col.style.display = !q || (card.innerText || '').toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+            });
         });
-        window.addEventListener('pagehide', stop);
-        start();
     })();
 </script>

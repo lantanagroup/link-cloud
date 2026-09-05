@@ -40,6 +40,7 @@
             @Model.TotalCount run@(Model.TotalCount == 1 ? "" : "s") &middot; page @Model.PageNumber of @Model.TotalPages
         </span>
     </div>
+    <div data-au-table>
     <div class="table-responsive">
         <table class="table au-table mb-0">
             <thead>
@@ -63,7 +64,7 @@
             }
             @foreach (var run in Model.Runs)
             {
-                <tr>
+                <tr data-type="@run.Status.ToDisplayName()" data-name="@run.RunName" data-search="@run.RunName @run.RunId @run.Seed @run.Status">
                     <td>
                         <div class="fw-semibold">@run.RunName</div>
                         <code class="small text-muted">@run.RunId</code>
@@ -94,6 +95,7 @@
             }
             </tbody>
         </table>
+    </div>
     </div>
     @if (Model.TotalPages > 1)
     {

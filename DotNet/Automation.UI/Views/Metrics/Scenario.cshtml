@@ -48,16 +48,16 @@
 
     <div class="au-card">
         <div class="card-header">Runs of this use case</div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-au-table>
             <div class="table-responsive">
                 <table class="table au-table mb-0">
                     <thead>
                         <tr>
                             <th></th>
-                            <th>Result</th>
-                            <th>Total time</th>
-                            <th>Patients / min</th>
-                            <th>Finished</th>
+                            <th data-sort="result">Result</th>
+                            <th data-sort="seconds" data-sort-type="number" data-sort-default="desc">Total time</th>
+                            <th data-sort="ppm" data-sort-type="number" data-sort-default="desc">Patients / min</th>
+                            <th data-sort="finished" data-sort-default="desc">Finished</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -70,7 +70,10 @@
                     {
                         foreach (var run in Model.Runs)
                         {
-                            <tr>
+                            <tr data-result="@(run.Outcome == "Succeeded" ? "Passed" : run.Outcome)"
+                                data-seconds="@run.E2eDurationSeconds"
+                                data-ppm="@(run.PatientsPerMinute?.ToString("0.0") ?? "")"
+                                data-finished="@FormatWhen(run.FinishedAt)">
                                 <td>
                                     <input type="checkbox" class="form-check-input compare-run" value="@run.RunId" aria-label="Select for compare" />
                                 </td>

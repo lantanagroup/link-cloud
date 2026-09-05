@@ -14,47 +14,20 @@
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
-        <div class="card-body">
-
-            <div class="row g-2 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label" for="scenarioSearch">Search</label>
-                    <input type="text"
-                           id="scenarioSearch"
-                           class="form-control"
-                           placeholder="Search scenarios..." />
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label" for="scenarioTypeFilter">Scenario type</label>
-                    <select id="scenarioTypeFilter" class="form-select">
-                        <option value="">All types</option>
-                        <option value="Custom">Custom</option>
-                        <option value="System">System</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label" for="scenarioSort">Sort by</label>
-                    <select id="scenarioSort" class="form-select">
-                        <option value="name">Alphabetical (A–Z)</option>
-                        <option value="updated">Recently Modified</option>
-                    </select>
-                </div>
-            </div>
+        <div class="card-body p-0" data-au-table>
 
             <div class="table-responsive">
                 <table class="table au-table mb-0" id="scenarioTable">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Method</th>
-                            <th>Measures</th>
-                            <th>Patients</th>
-                            <th>Resources</th>
-                            <th>Seed</th>
-                            <th>Type</th>
-                            <th>Updated</th>
+                            <th data-sort="name">Name</th>
+                            <th data-sort="method">Method</th>
+                            <th data-sort="measures">Measures</th>
+                            <th data-sort="patients" data-sort-type="number">Patients</th>
+                            <th data-sort="resources">Resources</th>
+                            <th data-sort="seed">Seed</th>
+                            <th data-sort="type">Type</th>
+                            <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                             <th style="width:180px;"></th>
                         </tr>
                     </thead>
@@ -131,9 +104,7 @@
                         }
                     </tbody>
                 </table>
-                <div id="noScenarioResults"
-                     class="text-center text-muted py-4"
-                     style="display:none;">
+                <div class="au-table-empty text-center text-muted py-4" hidden>
                     No matching scenarios found.
                 </div>
             </div>
@@ -153,104 +124,9 @@
         // The shared editor fires this event after a successful save/clone/delete.
         // On the Scenarios list page we reload so the table reflects the change.
 
-        // Reload after edits
         document.addEventListener('scenario-editor:changed', function () {
             location.reload();
         });
-
-        // Scenario search
-        var search = document.getElementById('scenarioSearch');
-        var typeFilter = document.getElementById('scenarioTypeFilter');
-        var sort = document.getElementById('scenarioSort');
-        var tableBody = document.querySelector('#scenarioTable tbody');
-        var noResults = document.getElementById('noScenarioResults');
-
-        function getScenarioRows() {
-            return Array.from(
-                document.querySelectorAll('#scenarioTable tbody tr[data-id]')
-            );
-        }
-
-        function applyScenarioView() {
-            if (!tableBody) return;
-
-            var searchValue = search
-                ? search.value.trim().toLowerCase()
-                : '';
-
-            var selectedType = typeFilter
-                ? typeFilter.value
-                : '';
-
-            var sortValue = sort
-                ? sort.value
-                : 'name';
-
-            var rows = getScenarioRows();
-
-            rows.forEach(function (row) {
-                var searchableText = (
-                    (row.dataset.name || '') + ' ' +
-                    (row.dataset.description || '') + ' ' +
-                    (row.dataset.method || '') + ' ' +
-                    (row.dataset.type || '') + ' ' +
-                    (row.dataset.measures || '') + ' ' +
-                    (row.dataset.seed || '') + ' ' +
-                    (row.dataset.patients || '') + ' ' +
-                    (row.dataset.resources || '')
-                ).toLowerCase();
-
-                var matchesSearch =
-                    !searchValue ||
-                    searchableText.includes(searchValue);
-
-                var matchesType =
-                    !selectedType ||
-                    row.dataset.type === selectedType;
-
-                row.hidden = !(matchesSearch && matchesType);
-            });
-
-            rows.sort(function (a, b) {
-                if (sortValue === 'updated') {
-                    return Number(b.dataset.updated || 0) -
-                        Number(a.dataset.updated || 0);
-                }
-
-                return (a.dataset.name || '').localeCompare(
-                    b.dataset.name || '',
-                    undefined,
-                    { sensitivity: 'base' }
-                );
-            });
-
-            rows.forEach(function (row) {
-                tableBody.appendChild(row);
-            });
-
-            var visibleCount = rows.filter(function (row) {
-                return !row.hidden;
-            }).length;
-
-            if (noResults) {
-                noResults.style.display =
-                    rows.length > 0 && visibleCount === 0 ? '' : 'none';
-            }
-        }
-
-        if (search) {
-            search.addEventListener('input', applyScenarioView);
-        }
-
-        if (typeFilter) {
-            typeFilter.addEventListener('change', applyScenarioView);
-        }
-
-        if (sort) {
-            sort.addEventListener('change', applyScenarioView);
-        }
-
-        applyScenarioView();
 
         // Open a scenario passed from Quick Launch directly in the editor.
         var editScenarioId = new URLSearchParams(window.location.search).get('editScenarioId');

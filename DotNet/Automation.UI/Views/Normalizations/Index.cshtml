@@ -50,22 +50,27 @@
                     <span><i class="bi bi-gear me-2"></i>All Operations</span>
                     <button type="button" class="btn btn-sm btn-success" id="btnNewOp" aria-label="Create new normalization operation" title="Create new normalization operation"><i class="bi bi-plus-lg"></i></button>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="opTable">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th>Resource Types</th>
-                                <th>Kind</th>
-                                <th>Updated</th>
+                                <th data-sort="name">Name</th>
+                                <th data-sort="optype">Type</th>
+                                <th data-sort="resources">Resource Types</th>
+                                <th data-sort="type">Kind</th>
+                                <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                                 <th style="width:200px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var op in operations)
                             {
-                                <tr data-id="@op.Id">
+                                <tr data-id="@op.Id"
+                                    data-name="@op.Name"
+                                    data-optype="@op.OperationType"
+                                    data-resources="@string.Join(", ", op.ResourceTypes)"
+                                    data-type="@(op.IsSystem ? "System" : "Custom")"
+                                    data-updated="@op.UpdatedAt.ToUnixTimeMilliseconds()">
                                     <td>
                                         <strong>@op.Name</strong>
                                         @if (!string.IsNullOrWhiteSpace(op.Description))
@@ -111,21 +116,25 @@
                     <span><i class="bi bi-list-ol me-2"></i>All Sequences</span>
                     <button type="button" class="btn btn-sm btn-success" id="btnNewSeq" aria-label="Create new normalization sequence" title="Create new normalization sequence"><i class="bi bi-plus-lg"></i></button>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="seqTable">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Operations</th>
-                                <th>Kind</th>
-                                <th>Updated</th>
+                                <th data-sort="name">Name</th>
+                                <th data-sort="ops" data-sort-type="number">Operations</th>
+                                <th data-sort="type">Kind</th>
+                                <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                                 <th style="width:200px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var seq in sequences)
                             {
-                                <tr data-id="@seq.Id">
+                                <tr data-id="@seq.Id"
+                                    data-name="@seq.Name"
+                                    data-ops="@seq.Entries.Count"
+                                    data-type="@(seq.IsSystem ? "System" : "Custom")"
+                                    data-updated="@seq.UpdatedAt.ToUnixTimeMilliseconds()">
                                     <td>
                                         <strong>@seq.Name</strong>
                                         @if (!string.IsNullOrWhiteSpace(seq.Description))
@@ -170,21 +179,25 @@
                     <span><i class="bi bi-box me-2"></i>All Suites</span>
                     <button type="button" class="btn btn-sm btn-success" id="btnNewSuite" aria-label="Create new normalization suite" title="Create new normalization suite"><i class="bi bi-plus-lg"></i></button>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="suiteTable">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Contents</th>
-                                <th>Kind</th>
-                                <th>Updated</th>
+                                <th data-sort="name">Name</th>
+                                <th data-sort="contents">Contents</th>
+                                <th data-sort="type">Kind</th>
+                                <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                                 <th style="width:260px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var suite in suites)
                             {
-                                <tr data-id="@suite.Id">
+                                <tr data-id="@suite.Id"
+                                    data-name="@suite.Name"
+                                    data-contents="@suite.SequenceIds.Count seq, @suite.OperationIds.Count op(s)"
+                                    data-type="@(suite.IsSystem ? "System" : "Custom")"
+                                    data-updated="@suite.UpdatedAt.ToUnixTimeMilliseconds()">
                                     <td>
                                         <strong>@suite.Name</strong>
                                         @if (suite.IsDefault)

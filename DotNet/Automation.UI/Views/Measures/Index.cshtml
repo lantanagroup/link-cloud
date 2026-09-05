@@ -21,24 +21,31 @@
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0" id="measureTable">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Generation type</th>
-                        <th>Measure id</th>
-                        <th>Version</th>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Updated</th>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="family">Generation type</th>
+                        <th data-sort="measureid">Measure id</th>
+                        <th data-sort="version">Version</th>
+                        <th data-sort="date">Date</th>
+                        <th data-sort="type">Type</th>
+                        <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                         <th style="width:280px;"></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var t in Model)
                     {
-                        <tr data-id="@t.Id">
+                        <tr data-id="@t.Id"
+                            data-name="@t.Name"
+                            data-family="@ProfiledMeasureCatalog.GetDisplayName(t.GenerationFamily)"
+                            data-measureid="@(t.MeasureId ?? "")"
+                            data-version="@(t.Version ?? "")"
+                            data-date="@(t.MeasureDate ?? "")"
+                            data-type="@(t.IsSystem ? "System" : "Custom")"
+                            data-updated="@t.UpdatedAt.ToUnixTimeMilliseconds()">
                             <td>
                                 <strong>@t.Name</strong>
                                 @if (!string.IsNullOrWhiteSpace(t.Description))
@@ -88,7 +95,7 @@
     </div>
 </div>
 
-<div id="measureModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="measureModal" class="au-modal-overlay" style="display:none;">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:1100px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">

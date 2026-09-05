@@ -653,6 +653,177 @@
             }
         }
         refreshPredicted();
+        refreshShape();
+    }
+
+    function classLabel(code) {
+        if (code === 'IMP') return 'Inpatient';
+        if (code === 'AMB') return 'Ambulatory';
+        if (code === 'EMER') return 'Emergency';
+        if (code === 'ACUTE') return 'Acute';
+        if (code === 'OBSENC') return 'Observation';
+        return code || 'Class not set';
+    }
+
+    function stayLabel() {
+        var sel = $('PcStayPattern');
+        if (!sel || !sel.selectedOptions || !sel.selectedOptions.length) return 'Stay not set';
+        return sel.selectedOptions[0].textContent || sel.value;
+    }
+
+    function profileLabel() {
+        var sel = $('PcClinicalProfile');
+        if (!sel || !sel.value) return 'No profile';
+        var opt = sel.selectedOptions && sel.selectedOptions[0];
+        return opt ? opt.textContent : sel.value;
+    }
+
+    function openSection(collapseId) {
+        var el = $(collapseId);
+        if (!el || typeof bootstrap === 'undefined' || !bootstrap.Collapse) return;
+        bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).show();
+    }
+
+    var QUICK_INTENTS = [
+        {
+            id: 'ach-ip',
+            label: 'ACH inpatient',
+            hint: 'Inpatient class, stay overlapping the report window',
+            apply: function () {
+                setVal('PcEncClass', 'IMP');
+                setVal('PcEncStatus', 'finished');
+                setVal('PcStayPattern', DEFAULT_STAY_PATTERN);
+                writeBool('PcHospitalization', true);
+                openSection('pcEnc');
+            },
+            matches: function () {
+                return val('PcEncClass') === 'IMP' && patternExpectedInReport(val('PcStayPattern') || DEFAULT_STAY_PATTERN);
+            }
+        },
+        {
+            id: 'hypo',
+            label: 'Hypoglycemia',
+            hint: 'Inpatient class plus the hypoglycemic insulin pair',
+            apply: function () {
+                setVal('PcEncClass', 'IMP');
+                writeBool('PcHypoInsulin', true);
+                setVal('PcStayPattern', DEFAULT_STAY_PATTERN);
+                openSection('pcClinical');
+            },
+            matches: function () {
+                return val('PcEncClass') === 'IMP' && val('PcHypoInsulin') === 'true';
+            }
+        },
+        {
+            id: 'amb',
+            label: 'Ambulatory',
+            hint: 'Ambulatory encounter — typically non-qualifying for ACH/Hypo',
+            apply: function () {
+                setVal('PcEncClass', 'AMB');
+                writeBool('PcHospitalization', false);
+                writeBool('PcHypoInsulin', false);
+                openSection('pcEnc');
+            },
+            matches: function () { return val('PcEncClass') === 'AMB'; }
+        },
+        {
+            id: 'emer',
+            label: 'Emergency',
+            hint: 'Emergency class — ACH qualifying, not Hypo inpatient',
+            apply: function () {
+                setVal('PcEncClass', 'EMER');
+                setVal('PcEncStatus', 'finished');
+                writeBool('PcHospitalization', true);
+                openSection('pcEnc');
+            },
+            matches: function () { return val('PcEncClass') === 'EMER'; }
+        },
+        {
+            id: 'out',
+            label: 'Out of window',
+            hint: 'Admit and discharge entirely before the report period',
+            apply: function () {
+                setVal('PcStayPattern', 'AdmittedAndDischargedBeforePeriod');
+                openSection('pcEnc');
+            },
+            matches: function () {
+                var p = val('PcStayPattern');
+                return p === 'AdmittedAndDischargedBeforePeriod' || p === 'AdmittedAndDischargedAfterPeriod';
+            }
+        },
+        {
+            id: 'thin',
+            label: 'Thin chart',
+            hint: '15–25 resources per patient',
+            apply: function () {
+                setVal('PcResMin', 15);
+                setVal('PcResMax', 25);
+                openSection('pcMix');
+            },
+            matches: function () { return val('PcResMin') === '15' && val('PcResMax') === '25'; }
+        },
+        {
+            id: 'heavy',
+            label: 'Heavy chart',
+            hint: '200–400 resources per patient',
+            apply: function () {
+                setVal('PcResMin', 200);
+                setVal('PcResMax', 400);
+                openSection('pcMix');
+            },
+            matches: function () { return val('PcResMin') === '200' && val('PcResMax') === '400'; }
+        }
+    ];
+
+    function renderIntentChips() {
+        var host = $('pcIntentChips');
+        if (!host) return;
+        var label = host.querySelector('.pc-intent-label');
+        host.innerHTML = '';
+        if (label) host.appendChild(label);
+        else {
+            var span = document.createElement('span');
+            span.className = 'pc-intent-label';
+            span.textContent = 'I need';
+            host.appendChild(span);
+        }
+        QUICK_INTENTS.forEach(function (intent) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pc-intent-chip' + (intent.matches() ? ' is-on' : '');
+            btn.dataset.intent = intent.id;
+            btn.title = intent.hint;
+            btn.textContent = intent.label;
+            btn.disabled = readOnly;
+            host.appendChild(btn);
+        });
+    }
+
+    function applyQuickIntent(id) {
+        var intent = QUICK_INTENTS.find(function (x) { return x.id === id; });
+        if (!intent || readOnly) return;
+        intent.apply();
+        updateSectionBadges();
+    }
+
+    function refreshShape() {
+        var facts = $('pcShapeFacts');
+        if (facts) {
+            var insulin = val('PcHypoInsulin') === 'true';
+            var min = val('PcResMin') || '50';
+            var max = val('PcResMax') || min;
+            var items = [
+                profileLabel(),
+                classLabel(val('PcEncClass')),
+                stayLabel(),
+                insulin ? 'Insulin on' : 'Insulin off',
+                min + '–' + max + ' resources'
+            ];
+            facts.innerHTML = items.map(function (t) {
+                return '<span class="pc-fact">' + esc(t) + '</span>';
+            }).join('');
+        }
+        renderIntentChips();
     }
 
     function resetSection(name) {
@@ -880,7 +1051,8 @@
                 || el.classList.contains('pc-picker-toggle')
                 || el.classList.contains('pc-picker-search')
                 || el.classList.contains('pc-picker-clear')
-                || el.classList.contains('au-info-toggle')) {
+                || el.classList.contains('au-info-toggle')
+                || el.classList.contains('pc-keep-enabled')) {
                 el.disabled = false;
                 return;
             }
@@ -892,6 +1064,7 @@
         }
         syncVolumeMode();
         refreshPredicted();
+        refreshShape();
     }
 
     function ensureCatalog() {
@@ -929,6 +1102,16 @@
         });
         root.addEventListener('input', function () { updateSectionBadges(); });
         root.addEventListener('click', function (e) {
+            var jump = e.target.closest('[data-pc-jump]');
+            if (jump) {
+                openSection(jump.getAttribute('data-pc-jump'));
+                return;
+            }
+            var chip = e.target.closest('.pc-intent-chip');
+            if (chip && !readOnly) {
+                applyQuickIntent(chip.dataset.intent);
+                return;
+            }
             var btn = e.target.closest('.pc-section-reset');
             if (!btn || readOnly) return;
             resetSection(btn.dataset.section);
