@@ -333,7 +333,9 @@ public class DataAcquisitionDatabaseValidator
             AddError(errors, "OrganizationLocationMapping rows exist but none are marked IsOrgLocation=true.");
 
         ValidateLocationHierarchy(activeMappings, errors);
-        await ValidateEncounterMappingTracking(facilityId, reportId, logs, activeMappings, errors, expectDataAcquisitionData, expectEncounterResources);
+        await ValidateEncounterMappingTracking(
+            facilityId, reportId, logs, activeMappings, errors,
+            expectDataAcquisitionData, expectEncounterResources, manifest);
     }
 
     private static bool ManifestExpectsLocationEvidence(GenerationManifest manifest)
@@ -415,7 +417,8 @@ public class DataAcquisitionDatabaseValidator
         List<PipelineDataReader.OrganizationLocationMappingInfo> activeLocationMappings,
         List<string> errors,
         bool expectDataAcquisitionData,
-        bool expectEncounterResources)
+        bool expectEncounterResources,
+        GenerationManifest? manifest)
     {
         if (!expectDataAcquisitionData)
             return;
@@ -445,6 +448,10 @@ public class DataAcquisitionDatabaseValidator
             .Select(m => m.LocationId!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var submitted = manifest?.ExpectedSubmittedPatientIds()
+            ?? logs.Select(l => l.PatientId).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList()!;
+        var submittedSet = submitted.ToHashSet(StringComparer.Ordinal);
+
         foreach (var (patientId, patientLogRows) in patientLogs)
         {
             mappingsByPatient.TryGetValue(patientId, out var patientMappings);
@@ -452,6 +459,13 @@ public class DataAcquisitionDatabaseValidator
 
             if (expectEncounterResources && patientMappings.Count == 0)
             {
+                if (!submittedSet.Contains(patientId))
+                {
+                    _output.WriteLine(
+                        $"  Skipping EncounterMapping assertion for {patientId}: not expected in the report (out of window or non-qualifying).");
+                    continue;
+                }
+
                 AddError(errors,
                     $"No EncounterMapping rows found for patient {patientId} despite Encounter queries being present.");
                 continue;

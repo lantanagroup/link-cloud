@@ -83,6 +83,40 @@ public class ThetisGenerationInvariantTests
     }
 
     [Fact]
+    public async Task Ambulatory_intent_does_not_emit_inpatient_encounter_type()
+    {
+        var (ids, _, practitionerIds, medicationIds) =
+            FactorySharedInfrastructureGenerator.Shared.Generate(null, RunTag);
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(
+                new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.NonQualifying
+                },
+                Intent: new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }),
+            PatientIndex = 0,
+            BaseSeed = FrozenSeed,
+            TotalResourcesPerPatient = 15,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            ClinicalPeriodStart = PeriodStartUtc,
+            ClinicalPeriodEnd = PeriodEndUtc,
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            Output = new NullOutputHelper()
+        };
+
+        var entries = await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
+        var encounter = Assert.Single(entries.Select(e => e.Resource).OfType<Encounter>());
+        Assert.Equal("AMB", encounter.Class?.Code);
+        Assert.DoesNotContain(
+            encounter.Type?.SelectMany(t => t.Coding) ?? [],
+            c => string.Equals(c.Code, "32485007", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task PatientId_override_is_honored()
     {
         const string overrideId = "mock-patient-0007";
@@ -181,7 +215,6 @@ public class ThetisGenerationInvariantTests
                     [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
                 },
                 SeedOffset: 0,
-                ClinicalScenarioId: ClinicalScenarioIds.Pneumonia.ToString(),
                 Intent: intent),
             PatientIndex = 0,
             BaseSeed = FrozenSeed,
@@ -257,7 +290,7 @@ public class ThetisGenerationInvariantTests
             Profile = new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>
             {
                 [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
-            }, ClinicalScenarioId: ClinicalScenarioIds.Pneumonia.ToString()),
+            }),
             PatientIndex = 0,
             BaseSeed = FrozenSeed,
             TotalResourcesPerPatient = ResourcesPerPatient,
@@ -310,7 +343,7 @@ public class ThetisGenerationInvariantTests
                 [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.Qualifying
             },
             SeedOffset: 0,
-            ClinicalScenarioId: ClinicalScenarioIds.DiabeticHypoglycemia.ToString());
+            Intent: IntentForScenario(ClinicalScenarioIds.DiabeticHypoglycemia, hypo: true));
 
         var achOnly = new PatientProfile(
             new Dictionary<ProfiledMeasureType, MeasureEligibility>
@@ -319,7 +352,7 @@ public class ThetisGenerationInvariantTests
                 [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
             },
             SeedOffset: 1,
-            ClinicalScenarioId: ClinicalScenarioIds.Pneumonia.ToString());
+            Intent: IntentForScenario(ClinicalScenarioIds.Pneumonia, hypo: false));
 
         var patients = new List<GeneratedPatient>();
         foreach (var (profile, index) in new[] { (hypo, 0), (achOnly, 1) })
@@ -347,6 +380,12 @@ public class ThetisGenerationInvariantTests
         return (ids, shared, patients);
     }
 
+    private static PatientGenerationIntent IntentForScenario(Guid scenarioId, bool hypo)
+    {
+        var scenario = FhirGenerationCodes.GetScenarioById(scenarioId.ToString())!;
+        return PatientConfigurationTemplate.FromClinicalProfile(scenario, ResourcesPerPatient, inpatient: true, hypo);
+    }
+
     private static async Task<List<Bundle.EntryComponent>> GenerateThetisForScenarioAsync(Guid scenarioId, bool hypo)
     {
         var (ids, _, practitionerIds, medicationIds) =
@@ -359,7 +398,7 @@ public class ThetisGenerationInvariantTests
         };
         var request = new PatientEntryRequest
         {
-            Profile = new PatientProfile(eligibilities, SeedOffset: 0, ClinicalScenarioId: scenarioId.ToString()),
+            Profile = new PatientProfile(eligibilities, SeedOffset: 0, Intent: IntentForScenario(scenarioId, hypo)),
             PatientIndex = 0,
             BaseSeed = FrozenSeed,
             TotalResourcesPerPatient = ResourcesPerPatient,

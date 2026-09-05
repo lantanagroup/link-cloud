@@ -25,8 +25,6 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
         var patientId = string.IsNullOrWhiteSpace(request.PatientId)
             ? request.Ids.PatientId(request.PatientIndex)
             : request.PatientId.Trim();
-        var scenario = FhirGenerationCodes.GetScenarioById(request.Profile.ClinicalScenarioId)
-                       ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
         var anchors = ScenarioResourceGeneration.ComputePatientAnchors(
             patientId, patientSeed, request.SharedPractitionerIds);
 
@@ -35,7 +33,7 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
             request.Profile, patientSeed, request.ClinicalPeriodStart, request.ClinicalPeriodEnd);
 
         var spec = PatientSpecFactory.From(
-            request.Profile, scenario, request.TotalResourcesPerPatient, request.Config);
+            request.Profile, request.TotalResourcesPerPatient, request.Config);
 
         using var scope = ThetisEngineHost.Services.CreateScope();
         var compiler = scope.ServiceProvider.GetRequiredService<IPatientGraphCompiler>();

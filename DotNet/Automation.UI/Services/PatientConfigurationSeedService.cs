@@ -65,7 +65,6 @@ public sealed class PatientConfigurationSeedService(
         var intent = PatientConfigurationTemplate.FromClinicalProfile(scenario, 50, inpatient, hypo);
         ConfigurationQualification.Stamp(
             intent,
-            scenarioId.ToString(),
             out var eligibilities,
             out var cohortQualification);
         return new PatientConfiguration

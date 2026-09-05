@@ -615,9 +615,6 @@ public static class FhirGenerationPipeline
                 output.WriteLine($"  [cache] Hit for {patientId}; reused template key={templateCacheKey}.");
         }
 
-        var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
-                       ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
-
         DateTime encStart, encEnd;
         (encStart, encEnd) = DeriveEncounterWindowForProfile(
             profile,
@@ -648,7 +645,10 @@ public static class FhirGenerationPipeline
 
         if (ShouldEmitDetailedPatientLog(patientIndex))
         {
-            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{FormatMeasureEligibilityLabel(measures, effectiveProfile)}] | scenario={scenario.PrimaryDxDisplay} | " +
+            var dx = profile.Intent?.PrimaryConditionDisplay
+                     ?? profile.Intent?.PrimaryConditionSnomed
+                     ?? "no primary dx";
+            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{FormatMeasureEligibilityLabel(measures, effectiveProfile)}] | dx={dx} | " +
                              $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
         }
 
@@ -977,7 +977,7 @@ public static class FhirGenerationPipeline
             PeriodEnd = periodEnd,
             Config = config,
             Requirements = requirements,
-            Generator = "thetis",
+            Generator = "thetis-intent-1",
             GeneratorDependencyFingerprint = GeneratorDependencyFingerprint.Value
         });
 

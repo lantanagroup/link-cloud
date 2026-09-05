@@ -53,7 +53,7 @@ public class PatientConfigurationTemplateTests
             ResourcesPerPatient: 50,
             Intent: seeded);
 
-        var spec = PatientSpecFactory.From(profile, scenario, 50);
+        var spec = PatientSpecFactory.From(profile, 50);
         Assert.Equal(scenario.PrimaryDxSnomed, spec.PrimaryConditionSnomed);
         Assert.Equal("IMP", spec.EncounterClass);
         Assert.Equal(seeded.ObservationPalette!.Count, spec.ObservationPalette.Count);

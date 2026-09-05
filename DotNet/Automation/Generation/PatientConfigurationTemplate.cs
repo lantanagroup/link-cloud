@@ -4,9 +4,10 @@ using Thetis.Generation.Abstractions;
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Turns a Clinical Profile (story pack) into a fully populated
-/// <see cref="PatientGenerationIntent"/> so the Patient Configuration editor
-/// can show the codes, encounter, and mix the generator will use.
+/// Turns an engine story pack into a fully populated
+/// <see cref="PatientGenerationIntent"/> so system kits (and "start from")
+/// bake those codes into the configuration. Generation reads the intent, not
+/// the pack id.
 /// </summary>
 public static class PatientConfigurationTemplate
 {

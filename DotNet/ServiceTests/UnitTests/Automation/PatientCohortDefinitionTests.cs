@@ -63,7 +63,6 @@ public class PatientCohortDefinitionTests
             new()
             {
                 PatientCount = 1,
-                EligibleClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
                 Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false },
                 ResourcesPerPatientMin = 10,
                 ResourcesPerPatientMax = 10

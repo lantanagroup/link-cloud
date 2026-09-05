@@ -190,7 +190,8 @@ public class PatientConfigurationsController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Name is required.");
 
-        model.ClinicalScenarioIds = SanitizeClinicalScenarioIds(model.ClinicalScenarioIds, model.Intent);
+        // Pack ids are seed provenance only. Generation reads Intent.
+        model.ClinicalScenarioIds = [];
 
         var existing = await store.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
@@ -258,31 +259,10 @@ public class PatientConfigurationsController(
         return Json(new { id = clone.Id });
     }
 
-    internal static List<string> SanitizeClinicalScenarioIds(
-        List<string>? ids,
-        PatientGenerationIntent? intent)
-    {
-        var valid = (ids ?? [])
-            .Where(id => FhirGenerationCodes.GetScenarioById(id) is not null)
-            .Take(1)
-            .ToList();
-        if (valid.Count > 0)
-            return valid;
-
-        var snomed = intent?.PrimaryConditionSnomed;
-        if (string.IsNullOrWhiteSpace(snomed))
-            return [];
-
-        var match = FhirGenerationCodes.ClinicalScenarios.FirstOrDefault(s =>
-            string.Equals(s.PrimaryDxSnomed, snomed, StringComparison.OrdinalIgnoreCase));
-        return match is null ? [] : [match.ScenarioId.ToString()];
-    }
-
     internal static void StampDerivedQualification(PatientConfiguration model)
     {
         ConfigurationQualification.Stamp(
             model.Intent,
-            model.ClinicalScenarioIds.FirstOrDefault(),
             out var eligibilities,
             out var cohortQualification);
         model.MeasureEligibilities = eligibilities;

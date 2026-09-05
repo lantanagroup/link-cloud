@@ -436,9 +436,7 @@
         var statusOk = !status || inSet(ipRules.statuses, status);
         var achIp = statusOk && inSet(ipRules.achClasses, encounterClass);
         var hypoIp = statusOk && inSet(ipRules.hypoClasses, encounterClass);
-        var insulin = inputs.includeHypoglycemicInsulin;
-        if (insulin == null)
-            insulin = inSet(ipRules.hypoScenarioIds, inputs.clinicalScenarioId);
+        var insulin = inputs.includeHypoglycemicInsulin === true;
         var diabetesMed = inSet(ipRules.diabetesMedicationCodes, inputs.medicationAdministrationRxNorm);
         var hypoClinical = !!insulin || diabetesMed;
         var achReason = achIp
@@ -592,8 +590,7 @@
             encounterClass: emptyToNull(val('PcEncClass')),
             encounterStatus: emptyToNull(val('PcEncStatus')),
             includeHypoglycemicInsulin: readBool('PcHypoInsulin'),
-            medicationAdministrationRxNorm: med.code,
-            clinicalScenarioId: emptyToNull(val('PcClinicalScenarioIds'))
+            medicationAdministrationRxNorm: med.code
         };
     }
 
@@ -720,7 +717,10 @@
                 openSection('pcClinical');
             },
             matches: function () {
-                return val('PcEncClass') === 'IMP' && val('PcHypoInsulin') === 'true';
+                var med = singleFromPicker($('PcMedAdminPicker'));
+                var diabetesMed = inSet(ipRules.diabetesMedicationCodes, med && med.code);
+                return val('PcEncClass') === 'IMP'
+                    && (val('PcHypoInsulin') === 'true' || diabetesMed);
             }
         },
         {
@@ -920,13 +920,12 @@
     }
 
     function collect() {
-        var story = emptyToNull(val('PcClinicalScenarioIds'));
         return {
             id: val('PcId') || (global.crypto && crypto.randomUUID ? crypto.randomUUID() : null),
             name: val('PcName'),
             description: val('PcDescription'),
             isSystem: val('PcIsSystem') === 'true',
-            clinicalScenarioIds: story ? [story] : [],
+            clinicalScenarioIds: [],
             resourcesPerPatientMin: parseInt(val('PcResMin') || '50', 10),
             resourcesPerPatientMax: parseInt(val('PcResMax') || '100', 10),
             scheduledInpatientPattern: val('PcStayPattern') || DEFAULT_STAY_PATTERN,

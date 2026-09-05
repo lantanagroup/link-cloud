@@ -32,6 +32,10 @@ public class PatientCohortDefinition
     /// </summary>
     public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = new();
 
+    /// <summary>
+    /// Legacy pack-id list. Generation does not read this; clinical shape
+    /// comes from <see cref="Intent"/> / the referenced Patient Configuration.
+    /// </summary>
     public List<string> EligibleClinicalScenarioIds { get; set; } = [];
     public int ResourcesPerPatientMin { get; set; } = 50;
     public int ResourcesPerPatientMax { get; set; } = 100;
@@ -44,7 +48,7 @@ public class PatientCohortDefinition
 
     /// <summary>
     /// Inline generation overlays. Applied after a referenced configuration.
-    /// Null / empty fields inherit the clinical-scenario pack.
+    /// Null / empty fields inherit the configuration intent, then fixture defaults.
     /// </summary>
     public PatientGenerationIntent? Intent { get; set; }
 
@@ -82,24 +86,19 @@ public class PatientCohortDefinition
             var count = Math.Max(0, cohort.PatientCount);
             var min = Math.Max(1, cohort.ResourcesPerPatientMin);
             var max = Math.Max(min, cohort.ResourcesPerPatientMax);
-            var scenarios = cohort.EligibleClinicalScenarioIds is { Count: > 0 }
-                ? cohort.EligibleClinicalScenarioIds
-                : FhirGenerationCodes.ClinicalScenarios.Select(s => s.ScenarioId.ToString()).ToList();
 
             for (var i = 0; i < count; i++)
             {
                 var seedOffset = seedCursor;
-                var scenarioId = scenarios[seedCursor % scenarios.Count];
                 var resources = ComputeResourceTarget(seed, cohortIndex, i, min, max);
                 var intent = PatientGenerationIntent.Clone(cohort.Intent);
-                var prediction = ConfigurationQualification.PredictFromConfiguration(
+                var prediction = ConfigurationQualification.Predict(
                     intent,
-                    scenarioId,
                     pattern: cohort.ScheduledInpatientPattern);
                 result.Add(new PatientProfile(
                     prediction.MeasureEligibilities,
                     seedOffset,
-                    scenarioId,
+                    ClinicalScenarioId: null,
                     resources,
                     cohort.ScheduledInpatientPattern,
                     prediction.CohortQualification,

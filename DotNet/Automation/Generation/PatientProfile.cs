@@ -2,21 +2,20 @@
 
 /// <summary>
 /// Per-patient profile that drives measure-aware generation.
-/// Clinical shape lives on <see cref="Intent"/> (and the clinical scenario).
+/// Clinical shape lives on <see cref="Intent"/>.
 /// <see cref="MeasureEligibilities"/> is a derived IP prediction, not a generation switch.
 /// </summary>
 /// <param name="MeasureEligibilities">
 /// Derived per-measure initial-population prediction from the clinical shape.
 /// Used by report-membership prediction. Generation reads encounter class and
-/// insulin from <see cref="Intent"/> / the clinical scenario instead.
+/// insulin from <see cref="Intent"/>.
 /// </param>
 /// <param name="SeedOffset">
 /// Optional per-patient seed offset. When null the generator assigns one
 /// automatically from the patient's ordinal position.
 /// </param>
 /// <param name="ClinicalScenarioId">
-/// Optional stable clinical scenario ID override. When provided, generation uses this
-/// scenario instead of deriving one from seed.
+/// Unused at generation time. Retained for imported-patient classification and logs.
 /// </param>
 /// <param name="ResourcesPerPatient">
 /// Optional per-patient resource target. When null, run-level default is used.
@@ -39,7 +38,7 @@ public record PatientProfile(
 
     /// <summary>
     /// True when the clinical shape uses an ACH/Hypo inpatient encounter class.
-    /// Story-pack default (no explicit class) is inpatient.
+    /// Unset class defaults to inpatient.
     /// </summary>
     public bool RequiresInpatientEncounter()
     {
@@ -52,15 +51,10 @@ public record PatientProfile(
 
     /// <summary>
     /// True when generation should include the hypoglycemic insulin pair.
-    /// Driven by the configuration (explicit insulin flag or diabetic clinical profile).
+    /// Driven by the configuration (explicit insulin flag or diabetes medication code).
     /// </summary>
     public bool RequiresHypoglycemicMedication()
-    {
-        var scenario = FhirGenerationCodes.GetScenarioById(ClinicalScenarioId);
-        if (EncounterIpClassification.IsDiabetesMedicationCode(Intent?.MedicationAdministrationRxNorm))
-            return true;
-        return ConfigurationQualification.ResolveHypoglycemicInsulin(Intent, scenario);
-    }
+        => ConfigurationQualification.ResolveHypoglycemicInsulin(Intent);
 
     /// <summary>
     /// Returns true when this profile qualifies for ALL of the specified measures.

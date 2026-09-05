@@ -22,18 +22,20 @@ public static class PatientSpecFactory
         ["9279-1"] = "respiratory-rate"
     };
 
+    /// <summary>
+    /// Builds a spec from the Patient Configuration intent and scenario-level
+    /// overlays only. Story packs are not consulted at generation time; kits
+    /// bake pack codes into <see cref="PatientGenerationIntent"/> at seed.
+    /// </summary>
     public static PatientGenerationSpec From(
         PatientProfile profile,
-        FhirGenerationCodes.ClinicalScenarioDefinition scenario,
         int totalResourcesPerPatient,
         FhirGenerationConfig? config = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
-        ArgumentNullException.ThrowIfNull(scenario);
-
-        var hypo = ConfigurationQualification.ResolveHypoglycemicInsulin(profile.Intent, scenario);
-        var spec = FromScenario(scenario, inpatient: true, hypo: hypo, totalResourcesPerPatient, config);
-        return ApplyIntent(spec, profile.Intent, hypoFromEligibility: false);
+        var hypo = profile.RequiresHypoglycemicMedication();
+        var spec = NeutralBaseline(totalResourcesPerPatient, hypo, config);
+        return ApplyIntent(spec, profile.Intent, hypoFromEligibility: hypo);
     }
 
     public static PatientGenerationSpec FromScenario(
@@ -133,13 +135,95 @@ public static class PatientSpecFactory
         };
     }
 
+    /// <summary>
+    /// Fixture defaults when the intent has not set a field. Inpatient class
+    /// plus Encounter Inpatient type so ACH CQL can match; no pack palettes,
+    /// primary dx, labs, or condition-driven meds.
+    /// </summary>
+    internal static PatientGenerationSpec NeutralBaseline(
+        int totalResourcesPerPatient,
+        bool hypo,
+        FhirGenerationConfig? config = null)
+    {
+        var n = Math.Max(1, totalResourcesPerPatient);
+        var dist = (config ?? new FhirGenerationConfig()).ResourceDistribution;
+        int Count(string type, int fallback = 0)
+        {
+            if (dist != null && dist.TryGetValue(type, out var fraction) && fraction > 0)
+                return Math.Max(1, (int)(n * fraction));
+            return fallback;
+        }
+
+        var observationCount = Count("Observation", 10);
+        var conditionCount = Count("Condition");
+        var procedureCount = Count("Procedure");
+        var medReqCount = Count("MedicationRequest", 5);
+        var medAdminCount = hypo ? Math.Max(1, Count("MedicationAdministration")) : 0;
+        var coverageCount = Count("Coverage");
+        var srCount = Count("ServiceRequest");
+        var specimenCount = Count("Specimen");
+        var dxCount = Count("DiagnosticReport");
+
+        const int anchors = 7;
+        var allocated = observationCount
+            + Math.Max(0, conditionCount - 1)
+            + procedureCount
+            + medReqCount
+            + medAdminCount
+            + coverageCount
+            + srCount
+            + specimenCount
+            + dxCount
+            + anchors
+            + (hypo ? 1 : 0);
+        if (allocated < n)
+            observationCount += n - allocated;
+
+        string? adminRx = null;
+        string? adminDisplay = null;
+        if (hypo)
+            (adminRx, adminDisplay) = InsulinMedication();
+
+        return new PatientGenerationSpec
+        {
+            EncounterClass = "IMP",
+            EncounterType = "32485007",
+            EncounterStatus = "finished",
+            LocationIdVar = LocationIdVar,
+            DischargeDisposition = "home",
+            IncludeHospitalization = true,
+            ConditionCategory = "encounter-diagnosis",
+            GenerateLabWork = false,
+            ConditionPalette = [],
+            AdditionalConditionCount = 0,
+            ObservationType = "heart-rate",
+            ObservationCount = Math.Max(1, observationCount),
+            ObservationPalette = [],
+            SpreadObservationsAcrossEncounter = true,
+            IncludeConditionDrivenMedications = false,
+            MedicationRequestCount = medReqCount,
+            MedicationAdministrationCount = medAdminCount,
+            MedicationAdministrationRxNorm = adminRx,
+            MedicationAdministrationDisplay = adminDisplay,
+            IncludeMedicationRequest = hypo,
+            MedicationIdVar = hypo ? HypoInsulinMedicationIdVar : null,
+            IncludeProcedure = false,
+            ProcedureCount = 0,
+            ProcedurePalette = [],
+            CoverageCount = coverageCount,
+            ServiceRequestCount = srCount,
+            SpecimenCount = specimenCount,
+            DiagnosticReportCount = dxCount,
+            IncludeAllergy = false
+        };
+    }
+
     internal static PatientGenerationSpec ApplyIntent(
         PatientGenerationSpec spec,
         PatientGenerationIntent? intent,
         bool hypoFromEligibility)
     {
-        if (intent == null)
-            return spec;
+        intent ??= new PatientGenerationIntent();
 
         var observationPalette = CombinePalette(
             spec.ObservationPalette,
@@ -193,10 +277,38 @@ public static class PatientSpecFactory
             || encounterClass.Equals("NONAC", StringComparison.OrdinalIgnoreCase)
             || encounterClass.Equals("SS", StringComparison.OrdinalIgnoreCase);
 
+        // ACH IP retrieves [Encounter: "Encounter Inpatient"] on SNOMED
+        // {32485007, 183452005, 8715000}. Keep that type only for inpatient
+        // classes so AMB/EMER patients do not still qualify.
+        var encounterType = inpatientClass
+            ? (spec.EncounterType ?? "32485007")
+            : null;
+
+        var medReqCount = Count("MedicationRequest", spec.MedicationRequestCount);
+        var includeConditionMeds = intent.IncludeConditionDrivenMedications ?? spec.IncludeConditionDrivenMedications;
+        if (intent.ResourceTypeCounts != null
+            && intent.ResourceTypeCounts.TryGetValue("MedicationRequest", out var pinnedMedReq)
+            && pinnedMedReq == 0)
+        {
+            includeConditionMeds = false;
+        }
+
+        var medAdminRx = string.IsNullOrWhiteSpace(intent.MedicationAdministrationRxNorm)
+            ? spec.MedicationAdministrationRxNorm
+            : intent.MedicationAdministrationRxNorm;
+        var medAdminDisplay = string.IsNullOrWhiteSpace(intent.MedicationAdministrationDisplay)
+            ? spec.MedicationAdministrationDisplay
+            : intent.MedicationAdministrationDisplay;
+        var medAdminCount = Count("MedicationAdministration", spec.MedicationAdministrationCount);
+        if (string.IsNullOrWhiteSpace(medAdminRx))
+            medAdminCount = 0;
+        else if (medAdminCount <= 0)
+            medAdminCount = 1;
+
         return new PatientGenerationSpec
         {
             EncounterClass = encounterClass,
-            EncounterType = inpatientClass ? (spec.EncounterType ?? "32485007") : spec.EncounterType,
+            EncounterType = encounterType,
             EncounterStatus = encounterStatus,
             DurationMinutes = intent.DurationMinutes ?? spec.DurationMinutes,
             LocationIdVar = spec.LocationIdVar,
@@ -225,18 +337,16 @@ public static class PatientSpecFactory
             ObservationCount = Math.Max(0, observationCount),
             ObservationPalette = observationPalette,
             SpreadObservationsAcrossEncounter = intent.SpreadObservationsAcrossEncounter ?? spec.SpreadObservationsAcrossEncounter,
-            IncludeConditionDrivenMedications = intent.IncludeConditionDrivenMedications ?? spec.IncludeConditionDrivenMedications,
-            MedicationRequestCount = Count("MedicationRequest", spec.MedicationRequestCount),
-            MedicationAdministrationCount = Count("MedicationAdministration", spec.MedicationAdministrationCount),
-            MedicationAdministrationRxNorm = string.IsNullOrWhiteSpace(intent.MedicationAdministrationRxNorm)
-                ? spec.MedicationAdministrationRxNorm
-                : intent.MedicationAdministrationRxNorm,
-            MedicationAdministrationDisplay = string.IsNullOrWhiteSpace(intent.MedicationAdministrationDisplay)
-                ? spec.MedicationAdministrationDisplay
-                : intent.MedicationAdministrationDisplay,
+            IncludeConditionDrivenMedications = includeConditionMeds,
+            MedicationRequestCount = medReqCount,
+            MedicationAdministrationCount = medAdminCount,
+            MedicationAdministrationRxNorm = medAdminRx,
+            MedicationAdministrationDisplay = medAdminDisplay,
             IncludeMedicationRequest = includeHypo,
             MedicationIdVar = includeHypo ? HypoInsulinMedicationIdVar : null,
-            IncludeProcedure = procedurePalette.Count > 0 || spec.IncludeProcedure,
+            IncludeProcedure = procedurePalette.Count > 0
+                || spec.IncludeProcedure
+                || Count("Procedure", spec.ProcedureCount) > 0,
             ProcedureCount = Count("Procedure", spec.ProcedureCount),
             ProcedurePalette = procedurePalette,
             ProcedureSnomed = procedurePalette.Count > 0 ? procedurePalette[0].Code : spec.ProcedureSnomed,

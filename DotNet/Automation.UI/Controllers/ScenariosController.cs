@@ -73,10 +73,8 @@ public class ScenariosController(
 
             cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
 
-            var scenarioId = cohort.EligibleClinicalScenarioIds.FirstOrDefault();
-            var prediction = ConfigurationQualification.PredictFromConfiguration(
+            var prediction = ConfigurationQualification.Predict(
                 cohort.Intent,
-                scenarioId,
                 cohort.ScheduledInpatientPattern);
             cohort.MeasureEligibilities = prediction.MeasureEligibilities;
             cohort.CohortQualification = prediction.CohortQualification;

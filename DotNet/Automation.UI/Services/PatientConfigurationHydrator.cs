@@ -25,15 +25,14 @@ public static class PatientConfigurationHydrator
 
             changed = true;
             cohort.Intent = PatientGenerationIntent.Merge(config.Intent, cohort.Intent);
-            // Live reference for clinical shape. Resource range and stay on the
-            // cohort are scenario overrides (mega/volume tests, scheduled-stay matrix);
-            // fill them from the configuration only when the cohort left them unset.
-            cohort.EligibleClinicalScenarioIds = config.ClinicalScenarioIds.Take(1).ToList();
+            // Live reference: stay timing is owned by the Patient Configuration.
+            // Scenario save stamps a cohort default, which must not shadow the config.
             if (cohort.ResourcesPerPatientMin <= 0 && config.ResourcesPerPatientMin > 0)
                 cohort.ResourcesPerPatientMin = config.ResourcesPerPatientMin;
             if (cohort.ResourcesPerPatientMax <= 0 && config.ResourcesPerPatientMax > 0)
                 cohort.ResourcesPerPatientMax = config.ResourcesPerPatientMax;
-            cohort.ScheduledInpatientPattern ??= config.ScheduledInpatientPattern
+            cohort.ScheduledInpatientPattern = config.ScheduledInpatientPattern
+                ?? cohort.ScheduledInpatientPattern
                 ?? ScheduledStayWindow.DefaultPattern;
         }
 

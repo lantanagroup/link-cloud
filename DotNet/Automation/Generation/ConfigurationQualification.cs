@@ -24,14 +24,13 @@ public static class ConfigurationQualification
 
     public static QualificationPrediction Predict(
         PatientGenerationIntent? intent,
-        FhirGenerationCodes.ClinicalScenarioDefinition? scenario,
         ScheduledInpatientPattern? pattern = null)
     {
         var encounterClass = ResolveEncounterClass(intent);
         var encounterStatus = string.IsNullOrWhiteSpace(intent?.EncounterStatus)
             ? "finished"
             : intent.EncounterStatus!;
-        var includeInsulin = ResolveHypoglycemicInsulin(intent, scenario);
+        var includeInsulin = ResolveHypoglycemicInsulin(intent);
         var diabetesMed = EncounterIpClassification.IsDiabetesMedicationCode(intent?.MedicationAdministrationRxNorm);
 
         var statusOk = EncounterIpClassification.IsValidIpEncounterStatus(encounterStatus);
@@ -75,13 +74,12 @@ public static class ConfigurationQualification
 
     public static QualificationPrediction PredictFromConfiguration(
         PatientGenerationIntent? intent,
-        string? clinicalScenarioId,
         ScheduledInpatientPattern? pattern = null)
-        => Predict(intent, FhirGenerationCodes.GetScenarioById(clinicalScenarioId), pattern);
+        => Predict(intent, pattern);
 
-    public static void Stamp(PatientGenerationIntent? intent, string? clinicalScenarioId, out Dictionary<ProfiledMeasureType, MeasureEligibility> eligibilities, out MeasureEligibility cohortQualification)
+    public static void Stamp(PatientGenerationIntent? intent, out Dictionary<ProfiledMeasureType, MeasureEligibility> eligibilities, out MeasureEligibility cohortQualification)
     {
-        var prediction = PredictFromConfiguration(intent, clinicalScenarioId);
+        var prediction = Predict(intent);
         eligibilities = prediction.MeasureEligibilities;
         cohortQualification = prediction.CohortQualification;
     }
@@ -89,16 +87,11 @@ public static class ConfigurationQualification
     public static string ResolveEncounterClass(PatientGenerationIntent? intent)
         => string.IsNullOrWhiteSpace(intent?.EncounterClass) ? "IMP" : intent.EncounterClass!;
 
-    public static bool ResolveHypoglycemicInsulin(
-        PatientGenerationIntent? intent,
-        FhirGenerationCodes.ClinicalScenarioDefinition? scenario)
+    public static bool ResolveHypoglycemicInsulin(PatientGenerationIntent? intent)
     {
         if (intent?.IncludeHypoglycemicInsulin is bool specified)
             return specified;
-        return scenario != null
-            && ClinicalScenarioEligibility.QualifiesForMeasure(
-                scenario,
-                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+        return EncounterIpClassification.IsDiabetesMedicationCode(intent?.MedicationAdministrationRxNorm);
     }
 
     public static bool ScenarioImpliesHypoglycemicInsulin(FhirGenerationCodes.ClinicalScenarioDefinition scenario)

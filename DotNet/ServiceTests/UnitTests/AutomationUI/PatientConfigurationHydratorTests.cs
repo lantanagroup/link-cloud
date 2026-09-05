@@ -65,7 +65,6 @@ public class PatientConfigurationHydratorTests
         Assert.Equal("female", cohort.Intent!.Gender);
         Assert.Equal("snf", cohort.Intent.DischargeDisposition);
         Assert.Equal(70, cohort.Intent.MinAge);
-        Assert.Equal(ClinicalScenarioIds.Pneumonia.ToString(), Assert.Single(cohort.EligibleClinicalScenarioIds));
         Assert.Equal(50, cohort.ResourcesPerPatientMin);
         Assert.Equal(100, cohort.ResourcesPerPatientMax);
         Assert.Equal(ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod, cohort.ScheduledInpatientPattern);
@@ -109,5 +108,50 @@ public class PatientConfigurationHydratorTests
 
         Assert.Null(Assert.Single(hydrated.PatientCohorts).Intent);
         store.Verify(s => s.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Hydrate_config_stay_wins_over_cohort_default()
+    {
+        var configId = Guid.Parse("00000000-0000-0000-3000-000000000088");
+        var store = new Mock<IPatientConfigurationStore>();
+        store.Setup(s => s.GetByIdAsync(configId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PatientConfiguration
+            {
+                Id = configId,
+                Name = "Out of window",
+                ClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
+                ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod,
+                Intent = new PatientGenerationIntent { EncounterClass = "IMP" }
+            });
+
+        var options = new ResolvedRunOptions(
+            PatientCount: 1,
+            ResourcesPerPatient: 15,
+            Seed: 1,
+            PollingIntervalSeconds: 3,
+            MaxPollingDurationMinutes: 10,
+            LokiScrapeWindowMinutes: 10,
+            CleanupServiceData: false,
+            CleanupFhirData: true,
+            SelectedMeasures: [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            PatientProfiles: [],
+            PatientCohorts:
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    PatientConfigurationId = configId,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
+                }
+            ],
+            ReportMethod: ReportMethod.Adhoc);
+
+        var hydrated = await PatientConfigurationHydrator.HydrateAsync(options, store.Object, CancellationToken.None);
+        var cohort = Assert.Single(hydrated.PatientCohorts);
+        Assert.Equal(ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod, cohort.ScheduledInpatientPattern);
+        Assert.Equal(
+            ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod,
+            Assert.Single(hydrated.PatientProfiles).ScheduledInpatientPattern);
     }
 }

@@ -10,9 +10,6 @@ public class ConfigurationQualificationTests
     private static readonly ProfiledMeasureType AchDaily = ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation;
     private static readonly ProfiledMeasureType Hypo = ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation;
 
-    private static FhirGenerationCodes.ClinicalScenarioDefinition Pneumonia()
-        => FhirGenerationCodes.GetScenarioById(ClinicalScenarioIds.Pneumonia.ToString())!;
-
     private static FhirGenerationCodes.ClinicalScenarioDefinition DiabeticHypo()
         => FhirGenerationCodes.GetScenarioById(ClinicalScenarioIds.DiabeticHypoglycemia.ToString())!;
 
@@ -20,8 +17,7 @@ public class ConfigurationQualificationTests
     public void Inpatient_pneumonia_qualifies_ach_not_hypo()
     {
         var prediction = ConfigurationQualification.Predict(
-            new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false },
-            Pneumonia());
+            new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false });
 
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[AchDaily]);
@@ -32,10 +28,10 @@ public class ConfigurationQualificationTests
     }
 
     [Fact]
-    public void Diabetic_hypoglycemia_profile_qualifies_ach_and_hypo()
+    public void Diabetic_hypoglycemia_intent_qualifies_ach_and_hypo()
     {
         var intent = PatientConfigurationTemplate.FromClinicalProfile(DiabeticHypo(), 50, inpatient: true, hypo: true);
-        var prediction = ConfigurationQualification.Predict(intent, DiabeticHypo());
+        var prediction = ConfigurationQualification.Predict(intent);
 
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Hypo]);
@@ -45,8 +41,7 @@ public class ConfigurationQualificationTests
     public void Ambulatory_pneumonia_qualifies_for_neither()
     {
         var prediction = ConfigurationQualification.Predict(
-            new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false },
-            Pneumonia());
+            new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false });
 
         Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Ach]);
         Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Hypo]);
@@ -57,19 +52,17 @@ public class ConfigurationQualificationTests
     public void Emergency_plus_insulin_is_ach_not_hypo()
     {
         var prediction = ConfigurationQualification.Predict(
-            new PatientGenerationIntent { EncounterClass = "EMER", IncludeHypoglycemicInsulin = true },
-            Pneumonia());
+            new PatientGenerationIntent { EncounterClass = "EMER", IncludeHypoglycemicInsulin = true });
 
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
         Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Hypo]);
     }
 
     [Fact]
-    public void Turning_insulin_off_on_diabetic_profile_drops_hypo()
+    public void Turning_insulin_off_on_diabetic_intent_drops_hypo()
     {
         var prediction = ConfigurationQualification.Predict(
-            new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false },
-            DiabeticHypo());
+            new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false });
 
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
         Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Hypo]);
@@ -80,7 +73,6 @@ public class ConfigurationQualificationTests
     {
         var prediction = ConfigurationQualification.Predict(
             new PatientGenerationIntent { EncounterClass = "IMP" },
-            Pneumonia(),
             pattern: ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod);
 
         Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
@@ -89,15 +81,19 @@ public class ConfigurationQualificationTests
     }
 
     [Fact]
-    public void Empty_intent_defaults_to_inpatient_story_pack()
+    public void Empty_intent_defaults_to_inpatient_without_insulin()
     {
-        var pneumonia = ConfigurationQualification.Predict(null, Pneumonia());
-        Assert.Equal(MeasureEligibility.Qualifying, pneumonia.MeasureEligibilities[Ach]);
-        Assert.Equal(MeasureEligibility.NonQualifying, pneumonia.MeasureEligibilities[Hypo]);
+        var prediction = ConfigurationQualification.Predict(null);
+        Assert.Equal(MeasureEligibility.Qualifying, prediction.MeasureEligibilities[Ach]);
+        Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Hypo]);
+    }
 
-        var hypo = ConfigurationQualification.Predict(null, DiabeticHypo());
-        Assert.Equal(MeasureEligibility.Qualifying, hypo.MeasureEligibilities[Ach]);
-        Assert.Equal(MeasureEligibility.Qualifying, hypo.MeasureEligibilities[Hypo]);
+    [Fact]
+    public void Story_pack_alone_does_not_qualify_hypo()
+    {
+        var prediction = ConfigurationQualification.Predict(
+            new PatientGenerationIntent { EncounterClass = "IMP" });
+        Assert.Equal(MeasureEligibility.NonQualifying, prediction.MeasureEligibilities[Hypo]);
     }
 
     [Fact]
@@ -106,9 +102,8 @@ public class ConfigurationQualificationTests
         var amb = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false };
         var spec = PatientSpecFactory.From(
             new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>(), Intent: amb),
-            Pneumonia(),
             20);
-        var prediction = ConfigurationQualification.Predict(amb, Pneumonia());
+        var prediction = ConfigurationQualification.Predict(amb);
 
         Assert.Equal("AMB", spec.EncounterClass);
         Assert.False(spec.IncludeMedicationRequest);
@@ -118,9 +113,8 @@ public class ConfigurationQualificationTests
         var diabeticIntent = PatientConfigurationTemplate.FromClinicalProfile(DiabeticHypo(), 20, inpatient: true, hypo: true);
         var hypoSpec = PatientSpecFactory.From(
             new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>(), Intent: diabeticIntent),
-            DiabeticHypo(),
             20);
-        var hypoPrediction = ConfigurationQualification.Predict(diabeticIntent, DiabeticHypo());
+        var hypoPrediction = ConfigurationQualification.Predict(diabeticIntent);
 
         Assert.Equal("IMP", hypoSpec.EncounterClass);
         Assert.True(hypoSpec.IncludeMedicationRequest);

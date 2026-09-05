@@ -3,8 +3,10 @@ using Thetis.Generation.Abstractions;
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Optional overlays on top of a clinical-scenario pack. Null / empty means
-/// "use the story default." Unset is not the same as an empty palette.
+/// Clinical shape for generation. Null / empty fields use fixture defaults
+/// (inpatient class, Encounter Inpatient type, home discharge). Palettes are
+/// the codes that will be generated — empty means no extra story-pack codes.
+/// Unset is not the same as an empty palette.
 /// </summary>
 public sealed class PatientGenerationIntent
 {
@@ -74,13 +76,13 @@ public sealed class PatientGenerationIntent
             PrimaryConditionSnomed = over.PrimaryConditionSnomed ?? under.PrimaryConditionSnomed,
             PrimaryConditionDisplay = over.PrimaryConditionDisplay ?? under.PrimaryConditionDisplay,
             ConditionCategory = over.ConditionCategory ?? under.ConditionCategory,
-            ConditionPalette = over.ConditionPalette ?? under.ConditionPalette,
+            ConditionPalette = MergeCoded(under.ConditionPalette, over.ConditionPalette, over.ConditionPaletteMode),
             ConditionPaletteMode = over.ConditionPalette is { Count: > 0 } || over.ConditionPaletteMode != PaletteMode.Inherit
                 ? over.ConditionPaletteMode
                 : under.ConditionPaletteMode,
             AdditionalConditionCount = over.AdditionalConditionCount ?? under.AdditionalConditionCount,
             GenerateLabWork = over.GenerateLabWork ?? under.GenerateLabWork,
-            ObservationPalette = over.ObservationPalette ?? under.ObservationPalette,
+            ObservationPalette = MergeObservations(under.ObservationPalette, over.ObservationPalette, over.ObservationPaletteMode),
             ObservationPaletteMode = over.ObservationPalette is { Count: > 0 } || over.ObservationPaletteMode != PaletteMode.Inherit
                 ? over.ObservationPaletteMode
                 : under.ObservationPaletteMode,
@@ -89,7 +91,7 @@ public sealed class PatientGenerationIntent
             IncludeConditionDrivenMedications = over.IncludeConditionDrivenMedications ?? under.IncludeConditionDrivenMedications,
             IncludeHypoglycemicInsulin = over.IncludeHypoglycemicInsulin ?? under.IncludeHypoglycemicInsulin,
             ResourceTypeCounts = over.ResourceTypeCounts ?? under.ResourceTypeCounts,
-            ProcedurePalette = over.ProcedurePalette ?? under.ProcedurePalette,
+            ProcedurePalette = MergeCoded(under.ProcedurePalette, over.ProcedurePalette, over.ProcedurePaletteMode),
             ProcedurePaletteMode = over.ProcedurePalette is { Count: > 0 } || over.ProcedurePaletteMode != PaletteMode.Inherit
                 ? over.ProcedurePaletteMode
                 : under.ProcedurePaletteMode,
@@ -148,8 +150,47 @@ public sealed class PatientGenerationIntent
         };
     }
 
+    private static List<ObservationPaletteItem>? MergeObservations(
+        List<ObservationPaletteItem>? under,
+        List<ObservationPaletteItem>? over,
+        PaletteMode overMode)
+        => MergePalette(under, over, overMode, i => i.LoincCode);
+
+    private static List<CodedPaletteItem>? MergeCoded(
+        List<CodedPaletteItem>? under,
+        List<CodedPaletteItem>? over,
+        PaletteMode overMode)
+        => MergePalette(under, over, overMode, i => i.Code);
+
+    private static List<T>? MergePalette<T>(
+        List<T>? under,
+        List<T>? over,
+        PaletteMode overMode,
+        Func<T, string> key)
+    {
+        if (overMode is PaletteMode.Replace)
+            return over?.ToList();
+        if (over is null)
+            return under?.ToList();
+        if (overMode is PaletteMode.Inherit)
+            return over.Count > 0 ? over.ToList() : under?.ToList();
+
+        if (under is null || under.Count == 0)
+            return over.ToList();
+
+        var merged = under.ToList();
+        var seen = new HashSet<string>(merged.Select(key), StringComparer.OrdinalIgnoreCase);
+        foreach (var item in over)
+        {
+            if (seen.Add(key(item)))
+                merged.Add(item);
+        }
+
+        return merged;
+    }
+
     /// <summary>
-    /// True when any overlay is set. Empty intent means "use the story pack."
+    /// True when any field is set. Empty intent means fixture defaults, not a story pack.
     /// </summary>
     public bool HasOverlays()
     {

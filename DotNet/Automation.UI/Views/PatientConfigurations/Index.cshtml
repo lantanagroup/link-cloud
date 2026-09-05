@@ -12,7 +12,7 @@
     <details class="au-help-panel">
         <summary><i class="bi bi-info-circle"></i> How Patient Configurations work</summary>
         <div class="au-help-body">
-            <p>Each configuration is a full patient. Optionally start from an existing one, edit, then save a name. A scenario cohort points at one configuration.</p>
+            <p>Each configuration is a full patient. Optionally start from an existing one, edit, then save a name. A scenario cohort points at one configuration. Generation uses only the fields on the form — there is no hidden clinical pack.</p>
             <ul>
                 <li>A scenario <strong>cohort</strong> is how many of this configuration to generate. Stay timing, encounter, and clinical content are saved here and reused.</li>
                 <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy. Starting from one does not overwrite the source.</li>
@@ -75,12 +75,10 @@
                 <tbody>
                     @foreach (var t in Model)
                     {
-                        var storyId = t.ClinicalScenarioIds.FirstOrDefault();
-                        var storyDef = FhirGenerationCodes.GetScenarioById(storyId);
                         var story = t.Intent?.PrimaryConditionDisplay
-                            ?? storyDef?.PrimaryDxDisplay
-                            ?? (string.IsNullOrWhiteSpace(storyId) ? "Not set" : storyId);
-                        var prediction = ConfigurationQualification.Predict(t.Intent, storyDef);
+                            ?? t.Intent?.PrimaryConditionSnomed
+                            ?? "No primary diagnosis";
+                        var prediction = ConfigurationQualification.Predict(t.Intent, t.ScheduledInpatientPattern);
                         <tr data-id="@t.Id"
                             data-name="@t.Name"
                             data-description="@(t.Description ?? "")"
