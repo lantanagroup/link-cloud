@@ -55,8 +55,20 @@ public class PatientConfigurationsController(
         if (catalogItems.Count == 0)
             catalogItems = GenerationCatalogSeed.FromHardcoded();
 
+        var configs = await store.GetAllAsync(ct);
         return Json(new
         {
+            baselines = configs
+                .OrderBy(c => c.IsSystem ? 0 : 1)
+                .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(c => new
+                {
+                    id = c.Id,
+                    name = c.Name,
+                    isSystem = c.IsSystem,
+                    description = c.Description,
+                    primaryDx = c.Intent?.PrimaryConditionDisplay
+                }),
             scenarios = FhirGenerationCodes.ClinicalScenarios.Select(s => new
             {
                 id = s.ScenarioId.ToString(),
@@ -178,13 +190,7 @@ public class PatientConfigurationsController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Name is required.");
 
-        if (model.ClinicalScenarioIds is { Count: > 1 })
-            model.ClinicalScenarioIds = [model.ClinicalScenarioIds[0]];
-        if (model.ClinicalScenarioIds is not { Count: 1 }
-            || FhirGenerationCodes.GetScenarioById(model.ClinicalScenarioIds[0]) is null)
-        {
-            return BadRequest("Select one Clinical Profile.");
-        }
+        model.ClinicalScenarioIds = SanitizeClinicalScenarioIds(model.ClinicalScenarioIds, model.Intent);
 
         var existing = await store.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
@@ -250,6 +256,26 @@ public class PatientConfigurationsController(
         StampDerivedQualification(clone);
         await store.UpsertAsync(clone, ct);
         return Json(new { id = clone.Id });
+    }
+
+    internal static List<string> SanitizeClinicalScenarioIds(
+        List<string>? ids,
+        PatientGenerationIntent? intent)
+    {
+        var valid = (ids ?? [])
+            .Where(id => FhirGenerationCodes.GetScenarioById(id) is not null)
+            .Take(1)
+            .ToList();
+        if (valid.Count > 0)
+            return valid;
+
+        var snomed = intent?.PrimaryConditionSnomed;
+        if (string.IsNullOrWhiteSpace(snomed))
+            return [];
+
+        var match = FhirGenerationCodes.ClinicalScenarios.FirstOrDefault(s =>
+            string.Equals(s.PrimaryDxSnomed, snomed, StringComparison.OrdinalIgnoreCase));
+        return match is null ? [] : [match.ScenarioId.ToString()];
     }
 
     internal static void StampDerivedQualification(PatientConfiguration model)

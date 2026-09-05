@@ -25,7 +25,7 @@ public static class PatientConfigurationHydrator
 
             changed = true;
             cohort.Intent = PatientGenerationIntent.Merge(config.Intent, cohort.Intent);
-            // Live reference for clinical profile. Resource range and stay on the
+            // Live reference for clinical shape. Resource range and stay on the
             // cohort are scenario overrides (mega/volume tests, scheduled-stay matrix);
             // fill them from the configuration only when the cohort left them unset.
             cohort.EligibleClinicalScenarioIds = config.ClinicalScenarioIds.Take(1).ToList();

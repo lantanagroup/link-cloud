@@ -3,14 +3,16 @@
     <input type="hidden" id="PcId" />
     <input type="hidden" id="PcIsSystem" value="false" />
 
+    <input type="hidden" id="PcClinicalScenarioIds" />
+
     <details class="au-help-panel">
         <summary><i class="bi bi-info-circle"></i> How this configuration is built</summary>
         <div class="au-help-body">
-            <p>Pick one <strong>Clinical Profile</strong>. That loads the diagnosis, labs, meds, procedures, stay timing, and encounter defaults so you can see exactly what will generate. Save it once and reuse it on any scenario.</p>
+            <p>A Patient Configuration is the patient. Optionally <strong>start from</strong> an existing one (system kits included), then change anything. Save a name and reuse it on any scenario cohort.</p>
             <ul>
                 <li>A cohort is <strong>how many</strong> of this configuration to generate. Stay timing, encounter class, and clinical content live here.</li>
                 <li>Measure qualification is predicted from this shape plus the scenario’s selected measures and report window — not a setting you pick.</li>
-                <li>Saved configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy.</li>
+                <li>Saved configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy. Starting from one does not overwrite the source.</li>
             </ul>
         </div>
     </details>
@@ -29,15 +31,15 @@
             <textarea class="form-control" id="PcDescription" maxlength="500" rows="2"></textarea>
         </div>
         <div class="col-12">
-            <label class="form-label" for="PcClinicalProfile">
-                Clinical Profile
-                <button type="button" class="au-info-toggle" data-help="pcHelpStories" aria-label="About clinical profile" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+            <label class="form-label" for="PcBaseline">
+                Start from
+                <button type="button" class="au-info-toggle" data-help="pcHelpStories" aria-label="About starting from a configuration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
             </label>
-            <select class="form-select" id="PcClinicalProfile">
-                <option value="">Select a clinical profile…</option>
+            <select class="form-select" id="PcBaseline">
+                <option value="">Start blank, or pick a configuration…</option>
             </select>
             <div id="pcHelpStories" class="au-help-text" hidden>
-                One diagnosis pack per configuration. Choosing a profile fills the fields below (primary diagnosis, labs, meds, procedures, discharge). You can then edit any of those values before saving.
+                Optional. Copies an existing Patient Configuration into this form — system kits included. Change anything, then save a new name. The source is not overwritten. Leave blank to build from the pickers and I-need chips.
             </div>
         </div>
         <div class="col-12">
@@ -83,10 +85,10 @@
                         <details class="au-help-panel mb-0 flex-grow-1">
                             <summary><i class="bi bi-info-circle"></i> About demographics</summary>
                             <div class="au-help-body">
-                                <p>Filled from the Clinical Profile (random gender, ages 18–80). Change them here if this configuration needs a specific person. Birth date is derived from age — legal name, MRN, address, race, and language are not configurable yet.</p>
+                                <p>Filled from the baseline (random gender, ages 18–80). Change them here if this configuration needs a specific person. Birth date is derived from age — legal name, MRN, address, race, and language are not configurable yet.</p>
                             </div>
                         </details>
-                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="demo">Restore profile</button>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="demo">Restore baseline</button>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcGender">
@@ -99,7 +101,7 @@
                             <option value="male">Male</option>
                             <option value="other">Other</option>
                         </select>
-                        <div id="pcHelpGender" class="au-help-text" hidden>Used for every patient generated from this configuration. Random is the Clinical Profile default.</div>
+                        <div id="pcHelpGender" class="au-help-text" hidden>Used for every patient generated from this configuration. Random is the baseline default.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcMinAge">
@@ -111,7 +113,7 @@
                     <div class="col-md-4">
                         <label class="form-label" for="PcMaxAge">Max age</label>
                         <input type="number" min="0" max="120" class="form-control" id="PcMaxAge" placeholder="80" />
-                        <div id="pcHelpAge" class="au-help-text" hidden>Inclusive years. The Clinical Profile fills 18–80. Set min and max to the same value to pin an exact age.</div>
+                        <div id="pcHelpAge" class="au-help-text" hidden>Inclusive years. The baseline fills 18–80. Set min and max to the same value to pin an exact age.</div>
                     </div>
                 </div>
             </div>
@@ -130,10 +132,10 @@
                         <details class="au-help-panel mb-0 flex-grow-1">
                             <summary><i class="bi bi-info-circle"></i> About the encounter</summary>
                             <div class="au-help-body">
-                                <p>The Clinical Profile fills class, status, and discharge. Stay timing is saved here: admit and discharge are placed against the scenario report period using the pattern below. Automation still overlays ED → ICU → step-down locations on inpatient stays.</p>
+                                <p>The baseline fills class, status, and discharge. Stay timing is saved here: admit and discharge are placed against the scenario report period using the pattern below. Automation still overlays ED → ICU → step-down locations on inpatient stays.</p>
                             </div>
                         </details>
-                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="enc">Restore profile</button>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="enc">Restore baseline</button>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcEncClass">
@@ -146,7 +148,7 @@
                             <option value="AMB">Ambulatory</option>
                             <option value="EMER">Emergency</option>
                         </select>
-                        <div id="pcHelpEncClass" class="au-help-text" hidden>The Clinical Profile fills this (inpatient for typical ACH stays). Change it here if this configuration should generate a different encounter class.</div>
+                        <div id="pcHelpEncClass" class="au-help-text" hidden>The baseline fills this (inpatient for typical ACH stays). Change it here if this configuration should generate a different encounter class.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcEncStatus">
@@ -190,7 +192,7 @@
                             <option value="exp">Expired</option>
                             <option value="oth">Other</option>
                         </select>
-                        <div id="pcHelpDischarge" class="au-help-text" hidden>The Clinical Profile fills this (for example pneumonia → home, heart failure → SNF). Applied on finished inpatient encounters. Change it here if this configuration needs a different disposition.</div>
+                        <div id="pcHelpDischarge" class="au-help-text" hidden>The baseline fills this (for example pneumonia → home, heart failure → SNF). Applied on finished inpatient encounters. Change it here if this configuration needs a different disposition.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="PcHospitalization">
@@ -202,7 +204,7 @@
                             <option value="true">Include</option>
                             <option value="false">Omit</option>
                         </select>
-                        <div id="pcHelpHosp" class="au-help-text" hidden>Whether Encounter.hospitalization (including discharge disposition) is written. The Clinical Profile turns this on for finished inpatient stays and off for in-progress encounters.</div>
+                        <div id="pcHelpHosp" class="au-help-text" hidden>Whether Encounter.hospitalization (including discharge disposition) is written. The baseline turns this on for finished inpatient stays and off for in-progress encounters.</div>
                     </div>
                 </div>
             </div>
@@ -221,11 +223,11 @@
                         <details class="au-help-panel mb-0 flex-grow-1">
                             <summary><i class="bi bi-info-circle"></i> About clinical content</summary>
                             <div class="au-help-body">
-                                <p>Choosing a Clinical Profile fills these pickers with that pack’s diagnosis, labs, meds, and procedures. Edit the lists if this test needs different codes.</p>
+                                <p>Starting from a configuration fills these pickers with that patient’s diagnosis, labs, meds, and procedures. Edit the lists if this test needs different codes.</p>
                                 <p>Legal name, MRN, race, exact lab numbers, and medication dose/route/timing are not available yet.</p>
                             </div>
                         </details>
-                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="clinical">Restore profile</button>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="clinical">Restore baseline</button>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">
@@ -233,7 +235,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpPrimaryDx" aria-label="About primary diagnosis" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcPrimaryDxPicker" class="pc-picker" data-catalog="conditions" data-multiple="false" data-placeholder="Search conditions…"></div>
-                        <div id="pcHelpPrimaryDx" class="au-help-text" hidden>Admitting diagnosis. The Clinical Profile fills this. Change it here if this configuration should use a different SNOMED. Comorbidities are a separate list below.</div>
+                        <div id="pcHelpPrimaryDx" class="au-help-text" hidden>Admitting diagnosis. The baseline fills this. Change it here if this configuration should use a different SNOMED. Comorbidities are a separate list below.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="PcAllergy">
@@ -245,7 +247,7 @@
                             <option value="true">Include</option>
                             <option value="false">Omit</option>
                         </select>
-                        <div id="pcHelpAllergy" class="au-help-text" hidden>Whether an AllergyIntolerance is generated. The Clinical Profile leaves this off unless the pack includes one. Turn it on here if this configuration needs an allergy.</div>
+                        <div id="pcHelpAllergy" class="au-help-text" hidden>Whether an AllergyIntolerance is generated. The baseline leaves this off unless the pack includes one. Turn it on here if this configuration needs an allergy.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="PcLabs">
@@ -257,7 +259,7 @@
                             <option value="true">On</option>
                             <option value="false">Off</option>
                         </select>
-                        <div id="pcHelpLabs" class="au-help-text" hidden>When on, the primary condition can enqueue matching lab orders. The Clinical Profile turns this on. Turn it off here for a thinner patient.</div>
+                        <div id="pcHelpLabs" class="au-help-text" hidden>When on, the primary condition can enqueue matching lab orders. The baseline turns this on. Turn it off here for a thinner patient.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcHypoInsulin">
@@ -281,7 +283,7 @@
                             <option value="true">On</option>
                             <option value="false">Off</option>
                         </select>
-                        <div id="pcHelpCondMeds" class="au-help-text" hidden>When on, MedicationRequests match the diagnosis (for example antibiotics for pneumonia). The Clinical Profile turns this on. Turn it off here to omit those orders.</div>
+                        <div id="pcHelpCondMeds" class="au-help-text" hidden>When on, MedicationRequests match the diagnosis (for example antibiotics for pneumonia). The baseline turns this on. Turn it off here to omit those orders.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcSpreadObs">
@@ -293,7 +295,7 @@
                             <option value="true">On</option>
                             <option value="false">Off</option>
                         </select>
-                        <div id="pcHelpSpread" class="au-help-text" hidden>On spaces vitals and labs across the encounter. Off clusters them near admit. The Clinical Profile turns this on for inpatient stays.</div>
+                        <div id="pcHelpSpread" class="au-help-text" hidden>On spaces vitals and labs across the encounter. Off clusters them near admit. The baseline turns this on for inpatient stays.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="PcAdditionalConditions">
@@ -301,7 +303,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpAddlDx" aria-label="About additional comorbidities" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <input type="number" min="0" class="form-control" id="PcAdditionalConditions" placeholder="Count" />
-                        <div id="pcHelpAddlDx" class="au-help-text" hidden>How many extra Condition resources besides the primary diagnosis. Codes come from the comorbidity list below. The Clinical Profile fills this; change it here if this configuration needs a different count.</div>
+                        <div id="pcHelpAddlDx" class="au-help-text" hidden>How many extra Condition resources besides the primary diagnosis. Codes come from the comorbidity list below. The baseline fills this; change it here if this configuration needs a different count.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">
@@ -309,7 +311,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpComorbid" aria-label="About comorbidities palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcConditionPicker" class="pc-picker" data-catalog="conditions" data-multiple="true" data-placeholder="Search conditions…"></div>
-                        <div id="pcHelpComorbid" class="au-help-text" hidden>Secondary conditions on this patient. The Clinical Profile preloads a matching list; check or uncheck freely — only the selected codes are generated.</div>
+                        <div id="pcHelpComorbid" class="au-help-text" hidden>Secondary conditions on this patient. The baseline preloads a matching list; check or uncheck freely — only the selected codes are generated.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">
@@ -317,7 +319,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpObs" aria-label="About observations palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcObservationPicker" class="pc-picker" data-catalog="observations" data-multiple="true" data-placeholder="Search LOINCs…"></div>
-                        <div id="pcHelpObs" class="au-help-text" hidden>LOINCs for vitals and labs. The Clinical Profile preloads a matching list; only checked codes are generated. Values are drawn from each code’s normal range. How many Observation resources are generated is set under Resource volume.</div>
+                        <div id="pcHelpObs" class="au-help-text" hidden>LOINCs for vitals and labs. The baseline preloads a matching list; only checked codes are generated. Values are drawn from each code’s normal range. How many Observation resources are generated is set under Resource volume.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">
@@ -325,7 +327,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpProc" aria-label="About procedures palette" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcProcedurePicker" class="pc-picker" data-catalog="procedures" data-multiple="true" data-placeholder="Search procedures…"></div>
-                        <div id="pcHelpProc" class="au-help-text" hidden>SNOMED procedures on this patient (for example thoracentesis with pneumonia). The Clinical Profile preloads a matching list; only the selected codes are generated.</div>
+                        <div id="pcHelpProc" class="au-help-text" hidden>SNOMED procedures on this patient (for example thoracentesis with pneumonia). The baseline preloads a matching list; only the selected codes are generated.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">
@@ -333,7 +335,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpMedAdmin" aria-label="About medication administration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcMedAdminPicker" class="pc-picker" data-catalog="medications" data-multiple="false" data-placeholder="Search RxNorm…"></div>
-                        <div id="pcHelpMedAdmin" class="au-help-text" hidden>RxNorm used when a MedicationAdministration is generated. The Clinical Profile fills this. Dose, route, and timing follow engine defaults and cannot be set here yet.</div>
+                        <div id="pcHelpMedAdmin" class="au-help-text" hidden>RxNorm used when a MedicationAdministration is generated. The baseline fills this. Dose, route, and timing follow engine defaults and cannot be set here yet.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">
@@ -341,7 +343,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpSR" aria-label="About service request" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcServiceRequestPicker" class="pc-picker" data-catalog="serviceRequests" data-multiple="false" data-placeholder="Search service requests…"></div>
-                        <div id="pcHelpSR" class="au-help-text" hidden>Primary ServiceRequest code (usually a lab panel). The Clinical Profile fills this. How many are generated is set under Resource volume.</div>
+                        <div id="pcHelpSR" class="au-help-text" hidden>Primary ServiceRequest code (usually a lab panel). The baseline fills this. How many are generated is set under Resource volume.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">
@@ -349,7 +351,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpSpec" aria-label="About specimen type" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcSpecimenPicker" class="pc-picker" data-catalog="specimens" data-multiple="false" data-placeholder="Search specimens…"></div>
-                        <div id="pcHelpSpec" class="au-help-text" hidden>Specimen.type when specimens are generated. The Clinical Profile fills a type that matches the diagnosis (for example blood or sputum). Clear or change it here if this configuration needs a different type.</div>
+                        <div id="pcHelpSpec" class="au-help-text" hidden>Specimen.type when specimens are generated. The baseline fills a type that matches the diagnosis (for example blood or sputum). Clear or change it here if this configuration needs a different type.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">
@@ -357,7 +359,7 @@
                             <button type="button" class="au-info-toggle" data-help="pcHelpDR" aria-label="About diagnostic report" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </label>
                         <div id="PcDiagnosticReportPicker" class="pc-picker" data-catalog="serviceRequests" data-multiple="false" data-placeholder="Search diagnostic reports…"></div>
-                        <div id="pcHelpDR" class="au-help-text" hidden>DiagnosticReport code. The Clinical Profile fills this, usually the same panel as the service request. Change it here if this configuration needs a different report.</div>
+                        <div id="pcHelpDR" class="au-help-text" hidden>DiagnosticReport code. The baseline fills this, usually the same panel as the service request. Change it here if this configuration needs a different report.</div>
                     </div>
                 </div>
             </div>
@@ -380,7 +382,7 @@
                                 <p>Always generated regardless of volume: Patient, Encounter, primary Condition, Device, CareTeam, CarePlan, and census List.</p>
                             </div>
                         </details>
-                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="mix">Restore profile</button>
+                        <button type="button" class="btn btn-link btn-sm pc-section-reset" data-section="mix">Restore baseline</button>
                     </div>
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-1" id="pcResourceRange">
                         <label class="form-label mb-0" for="PcResMin">Resource min/max</label>

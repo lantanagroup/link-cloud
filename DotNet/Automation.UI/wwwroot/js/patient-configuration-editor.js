@@ -331,14 +331,23 @@
         });
     }
 
-    function renderClinicalProfileSelect(selectedId) {
-        var host = $('PcClinicalProfile');
-        if (!host || !catalog) return;
+    function renderBaselineSelect(selectedId) {
+        var host = $('PcBaseline');
+        if (!host) return;
         var current = selectedId != null ? selectedId : host.value;
-        var opts = '<option value="">Select a clinical profile…</option>' +
-            catalog.scenarios.map(function (s) {
-                return '<option value="' + esc(s.id) + '">' + esc(s.display) + ' (' + esc(s.icd) + ')</option>';
-            }).join('');
+        var selfId = val('PcId');
+        var list = (catalog && catalog.baselines) || [];
+        var opts = '<option value="">Start blank, or pick a configuration…</option>';
+        var system = list.filter(function (b) { return b.isSystem && String(b.id) !== String(selfId); });
+        var custom = list.filter(function (b) { return !b.isSystem && String(b.id) !== String(selfId); });
+        function option(b) {
+            var extra = b.primaryDx ? ' — ' + b.primaryDx : '';
+            return '<option value="' + esc(b.id) + '">' + esc(b.name) + extra + '</option>';
+        }
+        if (system.length)
+            opts += '<optgroup label="System kits">' + system.map(option).join('') + '</optgroup>';
+        if (custom.length)
+            opts += '<optgroup label="Saved configurations">' + custom.map(option).join('') + '</optgroup>';
         host.innerHTML = opts;
         if (current) host.value = current;
     }
@@ -584,7 +593,7 @@
             encounterStatus: emptyToNull(val('PcEncStatus')),
             includeHypoglycemicInsulin: readBool('PcHypoInsulin'),
             medicationAdministrationRxNorm: med.code,
-            clinicalScenarioId: emptyToNull(val('PcClinicalProfile'))
+            clinicalScenarioId: emptyToNull(val('PcClinicalScenarioIds'))
         };
     }
 
@@ -628,7 +637,7 @@
         function setBadge(id, on) {
             var el = $(id);
             if (!el) return;
-            el.textContent = on ? 'From profile' : 'Empty';
+            el.textContent = on ? 'From baseline' : 'Empty';
             el.className = 'pc-section-badge ' + (on ? 'bg-primary text-white' : 'bg-light text-muted border');
         }
         setBadge('pcBadgeDemo', sectionHasValue(['PcGender', 'PcMinAge', 'PcMaxAge']));
@@ -672,10 +681,10 @@
     }
 
     function profileLabel() {
-        var sel = $('PcClinicalProfile');
-        if (!sel || !sel.value) return 'No profile';
-        var opt = sel.selectedOptions && sel.selectedOptions[0];
-        return opt ? opt.textContent : sel.value;
+        var dx = singleFromPicker($('PcPrimaryDxPicker'));
+        if (dx && dx.display) return dx.display;
+        if (dx && dx.code) return dx.code;
+        return 'No primary diagnosis';
     }
 
     function openSection(collapseId) {
@@ -911,7 +920,7 @@
     }
 
     function collect() {
-        var story = emptyToNull(val('PcClinicalProfile'));
+        var story = emptyToNull(val('PcClinicalScenarioIds'));
         return {
             id: val('PcId') || (global.crypto && crypto.randomUUID ? crypto.randomUUID() : null),
             name: val('PcName'),
@@ -935,8 +944,8 @@
         setVal('PcResMax', model.resourcesPerPatientMax || 100);
         renderStayPatternSelect(model.scheduledInpatientPattern || DEFAULT_STAY_PATTERN);
         var storyId = (model.clinicalScenarioIds && model.clinicalScenarioIds[0]) || model.clinicalScenarioId || '';
-        renderClinicalProfileSelect(storyId);
-        setVal('PcClinicalProfile', storyId);
+        setVal('PcClinicalScenarioIds', storyId);
+        renderBaselineSelect('');
         var intent = model.intent || {};
         applyIntent(intent);
         lastSeededIntent = intent.primaryConditionSnomed || (intent.observationPalette && intent.observationPalette.length)
@@ -1010,9 +1019,11 @@
             + '&resources=' + encodeURIComponent(resources);
         seeding = true;
         return fetch(url).then(function (r) {
-            if (!r.ok) throw new Error('Could not load that Clinical Profile.');
+            if (!r.ok) throw new Error('Could not load that configuration.');
             return r.json();
         }).then(function (seed) {
+            if (seed.clinicalScenarioId)
+                setVal('PcClinicalScenarioIds', seed.clinicalScenarioId);
             if (opts.suggestName && seed.display && !emptyToNull(val('PcName')))
                 setVal('PcName', seed.display);
             lastSeededIntent = seed.intent || {};
@@ -1023,6 +1034,31 @@
                     if (n != null) el.placeholder = String(n);
                 });
             }
+            updateSectionBadges();
+        }).finally(function () { seeding = false; });
+    }
+
+    function seedFromBaseline(configId, opts) {
+        opts = opts || {};
+        if (!configId || !options.getUrl) return Promise.resolve();
+        seeding = true;
+        return fetch(options.getUrl + '?id=' + encodeURIComponent(configId)).then(function (r) {
+            if (!r.ok) throw new Error('Could not load that configuration.');
+            return r.json();
+        }).then(function (model) {
+            var storyId = (model.clinicalScenarioIds && model.clinicalScenarioIds[0]) || '';
+            setVal('PcClinicalScenarioIds', storyId);
+            if (opts.suggestName && model.name && !emptyToNull(val('PcName'))) {
+                var suffix = model.isSystem ? ' (custom)' : ' (copy)';
+                setVal('PcName', model.name + suffix);
+            }
+            if (!emptyToNull(val('PcDescription')) && model.description)
+                setVal('PcDescription', model.description);
+            setVal('PcResMin', model.resourcesPerPatientMin || 50);
+            setVal('PcResMax', model.resourcesPerPatientMax || 100);
+            renderStayPatternSelect(model.scheduledInpatientPattern || DEFAULT_STAY_PATTERN);
+            lastSeededIntent = model.intent || {};
+            applyIntent(lastSeededIntent);
             updateSectionBadges();
         }).finally(function () { seeding = false; });
     }
@@ -1072,7 +1108,7 @@
         return fetch(options.catalogUrl).then(function (r) { return r.json(); }).then(function (c) {
             catalog = c;
             if (c && c.ipClassification) ipRules = c.ipClassification;
-            renderClinicalProfileSelect();
+            renderBaselineSelect();
             renderStayPatternSelect();
             renderTypeCounts();
             renderAllPickers();
@@ -1086,6 +1122,7 @@
         options = Object.assign({
             catalogUrl: '/PatientConfigurations/Catalog',
             seedUrl: '/PatientConfigurations/SeedFromProfile',
+            getUrl: '/PatientConfigurations/GetJson',
             lookupUrl: '/PatientConfigurations/LookupCode'
         }, opts || {});
         var root = $('pcEditorRoot');
@@ -1094,9 +1131,19 @@
         bindPickerEvents(root);
         root.addEventListener('change', function (e) {
             if (e.target.id === 'PcVolumeExact') syncVolumeMode();
-            if (e.target.id === 'PcClinicalProfile' && !seeding && !readOnly) {
+            if (e.target.id === 'PcBaseline' && !seeding && !readOnly) {
                 var id = e.target.value;
-                if (id) seedFromProfile(id, { suggestName: true });
+                if (!id) return;
+                var label = e.target.selectedOptions && e.target.selectedOptions[0]
+                    ? e.target.selectedOptions[0].textContent
+                    : 'that configuration';
+                var hasDx = selectedCodes($('PcPrimaryDxPicker')).length > 0;
+                if ((lastSeededIntent || hasDx || emptyToNull(val('PcName'))) &&
+                    !window.confirm('Replace this form with “' + label + '”? The source is not overwritten.')) {
+                    e.target.value = '';
+                    return;
+                }
+                seedFromBaseline(id, { suggestName: !emptyToNull(val('PcName')) });
             }
             updateSectionBadges();
         });
@@ -1151,10 +1198,12 @@
         collect: collect,
         collectIntent: collectIntent,
         seedFromProfile: seedFromProfile,
+        seedFromBaseline: seedFromBaseline,
         setMode: setMode,
         setBanner: setBanner,
         setReadOnly: setReadOnly,
         updateSectionBadges: updateSectionBadges,
+        renderBaselineSelect: renderBaselineSelect,
         predictQualification: predictQualification,
         renderQualificationBadges: renderQualificationBadges,
         setReportPeriod: setReportPeriod,

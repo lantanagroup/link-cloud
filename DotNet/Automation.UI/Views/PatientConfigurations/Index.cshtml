@@ -7,16 +7,16 @@
 <div class="container mt-4">
     <h2 class="fw-bold mb-1"><i class="bi bi-person-gear me-2"></i>Patient Configurations</h2>
     <p class="text-muted mb-2">
-        Named patient shapes. Each configuration is one Clinical Profile, filled in so you can see and edit what generates.
+        Named patient shapes. Start from a system kit or any saved configuration, change what you need, and reuse it on scenario cohorts.
     </p>
     <details class="au-help-panel">
         <summary><i class="bi bi-info-circle"></i> How Patient Configurations work</summary>
         <div class="au-help-body">
-            <p>Pick a <strong>Clinical Profile</strong> to seed the form, edit anything, then save a name. A scenario cohort points at one configuration.</p>
+            <p>Each configuration is a full patient. Optionally start from an existing one, edit, then save a name. A scenario cohort points at one configuration.</p>
             <ul>
                 <li>A scenario <strong>cohort</strong> is how many of this configuration to generate. Stay timing, encounter, and clinical content are saved here and reused.</li>
-                <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy.</li>
-                <li><strong>System</strong> rows are view-only starter kits. Clone them to customize.</li>
+                <li>Configurations are a <strong>live reference</strong>: editing one updates every scenario that points at it. Clone to freeze a copy. Starting from one does not overwrite the source.</li>
+                <li><strong>System</strong> rows are view-only starter kits. Clone them, or start from them on a new configuration.</li>
             </ul>
         </div>
     </details>
@@ -30,7 +30,7 @@
         </div>
         <div class="card-body p-0 au-help-scope" data-au-table>
             <div id="pcColStory" class="au-help-text mx-3 mt-2" hidden>
-                The Clinical Profile this configuration was built from. One profile per configuration.
+                Admitting diagnosis on this configuration. Copied from the baseline you started from, then editable.
             </div>
             <div id="pcColDefaults" class="au-help-text mx-3 mt-2" hidden>
                 Predicted from this configuration’s encounter class, insulin, and stay timing. Green check qualifies; red X does not. Not a setting you pick.
@@ -49,8 +49,8 @@
                     <tr>
                         <th data-sort="name">Name</th>
                         <th data-sort="profile">
-                            Clinical Profile
-                            <button type="button" class="au-info-toggle" data-help="pcColStory" aria-label="About clinical profile column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                            Primary diagnosis
+                            <button type="button" class="au-info-toggle" data-help="pcColStory" aria-label="About primary diagnosis column" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                         </th>
                         <th>
                             Predicted
@@ -77,7 +77,9 @@
                     {
                         var storyId = t.ClinicalScenarioIds.FirstOrDefault();
                         var storyDef = FhirGenerationCodes.GetScenarioById(storyId);
-                        var story = storyDef?.PrimaryDxDisplay ?? (string.IsNullOrWhiteSpace(storyId) ? "Not set" : storyId);
+                        var story = t.Intent?.PrimaryConditionDisplay
+                            ?? storyDef?.PrimaryDxDisplay
+                            ?? (string.IsNullOrWhiteSpace(storyId) ? "Not set" : storyId);
                         var prediction = ConfigurationQualification.Predict(t.Intent, storyDef);
                         <tr data-id="@t.Id"
                             data-name="@t.Name"
@@ -173,7 +175,7 @@
     var seedUrl = '@Url.Action("SeedFromProfile", "PatientConfigurations")';
     var editor = window.PatientConfigurationEditor;
 
-    editor.init({ catalogUrl: catalogUrl, seedUrl: seedUrl });
+    editor.init({ catalogUrl: catalogUrl, seedUrl: seedUrl, getUrl: getUrl });
 
     function token() {
         var t = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -201,10 +203,6 @@
     document.getElementById('btnPcSave').addEventListener('click', function () {
         var model = editor.collect();
         if (!model.name || !model.name.trim()) { showErr('Name is required.'); return; }
-        if (!model.clinicalScenarioIds || !model.clinicalScenarioIds.length) {
-            showErr('Select a Clinical Profile. That fills the rest of this configuration.');
-            return;
-        }
         fetch(saveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
