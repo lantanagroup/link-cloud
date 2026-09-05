@@ -14,8 +14,10 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.ListUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -42,8 +44,9 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
     private final ObjectMapper objectMapper;
 
     /**
-     * Max concurrent Bundle-entry validations. Configured value of 0 (the default) means "auto":
-     * match {@link ForkJoinPool#commonPool()}'s own parallelism -- this avoids a hardcoded number
+     * Number of Bundle entries grouped into each sub-Bundle validation call, and (doubling as) the max
+     * number of those batch validations run concurrently. Configured value of 0 (the default) means
+     * "auto": match {@link ForkJoinPool#commonPool()}'s own parallelism -- this avoids a hardcoded number
      * going stale if the pool's parallelism ever changes (e.g. via the
      * java.util.concurrent.ForkJoinPool.common.parallelism system property). Also sizes
      * {@link #bundleValidationExecutor}.
@@ -51,7 +54,7 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
     private final int batchSize;
 
     /**
-     * Dedicated, fixed-size pool for Bundle-entry validations -- isolated from
+     * Dedicated, fixed-size pool for Bundle batch validations -- isolated from
      * {@link ForkJoinPool#commonPool()} so this (CPU-heavy) work never competes with, or gets
      * starved by, unrelated parallel-stream/CompletableFuture work elsewhere in the app.
      * Concurrency is capped by the pool's fixed size itself, so no separate semaphore is needed.
@@ -107,20 +110,53 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
     }
 
     /**
-     * Validates each Bundle entry as its own independent resource on {@link #bundleValidationExecutor},
-     * which caps concurrent validations at {@link #batchSize}. All entries are submitted up front (no
-     * batch/wave joins in between) so a slow resource never delays the start of the next one -- excess
-     * entries simply queue on the executor until a pool thread frees up.
+     * Splits the Bundle's entries into groups of {@link #batchSize} resources, wraps each group in its
+     * own small collection Bundle, and validates each one with a single {@link #validate} call on
+     * {@link #bundleValidationExecutor} (which caps concurrent batch validations at {@link #batchSize}).
+     * All batches are submitted up front (no batch/wave joins in between) so a slow batch never delays
+     * the start of the next one -- excess batches simply queue on the executor until a pool thread frees
+     * up. Batching multiple entries per HAPI validation call amortizes the validator's per-call setup
+     * cost (e.g. profile/terminology resolution) across the group instead of paying it per entry.
+     *
+     * <p>{@code options}'s profiles (from the check's parameters) are stamped onto each entry's own
+     * {@code meta.profile} rather than passed as {@link ValidationOptions} on the batch call: HAPI only
+     * scopes {@link ValidationOptions#addProfile} to the exact resource passed to {@code validate},
+     * which here would be the synthetic wrapper Bundle, not each entry. Declaring the profile on
+     * {@code meta.profile} instead relies on the validator's normal (always-on) per-resource profile
+     * checking, so each entry is still checked against it individually, matching pre-batch behavior.
      */
     private List<RawFinding> executeBundle(RubricCheck check, ExecutionContext context, ValidationOptions options) {
-        List<CompletableFuture<List<RawFinding>>> futures = context.getBundleEntries().stream()
-                .map(entry -> CompletableFuture.supplyAsync(() -> validate(check, entry, options), bundleValidationExecutor))
+        List<List<IBaseResource>> batches = ListUtils.partition(context.getBundleEntries(), batchSize);
+
+        List<CompletableFuture<List<RawFinding>>> futures = batches.stream()
+                .map(batch -> CompletableFuture.supplyAsync(
+                        () -> validate(check, toBatchBundle(batch, options), new ValidationOptions()), bundleValidationExecutor))
                 .collect(Collectors.toList());
 
         return futures.stream()
                 .map(CompletableFuture::join)
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Wraps a group of Bundle entries in a new collection-type Bundle so they can be validated together
+     * in a single HAPI {@link #validate} call. Each entry is deep-copied before its profiles are stamped
+     * on so the mutation never touches the original resource objects held by {@link ExecutionContext}
+     * (shared across all checks running against this request). Entries are known to be R4 resources here
+     * since they were extracted from an R4 {@link Bundle} in {@link #execute}.
+     */
+    private static Bundle toBatchBundle(List<IBaseResource> batch, ValidationOptions options) {
+        Bundle batchBundle = new Bundle();
+        batchBundle.setType(Bundle.BundleType.COLLECTION);
+        for (IBaseResource entry : batch) {
+            Resource resource = ((Resource) entry).copy();
+            for (String profile : options.getProfiles()) {
+                resource.getMeta().addProfile(profile);
+            }
+            batchBundle.addEntry().setResource(resource);
+        }
+        return batchBundle;
     }
 
     private List<RawFinding> validate(RubricCheck check, IBaseResource resource, ValidationOptions options) {
