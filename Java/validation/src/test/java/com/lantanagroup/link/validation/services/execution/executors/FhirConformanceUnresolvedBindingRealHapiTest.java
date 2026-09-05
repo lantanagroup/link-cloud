@@ -53,7 +53,7 @@ class FhirConformanceUnresolvedBindingRealHapiTest {
         module.setAnyExtensionsAllowed(true);
         FhirValidator validator = CTX.newValidator();
         validator.registerValidatorModule(module);
-        return new FhirConformanceCheckExecutor(validator, new ObjectMapper());
+        return new FhirConformanceCheckExecutor(validator, new ObjectMapper(), 10);
     }
 
     private StructureDefinition profileBoundToUnresolvableVs() {

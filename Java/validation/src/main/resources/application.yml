@@ -153,6 +153,10 @@ link:
   fhir-client-retry:
     max-attempts: 5
     backoff-millis: 5000
+  fhir-conformance-check:
+    # 0 = auto: match ForkJoinPool.commonPool()'s own parallelism (see FhirConformanceCheckExecutor's
+    # batchSize javadoc — a hardcoded value here previously went stale when the executor changed).
+    batch-size: 0
   report:
     base-url: http://localhost:5110
     routes:
