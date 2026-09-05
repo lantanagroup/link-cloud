@@ -11,6 +11,7 @@ public class MetricsRunListItem
     public double E2eDurationSeconds { get; set; }
     public bool BenchmarkPass { get; set; } = true;
     public bool StagesUnavailable { get; set; }
+    public bool StagesIncomplete { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public int ScenarioVersion { get; set; } = 1;
     public string? SetupSummary { get; set; }
@@ -124,6 +125,7 @@ public sealed class MetricsScenarioCardViewModel
     public double LastE2eSeconds { get; set; }
     public double? LastPatientsPerMinute { get; set; }
     public bool LastStagesUnavailable { get; set; }
+    public bool LastStagesIncomplete { get; set; }
     public bool GotSlower { get; set; }
     public DateTimeOffset? LastFinishedAt { get; set; }
     public Guid? LastRunId { get; set; }
@@ -132,9 +134,12 @@ public sealed class MetricsScenarioCardViewModel
 
 public sealed class MetricsDashboardViewModel
 {
+    public Guid? LastRunId { get; set; }
+    public Guid? LastRunScenarioId { get; set; }
     public double LastRunE2eSeconds { get; set; }
     public double? LastRunPatientsPerMinute { get; set; }
     public bool LastRunStagesUnavailable { get; set; }
+    public bool LastRunStagesIncomplete { get; set; }
     public int RegressionFlagCount { get; set; }
     public double? FleetPatientsPerMinute { get; set; }
     public int ScenarioCount { get; set; }

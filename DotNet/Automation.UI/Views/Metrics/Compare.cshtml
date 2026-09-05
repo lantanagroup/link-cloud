@@ -63,6 +63,22 @@
         if (Math.Abs(change) < 1) return "about the same";
         return change > 0 ? $"{change:0}% more" : $"{Math.Abs(change):0}% less";
     }
+    string DeltaThroughputClass(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value;
+        if (change > 0.05) return "text-success";
+        if (change < -0.05) return "text-danger";
+        return "text-muted";
+    }
+    string DeltaThroughputText(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value * 100;
+        if (Math.Abs(change) < 1) return "about the same";
+        return change > 0 ? $"{change:0}% more throughput" : $"{Math.Abs(change):0}% less throughput";
+    }
+    bool BothMissing(bool leftMissing, bool rightMissing) => leftMissing && rightMissing;
 }
 
 <div class="container mt-4">
@@ -105,8 +121,8 @@
                     <thead>
                         <tr>
                             <th></th>
-                            <th>Left</th>
-                            <th>Right</th>
+                            <th>Earlier</th>
+                            <th>Later</th>
                             <th>Change</th>
                         </tr>
                     </thead>
@@ -127,7 +143,7 @@
                             <td>Patients / min</td>
                             <td>@(Model.Left.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                             <td>@(Model.Right.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
-                            <td class="@DeltaClass(Model.Right.PatientsPerMinute, Model.Left.PatientsPerMinute)">@DeltaText(Model.Right.PatientsPerMinute, Model.Left.PatientsPerMinute)</td>
+                            <td class="@DeltaThroughputClass(Model.Left.PatientsPerMinute, Model.Right.PatientsPerMinute)">@DeltaThroughputText(Model.Left.PatientsPerMinute, Model.Right.PatientsPerMinute)</td>
                         </tr>
                         @foreach (var key in stages)
                         {
@@ -135,6 +151,8 @@
                             Model.Right.Stages.TryGetValue(key, out var rightStage);
                             leftStage ??= new StageSnapshot { Unavailable = true };
                             rightStage ??= new StageSnapshot { Unavailable = true };
+                            if (BothMissing(leftStage.Unavailable, rightStage.Unavailable))
+                                continue;
                             <tr>
                                 <td>@DisplayName(key) (slow)</td>
                                 <td>@(leftStage.Unavailable ? "—" : FormatMs(leftStage.P95Ms))</td>
@@ -150,6 +168,8 @@
                                 ?? new ProcessUtilizationItemView { Unavailable = true };
                             var rightProc = Model.Right.ProcessUtilization.FirstOrDefault(p => p.Key == key)
                                 ?? new ProcessUtilizationItemView { Unavailable = true };
+                            if (BothMissing(leftProc.Unavailable, rightProc.Unavailable))
+                                continue;
                             var name = string.IsNullOrWhiteSpace(leftProc.Name) ? rightProc.Name : leftProc.Name;
                             <tr>
                                 <td>@name (peak RAM)</td>
@@ -174,6 +194,8 @@
                                 ?? new ApiLatencyItemView { Unavailable = true };
                             var rightApi = Model.Right.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
                                 ?? new ApiLatencyItemView { Unavailable = true };
+                            if (BothMissing(leftApi.Unavailable, rightApi.Unavailable))
+                                continue;
                             var apiName = string.IsNullOrWhiteSpace(leftApi.Name) ? rightApi.Name : leftApi.Name;
                             <tr>
                                 <td>@apiName (API slow)</td>

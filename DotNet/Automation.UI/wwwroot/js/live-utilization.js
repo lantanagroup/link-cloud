@@ -1,5 +1,5 @@
 (function () {
-    var ramMaxBytes = 2 * 1024 * 1024 * 1024;
+    var ramMaxBytes = 8 * 1024 * 1024 * 1024;
     var historyLimit = 24;
     var history = {};
     var selectedKey = null;
@@ -21,7 +21,7 @@
     }
 
     var view = loadPref('view', 'compact');
-    var filter = loadPref('filter', 'all');
+    var filter = loadPref('filter', 'pipeline');
     var sortMode = loadPref('sort', 'heat');
 
     function formatPercent(percent) {
@@ -55,7 +55,7 @@
     function heat(svc) {
         return Math.max(cpuPct(svc), ramPct(svc));
     }
-    function isHot(svc) { return heat(svc) >= 0.5; }
+    function isHot(svc) { return cpuPct(svc) >= 0.5 || ramPct(svc) >= 0.75; }
     function escapeHtml(value) {
         return String(value)
             .replace(/&/g, '&amp;')
@@ -93,10 +93,14 @@
             list = list.filter(function (s) { return s.group === 'pipeline'; });
         else if (filter === 'hot')
             list = list.filter(isHot);
-        if (sortMode === 'heat')
-            list.sort(function (a, b) { return heat(b) - heat(a); });
-        else
+        if (sortMode === 'heat') {
+            var maxH = 0;
+            list.forEach(function (s) { maxH = Math.max(maxH, heat(s)); });
+            if (maxH >= 0.3)
+                list.sort(function (a, b) { return heat(b) - heat(a); });
+        } else {
             list.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+        }
         return list;
     }
 
@@ -127,7 +131,7 @@
         var host = $('livePulseDetail');
         if (!host) return;
         if (!svc) {
-            host.innerHTML = '<p class="au-pulse-detail-empty mb-0">Click a service to pin CPU, RAM, and API p95. Hot services glow. Compact view keeps the rest of Performance in sight.</p>';
+            host.innerHTML = '<p class="au-pulse-detail-empty mb-0">Click a service to pin CPU, RAM, and API p95. Hot services glow. Pulse view keeps the rest of Performance in sight.</p>';
             return;
         }
         var points = history[svc.key] || [];
@@ -172,9 +176,11 @@
         var hottest = services.slice().sort(function (a, b) { return heat(b) - heat(a); })[0];
         var hottestEl = $('livePulseHottest');
         if (hottestEl) {
-            hottestEl.textContent = hottest && isHot(hottest)
+            var hot = hottest && isHot(hottest);
+            hottestEl.classList.toggle('is-idle', !hot);
+            hottestEl.textContent = hot
                 ? 'Hottest: ' + (hottest.name || hottest.key) + ' · CPU ' + formatPercent(hottest.cpuPercent) + ' · RAM ' + formatRam(hottest.memoryBytes)
-                : 'All services inside the 50% heat line';
+                : 'Nothing is hot — CPU under 50% and RAM under 6 GB';
         }
         if (!userPinned) {
             if (hottest && isHot(hottest)) selectedKey = hottest.key;
@@ -194,7 +200,8 @@
                         escapeHtml((svc.name || svc.key) + ' · CPU ' + formatPercent(svc.cpuPercent) + ' · RAM ' + formatRam(svc.memoryBytes) + ' · API p95 ' + formatApi(svc.apiP95Ms)) + '">' +
                         metersHtml(svc) +
                         '<div class="au-pulse-label">' + escapeHtml(shortName(svc.name || svc.key)) + '</div>' +
-                        '<div class="au-pulse-read">' + escapeHtml(formatPercent(svc.cpuPercent)) + '</div>' +
+                        '<div class="au-pulse-read"><span>CPU</span>' + escapeHtml(formatPercent(svc.cpuPercent)) + '</div>' +
+                        '<div class="au-pulse-read"><span>RAM</span>' + escapeHtml(formatRam(svc.memoryBytes)) + '</div>' +
                         '</button>';
                 }).join('');
             }
@@ -221,10 +228,6 @@
         setSeg('view', view);
         setSeg('filter', filter);
         setSeg('sort', sortMode);
-    }
-
-    function findService(key) {
-        return lastServices.filter(function (s) { return s.key === key; })[0] || null;
     }
 
     async function poll() {
@@ -278,7 +281,6 @@
             selectedKey = selectedKey === key ? null : key;
             if (!selectedKey) userPinned = false;
             render({ reachable: true, sampledAt: new Date().toISOString(), services: lastServices });
-            void findService;
         });
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) stop();

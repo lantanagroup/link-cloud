@@ -673,6 +673,15 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   padding: 1rem 1.1rem;
   text-align: left;
   border-top: 3px solid var(--au-accent);
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+a.au-kpi-link:hover {
+  border-top-color: #2b86e6;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  color: inherit;
 }
 .au-kpi-value {
   font-size: 1.7rem;
@@ -685,6 +694,11 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   text-transform: uppercase;
   letter-spacing: .04em;
   margin-top: .25rem;
+}
+.au-kpi-note {
+  font-size: .7rem;
+  color: var(--au-muted);
+  margin-top: .2rem;
 }
 
 .au-service-chip {
@@ -804,6 +818,17 @@ a.au-scenario-card:hover {
   font-weight: 700;
   line-height: 1.1;
 }
+.au-trend {
+  width: 100%;
+  height: 160px;
+  display: block;
+}
+.au-trend-axis {
+  font-size: 10px;
+  fill: #6b7280;
+  font-family: inherit;
+}
+.au-trend a:hover circle { fill: #2b86e6; }
 .au-sparkline {
   color: var(--au-accent);
   flex-shrink: 0;
@@ -976,6 +1001,17 @@ a.au-scenario-card:hover {
 .au-table thead th[data-sort-dir='asc']::after { content: ' \2191'; opacity: 1; }
 .au-table thead th[data-sort-dir='desc']::after { content: ' \2193'; opacity: 1; }
 .au-table tbody tr.au-row-hidden { display: none; }
+@media (max-width: 767.98px) {
+  .au-table td.text-nowrap,
+  .au-table th:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    box-shadow: -8px 0 8px -8px rgba(0,0,0,.18);
+    z-index: 1;
+  }
+  .au-table thead th:last-child { background: #111; }
+}
 
 /* ===================================================================
    Live service pulse (Performance dashboard)
@@ -1017,6 +1053,10 @@ a.au-scenario-card:hover {
   color: #ffd39a;
   font-weight: 600;
 }
+.au-pulse-hottest.is-idle {
+  color: rgba(255,255,255,.55);
+  font-weight: 500;
+}
 .au-pulse-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1055,11 +1095,13 @@ a.au-scenario-card:hover {
   padding: .7rem .75rem .8rem;
   overflow-x: auto;
   scrollbar-width: thin;
+  scroll-snap-type: x proximity;
 }
 .au-pulse-cell {
-  flex: 1 0 54px;
-  min-width: 54px;
-  max-width: 92px;
+  flex: 1 0 64px;
+  min-width: 64px;
+  max-width: 110px;
+  scroll-snap-align: start;
   background: rgba(255,255,255,.045);
   border: 1px solid rgba(255,255,255,.08);
   border-radius: .4rem;
@@ -1122,6 +1164,11 @@ a.au-scenario-card:hover {
   font-size: .62rem;
   color: rgba(255,255,255,.45);
   font-variant-numeric: tabular-nums;
+}
+.au-pulse-read span {
+  color: rgba(255,255,255,.32);
+  font-weight: 700;
+  margin-right: .15rem;
 }
 .au-pulse-detail {
   background: #fff;

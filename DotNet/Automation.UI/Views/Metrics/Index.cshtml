@@ -49,10 +49,28 @@
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3">
-            <div class="au-kpi-card" title="Wall-clock time of the most recent metrics run.">
-                <div class="au-kpi-value">@FormatDuration(Model.LastRunE2eSeconds)</div>
-                <div class="au-kpi-label">Last run</div>
-            </div>
+            @if (Model.LastRunId is Guid lastRunId)
+            {
+                <a class="au-kpi-card au-kpi-link" asp-action="Details" asp-route-id="@lastRunId" title="Open the most recent metrics run.">
+                    <div class="au-kpi-value">@FormatDuration(Model.LastRunE2eSeconds)</div>
+                    <div class="au-kpi-label">Last run</div>
+                    @if (Model.LastRunStagesIncomplete)
+                    {
+                        <div class="au-kpi-note">Partial timings</div>
+                    }
+                    else if (Model.LastRunStagesUnavailable)
+                    {
+                        <div class="au-kpi-note">Step timings missing</div>
+                    }
+                </a>
+            }
+            else
+            {
+                <div class="au-kpi-card" title="Wall-clock time of the most recent metrics run.">
+                    <div class="au-kpi-value">@FormatDuration(Model.LastRunE2eSeconds)</div>
+                    <div class="au-kpi-label">Last run</div>
+                </div>
+            }
         </div>
         <div class="col-6 col-lg-3">
             <div class="au-kpi-card" title="Typical patients per minute across successful metrics runs in the last 14 days.">
@@ -61,16 +79,16 @@
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="au-kpi-card" title="How many saved scenarios are marked as metrics use cases.">
+            <a class="au-kpi-card au-kpi-link" href="#useCases" title="Jump to use-case cards.">
                 <div class="au-kpi-value">@Model.ScenarioCount</div>
                 <div class="au-kpi-label">Use cases tracked</div>
-            </div>
+            </a>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="au-kpi-card" title="How many recent runs were slower than the previous successful run of the same setup.">
+            <a class="au-kpi-card au-kpi-link" href="#useCases" title="Use-case cards flag a run that got slower than the previous successful run of the same setup.">
                 <div class="au-kpi-value @(Model.RegressionFlagCount > 0 ? "text-warning" : "")">@Model.RegressionFlagCount</div>
-                <div class="au-kpi-label">Got slower (14 days)</div>
-            </div>
+                <div class="au-kpi-label">Runs that got slower</div>
+            </a>
         </div>
     </div>
 
@@ -88,8 +106,8 @@
                     <button type="button" data-pulse-group="view" data-pulse-value="expanded">Cards</button>
                 </div>
                 <div class="au-pulse-seg" role="group" aria-label="Filter">
-                    <button type="button" data-pulse-group="filter" data-pulse-value="all" class="is-on">All</button>
-                    <button type="button" data-pulse-group="filter" data-pulse-value="pipeline">Pipeline</button>
+                    <button type="button" data-pulse-group="filter" data-pulse-value="all">All</button>
+                    <button type="button" data-pulse-group="filter" data-pulse-value="pipeline" class="is-on">Pipeline</button>
                     <button type="button" data-pulse-group="filter" data-pulse-value="hot">Hot</button>
                 </div>
                 <div class="au-pulse-seg" role="group" aria-label="Sort">
@@ -103,7 +121,7 @@
         </div>
         <div id="livePulseExpanded" class="au-pulse-expanded" hidden></div>
         <div class="au-pulse-detail" id="livePulseDetail">
-            <p class="au-pulse-detail-empty mb-0">Click a service to pin CPU, RAM, and API p95. Hot services glow. Compact pulse keeps the rest of Performance in sight.</p>
+            <p class="au-pulse-detail-empty mb-0">Click a service to pin CPU, RAM, and API p95. Hot services glow. Pulse view keeps the rest of Performance in sight.</p>
         </div>
     </div>
 
@@ -128,7 +146,7 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-2">
+    <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-2" id="useCases">
         <h3 class="h5 fw-semibold mb-0">Use cases</h3>
         <div class="d-flex align-items-center gap-2">
             <input type="search" id="useCaseSearch" class="form-control form-control-sm" style="max-width:16rem;" placeholder="Filter use cases…" aria-label="Filter use cases" />
@@ -151,7 +169,7 @@
             @foreach (var card in Model.ScenarioCards)
             {
                 <div class="col-md-6 col-xl-4">
-                    <a class="au-scenario-card" asp-action="Scenario" asp-route-id="@card.ScenarioId">
+                    <a class="au-scenario-card" asp-action="Scenario" asp-route-id="@card.ScenarioId" data-name="@card.Name">
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
                                 <div class="au-scenario-card-name">@card.Name</div>
@@ -183,11 +201,15 @@
                             }
                             @if (card.VersionChanged)
                             {
-                                <span class="badge bg-light text-dark border">Setup v@card.ScenarioVersion</span>
+                                <span class="badge bg-light text-dark border">Setup v@(card.ScenarioVersion)</span>
                             }
                             @if (card.LastStagesUnavailable)
                             {
                                 <span class="badge bg-light text-dark border">Step timings missing</span>
+                            }
+                            else if (card.LastStagesIncomplete)
+                            {
+                                <span class="badge bg-light text-dark border">Partial timings</span>
                             }
                         </div>
                     </a>
@@ -214,7 +236,14 @@
                         <select class="form-select" id="metricsScenarioId" name="ScenarioId" required>
                             @foreach (var scenario in Model.MetricsScenarios)
                             {
-                                <option value="@scenario.Id">@scenario.Name</option>
+                                if (Model.LastRunScenarioId == scenario.Id)
+                                {
+                                    <option value="@scenario.Id" selected>@scenario.Name</option>
+                                }
+                                else
+                                {
+                                    <option value="@scenario.Id">@scenario.Name</option>
+                                }
                             }
                         </select>
                     </div>
@@ -259,12 +288,16 @@
                                 data-result="@(run.Outcome == "Succeeded" ? "Passed" : run.Outcome)"
                                 data-seconds="@run.E2eDurationSeconds"
                                 data-ppm="@(run.PatientsPerMinute?.ToString("0.0") ?? "")"
-                                data-finished="@FormatWhen(run.FinishedAt)">
+                                data-finished="@(run.FinishedAt?.UtcDateTime.ToString("o") ?? "")">
                                 <td>
                                     @run.ScenarioName
                                     @if (run.ScenarioVersion > 1)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">v@run.ScenarioVersion</span>
+                                        <span class="badge bg-light text-dark border ms-1">v@(run.ScenarioVersion)</span>
+                                    }
+                                    @if (run.StagesIncomplete)
+                                    {
+                                        <span class="badge bg-light text-dark border ms-1">Partial</span>
                                     }
                                 </td>
                                 <td>
@@ -320,7 +353,8 @@
             var q = search.value.trim().toLowerCase();
             document.querySelectorAll('.au-scenario-card').forEach(function (card) {
                 var col = card.closest('[class*="col-"]') || card;
-                col.style.display = !q || (card.innerText || '').toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+                var hay = (card.getAttribute('data-name') || card.innerText || '').toLowerCase();
+                col.style.display = !q || hay.indexOf(q) >= 0 ? '' : 'none';
             });
         });
     })();

@@ -1142,6 +1142,11 @@
             const value = String(status || '').toLowerCase();
             if (value === 'reportfinalization' || value === '6') return 'Finalizing';
             if (value === 'livewindowopen' || value === '5') return 'Live window';
+            if (value === 'succeeded' || value === '3') return 'Succeeded';
+            if (value === 'failed' || value === '4') return 'Failed';
+            if (value === 'cancelled' || value === '2') return 'Cancelled';
+            if (value === 'running' || value === '1') return 'Running';
+            if (value === 'queued' || value === '0') return 'Queued';
             return String(status || '');
         }
 

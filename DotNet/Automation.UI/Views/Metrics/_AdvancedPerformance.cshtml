@@ -70,6 +70,13 @@
         Per-step timings were not recorded for this run. Total time, speed, and check results below are still from this run.
     </div>
 }
+else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Only some pipeline steps were recorded for this run. Total time is still the wall clock; treat the missing steps as incomplete rather than zero.
+    </div>
+}
 
 <div class="au-card">
     <div class="card-header"><i class="bi bi-clipboard-data me-2"></i>At a glance</div>
@@ -84,7 +91,7 @@
             <div class="col-md-3">
                 <div class="au-summary-item">
                     <span class="au-label">Patient generator version</span>
-                    <code class="au-value" title="Git commit of the Thetis engine used to generate patients.">@(string.IsNullOrWhiteSpace(Model.ThetisGitSha) ? "—" : Model.ThetisGitSha)</code>
+                    <code class="au-value" title="@(string.IsNullOrWhiteSpace(Model.ThetisGitSha) ? "Git commit of the Thetis engine used to generate patients." : Model.ThetisGitSha)">@(string.IsNullOrWhiteSpace(Model.ThetisGitSha) ? "—" : Model.ThetisGitSha.Length <= 7 ? Model.ThetisGitSha : Model.ThetisGitSha[..7])</code>
                 </div>
             </div>
             <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Generation seed</span><span class="au-value">@Model.Seed</span></div></div>

@@ -70,12 +70,15 @@ public sealed class MetricsRunPresenter
 
         return new MetricsDashboardViewModel
         {
+            LastRunId = lastDoc?.RunId ?? records.FirstOrDefault()?.RunId,
+            LastRunScenarioId = lastDoc?.ScenarioId ?? records.FirstOrDefault()?.ScenarioId,
             LastRunE2eSeconds = lastDoc?.E2eDurationSeconds ?? records.FirstOrDefault()?.E2eDurationSeconds ?? 0,
             LastRunPatientsPerMinute = lastDoc?.Throughput.PatientsPerMinute,
             LastRunStagesUnavailable = lastDoc == null
                 ? records.FirstOrDefault()?.StagesUnavailable ?? true
                 : AreStagesUnavailable(lastDoc),
-            RegressionFlagCount = last14.Sum(d => d.Regression.Flags.Count),
+            LastRunStagesIncomplete = lastDoc != null && AreStagesIncomplete(lastDoc),
+            RegressionFlagCount = last14.Count(d => d.Regression.Flags.Count > 0),
             FleetPatientsPerMinute = Median(last14
                 .Where(d => d.Outcome == "Succeeded" && d.Throughput.PatientsPerMinute > 0)
                 .Select(d => d.Throughput.PatientsPerMinute)),
@@ -140,7 +143,12 @@ public sealed class MetricsRunPresenter
         if (left == null || right == null)
             return null;
 
-        return new MetricsCompareViewModel { Left = left, Right = right };
+        var leftFirst = (left.FinishedAt ?? DateTimeOffset.MaxValue) <= (right.FinishedAt ?? DateTimeOffset.MaxValue);
+        return new MetricsCompareViewModel
+        {
+            Left = leftFirst ? left : right,
+            Right = leftFirst ? right : left
+        };
     }
 
     public async Task<MetricsRunDetailViewModel?> GetDetailAsync(Guid runId, CancellationToken cancellationToken = default)
@@ -210,6 +218,7 @@ public sealed class MetricsRunPresenter
             E2eDurationSeconds = document.E2eDurationSeconds,
             BenchmarkPass = document.Benchmark.Pass,
             StagesUnavailable = AreStagesUnavailable(document),
+            StagesIncomplete = AreStagesIncomplete(document),
             FinishedAt = document.FinishedAt,
             ScenarioVersion = Math.Max(1, document.ScenarioVersion),
             SetupSummary = document.SetupSummary,
@@ -229,6 +238,7 @@ public sealed class MetricsRunPresenter
             E2eDurationSeconds = item.E2eDurationSeconds,
             BenchmarkPass = item.BenchmarkPass,
             StagesUnavailable = item.StagesUnavailable,
+            StagesIncomplete = item.StagesIncomplete,
             FinishedAt = item.FinishedAt,
             ScenarioVersion = item.ScenarioVersion,
             SetupSummary = item.SetupSummary,
@@ -295,6 +305,16 @@ public sealed class MetricsRunPresenter
 
     internal static bool AreStagesUnavailable(AutomationRunMetricsDocument document) =>
         document.Stages.Count == 0 || document.Stages.Values.All(s => s.Unavailable);
+
+    internal static bool AreStagesIncomplete(AutomationRunMetricsDocument document)
+    {
+        if (AreStagesUnavailable(document))
+            return false;
+        var recorded = document.Stages.Values.Count(s => !s.Unavailable);
+        return recorded > 0 && recorded < StageHistogramsLength;
+    }
+
+    private static int StageHistogramsLength => RunMetricsSnapshotService.StageHistograms.Length;
 
     internal static Dictionary<string, StageSnapshot> ToStages(AutomationRunMetricsDocument document)
     {
@@ -449,6 +469,7 @@ public sealed class MetricsRunPresenter
                     LastE2eSeconds = last.E2eDurationSeconds,
                     LastPatientsPerMinute = last.Throughput.PatientsPerMinute > 0 ? last.Throughput.PatientsPerMinute : null,
                     LastStagesUnavailable = AreStagesUnavailable(last),
+                    LastStagesIncomplete = AreStagesIncomplete(last),
                     GotSlower = last.Regression.Flags.Count > 0,
                     LastFinishedAt = last.FinishedAt,
                     LastRunId = last.RunId,

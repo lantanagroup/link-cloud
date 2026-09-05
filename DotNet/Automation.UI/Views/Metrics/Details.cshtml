@@ -16,7 +16,7 @@
                 Finished @FormatWhen(Model.FinishedAt)
                 @if (Model.ScenarioVersion > 1)
                 {
-                    <span class="ms-2">Setup v@Model.ScenarioVersion</span>
+                    <span class="ms-2">Setup v@(Model.ScenarioVersion)</span>
                 }
                 @if (!string.IsNullOrWhiteSpace(Model.SetupSummary))
                 {

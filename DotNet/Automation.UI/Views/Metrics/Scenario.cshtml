@@ -24,7 +24,7 @@
                 @Model.SetupSummary
                 @if (Model.HasVersionChange)
                 {
-                    <span class="ms-2 badge bg-light text-dark border">Setup changed · now v@Model.CurrentVersion</span>
+                    <span class="ms-2 badge bg-light text-dark border">Setup changed · now v@(Model.CurrentVersion)</span>
                 }
             </p>
         </div>
@@ -40,8 +40,36 @@
             }
             else
             {
-                <p class="small text-muted mb-2">Each point is one finished run of this use case. A jump usually means the pipeline got heavier — or the scenario setup changed (new version).</p>
-                <canvas id="scenarioDurationChart" height="120"></canvas>
+                <p class="small text-muted mb-2">Each point is one finished run of this use case. Click a point to open that run. A jump usually means the pipeline got heavier — or the scenario setup changed.</p>
+                var pts = Model.DurationTrend;
+                var maxSec = Math.Max(1, pts.Max(p => p.E2eDurationSeconds));
+                const double padL = 36, padR = 12, padT = 16, padB = 28, vw = 640, vh = 160;
+                var plotW = vw - padL - padR;
+                var plotH = vh - padT - padB;
+                string X(int i) => (padL + (pts.Count == 1 ? plotW / 2 : i * plotW / Math.Max(1, pts.Count - 1))).ToString("0.##");
+                string Y(double seconds) => (padT + plotH - seconds / maxSec * plotH).ToString("0.##");
+                var path = string.Join(" ", pts.Select((p, i) => $"{(i == 0 ? "M" : "L")}{X(i)},{Y(p.E2eDurationSeconds)}"));
+                <svg class="au-trend" id="scenarioDurationChart" viewBox="0 0 640 160" role="img" aria-label="Total time over runs">
+                    <line x1="@padL.ToString("0")" y1="@padT.ToString("0")" x2="@padL.ToString("0")" y2="@(padT + plotH)" stroke="#d7dbe3" />
+                    <line x1="@padL.ToString("0")" y1="@(padT + plotH)" x2="@(padL + plotW)" y2="@(padT + plotH)" stroke="#d7dbe3" />
+                    @Html.Raw($"<text x=\"4\" y=\"{padT + 4}\" class=\"au-trend-axis\">{(int)maxSec}s</text>")
+                    @Html.Raw($"<text x=\"4\" y=\"{padT + plotH}\" class=\"au-trend-axis\">0</text>")
+                    <path d="@path" fill="none" stroke="#4da3ff" stroke-width="2.5" />
+                    @for (var i = 0; i < pts.Count; i++)
+                    {
+                        var p = pts[i];
+                        <a asp-action="Details" asp-route-id="@p.RunId">
+                            <circle cx="@X(i)" cy="@Y(p.E2eDurationSeconds)" r="5" fill="#4da3ff" stroke="#fff" stroke-width="1.5">
+                                <title>@FormatDuration(p.E2eDurationSeconds) · @FormatWhen(p.FinishedAt)</title>
+                            </circle>
+                        </a>
+                    }
+                    @if (pts.Count > 0)
+                    {
+                        @Html.Raw($"<text x=\"{padL:0}\" y=\"{vh - 8}\" class=\"au-trend-axis\">{pts[0].FinishedAt.UtcDateTime:MMM d h:mm tt}</text>")
+                        @Html.Raw($"<text x=\"{padL + plotW:0}\" y=\"{vh - 8}\" class=\"au-trend-axis\" text-anchor=\"end\">{pts[^1].FinishedAt.UtcDateTime:MMM d h:mm tt}</text>")
+                    }
+                </svg>
             }
         </div>
     </div>
@@ -73,7 +101,7 @@
                             <tr data-result="@(run.Outcome == "Succeeded" ? "Passed" : run.Outcome)"
                                 data-seconds="@run.E2eDurationSeconds"
                                 data-ppm="@(run.PatientsPerMinute?.ToString("0.0") ?? "")"
-                                data-finished="@FormatWhen(run.FinishedAt)">
+                                data-finished="@(run.FinishedAt?.UtcDateTime.ToString("o") ?? "")">
                                 <td>
                                     <input type="checkbox" class="form-check-input compare-run" value="@run.RunId" aria-label="Select for compare" />
                                 </td>
@@ -83,7 +111,11 @@
                                     </span>
                                     @if (run.ScenarioVersion > 1)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">v@run.ScenarioVersion</span>
+                                        <span class="badge bg-light text-dark border ms-1">v@(run.ScenarioVersion)</span>
+                                    }
+                                    @if (run.StagesIncomplete)
+                                    {
+                                        <span class="badge bg-light text-dark border ms-1">Partial</span>
                                     }
                                 </td>
                                 <td>@FormatDuration(run.E2eDurationSeconds)</td>
@@ -130,41 +162,4 @@
         }
     })();
 </script>
-@if (Model.DurationTrend.Count > 0)
-{
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script>
-    (function () {
-        const points = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-            Model.DurationTrend.Select(p => new {
-                finishedAt = p.FinishedAt.UtcDateTime.ToString("MMM d h:mm tt"),
-                seconds = p.E2eDurationSeconds,
-                runId = p.RunId,
-                version = p.ScenarioVersion
-            }),
-            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
-        const canvas = document.getElementById('scenarioDurationChart');
-        if (!canvas || !points.length) return;
-        new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels: points.map(p => p.finishedAt),
-                datasets: [{
-                    label: 'Total time (seconds)',
-                    data: points.map(p => p.seconds),
-                    borderColor: '#4da3ff',
-                    backgroundColor: 'rgba(77,163,255,.15)',
-                    fill: true,
-                    tension: 0.2
-                }]
-            },
-            options: {
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, title: { display: true, text: 'Seconds' } }
-                }
-            }
-        });
-    })();
-</script>
-}
+

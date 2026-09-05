@@ -149,15 +149,21 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 {
                     await DelayAsync(wait, cancellationToken);
                     var evaluationTime = _time.GetUtcNow();
-                    var anyStage = false;
-                    foreach (var stageQuery in StageHistograms)
+                    await QueryStagesAsync(stages, input.FacilityId, evaluationTime, cancellationToken);
+
+                    // Later pipeline steps often export after Data Acquisition. One extra
+                    // OTEL interval is enough for short adhoc runs without stretching every capture.
+                    if (AreStagesIncomplete(stages))
                     {
-                        var snapshot = await QueryStageAsync(stageQuery, input.FacilityId, evaluationTime, cancellationToken);
-                        stages[stageQuery.Stage] = snapshot;
-                        if (!snapshot.Unavailable)
-                            anyStage = true;
+                        _logger.LogInformation(
+                            "Some pipeline steps were missing for metrics run {RunId}; waiting once more for Prometheus.",
+                            input.RunId);
+                        await DelayAsync(wait, cancellationToken);
+                        evaluationTime = _time.GetUtcNow();
+                        await QueryStagesAsync(stages, input.FacilityId, evaluationTime, cancellationToken, missingOnly: true);
                     }
 
+                    var anyStage = stages.Values.Any(s => !s.Unavailable);
                     stagesUnavailable = !anyStage;
                     if (stagesUnavailable)
                     {
@@ -168,24 +174,28 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                             input.FacilityId);
                     }
 
-                    var lookbackSeconds = ResolveUtilizationLookbackSeconds(e2eSeconds);
+                    // Query at now (after the wait) with a lookback that still covers the run.
+                    // Evaluating at FinishedAt misses OTEL samples that have not been scraped yet;
+                    // a lookback of only e2eSeconds at now covers the idle wait instead of the run.
+                    var lookbackSeconds = ResolveUtilizationLookbackSeconds(
+                        (evaluationTime - window.StartedAt).TotalSeconds);
                     foreach (var processQuery in ProcessUtilizationQueries)
                     {
                         utilization[processQuery.Key] = await QueryProcessUtilizationAsync(
                             processQuery,
                             lookbackSeconds,
-                            window.FinishedAt,
+                            evaluationTime,
                             cancellationToken);
                         apiLatency[processQuery.Key] = await QueryApiLatencyAsync(
                             processQuery,
                             lookbackSeconds,
-                            window.FinishedAt,
+                            evaluationTime,
                             cancellationToken);
                     }
 
                     slowestRoutes = await QuerySlowestApiRoutesAsync(
                         lookbackSeconds,
-                        window.FinishedAt,
+                        evaluationTime,
                         cancellationToken);
                 }
             }
@@ -384,8 +394,33 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         return TimeSpan.FromMilliseconds(exportMs + scrapeMs + 1_000);
     }
 
-    internal static int ResolveUtilizationLookbackSeconds(double e2eSeconds) =>
-        Math.Max(30, (int)Math.Ceiling(Math.Max(0, e2eSeconds)));
+    internal static int ResolveUtilizationLookbackSeconds(double seconds) =>
+        Math.Clamp((int)Math.Ceiling(Math.Max(0, seconds)), 30, 3600);
+
+    internal static bool AreStagesIncomplete(IReadOnlyDictionary<string, StageLatencySnapshot> stages)
+    {
+        var recorded = stages.Values.Count(s => !s.Unavailable);
+        return recorded > 0 && recorded < StageHistograms.Length;
+    }
+
+    private async Task QueryStagesAsync(
+        Dictionary<string, StageLatencySnapshot> stages,
+        string facilityId,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken,
+        bool missingOnly = false)
+    {
+        foreach (var stageQuery in StageHistograms)
+        {
+            if (missingOnly
+                && stages.TryGetValue(stageQuery.Stage, out var existing)
+                && !existing.Unavailable)
+                continue;
+
+            stages[stageQuery.Stage] = await QueryStageAsync(
+                stageQuery, facilityId, evaluationTime, cancellationToken);
+        }
+    }
 
     internal static string DotNetPeakMemoryQuery(string exportedJob, int windowSeconds) =>
         $"max(max_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";

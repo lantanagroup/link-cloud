@@ -228,6 +228,34 @@ public class MetricsRunPresenterTests
         dashboard.Services.Should().HaveCount(5);
         dashboard.Services.Select(s => s.Key).Should().Equal(
             "acquisition", "normalization", "measureeval", "validation", "submission");
+        dashboard.LastRunId.Should().Be(newer.RunId);
+        dashboard.LastRunScenarioId.Should().Be(scenarioId);
+        dashboard.LastRunStagesIncomplete.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetDashboard_flags_partial_timings_on_the_last_run()
+    {
+        var scenarioId = Guid.NewGuid();
+        var last = Document(scenarioId);
+        last.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 400 };
+
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.ListPageAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new[] { last }.ToList(), 1L));
+        store.Setup(s => s.ListSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { last });
+        var scenarios = new Mock<IScenarioStore>();
+        scenarios.Setup(s => s.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestScenarioDefinition { Id = scenarioId, Name = "Monthly 150", IsMetricsRun = true }]);
+
+        var presenter = new MetricsRunPresenter(store.Object, Mock.Of<IAutomationRunManager>(), scenarios.Object);
+        var dashboard = await presenter.GetDashboardAsync(1, 20);
+
+        dashboard.LastRunStagesUnavailable.Should().BeFalse();
+        dashboard.LastRunStagesIncomplete.Should().BeTrue();
+        dashboard.ScenarioCards[0].LastStagesIncomplete.Should().BeTrue();
+        MetricsRunPresenter.ToListItem(last).StagesIncomplete.Should().BeTrue();
     }
 
     [Fact]
@@ -308,6 +336,43 @@ public class MetricsRunPresenterTests
 
         var problem = result.Should().BeOfType<ObjectResult>().Subject;
         problem.StatusCode.Should().Be(400);
+    }
+
+    [Fact]
+    public async Task GetCompare_puts_the_earlier_run_on_the_left()
+    {
+        var earlier = Document();
+        earlier.FinishedAt = DateTimeOffset.Parse("2026-09-05T11:56:00Z");
+        earlier.E2eDurationSeconds = 47;
+        var later = Document();
+        later.FinishedAt = DateTimeOffset.Parse("2026-09-05T11:57:00Z");
+        later.E2eDurationSeconds = 56;
+
+        var store = new Mock<IRunMetricsStore>();
+        store.Setup(s => s.GetAsync(earlier.RunId, It.IsAny<CancellationToken>())).ReturnsAsync(earlier);
+        store.Setup(s => s.GetAsync(later.RunId, It.IsAny<CancellationToken>())).ReturnsAsync(later);
+        var manager = new Mock<IAutomationRunManager>();
+        manager.Setup(m => m.GetRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AutomationRunSummary?)null);
+        var presenter = new MetricsRunPresenter(store.Object, manager.Object, Mock.Of<IScenarioStore>());
+
+        var swapped = await presenter.GetCompareAsync(later.RunId, earlier.RunId);
+
+        swapped.Should().NotBeNull();
+        swapped!.Left.RunId.Should().Be(earlier.RunId);
+        swapped.Right.RunId.Should().Be(later.RunId);
+        swapped.Left.E2eDurationSeconds.Should().Be(47);
+        swapped.Right.E2eDurationSeconds.Should().Be(56);
+    }
+
+    [Fact]
+    public void AreStagesIncomplete_when_only_some_stages_recorded()
+    {
+        var doc = Document();
+        doc.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 400 };
+
+        MetricsRunPresenter.AreStagesUnavailable(doc).Should().BeFalse();
+        MetricsRunPresenter.AreStagesIncomplete(doc).Should().BeTrue();
     }
 
     [Fact]

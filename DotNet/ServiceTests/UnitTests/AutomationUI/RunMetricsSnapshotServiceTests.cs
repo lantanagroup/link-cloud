@@ -68,10 +68,11 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
-    public void Utilization_lookback_is_at_least_30_seconds()
+    public void Utilization_lookback_is_clamped()
     {
         RunMetricsSnapshotService.ResolveUtilizationLookbackSeconds(12).Should().Be(30);
         RunMetricsSnapshotService.ResolveUtilizationLookbackSeconds(101.4).Should().Be(102);
+        RunMetricsSnapshotService.ResolveUtilizationLookbackSeconds(10_000).Should().Be(3600);
     }
 
     [Fact]
@@ -441,7 +442,55 @@ public class RunMetricsSnapshotServiceTests
         histogramTimes.Should().NotBeEmpty();
         histogramTimes.Should().OnlyContain(t => t > finishedAt);
         utilizationTimes.Should().NotBeEmpty();
-        utilizationTimes.Should().OnlyContain(t => t == finishedAt);
+        utilizationTimes.Should().OnlyContain(t => t > finishedAt);
+    }
+
+    [Fact]
+    public async Task Capture_retries_missing_stages_once()
+    {
+        var countCalls = new Dictionary<string, int>(StringComparer.Ordinal);
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (query.Contains("process_memory", StringComparison.Ordinal)
+                    || query.Contains("process_cpu", StringComparison.Ordinal)
+                    || query.Contains("jvm_", StringComparison.Ordinal)
+                    || query.Contains("http_server_request_duration_seconds", StringComparison.Ordinal))
+                    return null;
+                var stage = RunMetricsSnapshotService.StageHistograms
+                    .FirstOrDefault(s => query.Contains(s.HistogramBase, StringComparison.Ordinal));
+                if (string.IsNullOrEmpty(stage.Stage) || !query.Contains("_count{", StringComparison.Ordinal))
+                    return query.Contains("histogram_quantile", StringComparison.Ordinal) ? 100 : 0;
+                countCalls[stage.Stage] = countCalls.GetValueOrDefault(stage.Stage) + 1;
+                if (stage.Stage == "acquisition")
+                    return 8;
+                return countCalls[stage.Stage] >= 2 ? 8 : 0;
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true));
+
+        saved.Should().NotBeNull();
+        saved!.Stages.Values.Should().OnlyContain(s => !s.Unavailable);
+        countCalls["acquisition"].Should().Be(1);
+        countCalls["normalization"].Should().Be(2);
+        countCalls["measureeval"].Should().Be(2);
+        countCalls["validation"].Should().Be(2);
+        countCalls["submission"].Should().Be(2);
     }
 
     [Fact]
