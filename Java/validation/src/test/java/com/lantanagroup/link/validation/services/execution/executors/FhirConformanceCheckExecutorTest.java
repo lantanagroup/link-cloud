@@ -27,8 +27,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -258,20 +256,15 @@ class FhirConformanceCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("a Bundle input splits into independent entries and aggregates their findings")
+    @DisplayName("a Bundle input is validated as a batch and aggregates its findings")
     void bundleSplitsEntriesAndAggregatesFindings() {
-        IBaseResource entryA = new Patient();
-        IBaseResource entryB = new Patient();
-        IBaseResource entryC = new Patient();
+        when(fhirValidator.validateWithResult(any(Bundle.class), any(ValidationOptions.class)))
+                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(
+                        message(ResultSeverityEnum.ERROR, "a-bad"),
+                        message(ResultSeverityEnum.WARNING, "b-meh"))));
 
-        when(fhirValidator.validateWithResult(eq(entryA), any(ValidationOptions.class)))
-                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(message(ResultSeverityEnum.ERROR, "a-bad"))));
-        when(fhirValidator.validateWithResult(eq(entryB), any(ValidationOptions.class)))
-                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(message(ResultSeverityEnum.WARNING, "b-meh"))));
-        when(fhirValidator.validateWithResult(eq(entryC), any(ValidationOptions.class)))
-                .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of()));
-
-        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of(entryA, entryB, entryC)));
+        List<RawFinding> findings = executor.execute(
+                check(), bundleContext(List.of(new Patient(), new Patient(), new Patient())));
 
         assertThat(findings).extracting(RawFinding::getMessage).containsExactly("a-bad", "b-meh");
     }
@@ -285,15 +278,14 @@ class FhirConformanceCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("per-entry not-evaluated classification still applies inside a Bundle entry")
+    @DisplayName("per-entry not-evaluated classification still applies inside a Bundle batch")
     void notEvaluatedClassificationAppliesPerBundleEntry() {
-        IBaseResource entry = new Patient();
-        when(fhirValidator.validateWithResult(eq(entry), any(ValidationOptions.class)))
+        when(fhirValidator.validateWithResult(any(Bundle.class), any(ValidationOptions.class)))
                 .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of(
                         message(ResultSeverityEnum.WARNING, "ValueSet 'http://nhsn/vs' not found",
                                 "Terminology_TX_ValueSet_NotFound"))));
 
-        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of(entry)));
+        List<RawFinding> findings = executor.execute(check(), bundleContext(List.of(new Patient())));
 
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getCode()).isEqualTo("binding-not-evaluated");
@@ -301,23 +293,28 @@ class FhirConformanceCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("profile scoping from check parameters is applied to every Bundle entry")
+    @DisplayName("profile scoping from check parameters is stamped onto every entry's meta before batching")
     void profileScopingAppliedToEveryBundleEntry() {
+        String profile = "http://example.org/StructureDefinition/my-profile";
         RubricCheck check = RubricCheck.builder()
                 .checkLocalId("fc-1")
                 .dimension(PiqiDimension.CONFORMANCE)
-                .parametersJson("{\"profiles\":[\"http://example.org/StructureDefinition/my-profile\"]}")
+                .parametersJson("{\"profiles\":[\"" + profile + "\"]}")
                 .build();
 
-        ArgumentCaptor<ValidationOptions> optionsCaptor = ArgumentCaptor.forClass(ValidationOptions.class);
-        when(fhirValidator.validateWithResult(any(IBaseResource.class), optionsCaptor.capture()))
+        ArgumentCaptor<IBaseResource> resourceCaptor = ArgumentCaptor.forClass(IBaseResource.class);
+        when(fhirValidator.validateWithResult(resourceCaptor.capture(), any(ValidationOptions.class)))
                 .thenReturn(new ValidationResult(FHIR_CONTEXT, List.of()));
 
         executor.execute(check, bundleContext(List.of(new Patient(), new Patient())));
 
-        assertThat(optionsCaptor.getAllValues()).hasSize(2);
-        assertThat(optionsCaptor.getAllValues()).allSatisfy(opts ->
-                assertThat(opts.getProfiles()).contains("http://example.org/StructureDefinition/my-profile"));
+        // one batch call for both entries (default batch size 10) -- the profile is scoped per entry via
+        // meta.profile rather than via ValidationOptions on the (synthetic, wrapper) batch resource
+        assertThat(resourceCaptor.getAllValues()).hasSize(1);
+        Bundle batch = (Bundle) resourceCaptor.getValue();
+        assertThat(batch.getEntry()).hasSize(2);
+        assertThat(batch.getEntry()).allSatisfy(entry ->
+                assertThat(entry.getResource().getMeta().hasProfile(profile)).isTrue());
     }
 
     @Test
@@ -349,38 +346,42 @@ class FhirConformanceCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("a slow resource does not block later resources from starting or finishing (no wave waiting)")
+    @DisplayName("a slow batch does not block another batch from finishing (no wave waiting)")
     void slowResourceDoesNotBlockLaterResourcesFromFinishing() {
         int batchSize = 3;
         FhirConformanceCheckExecutor cappedExecutor =
                 new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), batchSize);
 
-        IBaseResource slow = new Patient();
+        // toBatchBundle() copies each entry, so the mock can't match on entry identity -- an id marks
+        // which batch is the slow one instead.
+        Patient slowMarker = new Patient();
+        slowMarker.setId("slow-marker");
         List<IBaseResource> entries = new ArrayList<>();
-        entries.add(slow);
+        entries.add(slowMarker);
         for (int i = 0; i < 5; i++) {
             entries.add(new Patient());
         }
 
-        List<IBaseResource> completionOrder = Collections.synchronizedList(new ArrayList<>());
+        List<Bundle> completionOrder = Collections.synchronizedList(new ArrayList<>());
 
-        when(fhirValidator.validateWithResult(eq(slow), any(ValidationOptions.class)))
+        when(fhirValidator.validateWithResult(any(IBaseResource.class), any(ValidationOptions.class)))
                 .thenAnswer(invocation -> {
-                    Thread.sleep(300);
-                    completionOrder.add(slow);
-                    return new ValidationResult(FHIR_CONTEXT, List.of());
-                });
-        when(fhirValidator.validateWithResult(argThat((IBaseResource r) -> r != slow), any(ValidationOptions.class)))
-                .thenAnswer(invocation -> {
-                    IBaseResource resource = invocation.getArgument(0);
-                    completionOrder.add(resource);
+                    Bundle batch = invocation.getArgument(0);
+                    boolean isSlowBatch = batch.getEntry().stream()
+                            .anyMatch(e -> "slow-marker".equals(e.getResource().getIdElement().getIdPart()));
+                    if (isSlowBatch) {
+                        Thread.sleep(300);
+                    }
+                    completionOrder.add(batch);
                     return new ValidationResult(FHIR_CONTEXT, List.of());
                 });
 
         cappedExecutor.execute(check(), bundleContext(entries));
 
-        assertThat(completionOrder).hasSize(6);
-        assertThat(completionOrder.get(completionOrder.size() - 1)).isSameAs(slow);
+        assertThat(completionOrder).hasSize(2); // 6 entries / batch size 3 = 2 batches
+        Bundle lastCompleted = completionOrder.get(completionOrder.size() - 1);
+        assertThat(lastCompleted.getEntry())
+                .anyMatch(e -> "slow-marker".equals(e.getResource().getIdElement().getIdPart()));
     }
 
     @Test
