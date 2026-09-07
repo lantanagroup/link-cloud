@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.EncounterCodes;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.HslocCodes;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
@@ -65,6 +66,8 @@ public sealed class ReferenceDataService : IReferenceDataService
                 .Contains(q, StringComparison.OrdinalIgnoreCase))
             .ToArray();
     }
+
+    public IReadOnlyList<HslocCode> GetHslocCodes() => HslocCodeCatalog.All;
 
     private static IReadOnlyList<TimezoneResponse> BuildTimezones() =>
         OrderedTimezoneIds

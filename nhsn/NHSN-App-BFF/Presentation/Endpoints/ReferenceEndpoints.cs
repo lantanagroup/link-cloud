@@ -53,5 +53,19 @@ public class ReferenceEndpoints : IApi
                     "what the UI does — it keeps the list and filters it in place.";
                 return operation;
             });
+
+        group.MapGet("/hsloc-codes", (IReferenceDataService referenceData) =>
+                Results.Ok(referenceData.GetHslocCodes()))
+            .WithName("GetHslocCodes")
+            .Produces<IReadOnlyList<HslocCode>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "The NHSN HSLOC reference vocabulary for the HSLOC Location Identification step.";
+                operation.Description =
+                    "The whole catalog, every time — like /encounter-codes, the UI keeps the list " +
+                    "client-side and searches/filters it in place rather than querying per keystroke.";
+                return operation;
+            });
     }
 }

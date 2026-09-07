@@ -278,7 +278,69 @@
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },
   "hsloc": {
-    "title": "Location Identification (HSLOC)"
+    "title": "Location Identification (HSLOC)",
+    "subtitlePrefix": "When applicable, NHSN requires reporting facilities to associate acquired FHIR Location local codes to their NHSN Healthcare Facility Care Location (HSLOC) code counterparts. Information on the HSLOC code system can be found",
+    "subtitleLinkText": "here",
+    "subtitleSuffix": ". To support this, the form below contains fields to map local Location codes to HSLOC codes.",
+    "tabs": {
+      "mapping": "Location Mapping",
+      "reference": "HSLOC Reference Table"
+    },
+    "mapping": {
+      "listLabel": "HSLOC Code Mappings",
+      "emptyState": "None added yet.",
+      "addButton": "+ Add Mapping",
+      "fields": {
+        "yourCodePlaceholder": "Your Code",
+        "yourCodeAriaLabel": "Your Code",
+        "locationValueFallback": "Location value",
+        "hslocCodePlaceholder": "Select an HSLOC code…"
+      }
+    },
+    "reference": {
+      "searchPlaceholder": "Search category, type, mnemonic, description, code, definition…",
+      "allCategories": "All Categories",
+      "allTypes": "All Types",
+      "resultCount": "{{count}} of {{total}} HSLOC codes",
+      "noResults": "No matching HSLOC codes.",
+      "columns": {
+        "category": "Category",
+        "type": "Type",
+        "code": "Code",
+        "description": "Description",
+        "facilities": "Facilities"
+      },
+      "detail": {
+        "selectPrompt": "Select a row to see which of your entered location codes map to it.",
+        "mappedHeading": "Your Mapped Location Codes",
+        "noneMapped": "No location codes you've entered map to this HSLOC code yet.",
+        "noCode": "(no code)"
+      },
+      "facilityTypes": {
+        "acuteCareAll": "Acute",
+        "ltac": "LTAC",
+        "ltc": "LTC",
+        "inpatientRehab": "Rehab",
+        "outpatientSurgery": "Surgery",
+        "outpatientDialysis": "Dialysis",
+        "oncology": "Oncology",
+        "inpatientPsych": "Psych"
+      },
+      "facilityTypeTitles": {
+        "acuteCareAll": "Acute Care Facilities (All)",
+        "ltac": "Long Term Acute Care Facilities",
+        "ltc": "Long Term Care Facilities",
+        "inpatientRehab": "Inpatient Rehabilitation Facilities",
+        "outpatientSurgery": "Outpatient Ambulatory Surgery Centers",
+        "outpatientDialysis": "Outpatient Dialysis Facilities",
+        "oncology": "Oncology Facilities",
+        "inpatientPsych": "Inpatient Psychiatric Facilities"
+      }
+    },
+    "messages": {
+      "loadError": "Unable to load HSLOC reference data.",
+      "saveError": "Unable to save HSLOC location mappings."
+    }
   },
   "encounter": {
     "title": "Encounter Mapping",

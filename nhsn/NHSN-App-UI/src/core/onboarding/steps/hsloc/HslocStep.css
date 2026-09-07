@@ -1,0 +1,240 @@
+/*
+ * Only what has no shared equivalent lives here: the facility-type badges
+ * (unique to this step's reference table), the native HSLOC-code <select>
+ * used inside a RepeatableList row (kept native, not the Select field, so
+ * its <optgroup> category grouping survives), the reference tab's
+ * search/filter bar, and structural sizing for its table and side panel.
+ * Everything else (tabs, field labels, the repeatable list, the table's
+ * base look, the docked detail panel) comes from the shared classes in
+ * NHSNLink.css's "shared step blocks" section, same as Organization
+ * Identification.
+ */
+
+/* ---------------------------------------------------------- mapping tab */
+
+/* Matches Kendo's own .k-input chrome (see NHSNLink.css) so this native
+   select reads the same as the TextField inputs beside it in the row.
+   box-sizing: border-box is what keeps it from overflowing its
+   .nhsn-link__repeatable-fields column — width: 100% is content-box by
+   default, which would add this padding and border on top of that 100%. */
+.nhsn-link__hsloc-code-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.nhsn-link__hsloc-code-select:focus {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: -2px;
+}
+
+/* ---------------------------------------------------------- reference tab */
+
+.nhsn-link__hsloc-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 14px;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+
+.nhsn-link__hsloc-filter-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.nhsn-link__hsloc-filter-row select {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+/* Taller than the shared 52vh default — this table is the step's main
+   content, not a picker dialog, so it earns the room. Organization
+   Identification's own picker does the same thing for the same reason
+   (see .nhsn-link__location-org .nhsn-link__table-scroll). */
+.nhsn-link__hsloc-table-scroll {
+  max-height: 68vh;
+}
+
+/* Fixed layout + percentage widths keep every column, including Facilities,
+   inside the panel instead of growing to each cell's content width. */
+.nhsn-link__hsloc-table {
+  table-layout: fixed;
+}
+
+.nhsn-link__hsloc-table th:nth-child(1),
+.nhsn-link__hsloc-table td:nth-child(1) {
+  width: 15%;
+}
+
+.nhsn-link__hsloc-table th:nth-child(2),
+.nhsn-link__hsloc-table td:nth-child(2) {
+  width: 16%;
+}
+
+.nhsn-link__hsloc-table th:nth-child(3),
+.nhsn-link__hsloc-table td:nth-child(3) {
+  width: 8%;
+}
+
+.nhsn-link__hsloc-table th:nth-child(4),
+.nhsn-link__hsloc-table td:nth-child(4) {
+  width: 33%;
+}
+
+.nhsn-link__hsloc-table th:nth-child(5),
+.nhsn-link__hsloc-table td:nth-child(5) {
+  width: 28%;
+}
+
+.nhsn-link__hsloc-table td {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.nhsn-link__hsloc-row {
+  cursor: pointer;
+}
+
+.nhsn-link__hsloc-row:hover {
+  background: var(--kendo-color-surface, #f7f9fc);
+}
+
+.nhsn-link__hsloc-row--selected {
+  background: var(--kendo-color-primary-subtle, #eaf2fc);
+}
+
+.nhsn-link__hsloc-mapped-cell {
+  font-weight: 700;
+}
+
+.nhsn-link__hsloc-empty-row {
+  text-align: center;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  padding: 20px;
+}
+
+.hsloc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hsloc-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.hsloc-badge--acuteCareAll {
+  background: #0b5cab;
+}
+
+.hsloc-badge--ltac {
+  background: #0f766e;
+}
+
+.hsloc-badge--ltc {
+  background: #7c3aed;
+}
+
+.hsloc-badge--inpatientRehab {
+  background: #b45309;
+}
+
+.hsloc-badge--outpatientSurgery {
+  background: #15803d;
+}
+
+.hsloc-badge--outpatientDialysis {
+  background: #be185d;
+}
+
+.hsloc-badge--oncology {
+  background: #4338ca;
+}
+
+.hsloc-badge--inpatientPsych {
+  background: #a16207;
+}
+
+/* ---------------------------------------------------------- detail panel */
+
+.nhsn-link__hsloc-detail-code {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kendo-color-primary, #0057b7);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.nhsn-link__hsloc-detail-description {
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+/* The shared side panel (see NHSNLink.css) never shrinks below 460px — fine
+   for Census, which always has room, but this step's table needs the space
+   it would otherwise take on a narrower window. Scoped here rather than
+   changed globally so Census's behavior is untouched. */
+.nhsn-link__hsloc .nhsn-link__side-panel-layout {
+  container-type: inline-size;
+  container-name: hsloc-body;
+}
+
+.nhsn-link__hsloc .nhsn-link__side-panel {
+  flex: 0 1 340px;
+  min-width: 240px;
+}
+
+@container hsloc-body (max-width: 760px) {
+  .nhsn-link__hsloc .nhsn-link__side-panel-layout {
+    flex-direction: column;
+  }
+
+  .nhsn-link__hsloc .nhsn-link__side-panel {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+@supports not (container-type: inline-size) {
+  @media (max-width: 900px) {
+    .nhsn-link__hsloc .nhsn-link__side-panel-layout {
+      flex-direction: column;
+    }
+
+    .nhsn-link__hsloc .nhsn-link__side-panel {
+      flex: 1 1 auto;
+      width: 100%;
+    }
+  }
+}
