@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
@@ -71,6 +72,27 @@ public class ShadowComparisonController {
             return ResponseEntity.notFound().build();
         }
         String filename = "shadow-comparison-daily-report-" + reportDate + ".csv";
+        return ResponseEntity.ok()
+                .contentType(CSV_MEDIA_TYPE)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(content);
+    }
+
+    @Operation(summary = "Generates the shadow comparison CSV report on demand for a [startDate, endDate] "
+            + "range (both inclusive, UTC calendar days), in the same format as "
+            + "ShadowComparisonDailyReportJob's daily report -- queried live from shadow_comparison_result "
+            + "rather than a pre-built blob, so any date range can be requested (temporary, ADR-0003 shadow-run)")
+    @GetMapping("/report")
+    public ResponseEntity<byte[]> getReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        if (endDate.isBefore(startDate)) {
+            return ResponseEntity.badRequest().build();
+        }
+        OffsetDateTime start = startDate.atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        OffsetDateTime end = endDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        byte[] content = shadowCsvReportService.generateReport(start, end);
+        String filename = "shadow-comparison-report-" + startDate + "-to-" + endDate + ".csv";
         return ResponseEntity.ok()
                 .contentType(CSV_MEDIA_TYPE)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
