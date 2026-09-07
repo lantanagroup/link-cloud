@@ -23,10 +23,24 @@ public class ProgressMonitor
     private int _lastAcqLogCount;
     private int _lastCompletedAcqCount;
     private string? _lastAcqBreakdown;
+    private readonly AcquisitionActivityTracker _acquisitionActivity = new();
     private int _progressCheckCount;
     private string? _lastMeasureEvalActivity;
     private string? _lastValidationActivity;
     private string? _lastNormalizationActivity;
+    private string? _lastDataAcquisitionActivity;
+
+    /// <summary>Most recent time DA logs completed, acquired additional resources, or paged FHIR results.</summary>
+    public DateTime LastAcquisitionProgressUtc => _acquisitionActivity.LastProgressUtc;
+
+    /// <summary>Latest <c>TotalResourcesAcquired</c> from the DA report summary.</summary>
+    public int LastResourcesAcquired => _acquisitionActivity.LastResourcesAcquired;
+
+    /// <summary>True when at least one DA log is currently Processing.</summary>
+    public bool IsAcquisitionInFlight => _acquisitionActivity.InFlight;
+
+    public bool HasRecentAcquisitionProgress(TimeSpan window, DateTime? utcNow = null)
+        => _acquisitionActivity.HasRecentProgress(window, utcNow ?? DateTime.UtcNow);
 
     /// <summary>
     /// Returns the pipeline stage that appears stalled, or null if progress
@@ -71,12 +85,12 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
-        await CheckPipelineActivityAsync();
+        await CheckPipelineActivityAsync(facilityId, reportId);
 
         return hasCriticalFailure;
     }
 
-    private async Task CheckPipelineActivityAsync()
+    private async Task CheckPipelineActivityAsync(string facilityId, string reportId)
     {
         if (_lokiScraper == null)
             return;
@@ -89,6 +103,21 @@ public class ProgressMonitor
         {
             _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
             _lastMeasureEvalActivity = measureEvalActivity;
+        }
+
+        var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(
+            TimeSpan.FromSeconds(60),
+            facilityId,
+            reportId);
+        if (!string.IsNullOrWhiteSpace(dataAcquisitionActivity))
+        {
+            _acquisitionActivity.MarkProgress(DateTime.UtcNow);
+            _progressTracker?.NoteActivity();
+            if (!string.Equals(dataAcquisitionActivity, _lastDataAcquisitionActivity, StringComparison.Ordinal))
+            {
+                _output.WriteLine($"[DIAG][DataAcq] Active: {dataAcquisitionActivity}");
+                _lastDataAcquisitionActivity = dataAcquisitionActivity;
+            }
         }
 
         var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
@@ -187,15 +216,28 @@ public class ProgressMonitor
             var processing = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Processing", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var pending = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
 
-            var breakdown = $"completed={completed}, processing={processing}, " +
-                            $"pending={pending}, failed={failed}, maxRetries={maxRetries}";
+            var observation = _acquisitionActivity.Observe(
+                total,
+                completed,
+                processing,
+                pending,
+                failed,
+                maxRetries,
+                summary.TotalResourcesAcquired,
+                DateTime.UtcNow);
 
-            if (total != _lastAcqLogCount || completed != _lastCompletedAcqCount || breakdown != _lastAcqBreakdown)
+            if (observation.ShouldLogStatus)
             {
-                _output.WriteLine($"[DIAG][DataAcq] Logs: {total} total | {breakdown}");
-                _lastAcqLogCount = total;
-                _lastCompletedAcqCount = completed;
-                _lastAcqBreakdown = breakdown;
+                _output.WriteLine($"[DIAG][DataAcq] Logs: {observation.TotalLogs} total | {observation.Breakdown}");
+                _lastAcqLogCount = observation.TotalLogs;
+                _lastCompletedAcqCount = observation.Completed;
+                _lastAcqBreakdown = observation.Breakdown;
+            }
+            else if (observation.ShouldLogKeepAlive)
+            {
+                _output.WriteLine(
+                    $"[DIAG][DataAcq] Keep-alive: still acquiring {observation.ResourceDelta} resource(s) " +
+                    $"(total={observation.ResourcesAcquired}, processing={observation.Processing}, pending={observation.Pending}).");
             }
 
             if (maxRetries > 0)

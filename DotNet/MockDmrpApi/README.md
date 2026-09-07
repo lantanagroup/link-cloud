@@ -29,7 +29,7 @@ mistake most likely to waste someone's week.
 
 | | **Contract surface** | **Support surface** |
 |---|---|---|
-| Routes | `GET /msc`, `GET /ps/annual` | everything under `/api/mock-dmrp` |
+| Routes | `GET /msc`, `GET /ps/annual/mrp` | everything under `/api/mock-dmrp` |
 | Whose API is it? | The third party's | Ours |
 | In `Contracts/dmrp-openapi.yaml`? | Yes — it describes *only* these | No, deliberately |
 | Authentication | The third party's bearer token | **Link's standard scheme** |
@@ -49,11 +49,11 @@ The two contract endpoints differ in **subject and in cadence**:
 | Endpoint | Component | Subject | Cadence |
 |---|---|---|---|
 | `GET /msc` | `MSC` | Medicine reports | Monthly |
-| `GET /ps/annual` | `PS` | Patient safety | Annual |
+| `GET /ps/annual/mrp` | `PS` | Patient safety | Monthly |
 
-That cadence difference reaches the schema: `ReportingMonth` is **nullable**, populated for
-MSC and null for PS. Whether it is required depends on the component, which no column
-constraint or range annotation can express, so the service enforces it — see §4.1.
+Both components share that cadence, so `ReportingMonth` is **required** on every entry
+whatever its component, and the `annual` in the patient-safety path says nothing about how
+often it is reported — see §4.1.
 
 ⚠️ **The strings `"MSC"` and `"PS"` are our invention,** as is the response body. Both are
 cheap to change while nothing is deployed.
@@ -75,9 +75,9 @@ Two things about this are easy to get wrong:
   not a whole number — or a month outside 1–12 — is a `400` rather than a filter that quietly
   matches nothing. A typo must not read as "enrolled in nothing", which is the one conclusion
   this API exists to convey.
-- **`month` has no effect on `/ps/annual`.** Annual entries carry no month, so narrowing by one
-  would exclude every row the endpoint is supposed to return. It is accepted for symmetry and
-  ignored, and the response omits `reportingMonth` regardless.
+- **`month` narrows `/ps/annual/mrp` exactly as it narrows `/msc`.** Patient safety is reported
+  monthly, so the month is a real predicate on both routes rather than a parameter one of them
+  accepts and drops. See §4.1.
 
 The optional parameters are why `DmrpController` restates them as `string?`; see the second
 trap in §2.7.
@@ -91,16 +91,16 @@ Both come from the real API, and this stand-in reproduces them exactly. Normalis
 would let a consumer write code that works here and fails on first contact with the real
 endpoint — which is the one failure this service exists to prevent.
 
-**The same values appear twice, with different types.**
+**The facility appears twice, with a different type each time.**
 
 | | Root object | Inside `plans` |
 |---|---|---|
 | Facility | `orgid`, **number** | `nhsnorgid`, **string** |
-| Year | `year`, **number** | `year`, **string** |
-| Month | `month`, **number** | `month`, **string** |
+| Year | `year`, **number** | `year`, **number** |
+| Month | `month`, **number** | `month`, **number** |
 
-The generated C# reflects it: `int? Month` on `ReportingPlanResponse`, `string Month` on
-`ReportingPlanItem`.
+The generated C# reflects it: `int? Orgid` on `ReportingPlanResponse`, `string Nhsnorgid` on
+`ReportingPlanItem`. The period is numeric in both places.
 
 **The timestamps are not RFC 3339.** `modifyDate` and `createDate` are `2023-09-09 11:12:12.59`
 — a space separator, two fractional digits, no timezone. They are typed as plain strings in the
@@ -123,7 +123,7 @@ endpoints have to be supported as they are.
 This service hosts both under one base URL, because one stand-in is cheaper to run than two.
 That is a deviation, and it has a practical consequence: **a consumer cannot switch to the
 real thing by changing a single base URL.** It will need one per component, and the paths may
-well not be `/msc` and `/ps/annual` once each has its own host.
+well not be `/msc` and `/ps/annual/mrp` once each has its own host.
 
 Keeping the two operations distinct in the contract, rather than collapsing them into one
 parameterised endpoint, is what makes that switch a routing change rather than a rewrite.
@@ -288,7 +288,7 @@ Authenticated with the **third party's** bearer token, from `POST /api/mock-dmrp
 | Route | Purpose |
 |---|---|
 | `GET /msc?nhsnorgid=&name=&year=&month=` | Monthly medicine reporting plan (`MSC`) |
-| `GET /ps/annual?nhsnorgid=&name=&year=&month=` | Annual patient-safety reporting plan (`PS`) |
+| `GET /ps/annual/mrp?nhsnorgid=&name=&year=&month=` | Monthly patient-safety reporting plan (`PS`) |
 
 Only `nhsnorgid` is required. `name`, `year` and `month` each narrow the result when supplied
 and are ignored when not, so a caller passing only `nhsnorgid` gets the facility's whole plan
@@ -347,7 +347,7 @@ Seed only `HOB` for facility `100`, February 2020, then `GET /msc?nhsnorgid=100&
   "modifyDate": "2023-09-09 11:12:12.59",
   "createDate": "2023-09-09 11:12:12.59",
   "plans": [
-    { "name": "HOB", "nhsnorgid": "100", "month": "2", "year": "2020", "reporting": "Y", "rptSeq": 0 }
+    { "name": "HOB", "nhsnorgid": "100", "month": 2, "year": 2020, "reporting": "Y", "rptSeq": 0 }
   ]
 }
 ```
@@ -368,42 +368,22 @@ the only table this service has to check against. A **blank** facility identifie
 
 An entry stored with `isReporting` other than `"Y"` is excluded from a plan entirely.
 
-An annual plan omits the root `month` from the response, rather than reporting a zero or a
-stale value that would tell a consumer the plan covers one particular month.
+### 4.1 ⚠️ Both components are reported monthly
 
-### 4.1 ⚠️ The cadence rule, and why the service enforces it
+`/ps/annual/mrp` is **not** an annual plan. The `annual` is part of that operation's path and
+says nothing about its cadence: patient safety is reported monthly, exactly like medicine, and
+both plans narrow by `month` the same way.
 
-A monthly component **requires** a reporting month; an annual one **must omit** it. The rule
-is conditional on the component, so no column constraint or `[Range]` annotation can express
-it — `ReportingPlanService` rejects violations with a `400` naming the cadence.
+Every entry therefore **requires** a reporting month, whatever its component. An entry stored
+without one has no period to be reported against, so no plan returns it — the plan simply comes
+back short, with nothing to indicate a row was skipped. `ReportingPlanService` rejects it with a
+`400` rather than letting that happen quietly.
 
-It has to be enforced rather than merely documented, because both failure modes are silent:
+### 4.2 The unique index
 
-- A **PS entry saved with a month** satisfies the unique index perfectly well, and `/ps/annual`
-  does not filter on month — so the row is returned for every request, looking correct.
-- An **MSC entry saved without one** matches no month, so `/msc` never returns it. The plan
-  simply comes back short, with nothing to indicate a row was skipped.
-
-Neither produces an error anywhere. The only symptom is a reporting plan that is quietly wrong.
-
-### 4.2 ⚠️ The unique index must not be filtered
-
-The natural key is `(facilityId, component, reportingYear, reportingMonth, measure)`.
-
-`ReportingMonth` is nullable, and **EF's default for a unique index over a nullable column is a
-filtered index** — `WHERE [ReportingMonth] IS NOT NULL`. That would drop every annual row out
-of the index and silently permit duplicate patient-safety entries, which is precisely what the
-index exists to prevent. `ReportingPlanEntryMap` suppresses it with `.HasFilter(null)`, and
-`TheUniqueIndexIsNotFiltered` pins that.
-
-SQL Server then treats NULL as a single value in the index and rejects the second annual row
-(error 2601), which is the behaviour wanted: one PS row per (facility, year, measure), one MSC
-row per (facility, year, month, measure).
-
-⚠️ **The integration fixture runs on SQLite, which does not share that behaviour** — it follows
-the standard, where NULLs are distinct, so the index alone does not stop a duplicate annual
-entry there. What holds on both providers is the service's own pre-check, and that is what the
-tests assert.
+The natural key is `(facilityId, component, reportingYear, reportingMonth, measure)`. Every
+column takes part and none of them is nullable, so the index covers every row without needing a
+filter: one entry per facility, component, period and measure.
 
 ### 4.3 Making the contract endpoints answer slowly
 
@@ -457,13 +437,13 @@ B=http://localhost:6159
 # Start clean
 curl -X DELETE $B/api/mock-dmrp/entries
 
-# Enrol facility 100 in HOB for February 2020 -- monthly, so a month is required
+# Enrol facility 100 in HOB for February 2020
 curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
   -d '{"facilityId":"100","component":"MSC","measure":"HOB","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
-# ...and in HAI for 2020 -- annual, so a month must be omitted
+# ...and in HAI for February 2020 -- patient safety is monthly too
 curl -X POST $B/api/mock-dmrp/entries -H 'Content-Type: application/json' \
-  -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingYear":2020,"isReporting":"Y"}'
+  -d '{"facilityId":"100","component":"PS","measure":"HAI","reportingMonth":2,"reportingYear":2020,"isReporting":"Y"}'
 
 # Acquire a third-party token
 TOKEN=$(curl -s -X POST $B/api/mock-dmrp/oauth2/token -H 'Content-Type: application/json' \
@@ -472,7 +452,7 @@ TOKEN=$(curl -s -X POST $B/api/mock-dmrp/oauth2/token -H 'Content-Type: applicat
 
 # Query each plan -- each returns only its own component's measures
 curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100&year=2020&month=2" | jq
-curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual?nhsnorgid=100&year=2020" | jq
+curl -s -H "Authorization: Bearer $TOKEN" "$B/ps/annual/mrp?nhsnorgid=100&year=2020" | jq
 
 # Everything but nhsnorgid is optional -- this returns the whole medicine plan
 curl -s -H "Authorization: Bearer $TOKEN" "$B/msc?nhsnorgid=100" | jq
@@ -615,7 +595,7 @@ They are separate on purpose, mirroring the real topology.
 | | Guards | Scheme |
 |---|---|---|
 | **Link's** | the support surface at `/api/mock-dmrp` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
-| **The third party's** | `GET /msc`, `GET /ps/annual` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
+| **The third party's** | `GET /msc`, `GET /ps/annual/mrp` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
 
 `DmrpController` carries `[AllowAnonymous]` so Link's middleware never sees it, and checks the
 third-party token itself. That is not a hole: those endpoints impersonate an external service,
@@ -690,7 +670,7 @@ Everything below is invented. Getting a real request/response pair, or the publi
 matters more than anything else in this project — a consumer written against these guesses
 will work perfectly here and fail on first contact with the real endpoint.
 
-- **Path shapes** — `/msc` and `/ps/annual` are what LCG recorded, but the ADR describes the
+- **Path shapes** — `/msc` and `/ps/annual/mrp` are what LCG recorded, but the ADR describes the
   two components as *separately deployed APIs* rather than two paths on one. See §1.5.
 - **Component identifiers** — the strings `"MSC"` and `"PS"` are ours. Does the real API use
   these, longer names, or coded values?

@@ -137,17 +137,20 @@ public class GeneratedControllerBindingTests
         (await client.GetAsync("/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await client.GetAsync("/annotated/ps/annual?nhsnorgid=100&name=HAI&year=2020&month=2"))
+        (await client.GetAsync("/annotated/ps/annual/mrp?nhsnorgid=100&name=HAI&year=2020&month=2"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
-    public async Task WithApiController_QueryParametersStillBind()
+    [Theory]
+    [InlineData("/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2")]
+    [InlineData("/annotated/ps/annual/mrp?nhsnorgid=100&name=HAI&year=2020&month=2")]
+    public async Task WithApiController_QueryParametersStillBind(string url)
     {
+        // Both routes, because the probe echoes what MVC bound: a parameter that silently
+        // failed to bind on either one arrives here as a null instead of its value.
         using var host = await StartHostAsync();
 
-        var response = await host.GetTestClient().GetAsync(
-            "/annotated/msc?nhsnorgid=100&name=HOB&year=2020&month=2");
+        var response = await host.GetTestClient().GetAsync(url);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -158,7 +161,7 @@ public class GeneratedControllerBindingTests
 
     [Theory]
     [InlineData("/annotated/msc?name=HOB&year=2020&month=2")]
-    [InlineData("/annotated/ps/annual?name=HAI&year=2020&month=2")]
+    [InlineData("/annotated/ps/annual/mrp?name=HAI&year=2020&month=2")]
     public async Task WithApiController_OmittingTheRequiredParameterIsRejected(string url)
     {
         // [BindRequired] lives on the base's nhsnorgid parameter and is never restated by the
@@ -295,8 +298,9 @@ public abstract class ProbeControllerBase : DmrpControllerBase
     public override Task<ActionResult<ReportingPlanResponse>> GetPatientSafetyAnnualReportingPlan(
         string nhsnorgid, string name, string year, string month, CancellationToken cancellationToken)
     {
-        // Annual: the month never narrows the result, so it is not echoed either.
-        return Task.FromResult<ActionResult<ReportingPlanResponse>>(Echo(nhsnorgid, name, year, month: null));
+        // Echoes the month exactly as the medicine override does. Both routes narrow by it,
+        // and a probe that dropped it could not tell a binding failure from a success.
+        return Task.FromResult<ActionResult<ReportingPlanResponse>>(Echo(nhsnorgid, name, year, month));
     }
 
     private static ReportingPlanResponse Echo(string nhsnorgid, string? name, string? year, string? month) =>

@@ -22,7 +22,7 @@ properties:
       $ref: "#/$defs/serviceMetaEntry"
   environments:
     type: "object"
-    description: "The environments this catalog is checked against, keyed by the suffix of their export file (Config/app-config.<key>.json). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
+    description: "The environments this catalog is checked against, keyed by the suffix of their export file (app-config.<key>.json, in the private link-cac repository's Config/). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
     additionalProperties:
       $ref: "#/$defs/environmentEntry"
 required:
@@ -40,8 +40,9 @@ required:
 # Each service selects unlabeled keys first, then its own label, so a labeled row
 # overrides an unlabeled one for that service only. Changing a label requires a redeploy.
 # The environments every required: true key must be present in. Each key is the suffix of its
-# export file, so `qa2` means Config/app-config.qa2.json. A declared environment with no export
-# is an error, not a quietly smaller check.
+# export file, so `qa2` means app-config.qa2.json. Those exports are in the private link-cac
+# repository, not this one; the tooling defaults to a sibling clone at ../link-cac/Config. A
+# declared environment with no export is an error, not a quietly smaller check.
 #
 # The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
 # `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
@@ -403,6 +404,44 @@ global:
     defaultValue: "false"
     consumers: ["Tenant"]
 
+  # How the DMRP module reaches the DMRP API itself. Nothing here is required: an environment
+  # with DMRP:Enabled on still serves the api/dmrp routes and reads the reporting plans it has
+  # already recorded, and only a caller that actually asks the API for a plan needs these. Left
+  # unset, that call refuses with a message naming this section rather than failing somewhere
+  # further in. In the lower environments all four point at the mock (MockDmrpApi), whose token
+  # endpoint is POST /api/mock-dmrp/oauth2/token.
+  - key: "DMRP:Api:BaseUrl"
+    description: "Base URL of the DMRP API. The reporting-plan operations sit at its root, so this is the host and any path prefix in front of /msc and /ps/annual/mrp - not a URL including either of them."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenUrl"
+    description: "Full URL of the token endpoint the client-credentials grant is posted to. Separate from DMRP:Api:BaseUrl because the authorization server need not live under the API's root, and against the mock it does not."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientId"
+    description: "Client id presented to the DMRP API's token endpoint."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientSecret"
+    description: "Client secret presented to the DMRP API's token endpoint. Provision as a Key Vault reference; there is no code default, so an environment that has not provisioned it cannot obtain a token and says so."
+    required: false
+    sensitive: true
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:Scope"
+    description: "Optional scope requested with the client-credentials grant. Omitted from the token request when unset, which is what the mock expects; a real authorization server may require one."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenExpiryMarginSeconds"
+    description: "How long before a token's stated expiry it stops being reused, in seconds (default 60). A token that expires in flight fails the call it was fetched for; renewing slightly early costs one extra token request per lifetime and removes that class of failure."
+    required: false
+    defaultValue: "60"
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TimeoutSeconds"
+    description: "How long a single DMRP call may take before it is abandoned, in seconds (default 30, accepted range 1-600). These calls run inside an admin GET, so HttpClient's 100-second default would hold the request open long past the point the operator has given up and past most gateway timeouts in front of it. A value outside the range falls back to the default rather than failing the call."
+    required: false
+    defaultValue: "30"
+    consumers: ["Tenant"]
+
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -510,6 +549,10 @@ services:
       description: "The cron expression defining how often data acquisition jobs should run."
       required: false
       defaultValue: "0/10 * * * * ?"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200)."
+      required: false
+      defaultValue: "100"
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: false
@@ -552,6 +595,10 @@ services:
       description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
       required: false
       defaultValue: "8"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200). The worker is the process that pages FHIR searches."
+      required: false
+      defaultValue: "100"
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
@@ -782,9 +829,8 @@ services:
       description: "Kafka bootstrap servers for the validation service."
       required: true
     - key: "spring.data.redis.host"
-      description: "The Redis host for the validation service."
+      description: "The Redis host for the validation service. Not marked sensitive: a hostname is not a credential, and this one is already carried in the clear by ConnectionStrings:Redis and ResourceCache:Redis:ConnectionString, which address the same instance from the .NET services. The credential is spring.data.redis.password, which stays a Key Vault reference."
       required: true
-      sensitive: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
       required: true
