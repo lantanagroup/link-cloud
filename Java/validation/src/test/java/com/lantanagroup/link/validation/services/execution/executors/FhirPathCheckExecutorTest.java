@@ -218,4 +218,100 @@ class FhirPathCheckExecutorTest {
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getLocation()).isEqualTo("Patient/without");
     }
+
+    // ------------------------------------------------------------------
+    // Single non-Bundle resource: an expression whose leading resource type does not match the root
+    // must be skipped, not evaluated against the wrong resource. Previously "Condition.exists()" run
+    // against a lone Patient evaluated to false and invented a spurious finding.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("single resource: an expression for a DIFFERENT resource type is skipped (no phantom finding)")
+    void singleResourceMismatchedTypeExpressionSkipped() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Condition.exists()\"}", null), context(new Patient()));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("single resource: a nested expression for a different resource type is skipped too")
+    void singleResourceMismatchedNestedExpressionSkipped() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Condition.id.exists()\"}", null), context(new Patient()));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("single resource: an expression for the SAME resource type still evaluates (and can fail)")
+    void singleResourceMatchingTypeStillEvaluated() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\"}", null), context(patient));
+
+        assertThat(findings).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("single resource: an unscoped/relative expression still evaluates against the root")
+    void singleResourceRelativeExpressionStillEvaluated() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"active\"}", null), context(patient));
+
+        assertThat(findings).hasSize(1);
+    }
+
+    // ------------------------------------------------------------------
+    // The recommended authoring pattern for "a resource of type X must be present": a Bundle-level
+    // expression, so it evaluates against the Bundle and can fail when the type is absent. Bare
+    // "Condition.exists()" against a Bundle would filter to zero Condition entries and vacuously pass.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("bundle-level ofType existence expression FAILS when the required resource type is absent")
+    void bundleLevelExistenceFlagsMissingResource() {
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(patient))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.resource.ofType(Condition).exists()\",\"code\":\"condition-missing\"}", null),
+                ctx);
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("condition-missing");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Bundle");
+    }
+
+    @Test
+    @DisplayName("bundle-level ofType existence expression PASSES when the required resource type is present")
+    void bundleLevelExistencePassesWhenPresent() {
+        Patient patient = new Patient();
+        patient.setId("p1");
+        org.hl7.fhir.r4.model.Condition condition = new org.hl7.fhir.r4.model.Condition();
+        condition.setId("c1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(patient);
+        bundle.addEntry().setResource(condition);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(patient, condition))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.resource.ofType(Condition).exists()\"}", null), ctx);
+
+        assertThat(findings).isEmpty();
+    }
 }

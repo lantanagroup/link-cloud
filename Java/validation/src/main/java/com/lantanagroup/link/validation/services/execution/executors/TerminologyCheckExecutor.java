@@ -106,7 +106,7 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 if (result.isOk()) {
                     log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> VALID",
                             check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource));
-                } else if (UnresolvedBindingClassifier.isUnresolvable(result)) {
+                } else if (UnresolvedBindingClassifier.isUnresolvable(result) && !validationSupportChain.isCodeSystemSupported(supportContext, system)) {
                     notEvaluated++;
                     log.info("TERMINOLOGY check '{}': code system {} could not be resolved for code {} on {} -> NOT EVALUATED: {}",
                             check.getCheckLocalId(), system, code, location(resource), result.getMessage());
