@@ -31,6 +31,9 @@ public class RubricDefinitionValidator {
     private static final int MAX_CODE_LENGTH = 128;
     private static final int MAX_PROFILES = 20;
     private static final int MAX_SEMVER_LENGTH = 32;
+    private static final int MAX_COMBINATOR_CHECKS = 20;
+    private static final int MAX_COMBINATOR_DEPTH = 5;
+    private static final Set<String> COMBINATOR_MATCH_MODES = Set.of("ANY", "ALL");
 
     // Allowed parameter keys per check type (Rubric JSON Field Reference §6); unknown keys rejected.
     private static final Map<CheckType, Set<String>> ALLOWED_PARAMETER_KEYS = Map.of(
@@ -40,7 +43,7 @@ public class RubricDefinitionValidator {
             CheckType.PLAUSIBILITY, Set.of("expression", "failureMessage", "code"),
             CheckType.CURRENCY, Set.of("expression", "failureMessage", "code"),
             CheckType.TERMINOLOGY, Set.of("validateCodings", "valueSetWhitelistRegex"),
-            CheckType.VALUESET, Set.of("path", "valueSet", "system"),
+            CheckType.VALUESET, Set.of("path", "valueSet", "system", "checks", "matchMode", "failureMessage", "code"),
             CheckType.CUSTOM, Set.of("customCheckId", "className", "path", "min", "max", "code", "failureMessage")
     );
 
@@ -194,6 +197,10 @@ public class RubricDefinitionValidator {
     private static final int MAX_WHITELIST_REGEX_LENGTH = 512;
 
     private void validateParameters(CheckDto check, String label, List<String> errors) {
+        validateParameters(check, label, errors, 0);
+    }
+
+    private void validateParameters(CheckDto check, String label, List<String> errors, int depth) {
         JsonNode params = check.getParameters();
         if (params != null && !params.isNull() && !params.isObject()) {
             errors.add("checks[" + label + "].parameters: must be a JSON object");
@@ -232,24 +239,7 @@ public class RubricDefinitionValidator {
                     }
                 }
             }
-            case VALUESET -> {
-                String path = text(params, "path");
-                if (path == null) {
-                    errors.add("checks[" + label + "]: VALUESET requires parameters.path");
-                } else {
-                    validateFhirPath(path, "checks[" + label + "].parameters.path", errors);
-                }
-                String valueSet = text(params, "valueSet");
-                if (valueSet == null) {
-                    errors.add("checks[" + label + "]: VALUESET requires parameters.valueSet");
-                } else if (!isCanonicalUrl(valueSet)) {
-                    errors.add("checks[" + label + "].parameters.valueSet: must be a canonical URL (absolute URI, optionally versioned with |version)");
-                }
-                String system = text(params, "system");
-                if (system != null && !isCanonicalUrl(system)) {
-                    errors.add("checks[" + label + "].parameters.system: must be a canonical URL (absolute URI, optionally versioned with |version)");
-                }
-            }
+            case VALUESET -> validateValueSet(check, params, label, errors, depth);
             case CUSTOM -> {
                 String customCheckId = text(params, "customCheckId");
                 String className = text(params, "className");
@@ -267,6 +257,98 @@ public class RubricDefinitionValidator {
                 validateCodeLength(params, label, errors);
             }
             default -> { }
+        }
+    }
+
+    /**
+     * VALUESET carries two mutually exclusive modes in the same check type: direct mode (path +
+     * valueSet, the original membership check) and combinator mode (parameters.checks + matchMode,
+     * which combines child checks ΓÇö of any type, VALUESET included ΓÇö into a logical OR/AND without
+     * needing a separate check type).
+     */
+    private void validateValueSet(CheckDto check, JsonNode params, String label, List<String> errors, int depth) {
+        JsonNode children = params != null ? params.get("checks") : null;
+        if (children != null) {
+            if (params.has("path") || params.has("valueSet") || params.has("system")) {
+                errors.add("checks[" + label + "].parameters: cannot combine 'checks' (combinator mode) with "
+                        + "'path'/'valueSet'/'system' (direct mode) in the same VALUESET check");
+            }
+            validateValueSetCombinator(check, params, children, label, errors, depth);
+            return;
+        }
+
+        String path = text(params, "path");
+        if (path == null) {
+            errors.add("checks[" + label + "]: VALUESET requires parameters.path");
+        } else {
+            validateFhirPath(path, "checks[" + label + "].parameters.path", errors);
+        }
+        String valueSet = text(params, "valueSet");
+        if (valueSet == null) {
+            errors.add("checks[" + label + "]: VALUESET requires parameters.valueSet");
+        } else if (!isCanonicalUrl(valueSet)) {
+            errors.add("checks[" + label + "].parameters.valueSet: must be a canonical URL (absolute URI, optionally versioned with |version)");
+        }
+        String system = text(params, "system");
+        if (system != null && !isCanonicalUrl(system)) {
+            errors.add("checks[" + label + "].parameters.system: must be a canonical URL (absolute URI, optionally versioned with |version)");
+        }
+    }
+
+    private void validateValueSetCombinator(CheckDto check, JsonNode params, JsonNode children, String label,
+                                             List<String> errors, int depth) {
+        String matchMode = text(params, "matchMode");
+        if (matchMode != null && !COMBINATOR_MATCH_MODES.contains(matchMode.toUpperCase())) {
+            errors.add("checks[" + label + "].parameters.matchMode: must be one of " + COMBINATOR_MATCH_MODES
+                    + " (got '" + matchMode + "')");
+        }
+        validateCodeLength(params, label, errors);
+
+        if (!children.isArray() || children.isEmpty()) {
+            errors.add("checks[" + label + "]: VALUESET combinator mode requires a non-empty parameters.checks array");
+            return;
+        }
+        if (depth >= MAX_COMBINATOR_DEPTH) {
+            errors.add("checks[" + label + "].parameters.checks: nesting depth exceeds max of " + MAX_COMBINATOR_DEPTH);
+            return;
+        }
+        if (children.size() > MAX_COMBINATOR_CHECKS) {
+            errors.add("checks[" + label + "].parameters.checks: at most " + MAX_COMBINATOR_CHECKS + " branches are allowed");
+        }
+        for (int i = 0; i < children.size(); i++) {
+            String childLabel = label + ".checks[" + i + "]";
+            JsonNode child = children.get(i);
+            if (!child.isObject()) {
+                errors.add("checks[" + childLabel + "]: must be a JSON object");
+                continue;
+            }
+            String childTypeText = child.path("type").asText(null);
+            if (childTypeText == null || childTypeText.isBlank()) {
+                errors.add("checks[" + childLabel + "]: type is required");
+                continue;
+            }
+            CheckType childType;
+            try {
+                childType = CheckType.valueOf(childTypeText.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                errors.add("checks[" + childLabel + "]: unknown type '" + childTypeText + "'");
+                continue;
+            }
+            String childId = child.path("id").asText(null);
+            if (childId == null || childId.isBlank()) {
+                errors.add("checks[" + childLabel + "]: id is required");
+            } else if (childId.length() > MAX_CODE_LENGTH) {
+                // same bound as a top-level check's own id (CheckDto.id @Size(max=128)); this id
+                // becomes part of the synthetic checkLocalId ValueSetCheckExecutor builds for logging
+                // and finding traceability (parent.id + "." + childId), so keep it consistent
+                errors.add("checks[" + childLabel + "].id: must be at most " + MAX_CODE_LENGTH + " characters (got " + childId.length() + ")");
+            }
+
+            CheckDto syntheticChild = new CheckDto();
+            syntheticChild.setId(check.getId() + "." + (childId != null ? childId : i));
+            syntheticChild.setType(childType);
+            syntheticChild.setParameters(child.get("parameters"));
+            validateParameters(syntheticChild, childLabel, errors, depth + 1);
         }
     }
 
