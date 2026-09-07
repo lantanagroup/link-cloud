@@ -5,6 +5,7 @@ import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricResult;
 import com.lantanagroup.link.validation.entities.RubricVersion;
+import com.lantanagroup.link.validation.enums.ScoringPolicyType;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.*;
 import com.lantanagroup.link.validation.services.execution.CheckExecutionResult;
@@ -92,7 +93,11 @@ public class ResultEnvelopeAssembler {
                 .rubricVersion(version.getSemver())
                 .rubricVersionHash(version.getChecksum())
                 .scoringPolicyType(scoringPolicy.getType())
-                .scoringPolicyRollup(scoringPolicy.getRollup())
+                // PASS_FAIL has no rollup concept (see ScoreAggregator.aggregatePassFail); omit it
+                // rather than report the rollup ScoringPolicyResolver defaults in for other types.
+                .scoringPolicyRollup(scoringPolicy.getType() == ScoringPolicyType.PIQI_PASS_FAIL
+                        ? null
+                        : scoringPolicy.getRollup())
                 .subject(ctx.getSubject())
                 .status(score.getInterpretation())
                 .score(score)

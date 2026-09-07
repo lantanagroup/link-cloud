@@ -5,7 +5,9 @@ import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
+import com.lantanagroup.link.validation.enums.RollupStrategy;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
+import com.lantanagroup.link.validation.enums.ScoringPolicyType;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.FindingDto;
@@ -158,6 +160,74 @@ class ResultEnvelopeAssemblerTest {
 
         assertThat(out.resultEntity().getFacilityId()).isNull();
         assertThat(out.resultEntity().getPatientId()).isNull();
+    }
+
+    // ------------------------------------------------------------------
+    // Scoring policy metadata
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("default policy (no scoring_policy_json) exposes type + rollup on the envelope")
+    void defaultPolicyExposesTypeAndRollup() {
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version(), identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
+
+        assertThat(out.envelope().getScoringPolicyType()).isEqualTo(ScoringPolicyType.PIQI_DIMENSION_SCORECARD);
+        assertThat(out.envelope().getScoringPolicyRollup()).isEqualTo(RollupStrategy.WORST_OF);
+    }
+
+    @Test
+    @DisplayName("PASS_FAIL policy exposes its type but omits rollup, which has no meaning for it")
+    void passFailPolicyOmitsRollup() {
+        RubricVersion version = RubricVersion.builder()
+                .rubricId("piqi.core")
+                .semver("1.3.0")
+                .rubricVersionId(UUID.randomUUID())
+                .checksum("checksum-abc")
+                .scoringPolicyJson("{\"type\":\"piqi-pass-fail\"}")
+                .build();
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version, identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
+
+        assertThat(out.envelope().getScoringPolicyType()).isEqualTo(ScoringPolicyType.PIQI_PASS_FAIL);
+        assertThat(out.envelope().getScoringPolicyRollup()).isNull();
+    }
+
+    @Test
+    @DisplayName("PASS_FAIL policy still omits rollup even if one was persisted alongside it")
+    void passFailPolicyOmitsRollupEvenIfPersisted() {
+        RubricVersion version = RubricVersion.builder()
+                .rubricId("piqi.core")
+                .semver("1.3.0")
+                .rubricVersionId(UUID.randomUUID())
+                .checksum("checksum-abc")
+                .scoringPolicyJson("{\"type\":\"piqi-pass-fail\",\"rollup\":\"worst-of\"}")
+                .build();
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version, identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
+
+        assertThat(out.envelope().getScoringPolicyType()).isEqualTo(ScoringPolicyType.PIQI_PASS_FAIL);
+        assertThat(out.envelope().getScoringPolicyRollup()).isNull();
+    }
+
+    @Test
+    @DisplayName("a null/blank scoring_policy_json (e.g. never persisted) falls back to the default policy safely")
+    void blankScoringPolicyJsonFallsBackSafely() {
+        RubricVersion version = RubricVersion.builder()
+                .rubricId("piqi.core")
+                .semver("1.3.0")
+                .rubricVersionId(UUID.randomUUID())
+                .checksum("checksum-abc")
+                .scoringPolicyJson(null)
+                .build();
+
+        ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
+                ctx(), version, identity(List.of()), List.of(), Map.of(), OffsetDateTime.now());
+
+        assertThat(out.envelope().getScoringPolicyType()).isEqualTo(ScoringPolicyType.PIQI_DIMENSION_SCORECARD);
+        assertThat(out.envelope().getScoringPolicyRollup()).isEqualTo(RollupStrategy.WORST_OF);
     }
 
     // ------------------------------------------------------------------
