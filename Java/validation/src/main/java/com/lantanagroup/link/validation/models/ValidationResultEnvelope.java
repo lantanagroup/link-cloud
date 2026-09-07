@@ -1,7 +1,9 @@
 package com.lantanagroup.link.validation.models;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.lantanagroup.link.validation.enums.RollupStrategy;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
+import com.lantanagroup.link.validation.enums.ScoringPolicyType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,6 +25,8 @@ public class ValidationResultEnvelope {
     private String rubricId;
     private String rubricVersion;
     private String rubricVersionHash;
+    private ScoringPolicyType scoringPolicyType;
+    private RollupStrategy scoringPolicyRollup;
     private SubjectDto subject;
     private String payloadRef;
     private RubricResultStatus status;

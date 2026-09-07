@@ -83,6 +83,8 @@ public class ResultEnvelopeAssembler {
                 .rubricId(version.getRubricId())
                 .rubricVersion(version.getSemver())
                 .rubricVersionHash(version.getChecksum())
+                .scoringPolicyType(scoringPolicy.getType())
+                .scoringPolicyRollup(scoringPolicy.getRollup())
                 .subject(ctx.getSubject())
                 .status(score.getInterpretation())
                 .score(score)
