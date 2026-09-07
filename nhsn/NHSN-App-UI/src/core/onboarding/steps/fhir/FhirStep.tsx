@@ -5,7 +5,7 @@ import {Button, InfoTooltip, NHSNLoadingIndicator, NumberField, PageHeader, Step
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
-import {isValidHttpUrl, validateFhir, type FhirFieldValues} from './validate';
+import {validateFhir, type FhirFieldValues} from './validate';
 import './FhirStep.css';
 
 /**
@@ -102,11 +102,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setTestedBaseUrl(null);
   }
 
-  function handleBaseUrlBlur() {
-    const trimmed = baseUrl.trim();
-    setBaseUrlError(trimmed && !isValidHttpUrl(trimmed) ? t('onboarding:fhirServerInfo.messages.invalidBaseUrl') : null);
-  }
-
   function currentFieldValues(overrides: Partial<FhirFieldValues> = {}): FhirFieldValues {
     return {
       fhirServerBaseUrl: baseUrl,
@@ -124,6 +119,10 @@ export function FhirStep({onNext, onBack}: StepProps) {
   function validateField(field: keyof FhirFieldValues, setError: (message: string | null) => void, overrides?: Partial<FhirFieldValues>) {
     const errors = validateFhir(currentFieldValues(overrides));
     setError(errors[field] ? t(errors[field]) : null);
+  }
+
+  function handleBaseUrlBlur() {
+    validateField('fhirServerBaseUrl', setBaseUrlError);
   }
 
   function handlePullTimeBlur(value: string, setter: (value: string) => void, field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', setError: (message: string | null) => void) {

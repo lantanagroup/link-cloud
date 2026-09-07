@@ -39,6 +39,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
     private readonly IFacilityAdministrationService _facilityAdministrationService;
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
+    private readonly IEncounterMappingService _encounterMappingService;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -52,6 +53,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         ISftpConfigurationGateway sftpConfigurationGateway,
         IFacilityAdministrationService facilityAdministrationService,
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
+        IEncounterMappingService encounterMappingService,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -64,6 +66,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _sftpConfigurationGateway = sftpConfigurationGateway;
         _facilityAdministrationService = facilityAdministrationService;
         _organizationLocationGateway = organizationLocationGateway;
+        _encounterMappingService = encounterMappingService;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -245,11 +248,13 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 }, cancellationToken);
                 break;
 
+            case "encounter":
+                await _encounterMappingService.SaveAsync(draft.Encounter.Mappings, cancellationToken);
+                break;
+
             default:
-                // Workflow-only step, or one whose data is written through its own endpoint.
-                // encounter falls here: code systems are workflow state (see
-                // SaveWorkflowStateAsync), and the mappings are Normalization CodeMap operations
-                // written through their own /encounter-mappings endpoint.
+                // Workflow-only step, or one whose data belongs to a BFF table written through its
+                // own endpoint.
                 break;
         }
     }

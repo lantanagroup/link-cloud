@@ -68,6 +68,10 @@
       "loadError": "Unable to load facility information.",
       "saveSuccess": "Facility information saved.",
       "saveError": "Unable to save facility information."
+    },
+    "errors": {
+      "timeZoneRequired": "Facility Time Zone is required.",
+      "vendorRequired": "EHR Vendor is required."
     }
   },
   "manualUpload": {
@@ -133,6 +137,10 @@
       "testFailure": "Connection test failed.",
       "testError": "Unable to test the connection.",
       "connectionNotTested": "Test the connection before continuing."
+    },
+    "errors": {
+      "baseUrlRequired": "FHIR Server Base URL is required.",
+      "fieldRequired": "This field is required."
     }
   },
   "census": {

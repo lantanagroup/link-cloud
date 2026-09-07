@@ -185,9 +185,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, StaticAssetEndpoints>();
     builder.Services.AddTransient<IApi, OnboardingEndpoints>();
     builder.Services.AddTransient<IApi, ReferenceEndpoints>();
+    builder.Services.AddTransient<IApi, EncounterEndpoints>();
     builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();
     builder.Services.AddTransient<IApi, OrganizationIdentificationEndpoints>();
-    builder.Services.AddTransient<IApi, EncounterMappingsEndpoints>();
     builder.Services.AddTransient<IApi, HslocMappingsEndpoints>();
     builder.Services.AddTransient<IApi, DocumentsEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");

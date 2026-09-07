@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
@@ -35,6 +36,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IReportGateway _reportGateway;
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
+    private readonly IEncounterMappingService _encounterMappingService;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
 
@@ -50,6 +52,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IReportGateway reportGateway,
         IAcknowledgementService acknowledgementService,
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
+        IEncounterMappingService encounterMappingService,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
     {
@@ -64,6 +67,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _reportGateway = reportGateway;
         _acknowledgementService = acknowledgementService;
         _organizationLocationGateway = organizationLocationGateway;
+        _encounterMappingService = encounterMappingService;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -119,7 +123,10 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var locationOrgTask = ReadSectionAsync("locationOrg", "DataAcquisition",
             ct => _organizationLocationGateway.GetAsync(facilityId, ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask, locationOrgTask);
+        var encounterMappingsTask = ReadSectionAsync<IReadOnlyList<EncounterMapping>?>("encounter", "Normalization",
+            async ct => await _encounterMappingService.GetAsync(ct), overall.Token, cancellationToken);
+
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask, locationOrgTask, encounterMappingsTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
@@ -129,17 +136,20 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var hasCredentials = await hasCredentialsTask;
         var report = await reportTask;
         var locationOrg = await locationOrgTask;
+        var encounterMappings = await encounterMappingsTask;
 
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
         sources.Add(census.Source);
         sources.Add(report.Source);
         sources.Add(locationOrg.Source);
+        sources.Add(encounterMappings.Source);
 
         return new DraftEnvelopeResponse
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
-                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value, locationOrg.Value),
+                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value, locationOrg.Value,
+                encounterMappings.Value),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -156,7 +166,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         SftpConfig? sftpConfig,
         bool? hasCredentials,
         ReportScheduleSummary? report,
-        LocationOrgSection? locationOrg) => new()
+        LocationOrgSection? locationOrg,
+        IReadOnlyList<EncounterMapping>? encounterMappings) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -200,7 +211,11 @@ public sealed class OnboardingReadService : IOnboardingReadService
             // Reconstructed from Data Acquisition's FHIRPath conditions - see LocationOrgFhirPathParser.
             LocationOrg = locationOrg ?? new LocationOrgSection(),
 
-            Encounter = new EncounterSection { CodeSystems = stored.State.Encounter.CodeSystems },
+            Encounter = new EncounterSection
+            {
+                CodeSystems = stored.State.Encounter.CodeSystems,
+                Mappings = encounterMappings ?? []
+            },
 
             Hsloc = new HslocSection { Mappings = stored.State.Hsloc.Mappings },
 

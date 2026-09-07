@@ -38,14 +38,15 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const {draft, patch, saving} = useOnboarding();
 
   const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState<CodeSystemGroupState[]>([]);
+  const [groups, setGroups] = useState<CodeSystemGroupState[]>(() =>
+    buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? [])
+  );
   const [referenceCodes, setReferenceCodes] = useState<EncounterCode[]>([]);
   const [activeTab, setActiveTab] = useState<'mapping' | 'reference'>('mapping');
   const [search, setSearch] = useState('');
   const [systemFilter, setSystemFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
 
   useEffect(() => {
@@ -59,12 +60,12 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     let mounted = true;
     setLoading(true);
 
-    Promise.all([api.getEncounterMappings(), api.getEncounterCodes()])
-      .then(([mappings, codes]) => {
+    api
+      .getEncounterCodes()
+      .then(codes => {
         if (!mounted) {
           return;
         }
-        setGroups(buildGroups(draft.encounter.codeSystems ?? [], mappings));
         setReferenceCodes(codes);
       })
       .catch(cause => {
@@ -190,18 +191,9 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     );
   }
 
-  async function handleNext() {
-    setSaveError(null);
+  function handleNext() {
     const {codeSystems, mappings} = flattenGroups(groups);
-
-    try {
-      await api.saveEncounterMappings(mappings);
-    } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : t('onboarding:encounter.messages.saveError'));
-      return;
-    }
-
-    patch('encounter', {codeSystems});
+    patch('encounter', {codeSystems, mappings});
     setReadyToAdvance(true);
   }
 
@@ -413,11 +405,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
             </div>
           )}
 
-          {saveError && (
-            <p className="nhsn-link__form-error" role="alert">
-              {saveError}
-            </p>
-          )}
         </div>
 
         <StepActions saving={saving}>

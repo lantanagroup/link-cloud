@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -10,7 +11,29 @@ public class FhirServerEndpoints : IApi
             .WithTags("NHSN App BFF")
             .RequireAuthorization("AuthenticatedUser");
 
-        group.MapPost("/connection-tests", async (FhirConnectionTestRequest request, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (INhsnUserContext userContext, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
+            {
+                if (!userContext.HasFacility)
+                {
+                    return Results.BadRequest(new { message = "Facility context is required." });
+                }
+
+                try
+                {
+                    var info = await facilityAdministrationService.GetFhirServerInfoAsync(cancellationToken);
+                    return info is null ? Results.NotFound() : Results.Ok(info);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            })
+            .WithName("GetFhirServerInfo")
+            .Produces<FhirServerInfoResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/test-connection", async (FhirConnectionTestRequest request, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
             {
                 var result = await facilityAdministrationService.TestFhirConnectionAsync(request.FhirServerBaseUrl, cancellationToken);
                 return Results.Ok(result);

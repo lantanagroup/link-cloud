@@ -1358,8 +1358,6 @@
 }
 
 .info-icon.info-icon--open {
-  background: var(--kendo-color-primary, #0057b7);
-  color: var(--kendo-color-on-primary, #ffffff);
   outline: none;
 }
 
@@ -1394,7 +1392,6 @@
   border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
-.info-icon:hover .tooltip-bubble,
 .info-icon:focus-visible .tooltip-bubble,
 .info-icon.info-icon--open .tooltip-bubble {
   display: block;

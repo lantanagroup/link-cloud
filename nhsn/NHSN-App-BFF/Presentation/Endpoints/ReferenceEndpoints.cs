@@ -39,21 +39,6 @@ public class ReferenceEndpoints : IApi
                 return operation;
             });
 
-        group.MapGet("/encounter-codes", (string? q, IReferenceDataService referenceData) =>
-                Results.Ok(referenceData.GetEncounterCodes(q)))
-            .WithName("GetEncounterCodes")
-            .Produces<IReadOnlyList<EncounterCode>>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "CPT/SNOMED reference codes for the Encounter Mapping step.";
-                operation.Description =
-                    "Optional q: case-insensitive match across system, code, display, category " +
-                    "and categoryName. Omit it (or pass it blank) for the whole catalog, which is " +
-                    "what the UI does — it keeps the list and filters it in place.";
-                return operation;
-            });
-
         group.MapGet("/hsloc-codes", (IReferenceDataService referenceData) =>
                 Results.Ok(referenceData.GetHslocCodes()))
             .WithName("GetHslocCodes")

@@ -11,7 +11,7 @@ export interface InfoTooltipProps {
 export function InfoTooltip({label, content}: InfoTooltipProps) {
   const bubbleId = useId();
   return (
-    <button type="button" className="info-icon" aria-label={label} aria-describedby={bubbleId}>
+    <button type="button" className="info-icon" aria-label={label} aria-describedby={bubbleId} tabIndex={-1}>
       ?
       <span id={bubbleId} className="tooltip-bubble" role="tooltip">
         {content}

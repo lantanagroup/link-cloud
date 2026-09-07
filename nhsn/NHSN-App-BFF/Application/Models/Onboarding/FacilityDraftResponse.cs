@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
@@ -123,7 +124,7 @@ public sealed record HslocSection
 public sealed record EncounterSection
 {
     public IReadOnlyList<string> CodeSystems { get; init; } = [];
-    public IReadOnlyList<object> Mappings { get; init; } = [];
+    public IReadOnlyList<EncounterMapping> Mappings { get; init; } = [];
 }
 
 // Tenant for the measures and period; DraftJson for the request state.
