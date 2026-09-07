@@ -12,6 +12,8 @@ import com.lantanagroup.link.validation.services.execution.EvaluatedFinding;
 import com.lantanagroup.link.validation.services.scoring.ScoringPolicyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -26,6 +28,12 @@ public class ResultEnvelopeAssembler {
     private final ScoreAggregator scoreAggregator;
     private final ScoringPolicyResolver scoringPolicyResolver;
     private final ValidationPolicyConfig policyConfig;
+
+    // Not @RequiredArgsConstructor-injected: BuildProperties only exists once the module has
+    // actually been built by Maven (spring-boot-maven-plugin's build-info goal generates it), so
+    // it's absent e.g. when running straight from an IDE/test without a package step first.
+    @Autowired(required = false)
+    private BuildProperties buildProperties;
 
     public AssembleOutput assemble(
             ExecutionContext ctx,
@@ -97,7 +105,7 @@ public class ResultEnvelopeAssembler {
                         .durationMs(durationMs)
                         .checkDurationsMs(checkDurationsMs)
                         .checkWorkMs(checkWorkMs)
-                        .validatorVersion("vaas-0.2.0")
+                        .validatorVersion(buildProperties != null ? buildProperties.getVersion() : "UNKNOWN")
                         .build())
                 .build();
 

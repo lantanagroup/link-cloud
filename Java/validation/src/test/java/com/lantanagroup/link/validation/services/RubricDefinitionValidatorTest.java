@@ -585,4 +585,135 @@ class RubricDefinitionValidatorTest {
                 .anyMatch(e -> e.contains("invalid FHIRPath expression"))
                 .anyMatch(e -> e.contains("scoringPolicy.type"));
     }
+
+    //  VALUESET combinator mode (parameters.checks + matchMode ΓÇö folded into VALUESET, no separate check type)
+
+    private static String combinatorChildren(String... childJson) {
+        return "{\"matchMode\":\"ANY\",\"checks\":[" + String.join(",", childJson) + "]}";
+    }
+
+    @Test
+    @DisplayName("valid VALUESET combinator (VALUESET branch OR'd with a FHIRPATH branch) passes")
+    void validValueSetCombinator() {
+        var p = payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"b1\",\"type\":\"VALUESET\",\"parameters\":{\"path\":\"Encounter.class\",\"valueSet\":\"http://x/vs\"}}",
+                        "{\"id\":\"b2\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"Encounter.class.code = 'IMP'\"}}"
+                ))).build()).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator with invalid matchMode -> rejected")
+    void combinatorInvalidMatchMode() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params("{\"matchMode\":\"BOTH\",\"checks\":[{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}]}"))
+                .build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("parameters.matchMode"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator with empty checks array -> rejected")
+    void combinatorEmptyChecks() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params("{\"matchMode\":\"ANY\",\"checks\":[]}"))
+                .build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("requires a non-empty parameters.checks array"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch that is itself a VALUESET combinator is allowed to nest")
+    void combinatorNestingAllowed() {
+        var p = payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"b1\",\"type\":\"VALUESET\",\"parameters\":{\"matchMode\":\"ALL\",\"checks\":[{\"id\":\"b1a\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}]}}"
+                ))).build()).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator nesting deeper than the max depth -> rejected")
+    void combinatorNestingTooDeep() {
+        // 6 levels of VALUESET-combinator-in-VALUESET-combinator, exceeding MAX_COMBINATOR_DEPTH (5)
+        String built = "{\"id\":\"leaf\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}";
+        for (int i = 0; i < 6; i++) {
+            built = "{\"id\":\"b" + i + "\",\"type\":\"VALUESET\",\"parameters\":{\"matchMode\":\"ANY\",\"checks\":[" + built + "]}}";
+        }
+        String inner = built;
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params("{\"matchMode\":\"ANY\",\"checks\":[" + inner + "]}"))
+                .build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("nesting depth exceeds max"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator cannot mix 'checks' with direct-mode path/valueSet")
+    void combinatorCannotMixWithDirectMode() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params("{\"path\":\"Encounter.class\",\"valueSet\":\"http://x/vs\",\"matchMode\":\"ANY\","
+                        + "\"checks\":[{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}]}"))
+                .build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("cannot combine 'checks'"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch missing id -> rejected")
+    void combinatorChildMissingId() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}"
+                ))).build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c1.checks[0]]: id is required"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch id over 128 characters -> rejected")
+    void combinatorChildIdTooLong() {
+        String longId = "x".repeat(129);
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"" + longId + "\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}"
+                ))).build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c1.checks[0]].id: must be at most 128 characters (got 129)"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch id at exactly 128 characters passes")
+    void combinatorChildIdAtLimit() {
+        String id128 = "x".repeat(128);
+        var p = payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"" + id128 + "\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}"
+                ))).build()).build();
+        assertThatCode(() -> validator.validate(p)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch with an unknown type -> rejected")
+    void combinatorChildUnknownType() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"b1\",\"type\":\"NOT_A_TYPE\",\"parameters\":{}}"
+                ))).build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("unknown type 'NOT_A_TYPE'"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator branch's own bad parameters (e.g. VALUESET missing valueSet) surface with a nested label")
+    void combinatorChildBadParametersSurface() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params(combinatorChildren(
+                        "{\"id\":\"b1\",\"type\":\"VALUESET\",\"parameters\":{\"path\":\"Encounter.class\"}}"
+                ))).build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("checks[c1.checks[0]]: VALUESET requires parameters.valueSet"));
+    }
+
+    @Test
+    @DisplayName("VALUESET combinator with unknown parameter key -> rejected")
+    void combinatorUnknownParameterKey() {
+        var errors = errorsOf(() -> validator.validate(payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY)
+                .parameters(params("{\"matchMode\":\"ANY\",\"bogus\":true,\"checks\":[{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}]}"))
+                .build()).build()));
+        assertThat(errors).anyMatch(e -> e.contains("unknown property 'bogus'"));
+    }
 }

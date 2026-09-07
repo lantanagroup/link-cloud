@@ -65,7 +65,13 @@ public class FhirConfig {
      */
     @Bean
     public IFhirPath fhirPath(FhirContext fhirContext,
+                              ValidationSupportChain validationSupportChain,
                               com.lantanagroup.link.validation.services.execution.BundleReferenceResolver bundleReferenceResolver) {
+        // Must happen before ThreadLocalFhirPath is constructed: its constructor eagerly builds one
+        // engine via fhirContext.newFhirPath(), which reads whatever validation support is attached
+        // to fhirContext at that moment. Without this, memberOf() and other terminology-aware FHIRPath
+        // functions always see HAPI's default empty support and fail closed.
+        fhirContext.setValidationSupport(validationSupportChain);
         IFhirPath fhirPath = new ThreadLocalFhirPath(fhirContext);
         fhirPath.setEvaluationContext(bundleReferenceResolver);
         return fhirPath;
