@@ -72,6 +72,8 @@ export class TestAuthApiClient implements ApiClient {
     this.inner.getJwksInstructionsUrl(vendor);
   getLocationOrgResolutionUrl: ApiClient['getLocationOrgResolutionUrl'] = () =>
     this.inner.getLocationOrgResolutionUrl();
+  getCensusInstructionsUrl: ApiClient['getCensusInstructionsUrl'] = vendor =>
+    this.inner.getCensusInstructionsUrl(vendor);
 }
 
 /**

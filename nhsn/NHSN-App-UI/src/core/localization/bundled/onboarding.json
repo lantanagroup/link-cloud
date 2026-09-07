@@ -440,6 +440,7 @@
     "stepNotImplemented": "This step is not implemented yet.",
     "stepUnavailable": "That step is not available.",
     "draftConflict": "This facility was updated in another window. Reload to see the latest version.",
-    "notConnected": "Not yet connected to live data. The values shown are simulated."
+    "notConnected": "Not yet connected to live data. The values shown are simulated.",
+    "downloadFailed": "Unable to download the file. Please try again."
   }
 }

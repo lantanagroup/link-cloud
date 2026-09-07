@@ -107,24 +107,6 @@
   color: var(--census-gray-800);
 }
 
-.census-poi .census-instructions-box {
-  background: var(--census-gray-50);
-  border: 1px solid var(--census-gray-200);
-  border-radius: var(--census-radius);
-  padding: 14px 16px;
-  margin-bottom: 18px;
-}
-
-.census-poi .census-instructions-box p {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--census-gray-600);
-}
-
-.census-poi .census-instructions-box .nhsn-link__download-field {
-  margin: 0;
-}
-
 .census-poi .form-group {
   margin-bottom: 18px;
 }
