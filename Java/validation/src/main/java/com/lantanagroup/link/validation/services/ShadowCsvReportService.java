@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.ShadowComparisonResult;
 import com.lantanagroup.link.validation.models.LegacyShadowResultDto;
 import com.lantanagroup.link.validation.models.RubricResultDto;
+import com.lantanagroup.link.validation.repositories.ShadowComparisonResultRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,9 +13,11 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +44,7 @@ public class ShadowCsvReportService {
     };
 
     private final BlobStorageService blobStorageService;
+    private final ShadowComparisonResultRepository shadowComparisonResultRepository;
     private final RubricResultQueryService rubricResultQueryService;
     private final LegacyShadowResultQueryService legacyShadowResultQueryService;
     private final ObjectMapper objectMapper;
@@ -48,11 +52,13 @@ public class ShadowCsvReportService {
 
     public ShadowCsvReportService(
             Optional<BlobStorageService> blobStorageService,
+            ShadowComparisonResultRepository shadowComparisonResultRepository,
             RubricResultQueryService rubricResultQueryService,
             LegacyShadowResultQueryService legacyShadowResultQueryService,
             ObjectMapper objectMapper,
             @Value("${vaas.bridge.shadow-report.daily-blob-path:shadow-reports/shadow-comparison-daily-report.csv}") String dailyBlobPathTemplate) {
         this.blobStorageService = blobStorageService.orElse(null);
+        this.shadowComparisonResultRepository = shadowComparisonResultRepository;
         this.rubricResultQueryService = rubricResultQueryService;
         this.legacyShadowResultQueryService = legacyShadowResultQueryService;
         this.objectMapper = objectMapper;
@@ -86,6 +92,20 @@ public class ShadowCsvReportService {
         String blobPath = resolveBlobPath(dailyBlobPathTemplate, reportDate);
         BinaryData data = blobStorageService.downloadIfExists(blobPath);
         return data == null ? null : data.toBytes();
+    }
+
+    /**
+     * Builds the same CSV {@link #generateDailyReport} produces, but on demand for an arbitrary
+     * {@code [start, end)} window queried straight from {@code shadow_comparison_result} -- no blob
+     * storage involved, so it works for any date range, not just what the daily job has already run for.
+     */
+    public byte[] generateReport(OffsetDateTime start, OffsetDateTime end) {
+        List<ShadowComparisonResult> results = shadowComparisonResultRepository.findByComparedAtBetween(start, end);
+        try {
+            return buildCsv(results);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to build the shadow comparison report for " + start + " to " + end, e);
+        }
     }
 
     /** Inserts {@code date} before the given template's extension so each day gets its own blob. */
