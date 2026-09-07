@@ -7,6 +7,7 @@ import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.LegacyShadowResultDto;
 import com.lantanagroup.link.validation.models.RubricResultDto;
 import com.lantanagroup.link.validation.records.ShadowFindingDto;
+import com.lantanagroup.link.validation.repositories.ShadowComparisonResultRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,10 +34,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Covers {@link ShadowCsvReportService#generateDailyReport} and {@link
- * ShadowCsvReportService#downloadDailyReport} against a mocked {@link BlobStorageService} -- no real Azure
- * client is built or called. The uploaded bytes are read back with a small RFC 4180 parser to confirm the
- * row content and that quoting/escaping round-trips without data loss.
+ * Covers {@link ShadowCsvReportService#generateDailyReport}, {@link
+ * ShadowCsvReportService#downloadDailyReport}, and {@link ShadowCsvReportService#generateReport} against a
+ * mocked {@link BlobStorageService} -- no real Azure client is built or called. The uploaded/returned bytes
+ * are read back with a small RFC 4180 parser to confirm the row content and that quoting/escaping
+ * round-trips without data loss.
  */
 @ExtendWith(MockitoExtension.class)
 class ShadowCsvReportServiceTest {
@@ -46,6 +48,9 @@ class ShadowCsvReportServiceTest {
 
     @Mock
     private BlobStorageService blobStorageService;
+
+    @Mock
+    private ShadowComparisonResultRepository shadowComparisonResultRepository;
 
     @Mock
     private RubricResultQueryService rubricResultQueryService;
@@ -59,8 +64,8 @@ class ShadowCsvReportServiceTest {
         lenient().when(rubricResultQueryService.findByRequestId(any())).thenReturn(Optional.empty());
         lenient().when(legacyShadowResultQueryService.findByRequestId(any())).thenReturn(Optional.empty());
         return new ShadowCsvReportService(
-                Optional.of(blobStorageService), rubricResultQueryService, legacyShadowResultQueryService,
-                objectMapper, DAILY_BLOB_PATH_TEMPLATE);
+                Optional.of(blobStorageService), shadowComparisonResultRepository, rubricResultQueryService,
+                legacyShadowResultQueryService, objectMapper, DAILY_BLOB_PATH_TEMPLATE);
     }
 
     private static ShadowComparisonResult comparisonResult(boolean matched, String addedJson) {
@@ -192,8 +197,8 @@ class ShadowCsvReportServiceTest {
     @Test
     void generateDailyReport_doesNothing_whenBlobStorageNotConfigured() {
         ShadowCsvReportService service = new ShadowCsvReportService(
-                Optional.empty(), rubricResultQueryService, legacyShadowResultQueryService, objectMapper,
-                DAILY_BLOB_PATH_TEMPLATE);
+                Optional.empty(), shadowComparisonResultRepository, rubricResultQueryService,
+                legacyShadowResultQueryService, objectMapper, DAILY_BLOB_PATH_TEMPLATE);
 
         service.generateDailyReport(LocalDate.parse("2026-08-21"), List.of(comparisonResult(true, null)));
 
@@ -232,10 +237,28 @@ class ShadowCsvReportServiceTest {
     @Test
     void downloadDailyReport_returnsNull_whenBlobStorageNotConfigured() {
         ShadowCsvReportService service = new ShadowCsvReportService(
-                Optional.empty(), rubricResultQueryService, legacyShadowResultQueryService, objectMapper,
-                DAILY_BLOB_PATH_TEMPLATE);
+                Optional.empty(), shadowComparisonResultRepository, rubricResultQueryService,
+                legacyShadowResultQueryService, objectMapper, DAILY_BLOB_PATH_TEMPLATE);
 
         assertNull(service.downloadDailyReport(LocalDate.parse("2026-08-21")));
+        verifyNoInteractions(blobStorageService);
+    }
+
+    @Test
+    void generateReport_queriesRepositoryForWindow_andBuildsSameCsvShapeAsDailyReport() {
+        when(shadowComparisonResultRepository.findByComparedAtBetween(
+                OffsetDateTime.parse("2026-08-21T00:00:00Z"), OffsetDateTime.parse("2026-08-23T00:00:00Z")))
+                .thenReturn(List.of(comparisonResult(true, null), comparisonResult(false, "[{\"severity\":\"WARNING\"}]")));
+        ShadowCsvReportService service = service();
+
+        byte[] content = service.generateReport(
+                OffsetDateTime.parse("2026-08-21T00:00:00Z"), OffsetDateTime.parse("2026-08-23T00:00:00Z"));
+
+        List<List<String>> rows = parseCsv(new String(content, StandardCharsets.UTF_8));
+        assertEquals("Is Matched", rows.get(0).get(8));
+        assertEquals(3, rows.size());
+        assertEquals("true", rows.get(1).get(8));
+        assertEquals("false", rows.get(2).get(8));
         verifyNoInteractions(blobStorageService);
     }
 

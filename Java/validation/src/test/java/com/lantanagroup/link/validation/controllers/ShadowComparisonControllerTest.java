@@ -17,10 +17,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -141,5 +144,42 @@ class ShadowComparisonControllerTest {
 
         mockMvc.perform(get(BASE + "/daily-report").param("date", "2026-08-21"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET the report for a date range returns 200 with the csv bytes queried live for that window")
+    void returnsReportBytesForDateRange() throws Exception {
+        byte[] bytes = "csv-bytes".getBytes();
+        OffsetDateTime start = OffsetDateTime.parse("2026-08-21T00:00:00Z");
+        OffsetDateTime end = OffsetDateTime.parse("2026-08-24T00:00:00Z");
+        when(shadowCsvReportService.generateReport(start, end)).thenReturn(bytes);
+
+        mockMvc.perform(get(BASE + "/report")
+                        .param("startDate", "2026-08-21")
+                        .param("endDate", "2026-08-23"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"shadow-comparison-report-2026-08-21-to-2026-08-23.csv\""))
+                .andExpect(content().bytes(bytes));
+    }
+
+    @Test
+    @DisplayName("GET the report with endDate before startDate returns 400")
+    void returnsBadRequestWhenEndDateBeforeStartDate() throws Exception {
+        mockMvc.perform(get(BASE + "/report")
+                        .param("startDate", "2026-08-23")
+                        .param("endDate", "2026-08-21"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET the report for a single day (startDate == endDate) returns 200")
+    void returnsReportForSingleDayRange() throws Exception {
+        when(shadowCsvReportService.generateReport(any(), any())).thenReturn("bytes".getBytes());
+
+        mockMvc.perform(get(BASE + "/report")
+                        .param("startDate", "2026-08-21")
+                        .param("endDate", "2026-08-21"))
+                .andExpect(status().isOk());
     }
 }
