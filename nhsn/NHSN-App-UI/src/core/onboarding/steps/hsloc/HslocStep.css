@@ -35,6 +35,16 @@
   outline-offset: -2px;
 }
 
+.nhsn-link__hsloc-code-select--error {
+  border-color: var(--kendo-color-error, #cc1b22);
+}
+
+.nhsn-link__hsloc-code-error-text {
+  color: var(--kendo-color-error, #cc1b22);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
 /* ---------------------------------------------------------- reference tab */
 
 .nhsn-link__hsloc-search {

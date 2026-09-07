@@ -302,7 +302,8 @@
         "yourCodePlaceholder": "Your Code",
         "yourCodeAriaLabel": "Your Code",
         "locationValueFallback": "Location value",
-        "hslocCodePlaceholder": "Select an HSLOC code…"
+        "hslocCodePlaceholder": "Select an HSLOC code…",
+        "requiredError": "This field is required."
       }
     },
     "reference": {
@@ -346,6 +347,7 @@
       }
     },
     "messages": {
+      "incomplete": "Please complete all fields for each mapping row before continuing.",
       "loadError": "Unable to load HSLOC reference data.",
       "saveError": "Unable to save HSLOC location mappings."
     }

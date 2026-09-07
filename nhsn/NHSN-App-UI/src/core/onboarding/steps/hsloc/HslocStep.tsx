@@ -17,21 +17,32 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {findIncompleteRowIndexes} from './validate';
 import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
+
+interface RowDirtyState {
+  sourceDisplay: boolean;
+  sourceCode: boolean;
+  hslocCode: boolean;
+}
+
+const CLEAN_ROW: RowDirtyState = {sourceDisplay: false, sourceCode: false, hslocCode: false};
 
 interface MappingRow {
   sourceDisplay: string;
   sourceCode: string;
   hslocCode: string;
+  dirty: RowDirtyState;
 }
 
 function toMappingRow(mapping: HslocMapping): MappingRow {
   return {
     sourceDisplay: mapping.sourceDisplay ?? '',
     sourceCode: mapping.sourceCode,
-    hslocCode: mapping.hslocCode
+    hslocCode: mapping.hslocCode,
+    dirty: CLEAN_ROW
   };
 }
 
@@ -114,6 +125,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
     return rows.some(row => row.hslocCode === code && row.sourceCode.trim());
   }
 
+  const incompleteRowIndexes = useMemo(() => new Set(findIncompleteRowIndexes(rows)), [rows]);
+  const requiredFieldError = t('onboarding:hsloc.mapping.fields.requiredError');
+
   const categories = useMemo(
     () => Array.from(new Set(codes.map(row => row.category).filter((value): value is string => Boolean(value)))).sort(),
     [codes]
@@ -175,15 +189,18 @@ export function HslocStep({onNext, onBack}: StepProps) {
   }, [codes]);
 
   async function handleNext() {
+    if (incompleteRowIndexes.size > 0) {
+      notifyError(t('onboarding:hsloc.messages.incomplete'));
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const mappings: HslocMapping[] = rows
-        .filter(row => row.sourceCode.trim() || row.sourceDisplay.trim() || row.hslocCode.trim())
-        .map(row => ({
-          sourceCode: row.sourceCode.trim(),
-          sourceDisplay: row.sourceDisplay.trim() || undefined,
-          hslocCode: row.hslocCode.trim()
-        }));
+      const mappings: HslocMapping[] = rows.map(row => ({
+        sourceCode: row.sourceCode.trim(),
+        sourceDisplay: row.sourceDisplay.trim() || undefined,
+        hslocCode: row.hslocCode.trim()
+      }));
 
       await api.saveHslocMappings(mappings);
       patch('hsloc', {mappings});
@@ -233,44 +250,63 @@ export function HslocStep({onNext, onBack}: StepProps) {
           <RepeatableList<MappingRow>
             items={rows}
             onChange={setRows}
-            newItem={() => ({sourceDisplay: '', sourceCode: '', hslocCode: ''})}
+            newItem={() => ({sourceDisplay: '', sourceCode: '', hslocCode: '', dirty: CLEAN_ROW})}
             addLabel={t('onboarding:hsloc.mapping.addButton')}
             removeLabel={t('common:actions.remove')}
             emptyLabel={t('onboarding:hsloc.mapping.emptyState')}
-            renderItem={(row, index, onRowChange) => (
-              <>
-                <TextField
-                  id={`hsloc-your-code-${index}`}
-                  label={yourCodeLabel}
-                  placeholder={yourCodeLabel}
-                  value={row.sourceDisplay}
-                  onChange={sourceDisplay => onRowChange({...row, sourceDisplay})}
-                />
-                <TextField
-                  id={`hsloc-location-value-${index}`}
-                  label={locationValueLabel}
-                  placeholder={locationValueLabel}
-                  value={row.sourceCode}
-                  onChange={sourceCode => onRowChange({...row, sourceCode})}
-                />
-                <select
-                  className="nhsn-link__hsloc-code-select"
-                  aria-label={hslocCodeLabel}
-                  value={row.hslocCode}
-                  onChange={event => onRowChange({...row, hslocCode: event.target.value})}>
-                  <option value="">{hslocCodeLabel}</option>
-                  {groupedCodeOptions.map(([category, categoryCodes]) => (
-                    <optgroup label={category || t('onboarding:hsloc.reference.allCategories')} key={category}>
-                      {categoryCodes.map(code => (
-                        <option value={code.code} key={code.code}>
-                          {code.code} - {code.display}
-                        </option>
+            renderItem={(row, index, onRowChange) => {
+              const sourceDisplayInvalid = row.dirty.sourceDisplay && !row.sourceDisplay.trim();
+              const sourceCodeInvalid = row.dirty.sourceCode && !row.sourceCode.trim();
+              const hslocCodeInvalid = row.dirty.hslocCode && !row.hslocCode.trim();
+              return (
+                <>
+                  <TextField
+                    id={`hsloc-your-code-${index}`}
+                    label={yourCodeLabel}
+                    placeholder={yourCodeLabel}
+                    value={row.sourceDisplay}
+                    error={sourceDisplayInvalid ? requiredFieldError : undefined}
+                    onChange={sourceDisplay =>
+                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: true}})
+                    }
+                  />
+                  <TextField
+                    id={`hsloc-location-value-${index}`}
+                    label={locationValueLabel}
+                    placeholder={locationValueLabel}
+                    value={row.sourceCode}
+                    error={sourceCodeInvalid ? requiredFieldError : undefined}
+                    onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}})}
+                  />
+                  <div>
+                    <select
+                      className={
+                        hslocCodeInvalid
+                          ? 'nhsn-link__hsloc-code-select nhsn-link__hsloc-code-select--error'
+                          : 'nhsn-link__hsloc-code-select'
+                      }
+                      aria-label={hslocCodeLabel}
+                      aria-invalid={hslocCodeInvalid}
+                      value={row.hslocCode}
+                      onChange={event =>
+                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: true}})
+                      }>
+                      <option value="">{hslocCodeLabel}</option>
+                      {groupedCodeOptions.map(([category, categoryCodes]) => (
+                        <optgroup label={category || t('onboarding:hsloc.reference.allCategories')} key={category}>
+                          {categoryCodes.map(code => (
+                            <option value={code.code} key={code.code}>
+                              {code.code} - {code.display}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </>
-            )}
+                    </select>
+                    {hslocCodeInvalid && <p className="nhsn-link__hsloc-code-error-text">{requiredFieldError}</p>}
+                  </div>
+                </>
+              );
+            }}
           />
         </div>
       )}

@@ -49,9 +49,6 @@ export class TestAuthApiClient implements ApiClient {
     this.inner.getLocationCandidates(m);
   getHslocMappings = () => this.inner.getHslocMappings();
   saveHslocMappings: ApiClient['saveHslocMappings'] = m => this.inner.saveHslocMappings(m);
-  getEncounterMappings = () => this.inner.getEncounterMappings();
-  saveEncounterMappings: ApiClient['saveEncounterMappings'] = m =>
-    this.inner.saveEncounterMappings(m);
 
   getMrnIntake = () => this.inner.getMrnIntake();
   saveMrnIntake: ApiClient['saveMrnIntake'] = i => this.inner.saveMrnIntake(i);
