@@ -302,6 +302,10 @@ export class BffApiClient implements ApiClient {
   getLocationOrgResolutionUrl(): string {
     return `${this.bffBaseUrl}/static/location-org-resolution`;
   }
+
+  getCensusInstructionsUrl(vendor: string): string {
+    return `${this.bffBaseUrl}/static/census-instructions/${encodeURIComponent(vendor)}`;
+  }
 }
 
 function isReportSettled(value: unknown): boolean {

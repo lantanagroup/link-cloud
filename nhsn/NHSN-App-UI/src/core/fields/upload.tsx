@@ -1,4 +1,6 @@
 import React, {useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {MessageContainer} from './layout';
 
 export interface DownloadLinkButtonProps {
   buttonText: string;
@@ -16,10 +18,13 @@ export function DownloadLinkButton({
   hint,
   disabled
 }: DownloadLinkButtonProps) {
+  const {t} = useTranslation('onboarding');
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string>();
 
   async function handleClick() {
     setDownloading(true);
+    setError(undefined);
     try {
       const blob = await onDownload();
       const url = URL.createObjectURL(blob);
@@ -28,6 +33,8 @@ export function DownloadLinkButton({
       link.download = fileName;
       link.click();
       URL.revokeObjectURL(url);
+    } catch {
+      setError(t('onboarding:messages.downloadFailed'));
     } finally {
       setDownloading(false);
     }
@@ -44,6 +51,11 @@ export function DownloadLinkButton({
         {buttonText}
       </button>
       {hint && <p className="nhsn-link__hint-text">{hint}</p>}
+      {error && (
+        <MessageContainer type="error" showIcon>
+          <span role="alert">{error}</span>
+        </MessageContainer>
+      )}
     </div>
   );
 }

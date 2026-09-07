@@ -8,6 +8,7 @@ import type {
   ConnectionResult,
   SftpFile,
 } from "../../../api/contracts";
+import { InstructionsDownload } from "../../../documents";
 import {
   Button,
   CheckboxField,
@@ -504,20 +505,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                 </p>
 
                 {vendorProfile.documentKeys.censusInstructions && (
-                  <div className="census-instructions-box">
-                    <p>{t("onboarding:census.epic.instructionsHint")}</p>
-                    <DownloadLinkButton
-                      buttonText={t(
-                        "onboarding:census.epic.downloadInstructions",
-                      )}
-                      fileName="Epic_Census_Instructions.pdf"
-                      onDownload={() =>
-                        api.getDocument(
-                          vendorProfile.documentKeys.censusInstructions!,
-                        )
-                      }
-                    />
-                  </div>
+                  <InstructionsDownload
+                    href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
+                    description={t("onboarding:census.epic.instructionsHint")}
+                    linkText={t("onboarding:census.epic.downloadInstructions")}
+                  />
                 )}
 
                 {!patientListsLive && (
@@ -597,20 +589,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                 </div>
 
                 {vendorProfile.documentKeys.censusInstructions && (
-                  <div className="census-instructions-box">
-                    <p>{t("onboarding:census.cerner.instructionsHint")}</p>
-                    <DownloadLinkButton
-                      buttonText={t(
-                        "onboarding:census.cerner.downloadInstructions",
-                      )}
-                      fileName="Cerner_Census_Instructions.pdf"
-                      onDownload={() =>
-                        api.getDocument(
-                          vendorProfile.documentKeys.censusInstructions!,
-                        )
-                      }
-                    />
-                  </div>
+                  <InstructionsDownload
+                    href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
+                    description={t("onboarding:census.cerner.instructionsHint")}
+                    linkText={t("onboarding:census.cerner.downloadInstructions")}
+                  />
                 )}
 
                 <TextField

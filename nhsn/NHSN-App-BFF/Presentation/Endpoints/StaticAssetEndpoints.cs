@@ -11,6 +11,12 @@ public sealed class StaticAssetEndpoints : IApi
             profile => $"{profile.DisplayName}_JWKS_Instructions.pdf",
             StringComparer.OrdinalIgnoreCase);
 
+    private static readonly Dictionary<string, string> CensusInstructionsPdfByVendor =
+        VendorProfileCatalog.All.ToDictionary(
+            profile => profile.DisplayName,
+            profile => $"{profile.DisplayName}_Census_Instructions.pdf",
+            StringComparer.OrdinalIgnoreCase);
+
     public void RegisterEndpoints(WebApplication app)
     {
         var group = app.MapGroup("/api/nhsn-app-bff/static")
@@ -31,6 +37,23 @@ public sealed class StaticAssetEndpoints : IApi
                     : Results.NotFound();
             })
             .WithName("GetJwksInstructionsPdf")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/census-instructions/{vendor}", (string vendor, IWebHostEnvironment environment) =>
+            {
+                if (!CensusInstructionsPdfByVendor.TryGetValue(vendor, out var fileName))
+                {
+                    return Results.NotFound();
+                }
+
+                var filePath = Path.Combine(environment.ContentRootPath, "StaticAssets", "census-instructions", fileName);
+
+                return File.Exists(filePath)
+                    ? Results.File(filePath, "application/pdf")
+                    : Results.NotFound();
+            })
+            .WithName("GetCensusInstructionsPdf")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
