@@ -7,7 +7,6 @@ import type {
   CommitResult,
   ConnectionResult,
   EncounterCode,
-  EncounterMapping,
   FhirConfig,
   FhirServerInfoResponse,
   HslocCode,
@@ -94,8 +93,6 @@ export interface ApiClient {
   getLocationCandidates(method: LocationMethod): Promise<LocationCandidate[]>;
   getHslocMappings(): Promise<HslocMapping[]>;
   saveHslocMappings(mappings: HslocMapping[]): Promise<void>;
-  getEncounterMappings(): Promise<EncounterMapping[]>;
-  saveEncounterMappings(mappings: EncounterMapping[]): Promise<void>;
 
   // mrn intake — normalized server-side, mirrored into the draft
   getMrnIntake(): Promise<MrnIntake | null>;

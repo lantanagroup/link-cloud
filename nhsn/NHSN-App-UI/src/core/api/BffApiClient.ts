@@ -10,7 +10,6 @@ import type {
   CommitResult,
   ConnectionResult,
   EncounterCode,
-  EncounterMapping,
   FhirConfig,
   FhirServerInfoResponse,
   HslocCode,
@@ -133,13 +132,13 @@ export class BffApiClient implements ApiClient {
     const q = query?.trim();
     if (!q) {
       return cachedReference('encounter-codes', async () => {
-        const {data} = await this.http.get<EncounterCode[]>('/reference/encounter-codes');
+        const {data} = await this.http.get<EncounterCode[]>('/encounter/encounter-codes');
         return data;
       });
     }
 
     const {data} = await this.http.get<EncounterCode[]>(
-      `/reference/encounter-codes?q=${encodeURIComponent(q)}`
+      `/encounter/encounter-codes?q=${encodeURIComponent(q)}`
     );
     return data;
   }
@@ -153,8 +152,13 @@ export class BffApiClient implements ApiClient {
 
   // ------------------------------------------------------------ fhir server
 
+  async getFhirServerInfo(): Promise<FhirServerInfoResponse> {
+    const {data} = await this.http.get<FhirServerInfoResponse>('/fhir-server');
+    return data;
+  }
+
   async testFhirConnection(config: FhirConfig): Promise<ConnectionResult> {
-    const {data} = await this.http.post<ConnectionResult>('/fhir-server/connection-tests', config);
+    const {data} = await this.http.post<ConnectionResult>('/fhir-server/test-connection', config);
     return data;
   }
 
@@ -204,15 +208,6 @@ export class BffApiClient implements ApiClient {
 
   async saveHslocMappings(mappings: HslocMapping[]): Promise<void> {
     await this.http.put<void>('/hsloc-mappings', mappings);
-  }
-
-  async getEncounterMappings(): Promise<EncounterMapping[]> {
-    const {data} = await this.http.get<EncounterMapping[]>('/encounter-mappings');
-    return data;
-  }
-
-  async saveEncounterMappings(mappings: EncounterMapping[]): Promise<void> {
-    await this.http.put<void>('/encounter-mappings', mappings);
   }
 
   // ------------------------------------------------------------ mrn intake
@@ -297,13 +292,6 @@ export class BffApiClient implements ApiClient {
 
   async getReportingPlan(): Promise<ReportingPlan> {
     const {data} = await this.http.get<ReportingPlan>('/reporting-plan');
-    return data;
-  }
-
-  // ------------------------------------------------------------ fhir server info
-
-  async getFhirServerInfo(): Promise<FhirServerInfoResponse> {
-    const {data} = await this.http.get<FhirServerInfoResponse>('/facilities/fhir-server-info');
     return data;
   }
 

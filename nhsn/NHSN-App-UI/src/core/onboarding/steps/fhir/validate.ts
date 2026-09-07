@@ -30,49 +30,49 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   const trimmedBaseUrl = values.fhirServerBaseUrl.trim();
   if (!trimmedBaseUrl) {
-    errors.fhirServerBaseUrl = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.fhirServerBaseUrl = 'onboarding:fhirServerInfo.errors.baseUrlRequired';
   } else if (!isValidHttpUrl(trimmedBaseUrl)) {
     errors.fhirServerBaseUrl = 'onboarding:fhirServerInfo.messages.invalidBaseUrl';
   }
 
   if (values.maxConcurrentRequests === undefined) {
-    errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.maxConcurrentRequests) || values.maxConcurrentRequests < 1) {
     errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.messages.invalidMaxConcurrentRequests';
   }
 
   if (values.maxRetries === undefined) {
-    errors.maxRetries = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.maxRetries = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.maxRetries) || values.maxRetries < 0 || values.maxRetries > 10) {
     errors.maxRetries = 'onboarding:fhirServerInfo.messages.invalidMaxRetries';
   }
 
   if (!values.minAcquisitionPullTime) {
-    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
     errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
   if (!values.maxAcquisitionPullTime) {
-    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
     errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
   if (values.lagDays === undefined) {
-    errors.lagDays = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.lagDays = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0) {
     errors.lagDays = 'onboarding:fhirServerInfo.messages.invalidLagDays';
   }
 
   if (values.lagHours === undefined) {
-    errors.lagHours = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.lagHours = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagHours) || values.lagHours < 0 || values.lagHours > 23) {
     errors.lagHours = 'onboarding:fhirServerInfo.messages.invalidLagHours';
   }
 
   if (values.lagMinutes === undefined) {
-    errors.lagMinutes = 'onboarding:fhirServerInfo.messages.incomplete';
+    errors.lagMinutes = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagMinutes) || values.lagMinutes < 0 || values.lagMinutes > 59) {
     errors.lagMinutes = 'onboarding:fhirServerInfo.messages.invalidLagMinutes';
   }

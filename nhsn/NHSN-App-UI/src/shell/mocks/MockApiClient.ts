@@ -40,9 +40,6 @@ export class MockApiClient implements ApiClient {
     return `${DRAFT_KEY_PREFIX}${this.facilityId}`;
   }
 
-  private get encounterMappingsKey(): string {
-    return `${this.draftKey}.encounterMappings`;
-  }
 
   // ------------------------------------------------------------ session
 
@@ -322,17 +319,6 @@ export class MockApiClient implements ApiClient {
 
   async saveHslocMappings(): Promise<void> {
     await tick();
-  }
-
-  async getEncounterMappings(): Promise<C.EncounterMapping[]> {
-    await tick();
-    const raw = window.localStorage.getItem(this.encounterMappingsKey);
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  async saveEncounterMappings(mappings: C.EncounterMapping[]): Promise<void> {
-    await tick();
-    window.localStorage.setItem(this.encounterMappingsKey, JSON.stringify(mappings));
   }
 
   // ------------------------------------------------------------ mrn intake

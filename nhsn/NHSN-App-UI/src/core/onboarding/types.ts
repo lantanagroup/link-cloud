@@ -1,6 +1,7 @@
 import type {
   CensusListKey,
   EhrVendor,
+  EncounterMapping,
   HslocMapping,
   LocationMethod,
   MrnIntake,
@@ -116,6 +117,7 @@ export interface HslocDraft {
 
 export interface EncounterDraft {
   codeSystems?: string[];
+  mappings?: EncounterMapping[];
 }
 
 export interface ReportDraft {
