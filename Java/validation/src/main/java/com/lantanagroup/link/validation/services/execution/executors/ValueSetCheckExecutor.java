@@ -109,7 +109,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                     if (result.isOk()) {
                         log.info("VALUESET check '{}': code {}|{} -> IS a member of {}",
                                 check.getCheckLocalId(), system, code, valueSet);
-                    } else if (UnresolvedBindingClassifier.isUnresolvable(result)) {
+                    } else if (UnresolvedBindingClassifier.isUnresolvable(result) && !validationSupportChain.isCodeSystemSupported(supportContext, system)) {
                         // The value set (or the code system behind it) could not be resolved, so
                         // membership was never actually tested (HAPI issue coding NOT_FOUND, or a
                         // resolution-failure message). Emit a "not evaluated" finding (INCONCLUSIVE,
