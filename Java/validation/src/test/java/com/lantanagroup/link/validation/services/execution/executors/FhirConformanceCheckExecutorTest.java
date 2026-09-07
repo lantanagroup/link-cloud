@@ -18,6 +18,8 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Patient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
@@ -33,11 +35,16 @@ import static org.mockito.Mockito.when;
 class FhirConformanceCheckExecutorTest {
 
     private static final FhirContext FHIR_CONTEXT = FhirContext.forR4();
-    private static final int DEFAULT_BATCH_SIZE = 10;
+    // Small bundles used throughout this file (0-3 entries) all stay well under the production
+    // DEFAULT_MIN_BATCH_SIZE floor, so they always land in exactly one batch regardless of pool-size/
+    // tasks-per-thread -- these two values are otherwise arbitrary for the tests below that don't
+    // exercise batching/concurrency directly.
+    private static final int DEFAULT_POOL_SIZE = 2;
+    private static final int DEFAULT_TASKS_PER_THREAD = 3;
 
     private final FhirValidator fhirValidator = mock(FhirValidator.class);
-    private final FhirConformanceCheckExecutor executor =
-            new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), DEFAULT_BATCH_SIZE);
+    private final FhirConformanceCheckExecutor executor = new FhirConformanceCheckExecutor(
+            fhirValidator, new ObjectMapper(), DEFAULT_POOL_SIZE, DEFAULT_TASKS_PER_THREAD);
 
     private static RubricCheck check() {
         return RubricCheck.builder().checkLocalId("fc-1").dimension(PiqiDimension.CONFORMANCE).build();
@@ -318,11 +325,14 @@ class FhirConformanceCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("concurrent Bundle validations are capped at the configured batch size")
-    void bundleValidationConcurrencyIsCappedAtBatchSize() {
-        int batchSize = 2;
+    @DisplayName("concurrent Bundle validations are capped at the configured pool size")
+    void bundleValidationConcurrencyIsCappedAtPoolSize() {
+        int poolSize = 2;
+        // min == max == 1 forces one entry per batch regardless of entry count, so all 6 batches are
+        // submitted up front and concurrency is bounded only by poolSize -- isolating the pool-size cap
+        // from the (now decoupled) batch-size formula under test elsewhere.
         FhirConformanceCheckExecutor cappedExecutor =
-                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), batchSize);
+                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), poolSize, 1, 1, 1);
 
         List<IBaseResource> entries = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -342,15 +352,16 @@ class FhirConformanceCheckExecutorTest {
 
         cappedExecutor.execute(check(), bundleContext(entries));
 
-        assertThat(maxObserved.get()).isEqualTo(batchSize);
+        assertThat(maxObserved.get()).isEqualTo(poolSize);
     }
 
     @Test
     @DisplayName("a slow batch does not block another batch from finishing (no wave waiting)")
     void slowResourceDoesNotBlockLaterResourcesFromFinishing() {
-        int batchSize = 3;
+        // min == max == 3 forces batches of exactly 3 entries (2 batches for 6 entries), independent of
+        // the pool size used here for concurrency.
         FhirConformanceCheckExecutor cappedExecutor =
-                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), batchSize);
+                new FhirConformanceCheckExecutor(fhirValidator, new ObjectMapper(), 3, 1, 3, 3);
 
         // toBatchBundle() copies each entry, so the mock can't match on entry identity -- an id marks
         // which batch is the slow one instead.
@@ -393,5 +404,57 @@ class FhirConformanceCheckExecutorTest {
 
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getCode()).isEqualTo("fhir-conformance");
+    }
+
+    // computeBatchSize is the pure partitioning formula behind executeBundle's per-request batch sizing
+    // -- exercised directly (no mocks/executor/threads) so the sweep below can cover extremes cheaply.
+
+    @ParameterizedTest(name = "entryCount={0}, poolSize={1}")
+    @DisplayName("computeBatchSize never falls outside its min/max floor regardless of entryCount/poolSize")
+    @CsvSource({
+            "0,       1",   // empty bundle
+            "1,       1",   // smallest bundle, smallest (single-core) pool
+            "1,       32",  // tiny bundle, large pool -- must not collapse to batch size 0 (integer division)
+            "4,       1",
+            "20,      4",
+            "1000,    8",
+            "1000000, 1",   // huge bundle, single-core pool
+            "1000000, 32",  // huge bundle, large pool -- must not collapse to one giant batch
+    })
+    void computeBatchSizeStaysWithinFloorAndCeiling(int entryCount, int poolSize) {
+        int minBatchSize = 5;
+        int maxBatchSize = 500;
+
+        int batchSize = FhirConformanceCheckExecutor.computeBatchSize(
+                entryCount, poolSize, DEFAULT_TASKS_PER_THREAD, minBatchSize, maxBatchSize);
+
+        assertThat(batchSize).isBetween(minBatchSize, maxBatchSize);
+        if (entryCount > 0) {
+            int batchCount = (int) Math.ceil(entryCount / (double) batchSize);
+            assertThat(batchCount).isGreaterThanOrEqualTo(1);
+        }
+    }
+
+    @ParameterizedTest(name = "entryCount={0}, poolSize={1}, tasksPerThread={2}")
+    @DisplayName("when the formula isn't clamped, batch count tracks poolSize * tasksPerThread (no path starved of or drowned in parallelism)")
+    @CsvSource({
+            "300,   4, 3",
+            "1000,  8, 2",
+            "5000, 16, 4",
+    })
+    void computeBatchSizeKeepsBatchCountProportionalWhenUnclamped(int entryCount, int poolSize, int tasksPerThread) {
+        int minBatchSize = 5;
+        int maxBatchSize = 500;
+        int targetBatchCount = poolSize * tasksPerThread;
+
+        int batchSize = FhirConformanceCheckExecutor.computeBatchSize(
+                entryCount, poolSize, tasksPerThread, minBatchSize, maxBatchSize);
+
+        // Sanity check that this combination doesn't hit a floor/ceiling, or the proportionality
+        // assertion below wouldn't actually be exercising the unclamped formula.
+        assertThat(batchSize).isStrictlyBetween(minBatchSize, maxBatchSize);
+
+        int batchCount = (int) Math.ceil(entryCount / (double) batchSize);
+        assertThat(batchCount).isCloseTo(targetBatchCount, org.assertj.core.data.Offset.offset(1));
     }
 }

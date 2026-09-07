@@ -154,9 +154,13 @@ link:
     max-attempts: 5
     backoff-millis: 5000
   fhir-conformance-check:
-    # 0 = auto: match ForkJoinPool.commonPool()'s own parallelism (see FhirConformanceCheckExecutor's
-    # batchSize javadoc — a hardcoded value here previously went stale when the executor changed).
-    batch-size: 0
+    # Concurrency: fixed pool size for Bundle batch validations. 0 = auto: Runtime.availableProcessors()
+    # at startup (see FhirConformanceCheckExecutor's poolSize javadoc).
+    pool-size: 0
+    # Partitioning: target number of batches per pool thread for a given Bundle's entry count (see
+    # FhirConformanceCheckExecutor's tasksPerThread/computeBatchSize javadoc). Decoupled from pool-size so
+    # each can be tuned independently.
+    tasks-per-thread: 3
   report:
     base-url: http://localhost:5110
     routes:
