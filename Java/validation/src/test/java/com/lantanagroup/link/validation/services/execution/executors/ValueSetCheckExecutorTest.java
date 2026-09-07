@@ -10,11 +10,14 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
+import com.lantanagroup.link.validation.services.execution.CheckExecutor;
+import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 
@@ -30,8 +33,15 @@ class ValueSetCheckExecutorTest {
     private static final IFhirPath FHIR_PATH = FHIR_CONTEXT.newFhirPath();
 
     private final ValidationSupportChain chain = mock(ValidationSupportChain.class);
-    private final ValueSetCheckExecutor executor =
-            new ValueSetCheckExecutor(FHIR_PATH, chain, new ObjectMapper());
+    private final CheckExecutorRegistry registry = mock(CheckExecutorRegistry.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<CheckExecutorRegistry> registryProvider = mock(ObjectProvider.class);
+    private final ValueSetCheckExecutor executor;
+
+    {
+        when(registryProvider.getObject()).thenReturn(registry);
+        executor = new ValueSetCheckExecutor(FHIR_PATH, chain, new ObjectMapper(), registryProvider);
+    }
 
     private static ExecutionContext contextWithCoding(String system, String code) {
         Observation obs = new Observation();
@@ -152,6 +162,119 @@ class ValueSetCheckExecutorTest {
         assertThat(executor.execute(check("{\"valueSet\":\"http://x/vs\"}"),
                 contextWithCoding("http://loinc.org", "1234-5"))).isEmpty();
         assertThat(executor.execute(check("{\"path\":\"Observation.code\"}"),
+                contextWithCoding("http://loinc.org", "1234-5"))).isEmpty();
+    }
+
+    //  Combinator mode (parameters.checks + matchMode)
+
+    private static RawFinding failingFinding(String code) {
+        return RawFinding.builder().checkLocalId("child").dimension(PiqiDimension.TERMINOLOGY)
+                .severity(Severity.ERROR).code(code).message("branch failed: " + code).build();
+    }
+
+    private static RawFinding notEvaluatedFinding() {
+        return RawFinding.builder().checkLocalId("child").dimension(PiqiDimension.TERMINOLOGY)
+                .severity(Severity.INFORMATION).notEvaluated(true).code("not-evaluated").message("unresolved").build();
+    }
+
+    @Test
+    @DisplayName("combinator ANY: one passing branch is enough, even if another branch fails")
+    void combinatorAnyPassesOnFirstSatisfiedBranch() {
+        CheckExecutor fhirpathExec = mock(CheckExecutor.class);
+        CheckExecutor customExec = mock(CheckExecutor.class);
+        when(registry.get(CheckType.FHIRPATH)).thenReturn(fhirpathExec);
+        when(registry.get(CheckType.CUSTOM)).thenReturn(customExec);
+        when(fhirpathExec.execute(any(), any())).thenReturn(List.of(failingFinding("f1")));
+        when(customExec.execute(any(), any())).thenReturn(List.of());
+
+        List<RawFinding> findings = executor.execute(check(
+                "{\"matchMode\":\"ANY\",\"checks\":["
+                        + "{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}},"
+                        + "{\"id\":\"b2\",\"type\":\"CUSTOM\",\"parameters\":{}}]}"),
+                contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("combinator ANY: every branch fails -> single summarizing finding")
+    void combinatorAnyAllFail() {
+        CheckExecutor fhirpathExec = mock(CheckExecutor.class);
+        CheckExecutor customExec = mock(CheckExecutor.class);
+        when(registry.get(CheckType.FHIRPATH)).thenReturn(fhirpathExec);
+        when(registry.get(CheckType.CUSTOM)).thenReturn(customExec);
+        when(fhirpathExec.execute(any(), any())).thenReturn(List.of(failingFinding("f1")));
+        when(customExec.execute(any(), any())).thenReturn(List.of(failingFinding("f2")));
+
+        List<RawFinding> findings = executor.execute(check(
+                "{\"matchMode\":\"ANY\",\"code\":\"combo-failed\",\"checks\":["
+                        + "{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}},"
+                        + "{\"id\":\"b2\",\"type\":\"CUSTOM\",\"parameters\":{}}]}"),
+                contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("combo-failed");
+        assertThat(findings.get(0).getMessage()).contains("f1").contains("f2");
+    }
+
+    @Test
+    @DisplayName("combinator ANY: every branch inconclusive -> single not-evaluated finding")
+    void combinatorAnyAllInconclusive() {
+        CheckExecutor fhirpathExec = mock(CheckExecutor.class);
+        when(registry.get(CheckType.FHIRPATH)).thenReturn(fhirpathExec);
+        when(fhirpathExec.execute(any(), any())).thenReturn(List.of(notEvaluatedFinding()));
+
+        List<RawFinding> findings = executor.execute(check(
+                "{\"matchMode\":\"ANY\",\"checks\":[{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}}]}"),
+                contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).isNotEvaluated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("combinator ALL: one failing branch fails the whole check")
+    void combinatorAllOneBranchFails() {
+        CheckExecutor fhirpathExec = mock(CheckExecutor.class);
+        CheckExecutor customExec = mock(CheckExecutor.class);
+        when(registry.get(CheckType.FHIRPATH)).thenReturn(fhirpathExec);
+        when(registry.get(CheckType.CUSTOM)).thenReturn(customExec);
+        when(fhirpathExec.execute(any(), any())).thenReturn(List.of());
+        when(customExec.execute(any(), any())).thenReturn(List.of(failingFinding("f2")));
+
+        List<RawFinding> findings = executor.execute(check(
+                "{\"matchMode\":\"ALL\",\"checks\":["
+                        + "{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}},"
+                        + "{\"id\":\"b2\",\"type\":\"CUSTOM\",\"parameters\":{}}]}"),
+                contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getMessage()).contains("f2");
+    }
+
+    @Test
+    @DisplayName("combinator ALL: every branch passes -> no findings")
+    void combinatorAllAllPass() {
+        CheckExecutor fhirpathExec = mock(CheckExecutor.class);
+        CheckExecutor customExec = mock(CheckExecutor.class);
+        when(registry.get(CheckType.FHIRPATH)).thenReturn(fhirpathExec);
+        when(registry.get(CheckType.CUSTOM)).thenReturn(customExec);
+        when(fhirpathExec.execute(any(), any())).thenReturn(List.of());
+        when(customExec.execute(any(), any())).thenReturn(List.of());
+
+        List<RawFinding> findings = executor.execute(check(
+                "{\"matchMode\":\"ALL\",\"checks\":["
+                        + "{\"id\":\"b1\",\"type\":\"FHIRPATH\",\"parameters\":{\"expression\":\"x\"}},"
+                        + "{\"id\":\"b2\",\"type\":\"CUSTOM\",\"parameters\":{}}]}"),
+                contextWithCoding("http://loinc.org", "1234-5"));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("empty checks array falls back to direct-mode requirements (no path/valueSet -> no findings)")
+    void emptyChecksArrayFallsBackToDirectMode() {
+        assertThat(executor.execute(check("{\"matchMode\":\"ANY\",\"checks\":[]}"),
                 contextWithCoding("http://loinc.org", "1234-5"))).isEmpty();
     }
 }

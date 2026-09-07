@@ -44,17 +44,23 @@ class ScoringPolicyValidatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"piqi-dimension-scorecard", "piqi-check-scorecard", "piqi-pass-fail"})
-    @DisplayName("each documented type slug accepted")
-    void validTypes(String type) {
+    @ValueSource(strings = {"piqi-dimension-scorecard", "piqi-check-scorecard"})
+    @DisplayName("each documented scorecard type slug accepted with a rollup")
+    void validScorecardTypes(String type) {
         assertThat(validate("{\"type\":\"" + type + "\",\"rollup\":\"worst-of\"}")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("piqi-pass-fail accepted without a rollup")
+    void validPassFailType() {
+        assertThat(validate("{\"type\":\"piqi-pass-fail\"}")).isEmpty();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"worst-of", "best-of", "pass-fail", "majority", "all-must-pass"})
-    @DisplayName("each documented rollup slug accepted")
+    @DisplayName("each documented rollup slug accepted for a scorecard type")
     void validRollups(String rollup) {
-        assertThat(validate("{\"type\":\"piqi-pass-fail\",\"rollup\":\"" + rollup + "\"}")).isEmpty();
+        assertThat(validate("{\"type\":\"piqi-dimension-scorecard\",\"rollup\":\"" + rollup + "\"}")).isEmpty();
     }
 
     @Test
@@ -69,9 +75,9 @@ class ScoringPolicyValidatorTest {
     }
 
     @Test
-    @DisplayName("invalid rollup rejected with allowed values listed")
+    @DisplayName("invalid rollup rejected with allowed values listed (scorecard type)")
     void badRollup() {
-        assertThat(validate("{\"type\":\"piqi-pass-fail\",\"rollup\":\"average\"}"))
+        assertThat(validate("{\"type\":\"piqi-dimension-scorecard\",\"rollup\":\"average\"}"))
                 .anyMatch(e -> e.contains("scoringPolicy.rollup") && e.contains("worst-of"));
     }
 
@@ -89,11 +95,15 @@ class ScoringPolicyValidatorTest {
         assertThat(validate("{\"type\":\"piqi-pass-fail\"}")).isEmpty();
     }
 
-    @Test
-    @DisplayName("non-textual rollup rejected")
-    void nonTextualRollup() {
-        assertThat(validate("{\"type\":\"piqi-pass-fail\",\"rollup\":42}"))
-                .anyMatch(e -> e.contains("scoringPolicy.rollup"));
+    @ParameterizedTest
+    @ValueSource(strings = {"worst-of", "average", "42"})
+    @DisplayName("any rollup present for piqi-pass-fail is rejected, valid slug or not (rollup means nothing for pass/fail)")
+    void rollupPresentRejectedForPassFail(String rollupValue) {
+        String json = rollupValue.equals("42")
+                ? "{\"type\":\"piqi-pass-fail\",\"rollup\":42}"
+                : "{\"type\":\"piqi-pass-fail\",\"rollup\":\"" + rollupValue + "\"}";
+        assertThat(validate(json))
+                .anyMatch(e -> e.contains("scoringPolicy.rollup: must not be present for piqi-pass-fail"));
     }
 
     @Test

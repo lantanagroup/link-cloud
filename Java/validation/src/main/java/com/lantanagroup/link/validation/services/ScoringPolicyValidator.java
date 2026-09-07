@@ -50,14 +50,16 @@ public class ScoringPolicyValidator {
         }
 
         JsonNode rollup = scoringPolicy.get("rollup");
-        boolean rollupRequired = resolvedType != ScoringPolicyType.PIQI_PASS_FAIL;
-        if (rollup == null) {
-            if (rollupRequired) {
-                errors.add("scoringPolicy.rollup: is required and must be one of " + RollupStrategy.allowedValues());
+        if (resolvedType == ScoringPolicyType.PIQI_PASS_FAIL) {
+            // rollup means nothing for a single pass/fail verdict ΓÇö reject its presence outright
+            // rather than silently ignoring it, so a rubric author isn't misled into thinking it
+            // has an effect it doesn't.
+            if (rollup != null && !rollup.isNull()) {
+                errors.add("scoringPolicy.rollup: must not be present for piqi-pass-fail (rollup strategies apply only to scorecard types)");
             }
+        } else if (rollup == null) {
+            errors.add("scoringPolicy.rollup: is required and must be one of " + RollupStrategy.allowedValues());
         } else if (!rollup.isTextual() || RollupStrategy.fromValue(rollup.asText()).isEmpty()) {
-            // present-but-invalid is always an error, even for piqi-pass-fail, so a typo doesn't
-            // silently pass through unnoticed just because the field isn't required
             errors.add("scoringPolicy.rollup: must be one of " + RollupStrategy.allowedValues());
         }
     }

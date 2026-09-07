@@ -8,10 +8,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.enums.CheckType;
+import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
+import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,12 +23,23 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IPrimitiveType;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+/**
+ * VALUESET carries two modes in the same check type. Direct mode (path + valueSet) does the
+ * original FHIRPath-then-membership check. Combinator mode (parameters.checks + matchMode) instead
+ * combines several child checks ΓÇö of any type, VALUESET included ΓÇö into a single logical OR
+ * (matchMode ANY) or AND (matchMode ALL), dispatching each child back through the same
+ * {@link CheckExecutorRegistry}. This is how "or"/"and" across checks (e.g. a VALUESET branch that
+ * may be unresolvable, OR'd with a literal-code FHIRPATH workaround) becomes expressible in a
+ * rubric without a dedicated combinator check type.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -35,6 +48,10 @@ public class ValueSetCheckExecutor implements CheckExecutor {
     private final IFhirPath fhirPath;
     private final ValidationSupportChain validationSupportChain;
     private final ObjectMapper objectMapper;
+    // ObjectProvider breaks the cycle: registry <- executors (including this one) <- registry
+    private final ObjectProvider<CheckExecutorRegistry> registryProvider;
+
+    private enum MatchMode { ANY, ALL }
 
     @Override
     public CheckType supports() {
@@ -48,6 +65,11 @@ public class ValueSetCheckExecutor implements CheckExecutor {
             log.warn("VALUESET check {} missing parameters", check.getCheckLocalId());
             return List.of();
         }
+        JsonNode checksNode = params.path("checks");
+        if (checksNode.isArray() && !checksNode.isEmpty()) {
+            return executeCombinator(check, context, params, checksNode);
+        }
+
         String path = params.path("path").asText(null);
         String valueSet = params.path("valueSet").asText(null);
         String fallbackSystem = params.path("system").asText(null);
@@ -178,5 +200,168 @@ public class ValueSetCheckExecutor implements CheckExecutor {
             log.warn("VALUESET check {} has invalid parameters JSON: {}", check.getCheckLocalId(), e.getMessage());
             return null;
         }
+    }
+
+    private List<RawFinding> executeCombinator(RubricCheck check, ExecutionContext context, JsonNode params, JsonNode checksNode) {
+        MatchMode matchMode = parseMatchMode(params, check);
+        String failureMessage = params.path("failureMessage").asText(
+                "None of the branches were satisfied for check " + check.getCheckLocalId());
+        String code = params.path("code").asText(check.getCheckLocalId());
+        Severity severity = check.getSeverityOverride() != null ? check.getSeverityOverride() : Severity.ERROR;
+
+        CheckExecutorRegistry registry = registryProvider.getObject();
+
+        List<RawFinding> reasons = new ArrayList<>();
+        boolean anyPassed = false;
+        boolean anyInconclusive = false;
+
+        for (JsonNode childNode : checksNode) {
+            RubricCheck synthetic = toSyntheticCheck(check, childNode);
+            if (synthetic == null) {
+                continue;
+            }
+
+            List<RawFinding> childFindings;
+            try {
+                childFindings = registry.get(synthetic.getType()).execute(synthetic, context);
+            } catch (Exception e) {
+                log.error("VALUESET (combinator) check '{}': child '{}' failed during execution",
+                        check.getCheckLocalId(), synthetic.getCheckLocalId(), e);
+                anyInconclusive = true;
+                continue;
+            }
+
+            if (childFindings.isEmpty()) {
+                log.info("VALUESET (combinator) check '{}': branch '{}' passed", check.getCheckLocalId(), synthetic.getCheckLocalId());
+                anyPassed = true;
+                if (matchMode == MatchMode.ANY) {
+                    break; // short-circuit: one satisfied branch is enough for ANY
+                }
+                continue;
+            }
+
+            if (childFindings.stream().allMatch(RawFinding::isNotEvaluated)) {
+                log.info("VALUESET (combinator) check '{}': branch '{}' could not be evaluated", check.getCheckLocalId(), synthetic.getCheckLocalId());
+                anyInconclusive = true;
+                continue;
+            }
+
+            log.info("VALUESET (combinator) check '{}': branch '{}' failed", check.getCheckLocalId(), synthetic.getCheckLocalId());
+            reasons.addAll(childFindings);
+        }
+
+        if (matchMode == MatchMode.ANY && anyPassed) {
+            return List.of();
+        }
+        if (matchMode == MatchMode.ALL && reasons.isEmpty()) {
+            return anyInconclusive
+                    ? List.of(notEvaluatedFinding(check, "Not every VALUESET (ALL) branch could be evaluated (unresolved value sets or execution errors)"))
+                    : List.of();
+        }
+        if (matchMode == MatchMode.ANY && reasons.isEmpty()) {
+            return anyInconclusive
+                    ? List.of(notEvaluatedFinding(check, "No VALUESET (ANY) branch could be evaluated (unresolved value sets or execution errors)"))
+                    : List.of();
+        }
+
+        return List.of(RawFinding.builder()
+                .checkLocalId(check.getCheckLocalId())
+                .dimension(check.getDimension())
+                .severity(severity)
+                .code(code)
+                .message(failureMessage + summarise(reasons))
+                .location(reasons.get(0).getLocation())
+                .expression(reasons.get(0).getExpression())
+                .build());
+    }
+
+    private RawFinding notEvaluatedFinding(RubricCheck check, String message) {
+        return RawFinding.builder()
+                .checkLocalId(check.getCheckLocalId())
+                .dimension(check.getDimension())
+                .severity(Severity.INFORMATION)
+                .notEvaluated(true)
+                .code("valueset-combinator-not-evaluated")
+                .message(message)
+                .build();
+    }
+
+    private String summarise(List<RawFinding> reasons) {
+        return " (" + reasons.stream()
+                .map(RawFinding::getMessage)
+                .filter(m -> m != null && !m.isBlank())
+                .distinct()
+                .limit(10)
+                .collect(Collectors.joining("; ")) + ")";
+    }
+
+    private MatchMode parseMatchMode(JsonNode params, RubricCheck check) {
+        String raw = params.path("matchMode").asText("ANY");
+        try {
+            return MatchMode.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("VALUESET (combinator) check {} has invalid matchMode '{}', defaulting to ANY", check.getCheckLocalId(), raw);
+            return MatchMode.ANY;
+        }
+    }
+
+    /**
+     * Builds a transient (not persisted) RubricCheck for a child check definition, inheriting the
+     * parent's dimension/severityOverride unless the child explicitly overrides them.
+     */
+    private RubricCheck toSyntheticCheck(RubricCheck parent, JsonNode childNode) {
+        String typeText = childNode.path("type").asText(null);
+        if (typeText == null || typeText.isBlank()) {
+            log.warn("VALUESET (combinator) check {}: child check missing 'type', skipping", parent.getCheckLocalId());
+            return null;
+        }
+        CheckType childType;
+        try {
+            childType = CheckType.valueOf(typeText.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("VALUESET (combinator) check {}: child has unknown type '{}', skipping", parent.getCheckLocalId(), typeText);
+            return null;
+        }
+
+        String childId = childNode.path("id").asText(null);
+        String checkLocalId = parent.getCheckLocalId() + (childId != null && !childId.isBlank() ? "." + childId : "");
+
+        PiqiDimension dimension = parent.getDimension();
+        if (childNode.hasNonNull("dimension")) {
+            try {
+                dimension = PiqiDimension.valueOf(childNode.get("dimension").asText().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("VALUESET (combinator) check {}: child '{}' has unknown dimension override, using parent's",
+                        parent.getCheckLocalId(), checkLocalId);
+            }
+        }
+
+        Severity severityOverride = parent.getSeverityOverride();
+        if (childNode.hasNonNull("severityOverride")) {
+            try {
+                severityOverride = Severity.valueOf(childNode.get("severityOverride").asText().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("VALUESET (combinator) check {}: child '{}' has unknown severityOverride, using parent's",
+                        parent.getCheckLocalId(), checkLocalId);
+            }
+        }
+
+        String parametersJson = null;
+        if (childNode.has("parameters")) {
+            try {
+                parametersJson = objectMapper.writeValueAsString(childNode.get("parameters"));
+            } catch (Exception e) {
+                log.warn("VALUESET (combinator) check {}: child '{}' has unwritable parameters", parent.getCheckLocalId(), checkLocalId, e);
+            }
+        }
+
+        return RubricCheck.builder()
+                .checkLocalId(checkLocalId)
+                .type(childType)
+                .dimension(dimension)
+                .severityOverride(severityOverride)
+                .parametersJson(parametersJson)
+                .enabled(true)
+                .build();
     }
 }
