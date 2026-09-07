@@ -1,5 +1,14 @@
 .nhsn-link {
-  font-family: var(--kendo-font-family, 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif);
+  font-family: var(
+    --kendo-font-family,
+    "Nunito Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif
+  );
   font-size: 15px;
   line-height: 1.5;
   color: var(--kendo-color-app-text, #1f2328);
@@ -13,7 +22,14 @@
 .nhsn-link h1,
 .nhsn-link h2,
 .nhsn-link h3 {
-  font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    "Roboto",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
 }
 
 .nhsn-link,
@@ -561,7 +577,14 @@
 .nhsn-link .k-input *,
 .nhsn-link .k-numerictextbox,
 .nhsn-link .k-numerictextbox * {
-  font-family: 'Nunito Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    "Nunito Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
 }
 
 .nhsn-link .k-input::placeholder {
@@ -633,7 +656,7 @@
 }
 
 .nhsn-link .k-form-hint::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 100%;
   left: 14px;
@@ -818,7 +841,7 @@
 }
 
 .nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label::after {
-  content: '?';
+  content: "?";
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -972,7 +995,7 @@
   color: var(--kendo-color-app-text, #1f2328);
 }
 
-.nhsn-link__upload-field input[type='file'] {
+.nhsn-link__upload-field input[type="file"] {
   display: block;
   width: 100%;
   max-width: 420px;
@@ -984,7 +1007,7 @@
   font-size: 14px;
 }
 
-.nhsn-link__upload-field input[type='file']::file-selector-button {
+.nhsn-link__upload-field input[type="file"]::file-selector-button {
   margin-right: 0.75rem;
   padding: 0.45rem 0.85rem;
   border: 1px solid var(--kendo-color-border, #d0d7de);
@@ -995,11 +1018,11 @@
   cursor: pointer;
 }
 
-.nhsn-link__upload-field input[type='file']::file-selector-button:hover {
+.nhsn-link__upload-field input[type="file"]::file-selector-button:hover {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__upload-field input[type='file']:disabled {
+.nhsn-link__upload-field input[type="file"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1362,7 +1385,7 @@
 }
 
 .info-icon .tooltip-bubble::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 100%;
   left: 50%;
@@ -1498,7 +1521,7 @@
    suppressed above, its border/shadow reads as missing along the top edge -
    give the step back its own breathing room instead. */
 .nhsn-link__location-org.nhsn-link__content {
-  padding-top: 28px;
+  /* padding-top: 28px; */
 }
 
 .nhsn-link__location-org .page-header-buttons {
@@ -1526,4 +1549,32 @@
    rather than the dialog's default scroll height. */
 .nhsn-link__location-org .nhsn-link__table-scroll {
   max-height: 70vh;
+}
+
+/* ---------------------------------------------- location identification (HSLOC) */
+.nhsn-link__hsloc .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__hsloc.nhsn-link__content {
+  /* padding-top: 28px; */
+}
+
+.nhsn-link__hsloc .page-header-buttons {
+  display: none;
+}
+
+.nhsn-link__hsloc .nhsn-link__subtitle {
+  max-width: none;
+  margin-bottom: 16px;
+}
+
+.nhsn-link__hsloc .nhsn-link__field-group {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__hsloc .nhsn-link__tabs {
+  gap: 14px;
+  margin-top: 2px;
 }

@@ -13,4 +13,6 @@ public interface IReferenceDataService
     IReadOnlyList<TimezoneResponse> GetTimezones();
 
     IReadOnlyList<EncounterCode> GetEncounterCodes(string? query = null);
+
+    IReadOnlyList<HslocCode> GetHslocCodes();
 }

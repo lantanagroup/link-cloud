@@ -121,9 +121,33 @@ export interface Measure {
   name: string;
 }
 
+/**
+ * Facility types NHSN groups HSLOC codes by, shown as badges in the reference
+ * table ("Facilities" column). Matches the flags the POC's HSLOC_CODES fixture
+ * carries per row.
+ */
+export type HslocFacilityType =
+  | 'acuteCareAll'
+  | 'ltac'
+  | 'ltc'
+  | 'inpatientRehab'
+  | 'outpatientSurgery'
+  | 'outpatientDialysis'
+  | 'oncology'
+  | 'inpatientPsych';
+
+/**
+ * A row of the NHSN HSLOC reference vocabulary. `category`/`type`/`definition`/
+ * `facilityTypes` back the searchable reference table and are optional so a
+ * thinner future feed (just `code`/`display`) still satisfies this contract.
+ */
 export interface HslocCode {
   code: string;
   display: string;
+  category?: string;
+  type?: string;
+  definition?: string;
+  facilityTypes?: HslocFacilityType[];
 }
 
 export interface EncounterCode {

@@ -40,7 +40,7 @@ public static class VendorProfileCatalog
             JwksInstructions = "epic-jwks-instructions",
             LocationOrgResolution = "location-org-resolution"
         },
-        HslocSourceLabel = "Epic location"
+        HslocSourceLabel = "Location.identifier value"
     };
 
     private static readonly VendorProfile Cerner = new()
@@ -62,7 +62,7 @@ public static class VendorProfileCatalog
             JwksInstructions = "cerner-jwks-instructions",
             LocationOrgResolution = "location-org-resolution"
         },
-        HslocSourceLabel = "Cerner location"
+        HslocSourceLabel = "Location.alias value"
     };
 
     public static IReadOnlyList<VendorProfile> All { get; } = [Epic, Cerner];
