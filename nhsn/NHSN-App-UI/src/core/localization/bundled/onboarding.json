@@ -16,7 +16,7 @@
   },
   "welcome": {
     "title": "Welcome to DQM Onboarding",
-    "intro": "The National Healthcare Safety Network (NHSN) uses <nhsnlink>NHSNLink</nhsnlink>, an open-source Fast Healthcare Interoperability Resources (<fhir>FHIR®</fhir>) application, to enable reporting of digital quality measures (dQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of dQMs to NHSN.",
+    "intro": "The National Healthcare Safety Network (NHSN) uses <nhsnlink>NHSNLink</nhsnlink>, an open-source Fast Healthcare Interoperability Resources (<fhir>FHIR®</fhir>) application, to enable reporting of Digital Quality Measures (DQMs) to NHSN. The enrollment information populated in this web form supports secure and successful authentication of NHSNLink with your facility’s FHIR endpoint, adequate understanding by NHSN of your FHIR data submissions, and successful reporting of DQMs to NHSN.",
     "audienceTitle": "Intended Audience",
     "audienceBody": "The onboarding steps that follow should be completed by the site’s information technology team.",
     "workflowTitle": "Workflow",
