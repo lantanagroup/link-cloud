@@ -13,7 +13,8 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 /// <summary>
 /// Exercises Normalization service CRUD operations via LinkSdk.
 /// Self-contained: creates its own prerequisite facility for each run.
-/// Includes SDK-reachable 4xx validation paths for malformed create/search/sequence requests.
+/// Covers operations/sequences plus the LEGLINK-677 facility-location and HSLOC mapping APIs,
+/// including SDK-reachable 4xx/409 paths and persisted LocationName/LocationAlias/LocalCodeSystem fields.
 /// </summary>
 public sealed class NormalizationTestSuite : ServiceTestSuiteBase
 {
@@ -91,7 +92,17 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
 
         var facilityId = $"ApiHealth-Norm-{Guid.NewGuid():N}";
         var facilityCreated = false;
+        var facilityLocationCreated = false;
         var operationCreated = false;
+        var mappingsCreated = false;
+        var locationId = $"ApiHealth-Loc-{Guid.NewGuid():N}";
+        const string locationName = "ApiHealth Main";
+        const string locationAlias = "apihealth-main";
+        const string localCodeSystem = "http://example.org/apihealth-location";
+        var localCode = $"code-{Guid.NewGuid():N}";
+        var secondLocalCode = $"code-{Guid.NewGuid():N}";
+        string? mappingId = null;
+        string? secondMappingId = null;
 
         try
         {
@@ -260,11 +271,219 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
+            results.Add(await RunStepAsync(StepNames.LocationPost400EmptyLocationId, 400, () =>
+                _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel(), ct), ct: ct));
 
+            results.Add(await RunStepAsync(StepNames.LocationGet400EmptyLocationId, 400, () =>
+                _client.GetFacilityLocationAsync(facilityId, " ", ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.LocationGet404, 404, () =>
+                _client.GetFacilityLocationAsync(facilityId, $"missing-{Guid.NewGuid():N}", ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.LocationPost201, 201, async () =>
+            {
+                var resp = await _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocationName = locationName,
+                    LocationAlias = locationAlias
+                }, ct);
+                if (resp.IsSuccessStatusCode)
+                    AssertFacilityLocation(resp.Body, facilityId, locationId, locationName, locationAlias);
+                return resp;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.LocationPost409Duplicate, 409, () =>
+                _client.CreateFacilityLocationAsync(facilityId, new CreateFacilityLocationRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocationName = locationName,
+                    LocationAlias = locationAlias
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.LocationGet200, 200, async () =>
+            {
+                var resp = await _client.GetFacilityLocationAsync(facilityId, locationId, ct);
+                if (resp.IsSuccessStatusCode)
+                    AssertFacilityLocation(resp.Body, facilityId, locationId, locationName, locationAlias);
+                return resp;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingPost400EmptyLocalCode, 400, () =>
+                _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = " "
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingPost404UnknownLocation, 404, () =>
+                _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = $"missing-{Guid.NewGuid():N}",
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingGet400EmptyId, 400, () =>
+                _client.GetFacilityLocationLocalCodeMappingAsync(" ", ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingGet404, 404, () =>
+                _client.GetFacilityLocationLocalCodeMappingAsync(Guid.NewGuid().ToString("N"), ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingPost201, 201, async () =>
+            {
+                var resp = await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct);
+                if (resp.IsSuccessStatusCode)
+                {
+                    mappingId = resp.Body?.Id;
+                    mappingsCreated = true;
+                    AssertMapping(resp.Body, facilityId, locationId, locationName, locationAlias, localCodeSystem, localCode);
+                }
+                return resp;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingPost409Duplicate, 409, () =>
+                _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocationId = locationId,
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct), ct: ct));
+
+            results.Add(mappingId is null
+                ? SkipStepAsync(StepNames.MappingGet200, "MAPPING POST → 201 did not return a mapping id.")
+                : await RunStepAsync(StepNames.MappingGet200, 200, async () =>
+                {
+                    var resp = await _client.GetFacilityLocationLocalCodeMappingAsync(mappingId, ct);
+                    if (resp.IsSuccessStatusCode)
+                        AssertMapping(resp.Body, facilityId, locationId, locationName, locationAlias, localCodeSystem, localCode);
+                    return resp;
+                }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingSearch200HasResults, 200, async () =>
+            {
+                var resp = await _client.SearchFacilityLocationLocalCodeMappingsAsync(new SearchFacilityLocationLocalCodeMappingsRequestApiModel
+                {
+                    FacilityId = facilityId,
+                    LocationId = locationId,
+                    PageSize = 10,
+                    PageNumber = 1
+                }, ct);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var match = resp.Body?.Records?.FirstOrDefault(record => record.Id == mappingId)
+                        ?? throw new InvalidOperationException("Expected the created HSLOC mapping in search results.");
+                    AssertMapping(match, facilityId, locationId, locationName, locationAlias, localCodeSystem, localCode);
+                }
+                return resp;
+            }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingSearch200Empty, 200, async () =>
+            {
+                var resp = await _client.SearchFacilityLocationLocalCodeMappingsAsync(new SearchFacilityLocationLocalCodeMappingsRequestApiModel
+                {
+                    FacilityId = $"ApiHealth-Norm-Ghost-{Guid.NewGuid():N}",
+                    PageSize = 10,
+                    PageNumber = 1
+                }, ct);
+                if (resp.IsSuccessStatusCode && resp.Body?.Records is { Count: > 0 })
+                    throw new InvalidOperationException("Expected no HSLOC mappings for an unused facility.");
+                return resp;
+            }, ct: ct));
+
+            results.Add(mappingId is null
+                ? SkipStepAsync(StepNames.MappingPut400EmptyLocalCode, "MAPPING POST → 201 did not return a mapping id.")
+                : await RunStepAsync(StepNames.MappingPut400EmptyLocalCode, 400, () =>
+                    _client.UpdateFacilityLocationLocalCodeMappingAsync(mappingId, new UpdateFacilityLocationLocalCodeMappingRequestApiModel
+                    {
+                        LocalCodeSystem = localCodeSystem,
+                        LocalCode = " "
+                    }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingPut404, 404, () =>
+                _client.UpdateFacilityLocationLocalCodeMappingAsync(Guid.NewGuid().ToString("N"), new UpdateFacilityLocationLocalCodeMappingRequestApiModel
+                {
+                    LocalCodeSystem = localCodeSystem,
+                    LocalCode = localCode
+                }, ct), ct: ct));
+
+            results.Add(mappingId is null
+                ? SkipStepAsync(StepNames.MappingPut202, "MAPPING POST → 201 did not return a mapping id.")
+                : await RunStepAsync(StepNames.MappingPut202, 202, async () =>
+                {
+                    var updatedCode = $"{localCode}-upd";
+                    var resp = await _client.UpdateFacilityLocationLocalCodeMappingAsync(mappingId, new UpdateFacilityLocationLocalCodeMappingRequestApiModel
+                    {
+                        LocalCodeSystem = localCodeSystem,
+                        LocalCode = updatedCode
+                    }, ct);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        localCode = updatedCode;
+                        AssertMapping(resp.Body, facilityId, locationId, locationName, locationAlias, localCodeSystem, updatedCode);
+                    }
+                    return resp;
+                }, ct: ct));
+
+            results.Add(mappingId is null
+                ? SkipStepAsync(StepNames.MappingPut409Duplicate, "MAPPING POST → 201 did not return a mapping id.")
+                : await RunStepAsync(StepNames.MappingPut409Duplicate, 409, async () =>
+                {
+                    var second = await _client.CreateFacilityLocationLocalCodeMappingAsync(facilityId, new CreateFacilityLocationLocalCodeMappingRequestApiModel
+                    {
+                        LocationId = locationId,
+                        LocalCodeSystem = localCodeSystem,
+                        LocalCode = secondLocalCode
+                    }, ct);
+                    if (!second.IsSuccessStatusCode || string.IsNullOrWhiteSpace(second.Body?.Id))
+                        throw new InvalidOperationException($"Could not create a second mapping to prove PUT 409. HTTP {second.StatusCode}: {second.RawBody}");
+
+                    secondMappingId = second.Body.Id;
+                    return await _client.UpdateFacilityLocationLocalCodeMappingAsync(secondMappingId, new UpdateFacilityLocationLocalCodeMappingRequestApiModel
+                    {
+                        LocalCodeSystem = localCodeSystem,
+                        LocalCode = localCode
+                    }, ct);
+                }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingDelete400EmptyId, 400, () =>
+                _client.DeleteFacilityLocationLocalCodeMappingAsync(" ", ct), ct: ct));
+
+            results.Add(secondMappingId is null
+                ? SkipStepAsync(StepNames.MappingDelete204, "Second mapping was not created, so DELETE by id has nothing to remove.")
+                : await RunStepAsync(StepNames.MappingDelete204, 204, async () =>
+                {
+                    var resp = await _client.DeleteFacilityLocationLocalCodeMappingAsync(secondMappingId, ct);
+                    if (resp.IsSuccessStatusCode)
+                        secondMappingId = null;
+                    return resp;
+                }, ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingDeleteFacility400EmptyFacility, 400, () =>
+                _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(" ", ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.MappingDeleteFacility204, 204, async () =>
+            {
+                var resp = await _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode)
+                    mappingsCreated = false;
+                return resp;
+            }, ct: ct));
         }
         finally
         {
+            if (secondMappingId != null)
+                await TryCleanupAsync(() => _client.DeleteFacilityLocationLocalCodeMappingAsync(secondMappingId, ct));
+            if (mappingsCreated)
+                await TryCleanupAsync(() => _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(facilityId, ct));
             if (operationCreated) await TryCleanupAsync(() => _client.DeleteFacilityOperationsAsync(facilityId, ct));
+            if (facilityLocationCreated) await TryCleanupAsync(() => _client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 
@@ -285,6 +504,48 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
         };
         await _facilityClient.CreateAsync(model, ct);
+    }
+
+    private static void AssertFacilityLocation(
+        FacilityLocationApiModel? location,
+        string facilityId,
+        string locationId,
+        string locationName,
+        string locationAlias)
+    {
+        if (location is null)
+            throw new InvalidOperationException("Expected a facility location in the response body.");
+        if (!string.Equals(location.FacilityId, facilityId, StringComparison.Ordinal)
+            || !string.Equals(location.LocationId, locationId, StringComparison.Ordinal)
+            || !string.Equals(location.LocationName, locationName, StringComparison.Ordinal)
+            || !string.Equals(location.LocationAlias, locationAlias, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Facility location fields were not persisted. FacilityId={location.FacilityId}, LocationId={location.LocationId}, LocationName={location.LocationName}, LocationAlias={location.LocationAlias}.");
+        }
+    }
+
+    private static void AssertMapping(
+        FacilityLocationLocalCodeMappingApiModel? mapping,
+        string facilityId,
+        string locationId,
+        string locationName,
+        string locationAlias,
+        string localCodeSystem,
+        string localCode)
+    {
+        if (mapping is null)
+            throw new InvalidOperationException("Expected an HSLOC mapping in the response body.");
+        if (!string.Equals(mapping.FacilityId, facilityId, StringComparison.Ordinal)
+            || !string.Equals(mapping.LocationId, locationId, StringComparison.Ordinal)
+            || !string.Equals(mapping.LocationName, locationName, StringComparison.Ordinal)
+            || !string.Equals(mapping.LocationAlias, locationAlias, StringComparison.Ordinal)
+            || !string.Equals(mapping.LocalCodeSystem, localCodeSystem, StringComparison.Ordinal)
+            || !string.Equals(mapping.LocalCode, localCode, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"HSLOC mapping fields were not persisted. FacilityId={mapping.FacilityId}, LocationId={mapping.LocationId}, LocationName={mapping.LocationName}, LocationAlias={mapping.LocationAlias}, LocalCodeSystem={mapping.LocalCodeSystem}, LocalCode={mapping.LocalCode}.");
+        }
     }
 
     private async Task<ApiTestRunResult> CallRawGetAsync(
@@ -329,9 +590,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
 
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : responseBody.Length > 500
-                    ? responseBody[..500]
-                    : responseBody;
+                : responseBody;
 
             if (!result.Passed)
             {

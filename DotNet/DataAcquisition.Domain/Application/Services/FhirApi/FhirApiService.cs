@@ -20,8 +20,10 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using DateTime = System.DateTime;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -47,6 +49,7 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
     private readonly ILocationMappingService _locationMappingService;
+    private readonly int _searchPageSize;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -55,7 +58,8 @@ public class FhirApiService : IFhirApiService
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
-        ILocationMappingService locationMappingService)
+        ILocationMappingService locationMappingService,
+        IOptions<FhirSearchSettings>? fhirSearchSettings = null)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -64,6 +68,7 @@ public class FhirApiService : IFhirApiService
         _logger = logger;
         _resourceCache = resourceCache;
         _locationMappingService = locationMappingService;
+        _searchPageSize = fhirSearchSettings?.Value.ResolvePageSize() ?? FhirSearchSettings.DefaultPageSize;
     }
 
     #region Interface Implementation
@@ -153,15 +158,7 @@ public class FhirApiService : IFhirApiService
 
             await UpdateResourceMappingsAsync(log, [resource], cancellationToken);
 
-            await AddResourceToCacheAsync(new ResourceAcquired
-            {
-                Resource = resource,
-                ResourceType = resource.TypeName,
-                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
-                QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
-                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-            }, log.CorrelationId, cancellationToken);
+            await AddResourcesToCacheAsync(log, [resource], cancellationToken);
 
             return resourceIds;
         }
@@ -222,8 +219,16 @@ public class FhirApiService : IFhirApiService
         }
         else
         {
-            var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
-            return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
+            var parameterBatches = FhirSearchLimits.SplitOversizedIdParameters(fhirQuery.QueryParameters);
+            foreach (var batch in parameterBatches)
+            {
+                var searchParams = BuildSearchParams(batch);
+                var ids = await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
+                if (ids != null)
+                    resourceIds.AddRange(ids);
+            }
+
+            return resourceIds;
         }
     }
     #endregion
@@ -240,6 +245,15 @@ public class FhirApiService : IFhirApiService
 
         var isReferenceLog = fhirQuery.IsReference.GetValueOrDefault();
         var resourceIds = new List<string>();
+        ApplySearchPageSize(searchParams, fhirQuery);
+        var pageNumber = 0;
+        _logger.LogInformation(
+            "Log {LogId} retrieving paged results: starting {ResourceType} search facility={FacilityId} correlationId={CorrelationId} report={ReportTrackingId}",
+            log.Id.SanitizeForLog(),
+            resourceType.SanitizeForLog(),
+            log.FacilityId.SanitizeForLog(),
+            log.CorrelationId.SanitizeForLog(),
+            log.ReportTrackingId.SanitizeForLog());
         try
         {
             await foreach (var bundle in _searchFhirCommand.ExecuteAsync(
@@ -326,18 +340,23 @@ public class FhirApiService : IFhirApiService
 
                 await UpdateResourceMappingsAsync(log, resources, cancellationToken);
 
-                foreach (var resource in resources)
-                {
-                    await AddResourceToCacheAsync(new ResourceAcquired
-                    {
-                        Resource = resource,
-                        ResourceType = resource.TypeName,
-                        ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
-                        PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
-                        QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
-                        ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-                    }, log.CorrelationId, cancellationToken);
-                }
+                await AddResourcesToCacheAsync(log, resources, cancellationToken);
+
+                pageNumber++;
+                var hasNextPage = bundle.Link?.Exists(link => link.Relation == "next") == true;
+                var resourceLabel = resources.Count == 1 ? "resource" : "resources";
+                _logger.LogInformation(
+                    "Log {LogId} retrieving paged results: {ResourceType} page {PageNumber} ({PageResourceCount} {ResourceLabel} this page, {CumulativeCount} total so far, {PagingStatus}) facility={FacilityId} correlationId={CorrelationId} report={ReportTrackingId}",
+                    log.Id.SanitizeForLog(),
+                    resourceType.SanitizeForLog(),
+                    pageNumber,
+                    resources.Count,
+                    resourceLabel,
+                    resourceIds.Count,
+                    hasNextPage ? "fetching next page" : "last page",
+                    log.FacilityId.SanitizeForLog(),
+                    log.CorrelationId.SanitizeForLog(),
+                    log.ReportTrackingId.SanitizeForLog());
             }
 
             return resourceIds;
@@ -433,13 +452,53 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private async Task AddResourceToCacheAsync(ResourceAcquired resourceAcquired, string correlationId, CancellationToken cancellationToken)
+    private void ApplySearchPageSize(SearchParams searchParams, FhirQueryModel fhirQuery)
     {
-        if (resourceAcquired.Resource is DomainResource domainResource
-            && !string.IsNullOrWhiteSpace(resourceAcquired.ResourceType)
-            && Enum.TryParse<ResourceType>(resourceAcquired.ResourceType, out var resourceType))
+        if (searchParams.Count is > 0)
+            return;
+
+        if (fhirQuery.QueryParameters.Any(parameter =>
+                parameter.StartsWith("_count=", StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        // Query-plan Paged, when set, is a per-query override. Otherwise use app config
+        // (FhirSearch:PageSize), which defaults to 100.
+        var pageSize = fhirQuery.Paged is > 0 ? fhirQuery.Paged.Value : _searchPageSize;
+        searchParams.Count = pageSize;
+    }
+
+    private async Task AddResourcesToCacheAsync(
+        DataAcquisitionLogModel log,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(log.CorrelationId) || resources.Count == 0)
+            return;
+
+        var resourcesByType = new Dictionary<ResourceType, List<DomainResource>>();
+        foreach (var resource in resources)
         {
-            await _resourceCache.UpdateCorrelationCacheAsync($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
+            if (resource is DomainResource domainResource
+                && !string.IsNullOrWhiteSpace(resource.TypeName)
+                && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
+            {
+                if (!resourcesByType.TryGetValue(resourceType, out var typedResources))
+                {
+                    typedResources = [];
+                    resourcesByType[resourceType] = typedResources;
+                }
+
+                typedResources.Add(domainResource);
+            }
+        }
+
+        foreach (var (resourceType, typedResources) in resourcesByType)
+        {
+            await _resourceCache.UpdateCorrelationCacheAsync(
+                $"{log.CorrelationId}:{resourceType}",
+                typedResources,
+                resourceType,
+                cancellationToken);
         }
     }
 

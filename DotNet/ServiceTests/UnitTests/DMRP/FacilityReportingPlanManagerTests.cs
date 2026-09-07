@@ -38,8 +38,8 @@ namespace UnitTests.DMRP
                 .ReturnsAsync(true);
 
             _mockMeasureMappingRepository
-                .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(true);
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new MeasureMapping { Measure = "HOB", DQM = "dqm-HOB" });
 
             _mockRepository
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(), It.IsAny<CancellationToken>()))
@@ -57,6 +57,7 @@ namespace UnitTests.DMRP
         {
             FacilityId = FacilityId,
             MeasureMappingId = Guid.NewGuid().ToString(),
+            Measure = "HOB",
             ReportingMonth = 5,
             ReportingYear = 2026,
             IsReporting = true
@@ -75,6 +76,71 @@ namespace UnitTests.DMRP
             _mockRepository.Verify(r => r.AddAsync(plan, It.IsAny<CancellationToken>()), Times.Once);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
             _mockFacilityExistence.Verify(s => s.ExistsAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Theory]
+        [InlineData("XX")]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task CreateAsync_UnknownComponent_IsRejected(string component)
+        {
+            var plan = ValidPlan();
+            plan.Component = component;
+
+            // The component is part of the unique key and decides which DMRP operation an enrollment
+            // came from, so a value outside the known set would sit in the column describing nothing
+            // and silently occupy its own slot in the key.
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+
+            Assert.Equal($"Component must be one of: {string.Join(", ", ReportingComponents.All)}.", ex.Message);
+
+            // Rejected before anything is written, not after.
+            _mockRepository.Verify(r => r.AddAsync(It.IsAny<FacilityReportingPlan>(), It.IsAny<CancellationToken>()), Times.Never);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(ReportingComponents.Msc)]
+        [InlineData(ReportingComponents.Ps)]
+        public async Task CreateAsync_KnownComponent_IsAccepted(string component)
+        {
+            var plan = ValidPlan();
+            plan.Component = component;
+
+            // The other side of the branch: both components are real, and PS is not a special case
+            // despite its endpoint being the one named "annual".
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal(component, result.Component);
+        }
+
+        [Fact]
+        public async Task CreateAsync_MeasureContradictingItsMapping_IsRejected()
+        {
+            var plan = ValidPlan();
+            plan.Measure = "ZZZ";
+
+            // The default mapping in this fixture is for HOB. The measure is the fact DMRP reported
+            // and the mapping is an admin's decision about how to evaluate it, so a row asserting one
+            // measure while resolving another's dQM is a contradiction rather than an override -- it
+            // would display ZZZ, schedule HOB's dQM, and slip past the unique key, which is on the
+            // measure and would see two different names as two different enrollments.
+            var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
+
+            Assert.Contains("ZZZ", ex.Message);
+            Assert.Contains("HOB", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_MeasureMatchingItsMappingInAnotherCase_IsAccepted()
+        {
+            var plan = ValidPlan();
+            plan.Measure = "hob";
+
+            // The check exists to catch a contradiction, not to police casing.
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal("hob", result.Measure);
         }
 
         [Fact]
@@ -100,17 +166,46 @@ namespace UnitTests.DMRP
         [Theory]
         [InlineData("")]
         [InlineData(null)]
-        public async Task CreateAsync_MissingMeasureMappingId_IsRejected(string? measureMappingId)
+        public async Task CreateAsync_NoMappingAndNoMeasure_IsRejected(string? measureMappingId)
         {
+            // The mapping is optional, but something has to say what the facility is enrolled in.
+            // With neither, the row could not be mapped later either.
             var plan = ValidPlan();
-            plan.MeasureMappingId = measureMappingId!;
+            plan.MeasureMappingId = measureMappingId;
+            plan.Measure = string.Empty;
 
             var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.CreateAsync(plan));
-            Assert.Equal("MeasureMappingId is required.", ex.Message);
+            Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", ex.Message);
         }
 
         [Fact]
-        public async Task UpdateAsync_MissingMeasureMappingId_IsRejectedAndLeavesTheRowAlone()
+        public async Task CreateAsync_NoMappingButAMeasure_IsAccepted()
+        {
+            // DMRP returns measures Link may have no mapping for yet. The enrollment is recorded
+            // so an admin can map it afterwards, rather than being dropped.
+            var plan = ValidPlan();
+            plan.MeasureMappingId = null;
+            plan.Measure = "HOB";
+
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Null(result.MeasureMappingId);
+            Assert.Equal("HOB", result.Measure);
+        }
+
+        [Fact]
+        public async Task CreateAsync_AMappingWithNoMeasure_TakesTheMeasureFromTheMapping()
+        {
+            var plan = ValidPlan();
+            plan.Measure = string.Empty;
+
+            var result = await _manager.CreateAsync(plan);
+
+            Assert.Equal("HOB", result.Measure);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_NoMappingAndNoMeasure_IsRejectedAndLeavesTheRowAlone()
         {
             var existing = ValidPlan();
 
@@ -119,11 +214,12 @@ namespace UnitTests.DMRP
 
             var update = ValidPlan();
             update.MeasureMappingId = string.Empty;
+            update.Measure = string.Empty;
 
             var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.UpdateAsync(existing.Id, update));
-            Assert.Equal("MeasureMappingId is required.", ex.Message);
+            Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", ex.Message);
 
-            Assert.NotEmpty(existing.MeasureMappingId);
+            Assert.NotEmpty(existing.Measure);
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -159,8 +255,8 @@ namespace UnitTests.DMRP
         public async Task CreateAsync_UnknownMeasureMapping_IsRejected()
         {
             _mockMeasureMappingRepository
-                .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(false);
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<MeasureMapping, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((MeasureMapping?)null);
 
             var plan = ValidPlan();
 
@@ -230,6 +326,29 @@ namespace UnitTests.DMRP
                 .ThrowsAsync(new DbUpdateException("unique index violated"));
 
             await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(ValidPlan()));
+        }
+
+        [Fact]
+        public async Task CreateAsync_DuplicateOfAnUnmappedEnrollment_NamesWhatItConflictedOn()
+        {
+            // The unique index is keyed on component and measure, and the mapping is optional. A
+            // message built from the mapping would name a field the conflict had nothing to do with,
+            // and would leave a blank where the reason belongs for exactly the unmapped enrollment
+            // this branch now exists to allow.
+            var plan = ValidPlan();
+            plan.MeasureMappingId = null;
+            plan.Component = ReportingComponents.Ps;
+
+            _mockRepository
+                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new DbUpdateException("save failed",
+                    new Exception($"Violation of UNIQUE KEY constraint '{FacilityReportingPlanConfigMap.UniquePeriodIndexName}'.")));
+
+            var ex = await Assert.ThrowsAsync<DuplicateReportingPlanException>(() => _manager.CreateAsync(plan));
+
+            Assert.Contains(ReportingComponents.Ps, ex.Message);
+            Assert.Contains(plan.Measure, ex.Message);
+            Assert.DoesNotContain("measure mapping", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

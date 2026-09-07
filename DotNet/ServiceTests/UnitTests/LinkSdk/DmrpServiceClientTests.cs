@@ -94,6 +94,64 @@ public class DmrpServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_ReadsThePeriodsOperation()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/dmrp/reporting-plans/facilities/100/periods", request.Path);
+        Assert.Contains("monthsAhead=6", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_AsksForARefreshOnlyWhenTold()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        // A refresh makes the service call DMRP, so the parameter is sent only when it was asked
+        // for - refresh=false and no refresh at all should not be distinguishable to the service.
+        Assert.DoesNotContain("refresh", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlanPeriodsAsync_SendsRefreshWhenAskedFor()
+    {
+        using var server = new OneShotServer(EmptyPage);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlanPeriodsAsync("100", monthsAhead: 6, refresh: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("refresh=true", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFacilityReportingPlansForFacilityAsync_CarriesTheLookAheadAndRefresh()
+    {
+        using var server = new OneShotServer("[]");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityReportingPlansForFacilityAsync("100", monthsAhead: 6, refresh: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("/api/dmrp/reporting-plans/facilities/100", request.Path);
+        Assert.Contains("monthsAhead=6", request.Query);
+        Assert.Contains("refresh=true", request.Query);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SearchMeasureMappingsAsync_ReportsNotFoundRatherThanThrowing()
     {
         using var server = new OneShotServer("{}", statusCode: 404);
@@ -119,67 +177,4 @@ public class DmrpServiceClientTests
             new Mock<ICreateSystemToken>().Object);
     }
 
-    private sealed class CapturedRequest
-    {
-        public string Method { get; init; } = string.Empty;
-        public string Path { get; init; } = string.Empty;
-        public string Query { get; init; } = string.Empty;
-    }
-
-    private sealed class OneShotServer : IDisposable
-    {
-        private readonly HttpListener _listener;
-        private readonly System.Threading.Tasks.Task<CapturedRequest> _requestTask;
-
-        public string BaseUrl { get; }
-
-        public OneShotServer(string responseBody, int statusCode = 200)
-        {
-            var port = GetFreePort();
-            BaseUrl = $"http://127.0.0.1:{port}";
-
-            _listener = new HttpListener();
-            _listener.Prefixes.Add($"{BaseUrl}/");
-            _listener.Start();
-
-            _requestTask = System.Threading.Tasks.Task.Run(async () =>
-            {
-                var context = await _listener.GetContextAsync();
-
-                var captured = new CapturedRequest
-                {
-                    Method = context.Request.HttpMethod,
-                    Path = context.Request.Url?.AbsolutePath ?? string.Empty,
-                    Query = context.Request.Url?.Query ?? string.Empty
-                };
-
-                context.Response.StatusCode = statusCode;
-                context.Response.ContentType = "application/json";
-                var buffer = Encoding.UTF8.GetBytes(responseBody);
-                await context.Response.OutputStream.WriteAsync(buffer);
-                context.Response.Close();
-
-                return captured;
-            });
-        }
-
-        public System.Threading.Tasks.Task<CapturedRequest> WaitForRequestAsync() => _requestTask;
-
-        public void Dispose()
-        {
-            if (_listener.IsListening)
-                _listener.Stop();
-
-            _listener.Close();
-        }
-
-        private static int GetFreePort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
-        }
-    }
 }

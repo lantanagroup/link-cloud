@@ -119,6 +119,38 @@ namespace UnitTests.DMRP
             _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
 
+        [Fact]
+        public async Task DeleteAllAsync_OnlyUnmappedPlansExist_DeletesTheMappings()
+        {
+            // An enrollment Link has no mapping for holds no foreign key, so it is not what "in use"
+            // means. A database of nothing but these must still be able to clear its mappings.
+            ReportingPlans(new FacilityReportingPlan { MeasureMappingId = null });
+
+            var mappings = new List<MeasureMapping> { new(), new() };
+
+            _mockRepository.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mappings);
+
+            await _manager.DeleteAllAsync();
+
+            _mockRepository.Verify(r => r.Remove(It.IsAny<MeasureMapping>()), Times.Exactly(mappings.Count));
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAllAsync_AMappedPlanExists_RefusesBeforeTouchingTheRepository()
+        {
+            // The unmapped row alongside it must not be what carries the refusal - the mapped one must.
+            ReportingPlans(
+                new FacilityReportingPlan { MeasureMappingId = null },
+                new FacilityReportingPlan { MeasureMappingId = "mapping-1" });
+
+            await Assert.ThrowsAsync<MeasureMappingInUseException>(() => _manager.DeleteAllAsync());
+
+            _mockRepository.Verify(r => r.Remove(It.IsAny<MeasureMapping>()), Times.Never);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
         /// <summary>
         /// The pre-check above and the delete are two round trips, so a reporting plan can be created
         /// in between. These cover what the database says when that happens.
@@ -188,6 +220,20 @@ namespace UnitTests.DMRP
                 .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
+        }
+
+        /// <summary>
+        /// Answers AnyAsync by running the caller's predicate over <paramref name="plans"/> rather than
+        /// returning a fixed answer, so a test can tell which question the guard asked and not merely
+        /// that it asked one.
+        /// </summary>
+        private void ReportingPlans(params FacilityReportingPlan[] plans)
+        {
+            _mockReportingPlanRepository
+                .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken _) =>
+                    plans.Any(predicate.Compile()));
         }
     }
 }

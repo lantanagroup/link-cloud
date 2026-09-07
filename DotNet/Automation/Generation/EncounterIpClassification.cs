@@ -117,9 +117,12 @@ internal static class EncounterIpClassification
     public static readonly IReadOnlyList<string> DiabetesMedicationCodes =
         new[]
         {
-            // Insulins (RxNorm) — the only antidiabetics emitted by FhirGenerationCodes.Medications today.
+            // Insulins (RxNorm) — codes the Automation / Thetis generators emit today.
             "1116635", // Insulin glargine 100 UNT/ML Injectable Solution
             "311040",  // Insulin regular 100 UNT/ML Injectable Solution
+            "274783",  // insulin glargine (ingredient). FhirBundleGenerator Hypo shared Medication
+                       // and Thetis HypoInsulinGlargine use this code on Medication, referenced
+                       // from MedicationRequest — not the clinical-drug codes above.
         };
 
     /// <summary>

@@ -22,7 +22,7 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: project
-  value: 'nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj.csproj'
+  value: 'nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj'
 # - name: testProject
 #   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
 - name: serviceName

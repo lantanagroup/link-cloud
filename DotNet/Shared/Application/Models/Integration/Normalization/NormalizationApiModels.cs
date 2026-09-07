@@ -118,3 +118,67 @@ public class NormalizationVendorVersionOperationPresetApiModel
     public Guid VendorVersionId { get; set; }
     public Guid OperationResourceTypeId { get; set; }
 }
+
+public class FacilityLocationApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
+    public string LocationId { get; set; } = string.Empty;
+    public string? PartOfId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
+}
+
+public class CreateFacilityLocationRequestApiModel
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string? PartOfId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+}
+
+public class FacilityLocationLocalCodeMappingApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
+    public string LocationId { get; set; } = string.Empty;
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+    public string? HSLOCCode { get; set; }
+    public string? HSLOCVersion { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
+}
+
+public class SearchFacilityLocationLocalCodeMappingsRequestApiModel
+{
+    public string? Id { get; set; }
+    public string? FacilityId { get; set; }
+    public string? LocationId { get; set; }
+    public string? LocalCodeSystem { get; set; }
+    public string? LocalCode { get; set; }
+    public Guid? HSLOCId { get; set; }
+    public bool? Unmapped { get; set; }
+    public int? PageSize { get; set; }
+    public int? PageNumber { get; set; }
+}
+
+public class CreateFacilityLocationLocalCodeMappingRequestApiModel
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+}
+
+public class UpdateFacilityLocationLocalCodeMappingRequestApiModel
+{
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+}

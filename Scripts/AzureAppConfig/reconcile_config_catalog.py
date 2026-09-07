@@ -5,7 +5,10 @@ against the others:
 
     app-config.yaml            what should be provisioned per environment  (intent)
     config-key-inventory.json  what the code actually reads                (reality)
-    Config/app-config.*.json   what each store actually holds              (deployed)
+    app-config.*.json          what each store actually holds              (deployed)
+
+The first two are in this repository; the exports are in the private `link-cac` repository,
+found via config_key_matching.default_config_dir.
 
 This joins all three and reports where they disagree. Nothing is changed; the output is the
 worklist for editing the catalog by hand, because most of the calls are judgement rather than
@@ -48,7 +51,7 @@ import config_findings as findings_mod
 import config_key_matching as matching
 
 DEFAULT_CATALOG = "app-config.yaml"
-DEFAULT_INVENTORY = "Config/config-key-inventory.json"
+DEFAULT_INVENTORY = "Scripts/AzureAppConfig/config-key-inventory.json"
 
 # Framework-owned schemas, on both sides. YARP binds ReverseProxy:Routes:<name>:* and Serilog
 # binds Serilog:WriteTo:<index>:* from their own schemas; on the Java side Spring Boot's
@@ -140,7 +143,9 @@ def main() -> int:
         description="Reconcile the config catalog against code and stores.")
     parser.add_argument("--catalog", default=DEFAULT_CATALOG)
     parser.add_argument("--inventory", default=DEFAULT_INVENTORY)
-    parser.add_argument("--config-dir", default="Config")
+    parser.add_argument("--config-dir", default=matching.default_config_dir(),
+                        help="Where link-cac's exports are (default: %(default)s; "
+                             "also settable with LINK_CAC_CONFIG_DIR)")
     parser.add_argument("--bucket", choices=["A", "B", "C", "D"],
                         help="Show only one bucket")
     args = parser.parse_args()

@@ -253,9 +253,14 @@ public static class OrgResourceMapProposalBuilder
             var type = TypeExists.Match(part);
             if (type.Success)
             {
-                yield return $"typesys|{type.Groups[1].Value}";
+                // A code-specific condition must not count as covering every Location
+                // that merely shares the type codesystem. Mega-patient uploads have
+                // many HSLOC codes; treating the first as system-wide skipped the rest
+                // and left most Locations out-of-org.
                 if (type.Groups[2].Success && !string.IsNullOrWhiteSpace(type.Groups[2].Value))
                     yield return $"type|{type.Groups[1].Value}|{type.Groups[2].Value}";
+                else
+                    yield return $"typesys|{type.Groups[1].Value}";
             }
         }
     }

@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -13,7 +14,12 @@ public interface IResourcesAcquiredTailFinalizer
     /// Applies org-location encounter stripping, then drops any cache keys that no longer
     /// contain resources so ResourcesAcquired never points at an empty location.
     /// </summary>
-    Task FinalizeAsync(TailCompletionResult tail, CancellationToken cancellationToken = default);
+    /// <returns>
+    /// How the patient resolved against the facility's organization. Returned rather than discarded
+    /// because this is the only place it is computed, and it is what the report's Location Org and
+    /// Encounter Mapping indicators record.
+    /// </returns>
+    Task<LocationOrgOutcome> FinalizeAsync(TailCompletionResult tail, CancellationToken cancellationToken = default);
 }
 
 public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
@@ -32,13 +38,13 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task FinalizeAsync(TailCompletionResult tail, CancellationToken cancellationToken = default)
+    public async Task<LocationOrgOutcome> FinalizeAsync(TailCompletionResult tail, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tail);
 
         // Encounter is cached by its ungated primary log. Strip non-org encounters before
         // the tail is produced so MeasureEval never rehydrates them.
-        await _locationMappingService.StripNonOrgEncountersFromCacheAsync(
+        var locationOrgOutcome = await _locationMappingService.StripNonOrgEncountersFromCacheAsync(
             tail.FacilityId,
             tail.CorrelationId,
             tail.PatientId.SplitReference(),
@@ -49,7 +55,7 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         {
             // CacheType is already stamped on the tail; Hybrid no longer needs the in-process memo.
             _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
-            return;
+            return locationOrgOutcome;
         }
 
         var kept = new List<string>(listed.Count);
@@ -103,6 +109,8 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         // Drop the in-process Hybrid memo. The Redis {correlation}:__cacheType memo stays
         // so a later retry or replica can still resolve ABS vs Redis.
         _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
+
+        return locationOrgOutcome;
     }
 
     private async Task ConsolidateIntoAbsAsync(List<string> kept, CancellationToken cancellationToken)

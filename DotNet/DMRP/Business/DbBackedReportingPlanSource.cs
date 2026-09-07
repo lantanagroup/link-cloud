@@ -43,7 +43,12 @@ namespace LantanaGroup.Link.DMRP.Business
                 return Array.Empty<ReportingPlanEntry>();
             }
 
-            var mappingIds = plans.Select(p => p.MeasureMappingId).Distinct().ToList();
+            var mappingIds = plans
+                .Select(p => p.MeasureMappingId)
+                .Where(id => id is not null)
+                .Select(id => id!)
+                .Distinct()
+                .ToList();
 
             var mappings = await _measureMappings.FindAsync(m => mappingIds.Contains(m.Id), cancellationToken);
 
@@ -53,10 +58,20 @@ namespace LantanaGroup.Link.DMRP.Business
 
             foreach (var plan in plans)
             {
+                if (plan.MeasureMappingId is null)
+                {
+                    // An enrollment recorded before anyone mapped its measure. It is reported with no
+                    // dQM rather than dropped -- the schedule projector excludes it and says so, which
+                    // is the whole reason the row is storable. Dropping it here would lose the fact
+                    // that the facility is enrolled in something Link cannot yet evaluate.
+                    entries.Add(new ReportingPlanEntry(plan.Measure, string.Empty, null));
+                    continue;
+                }
+
                 if (!mappingsById.TryGetValue(plan.MeasureMappingId, out var mapping))
                 {
-                    // The reporting plan's foreign key guarantees the mapping row exists, so this is a
-                    // read that raced a delete rather than an ordinary miss.
+                    // A mapped plan whose mapping is gone: the foreign key means this is a read that
+                    // raced a delete rather than an ordinary miss.
                     _logger.LogWarning(
                         "Reporting plan {PlanId} for facility {FacilityId} references measure mapping {MeasureMappingId}, which was not found. The measure is excluded from the facility's schedule.",
                         plan.Id.SanitizeForLog(), facilityId.SanitizeForLog(), plan.MeasureMappingId.SanitizeForLog());

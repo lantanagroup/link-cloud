@@ -28,6 +28,14 @@ internal static class CqlInstanceFilterAnalyzer
     private static readonly Regex IntentTildePattern = new(
         """intent\s*~\s*'([^']+)'""",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match each category tilde independently (`Category ~ "imaging"` or
+    // `categories ~ "encounter-diagnosis"`). A greedy
+    // `.category[\s\S]{0,160}~ "code"` span jumped from the first `.category`
+    // to the last tilde in an `or` chain, so ACH Monthly SDE Observation
+    // Category kept only `procedure` and dropped `imaging`.
+    private static readonly Regex CategoryTildePattern = new(
+        @"\bcategor(?:y|ies)\s*~\s*""([^""]+)""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Dictionary<string, string> ReturnFunctionToType = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,6 +82,9 @@ internal static class CqlInstanceFilterAnalyzer
         public bool LocationFromIpEncounterLocations { get; init; }
         public bool SubjectMustBePatient { get; init; }
         public bool SpecimenFromMatchingObservations { get; init; }
+        public bool DiagnosticReportResultsReferenceMatchingObservations { get; init; }
+        public bool AllowSpecimenCollectionDuringIp { get; init; }
+        public bool IncludeAllWhenAnyObservationLinkedReportExists { get; init; }
         public List<CqlInclusionRule> ObservationSourceRules { get; init; } = [];
     }
 
@@ -174,6 +185,28 @@ internal static class CqlInstanceFilterAnalyzer
             ];
         }
 
+        if (LooksLikeDiagnosticReportResultReferences(body))
+        {
+            var sourceName = FirstExistsDefineReference(body);
+            var observationRules = sourceName != null
+                ? AnalyzeDefine(model, sourceName, visiting)
+                : [];
+            var observationOnly = observationRules
+                .Where(r => string.Equals(r.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (observationOnly.Count == 0)
+                observationOnly = observationRules;
+            return
+            [
+                Merge(new CqlInclusionRule
+                {
+                    ResourceType = "DiagnosticReport",
+                    DiagnosticReportResultsReferenceMatchingObservations = true,
+                    ObservationSourceRules = observationOnly
+                }, predicates, returnType ?? "DiagnosticReport")
+            ];
+        }
+
         var named = FirstNamedDefineReference(body);
         if (named != null && model.Defines.ContainsKey(named))
         {
@@ -193,7 +226,10 @@ internal static class CqlInstanceFilterAnalyzer
 
             var inherited = AnalyzeDefine(model, named, visiting);
             if (inherited.Count > 0)
-                return inherited.Select(rule => Merge(rule, predicates, returnType)).ToList();
+            {
+                var merged = inherited.Select(rule => Merge(rule, predicates, returnType)).ToList();
+                return ApplyUncorrelatedDiagnosticReportExistsGate(model, body, merged, visiting);
+            }
         }
 
         var rules = new List<CqlInclusionRule>();
@@ -237,7 +273,59 @@ internal static class CqlInstanceFilterAnalyzer
             }, predicates, returnType));
         }
 
-        return rules;
+        return ApplyUncorrelatedDiagnosticReportExistsGate(model, body, rules, visiting);
+    }
+
+    private static List<CqlInclusionRule> ApplyUncorrelatedDiagnosticReportExistsGate(
+        CqlMeasureBundleModel model,
+        string body,
+        List<CqlInclusionRule> rules,
+        HashSet<string> visiting)
+    {
+        if (LooksLikeDiagnosticReportResultReferences(body) || rules.Count == 0)
+            return rules;
+        if (!rules.Any(r => string.Equals(r.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+            return rules;
+
+        var existsName = FirstExistsDefineReference(body);
+        if (string.IsNullOrWhiteSpace(existsName)
+            || string.Equals(existsName, "Initial Population", StringComparison.Ordinal))
+        {
+            return rules;
+        }
+
+        var inner = AnalyzeDefine(model, existsName, visiting);
+        var observationRules = inner
+            .Where(r => string.Equals(r.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || r.DiagnosticReportResultsReferenceMatchingObservations)
+            .SelectMany(r => r.DiagnosticReportResultsReferenceMatchingObservations
+                ? r.ObservationSourceRules
+                : [r])
+            .Where(r => string.Equals(r.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (observationRules.Count == 0)
+            return rules;
+
+        return rules.Select(rule => new CqlInclusionRule
+        {
+            ResourceType = rule.ResourceType,
+            CategoryAnyOf = rule.CategoryAnyOf,
+            CategoryNoneOf = rule.CategoryNoneOf,
+            StatusAnyOf = rule.StatusAnyOf,
+            IntentAnyOf = rule.IntentAnyOf,
+            CodeAnyOf = rule.CodeAnyOf,
+            Date = rule.Date,
+            RequireIpExists = rule.RequireIpExists,
+            RequireEncounterLinkedToIp = rule.RequireEncounterLinkedToIp,
+            MustBeIpEncounter = rule.MustBeIpEncounter,
+            LocationFromIpEncounterLocations = rule.LocationFromIpEncounterLocations,
+            SubjectMustBePatient = rule.SubjectMustBePatient,
+            SpecimenFromMatchingObservations = rule.SpecimenFromMatchingObservations,
+            DiagnosticReportResultsReferenceMatchingObservations = rule.DiagnosticReportResultsReferenceMatchingObservations,
+            AllowSpecimenCollectionDuringIp = rule.AllowSpecimenCollectionDuringIp,
+            IncludeAllWhenAnyObservationLinkedReportExists = true,
+            ObservationSourceRules = observationRules
+        }).ToList();
     }
 
     private static CqlInclusionRule Merge(CqlInclusionRule source, WherePredicates predicates, string? returnType)
@@ -257,6 +345,9 @@ internal static class CqlInstanceFilterAnalyzer
             LocationFromIpEncounterLocations = source.LocationFromIpEncounterLocations || predicates.LocationFromIpEncounter,
             SubjectMustBePatient = source.SubjectMustBePatient,
             SpecimenFromMatchingObservations = source.SpecimenFromMatchingObservations,
+            DiagnosticReportResultsReferenceMatchingObservations = source.DiagnosticReportResultsReferenceMatchingObservations,
+            AllowSpecimenCollectionDuringIp = source.AllowSpecimenCollectionDuringIp || predicates.AllowSpecimenCollectionDuringIp,
+            IncludeAllWhenAnyObservationLinkedReportExists = source.IncludeAllWhenAnyObservationLinkedReportExists,
             ObservationSourceRules = source.ObservationSourceRules
         };
     }
@@ -306,6 +397,7 @@ internal static class CqlInstanceFilterAnalyzer
         public bool RequireIpExists { get; set; }
         public bool RequireEncounterLinkedToIp { get; set; }
         public bool LocationFromIpEncounter { get; set; }
+        public bool AllowSpecimenCollectionDuringIp { get; set; }
     }
 
     private static WherePredicates ParseWhere(CqlMeasureBundleModel model, string? whereClause)
@@ -331,10 +423,7 @@ internal static class CqlInstanceFilterAnalyzer
         var categoryAnyOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var categoryNoneOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var notSpans = FindNotSpans(text);
-        foreach (Match match in Regex.Matches(
-                     text,
-                     @"\.category\b[\s\S]{0,160}~\s*""([^""]+)""",
-                     RegexOptions.IgnoreCase))
+        foreach (Match match in CategoryTildePattern.Matches(text))
         {
             var code = model.ResolveCode(match.Groups[1].Value);
             if (notSpans.Any(span => match.Index >= span.Start && match.Index <= span.End))
@@ -367,6 +456,12 @@ internal static class CqlInstanceFilterAnalyzer
             result.IntentAnyOf = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { intent.Groups[1].Value };
 
         result.Date = InferDateRelation(text);
+        if (text.Contains("GetSpecimen", StringComparison.OrdinalIgnoreCase)
+            && text.Contains("collection.collected", StringComparison.OrdinalIgnoreCase)
+            && text.Contains("during", StringComparison.OrdinalIgnoreCase))
+        {
+            result.AllowSpecimenCollectionDuringIp = true;
+        }
 
         foreach (Match match in Regex.Matches(text, @"\bin\s+""([^""]+)""", RegexOptions.IgnoreCase))
         {
@@ -497,6 +592,16 @@ internal static class CqlInstanceFilterAnalyzer
             || (returnClause ?? string.Empty).Contains("SpecimenResource", StringComparison.OrdinalIgnoreCase))
            && (body.Contains("GetSpecimen", StringComparison.OrdinalIgnoreCase)
                || body.Contains(".specimen", StringComparison.OrdinalIgnoreCase));
+
+    private static bool LooksLikeDiagnosticReportResultReferences(string body)
+        => body.Contains(".result.references", StringComparison.OrdinalIgnoreCase)
+           || body.Contains("result.references(", StringComparison.OrdinalIgnoreCase);
+
+    private static string? FirstExistsDefineReference(string body)
+    {
+        var match = Regex.Match(body, @"exists\s*\(\s*""([^""]+)", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value : null;
+    }
 
     private static string? FirstNamedDefineReference(string body)
     {

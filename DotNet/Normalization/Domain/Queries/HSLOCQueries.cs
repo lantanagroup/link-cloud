@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IHSLOCQueries
     {
-        Task<List<HSLOC>> GetAll(bool includeInactive = false);
+        Task<List<HSLOC>> GetAll(bool includeInactive = false, CancellationToken cancellationToken = default);
     }
 
     public class HSLOCQueries : IHSLOCQueries
@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<List<HSLOC>> GetAll(bool includeInactive = false)
+        public async Task<List<HSLOC>> GetAll(bool includeInactive = false, CancellationToken cancellationToken = default)
         {
             var query = _dbContext.HSLOCS.AsQueryable();
 
@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(h => h.IsActive);
             }
 
-            return await query.ToListAsync();
+            return await query.ToListAsync(cancellationToken);
         }
     }
 }

@@ -1,11 +1,18 @@
 """Focused tests for Azure App Configuration secret validation."""
 
+import contextlib
+import io
+import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import config_findings as findings_mod  # noqa: E402
 import validate_aac_secrets as validator  # noqa: E402
 
 
@@ -94,3 +101,61 @@ class NonProductionFixtureSecretTests(unittest.TestCase):
 
         self.assertEqual(1, len(findings))
         self.assertEqual("WARN", findings[0].severity)
+
+
+class DefaultExportDiscoveryTests(unittest.TestCase):
+    """main() resolves its own default glob, so a missing link-cac must be reported.
+
+    resolve_paths() echoes a pattern back when it matches nothing, so `paths` is never
+    empty and cannot be used to detect a missing checkout -- the guard has to test the
+    default separately. It was unreachable dead code before, hence these tests.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def run_main(self, argv, config_dir):
+        """Invoke main() with the export directory swapped for a temporary one."""
+        with mock.patch.object(validator.matching, "default_config_dir",
+                               return_value=config_dir),              mock.patch.object(validator.sys, "argv", ["validate_aac_secrets.py"] + argv),              contextlib.redirect_stdout(io.StringIO()),              contextlib.redirect_stderr(io.StringIO()):
+            return validator.main()
+
+    def write_export(self, name, items):
+        path = os.path.join(self.tmp, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"items": items}, handle)
+        return path
+
+    def test_missing_default_exports_are_unusable_not_clean(self):
+        """An absent link-cac must not read as 'nothing wrong here'."""
+        self.assertEqual(findings_mod.EXIT_UNUSABLE,
+                         self.run_main([], os.path.join(self.tmp, "nonexistent")))
+
+    def test_matching_default_exports_are_scanned(self):
+        self.write_export("app-config.dev.json", [item("Logging:LogLevel", "Information")])
+
+        self.assertEqual(0, self.run_main([], self.tmp))
+
+    def test_default_glob_skips_the_derived_inventory(self):
+        """config-key-inventory.json sits beside the exports and is not one."""
+        self.write_export("app-config.dev.json", [item("Logging:LogLevel", "Information")])
+        with open(os.path.join(self.tmp, "config-key-inventory.json"), "w",
+                  encoding="utf-8") as handle:
+            handle.write("not an export")
+
+        self.assertEqual(0, self.run_main([], self.tmp))
+
+    def test_a_credential_in_a_default_export_still_fails(self):
+        """The guard short-circuits only when nothing matched, never a real scan."""
+        self.write_export("app-config.qa.json",
+                          [item("Some:Key", "AccountKey=" + "A" * 32)])
+
+        self.assertEqual(findings_mod.EXIT_FINDINGS, self.run_main([], self.tmp))
+
+    def test_explicit_missing_path_keeps_the_file_load_error(self):
+        """An explicit path is the caller's mistake; the checkout guard must not eat it."""
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main([os.path.join(self.tmp, "absent.json")], self.tmp)
+
+        self.assertEqual(findings_mod.EXIT_UNUSABLE, caught.exception.code)

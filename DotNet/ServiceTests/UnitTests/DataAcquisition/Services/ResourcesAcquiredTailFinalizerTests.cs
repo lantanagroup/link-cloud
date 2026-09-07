@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -25,7 +26,7 @@ public class ResourcesAcquiredTailFinalizerTests
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(FacilityId, CorrelationId, "patient-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(2);
+            .ReturnsAsync(Stripped(2));
 
         var cache = new Mock<IResourceCache>();
         cache.Setup(c => c.GetImplementation(ResourceCacheType.ABS)).Returns(cache.Object);
@@ -58,7 +59,7 @@ public class ResourcesAcquiredTailFinalizerTests
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .ReturnsAsync(Stripped(0));
 
         var cache = new Mock<IResourceCache>();
         cache.Setup(c => c.GetImplementation(ResourceCacheType.ABS)).Returns(cache.Object);
@@ -86,7 +87,7 @@ public class ResourcesAcquiredTailFinalizerTests
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .ReturnsAsync(Stripped(0));
 
         var cache = new Mock<IResourceCache>();
         var sut = new ResourcesAcquiredTailFinalizer(
@@ -128,7 +129,7 @@ public class ResourcesAcquiredTailFinalizerTests
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .ReturnsAsync(Stripped(0));
 
         var redis = new Mock<IResourceCache>();
         redis.Setup(c => c.HasResourcesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -164,7 +165,7 @@ public class ResourcesAcquiredTailFinalizerTests
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .ReturnsAsync(Stripped(0));
 
         var patient = new Patient { Id = "patient-1" };
 
@@ -233,4 +234,11 @@ public class ResourcesAcquiredTailFinalizerTests
             CacheKeys = cacheKeys
         }
     };
+    /// <summary>
+    /// An outcome describing <paramref name="strippedCount"/> non-org encounters removed, one org
+    /// encounter kept. The finalizer only forwards this value, so the counts matter to the caller rather
+    /// than to the finalizer itself.
+    /// </summary>
+    private static LocationOrgOutcome Stripped(int strippedCount) =>
+        new(LocationOrgStatus.Found, strippedCount + 1, 1, 0, []);
 }

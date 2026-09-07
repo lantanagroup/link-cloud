@@ -1,4 +1,5 @@
 using LantanaGroup.Link.DMRP.Business.Managers;
+using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -23,6 +24,7 @@ namespace LantanaGroup.Link.DMRP.Business
         private readonly ILogger<DmrpFacilityOperations> _logger;
         private readonly IFacilityOperations _hostImplementation;
         private readonly IReportingPlanSource _reportingPlans;
+        private readonly IReportingPlanScheduleProjector _scheduleProjector;
         private readonly IFacilityReportingPlanManager _reportingPlanManager;
 
         /// <summary>
@@ -37,6 +39,7 @@ namespace LantanaGroup.Link.DMRP.Business
         public DmrpFacilityOperations(ILogger<DmrpFacilityOperations> logger,
             IFacilityOperations hostImplementation,
             IReportingPlanSource reportingPlans,
+            IReportingPlanScheduleProjector scheduleProjector,
             IFacilityReportingPlanManager reportingPlanManager,
             IEntityRepository<FacilityReportingPlan> reportingPlanRepository,
             TimeProvider timeProvider)
@@ -44,6 +47,7 @@ namespace LantanaGroup.Link.DMRP.Business
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hostImplementation = hostImplementation ?? throw new ArgumentNullException(nameof(hostImplementation));
             _reportingPlans = reportingPlans ?? throw new ArgumentNullException(nameof(reportingPlans));
+            _scheduleProjector = scheduleProjector ?? throw new ArgumentNullException(nameof(scheduleProjector));
             _reportingPlanManager = reportingPlanManager ?? throw new ArgumentNullException(nameof(reportingPlanManager));
             _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
             _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -173,33 +177,11 @@ namespace LantanaGroup.Link.DMRP.Business
                 return EmptySchedule();
             }
 
-            foreach (var entry in entries.Where(e => string.IsNullOrWhiteSpace(e.DQM)))
-            {
-                // The scheduling workflow records a measure DMRP returned that Link has no mapping for
-                // with a null dQM, precisely so it shows up here rather than being lost.
-                _logger.LogWarning(
-                    "Facility {FacilityId} is enrolled in measure {Measure} for {Month}/{Year}, which has no dQM mapped. It is excluded from the facility's schedule.",
-                    facilityId.SanitizeForLog(), entry.Measure.SanitizeForLog(), month, year);
-            }
-
-            return new TenantScheduledReportConfig
-            {
-                Daily = DqmsFor(entries, Frequency.Daily),
-                Weekly = DqmsFor(entries, Frequency.Weekly),
-                Monthly = DqmsFor(entries, Frequency.Monthly)
-            };
+            // The same derivation the facility-facing look-ahead runs. Shared rather than repeated:
+            // a facility told it will report something Link is not going to run is worse than a
+            // facility told nothing.
+            return _scheduleProjector.Project(entries, facilityId, new ReportingPeriod(year, month));
         }
-
-        /// <summary>
-        /// The distinct dQMs reported at one frequency. Two NHSN measures can map to the same dQM — the
-        /// ADR's example is a patient safety measure and a medication safety measure both under ACH
-        /// Monthly — and the host refuses a schedule that names one twice.
-        /// </summary>
-        private static string[] DqmsFor(IReadOnlyList<ReportingPlanEntry> entries, Frequency frequency) =>
-            entries.Where(e => e.Frequency == frequency && !string.IsNullOrWhiteSpace(e.DQM))
-                .Select(e => e.DQM)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
 
         /// <summary>
         /// The reporting period the facility is currently in, read in its own timezone so a facility
@@ -256,11 +238,7 @@ namespace LantanaGroup.Link.DMRP.Business
                 || (schedule.Weekly?.Length ?? 0) > 0
                 || (schedule.Monthly?.Length ?? 0) > 0);
 
-        private static TenantScheduledReportConfig EmptySchedule() => new()
-        {
-            Daily = Array.Empty<string>(),
-            Weekly = Array.Empty<string>(),
-            Monthly = Array.Empty<string>()
-        };
+        private static TenantScheduledReportConfig EmptySchedule() =>
+            ReportingPlanScheduleProjector.EmptySchedule();
     }
 }
