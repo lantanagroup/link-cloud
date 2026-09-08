@@ -1,5 +1,6 @@
 using System.Net;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace LantanaGroup.Link.Terminology.Application.Models;
@@ -24,6 +25,7 @@ public class CodeSearchQuery
     /// <summary>
     /// Free text matched against both the code and its display, or null to return everything in scope.
     /// </summary>
+    [FromQuery(Name = CodeSearchParameters.Search)]
     public string? Search
     {
         get => _search;
@@ -31,6 +33,7 @@ public class CodeSearchQuery
     }
 
     /// <summary>The canonical URI of the single code system to search, if the caller named one.</summary>
+    [FromQuery(Name = CodeSearchParameters.CodeSystem)]
     public string? CodeSystem
     {
         get => _codeSystem;
@@ -38,6 +41,7 @@ public class CodeSearchQuery
     }
 
     /// <summary>The canonical URI of the single value set to search, if the caller named one.</summary>
+    [FromQuery(Name = CodeSearchParameters.ValueSet)]
     public string? ValueSet
     {
         get => _valueSet;
@@ -45,9 +49,10 @@ public class CodeSearchQuery
     }
 
     /// <summary>
-    /// The version of whichever of <see cref="CodeSystem"/> or <see cref="ValueSet"/> was supplied.
+    /// The version of whichever of <c>codeSystem</c> or <c>valueSet</c> was supplied.
     /// Null selects the latest loaded version.
     /// </summary>
+    [FromQuery(Name = CodeSearchParameters.Version)]
     public string? Version
     {
         get => _version;
@@ -55,15 +60,18 @@ public class CodeSearchQuery
     }
 
     /// <summary>When true, codes whose resolved status is inactive are omitted.</summary>
+    [FromQuery(Name = "excludeInactive")]
     public bool ExcludeInactive { get; init; }
 
     /// <summary>The 1-based page to return. Values below 1 are clamped.</summary>
+    [FromQuery(Name = "pageNumber")]
     public int PageNumber { get; init; } = 1;
 
     /// <summary>
     /// The maximum number of records to return. Clamped to the server maximum so that no request can
     /// return an entire code system.
     /// </summary>
+    [FromQuery(Name = "pageSize")]
     public int PageSize { get; init; } = CodeSearchDefaults.DefaultPageSize;
 
     /// <summary>
