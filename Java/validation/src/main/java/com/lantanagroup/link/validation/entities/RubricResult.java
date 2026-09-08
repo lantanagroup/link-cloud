@@ -7,12 +7,13 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -28,13 +29,7 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "rubric_result",
-        uniqueConstraints = @UniqueConstraint(name = "uq_result_request", columnNames = "request_id"),
-        indexes = {
-                @Index(name = "ix_result_rubric", columnList = "rubric_id, completed_at"),
-                @Index(name = "ix_result_facility_report", columnList = "facility_id, report_id"),
-                @Index(name = "ix_result_status", columnList = "status, completed_at"),
-                @Index(name = "ix_result_workflow", columnList = "workflow_tag, completed_at")
-        }
+        uniqueConstraints = @UniqueConstraint(name = "uq_result_request", columnNames = "request_id")
 )
 @Getter
 @Setter
@@ -44,8 +39,10 @@ import java.util.UUID;
 public class RubricResult {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rubric_result_seq")
+    @SequenceGenerator(name = "rubric_result_seq", sequenceName = "rubric_result_sequence", allocationSize = 50)
     @Column(name = "result_id")
-    private UUID resultId;
+    private Long resultId;
 
     @Column(name = "request_id", nullable = false)
     private UUID requestId;
@@ -54,7 +51,7 @@ public class RubricResult {
     private String rubricId;
 
     @Column(name = "rubric_version_id", nullable = false)
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "rubric_id", insertable = false, updatable = false,
@@ -123,11 +120,4 @@ public class RubricResult {
 
     @Column(name = "duration_ms", nullable = false)
     private long durationMs;
-
-    @PrePersist
-    void onCreate() {
-        if (resultId == null) {
-            resultId = UUID.randomUUID();
-        }
-    }
 }

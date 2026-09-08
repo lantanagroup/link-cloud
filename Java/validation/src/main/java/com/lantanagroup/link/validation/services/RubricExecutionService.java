@@ -4,10 +4,12 @@ import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.RubricCheck;
+import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ExecutionContext;
+import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
@@ -165,6 +167,14 @@ public class RubricExecutionService {
 
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
+            // finding ids are DB-sequence-generated during persist(); backfill them into the
+            // response DTOs, which were built beforehand in assemble() and are index-aligned
+            // with findingEntities.
+            List<FindingDto> findingDtos = out.envelope().getFindings();
+            List<RubricFinding> findingEntities = out.findingEntities();
+            for (int i = 0; i < findingDtos.size(); i++) {
+                findingDtos.get(i).setId(findingEntities.get(i).getFindingId());
+            }
         } else {
             rubricVersionRepository.recordDryRun(
                     version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);
