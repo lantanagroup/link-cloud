@@ -8,12 +8,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -22,13 +24,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.UUID;
-
 @Entity
 @Table(
         name = "rubric_finding",
         indexes = {
-                @Index(name = "ix_finding_result", columnList = "result_id"),
                 @Index(name = "ix_finding_check", columnList = "check_id"),
                 @Index(name = "ix_finding_severity", columnList = "result_id, severity")
         }
@@ -41,14 +40,16 @@ import java.util.UUID;
 public class RubricFinding {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rubric_finding_seq")
+    @SequenceGenerator(name = "rubric_finding_seq", sequenceName = "rubric_finding_sequence", allocationSize = 50)
     @Column(name = "finding_id")
-    private UUID findingId;
+    private Long findingId;
 
     @Column(name = "result_id", nullable = false)
-    private UUID resultId;
+    private Long resultId;
 
     @Column(name = "check_id", nullable = false)
-    private UUID checkId;
+    private Long checkId;
 
     // Read-only associations purely to emit real FKs; the scalar id columns above remain the writable
     // mappings. Do not use these fields in code.
@@ -87,11 +88,4 @@ public class RubricFinding {
     @Lob
     @Column(name = "expression")
     private String expression;
-
-    @PrePersist
-    void onCreate() {
-        if (findingId == null) {
-            findingId = UUID.randomUUID();
-        }
-    }
 }

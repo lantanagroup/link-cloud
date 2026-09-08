@@ -21,6 +21,9 @@ public class RubricResultPersister {
     @Transactional
     public void persist(RubricResult result, List<RubricFinding> findings) {
         rubricResultRepository.save(result);
+        // result_id is DB-sequence-generated and only known once the row above is saved, so the
+        // findings (built beforehand by ResultEnvelopeAssembler) get it wired in here.
+        findings.forEach(f -> f.setResultId(result.getResultId()));
         rubricFindingRepository.saveAll(findings);
     }
 }

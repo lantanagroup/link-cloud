@@ -29,7 +29,6 @@ import org.springframework.context.annotation.Configuration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -40,7 +39,7 @@ import static org.mockito.Mockito.when;
 
 class RubricCacheServiceTest {
 
-    private static final UUID VERSION_ID = UUID.randomUUID();
+    private static final Long VERSION_ID = 1L;
 
     private AnnotationConfigApplicationContext context;
     private RubricCacheService cacheService;
@@ -98,7 +97,7 @@ class RubricCacheServiceTest {
 
     private static RubricCheck check() {
         return RubricCheck.builder()
-                .checkId(UUID.randomUUID())
+                .checkId(100L)
                 .rubricVersionId(VERSION_ID)
                 .checkLocalId("c1")
                 .type(CheckType.FHIRPATH)

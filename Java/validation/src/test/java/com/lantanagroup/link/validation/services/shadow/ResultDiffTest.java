@@ -13,9 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResultDiffTest {
 
-    /** Message (and patientId) default to null -- the matching key is (patientId, expression), with
-     *  severity and message compared as the "value" once a key match is found, so callers that don't
-     *  care about message can keep using this 4-arg form unchanged. */
+    /** Message (and patientId) default to null -- the matching key is (expression, normalized message),
+     *  with severity compared as the "value" once a key match is found. patientId is carried on the
+     *  Result but no longer participates in matching, so callers that don't care about message can keep
+     *  using this 4-arg form unchanged. */
     private static Result result(OperationOutcome.IssueSeverity severity, OperationOutcome.IssueType code,
                                   String location, String expression) {
         return result(severity, code, location, expression, null);
@@ -124,8 +125,8 @@ class ResultDiffTest {
 
     @Test
     void sameExpressionDifferentLocationAndCodeStillMatches() {
-        // location and code are not part of the key or the value comparison -- only expression decides
-        // candidacy, and severity + message (both equal here) decide the match.
+        // location and code are not part of the key -- expression and (normalized) message together
+        // decide candidacy, and severity (equal here) decides whether that becomes a match.
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
                 "loc-a", "expr", "same message");
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.STRUCTURE,
@@ -141,11 +142,11 @@ class ResultDiffTest {
     }
 
     @Test
-    void samePatientSameExpressionAndMessageDifferentSeverityIsSeverityChanged() {
+    void sameExpressionAndMessageDifferentSeverityIsSeverityChanged() {
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
-                "loc", "expr", "same message", "patient-1");
+                "loc", "expr", "same message");
         Result modern = result(OperationOutcome.IssueSeverity.WARNING, OperationOutcome.IssueType.INVALID,
-                "loc", "expr", "same message", "patient-1");
+                "loc", "expr", "same message");
 
         ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
 
@@ -154,13 +155,33 @@ class ResultDiffTest {
     }
 
     @Test
-    void sameSeverityExpressionAndMessageDifferentPatientIdDoesNotMatch() {
-        // same severity/expression/message but a different patientId -- patientId is part of the key,
-        // so no candidate is even found and this is added+missing, not matched or severity-changed.
+    void sameSeverityExpressionAndMessageDifferentPatientIdStillMatches() {
+        // patientId is no longer part of the key -- only expression and (normalized) message decide
+        // candidacy, so two findings for different patients still match as long as those agree.
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
                 "loc", "expr", "same message", "patient-1");
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
                 "loc", "expr", "same message", "patient-2");
+
+        ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
+
+        assertTrue(diff.isEmpty());
+        assertEquals(1, diff.getMatchedCount());
+        assertSame(legacy, diff.getMatched().get(0).legacy());
+        assertSame(modern, diff.getMatched().get(0).modern());
+        assertTrue(diff.getAdded().isEmpty());
+        assertTrue(diff.getMissing().isEmpty());
+    }
+
+    @Test
+    void differentMessageSameExpressionAndSeverityIsAddedAndMissing() {
+        // message is now folded into the matching key itself, so a differing message means the two
+        // findings are never even candidates for each other -- this is added+missing, not a severity
+        // change (unlike the old (patientId, expression)-keyed behavior).
+        Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
+                "loc", "expr", "legacy wording");
+        Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
+                "loc", "expr", "different wording");
 
         ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
 
@@ -171,30 +192,10 @@ class ResultDiffTest {
     }
 
     @Test
-    void sameKeyDifferentMessageSameSeverityIsSeverityChanged() {
-        // same (patientId, expression) key and same severity, but a different message -- message is
-        // part of the value comparison now, so a mismatch here still falls short of "matched" and is
-        // reported alongside severity mismatches rather than as added+missing.
-        Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
-                "loc", "expr", "legacy wording");
-        Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID,
-                "loc", "expr", "different wording");
-
-        ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
-
-        assertEquals(1, diff.getSeverityChanged().size());
-        assertSame(legacy, diff.getSeverityChanged().get(0).legacy());
-        assertSame(modern, diff.getSeverityChanged().get(0).modern());
-        assertTrue(diff.getAdded().isEmpty());
-        assertTrue(diff.getMissing().isEmpty());
-        assertEquals(0, diff.getMatchedCount());
-    }
-
-    @Test
     void messageDifferingOnlyByObjectIdentityHashIsMatched() {
         // both messages embed a default Object#toString() identity hash (class@hexhash) -- a JVM-run
         // artifact that differs between the legacy and modern engine's own runs even for the same
-        // underlying finding, and must be normalized away before matching.
+        // underlying finding, and must be normalized away before it's folded into the matching key.
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
                 "Unable to validate code against ValueSet$ConceptSetFilterComponent@5a0bb980 -- no matching code found");
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
@@ -211,11 +212,11 @@ class ResultDiffTest {
     }
 
     @Test
-    void messagesDifferingBeyondTheObjectIdentityHashAreNotMatched() {
+    void messagesDifferingBeyondTheObjectIdentityHashAreAddedAndMissing() {
         // the hash normalization must not swallow real content differences -- here the class names
-        // themselves differ (not just the trailing hash), so the normalized messages still differ.
-        // Same (patientId, expression) key and same severity, so this is a message value mismatch
-        // reported as a severity change rather than a match -- not added+missing (the key still lines up).
+        // themselves differ (not just the trailing hash), so the normalized messages -- and therefore
+        // the keys -- still differ. No candidate is found at all, so this is added+missing rather than
+        // a match or a severity change.
         Result legacy = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
                 "Unable to validate code against ValueSet$ConceptSetFilterComponent@5a0bb980 -- no matching code found");
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, OperationOutcome.IssueType.INVALID, "loc", "expr",
@@ -223,11 +224,9 @@ class ResultDiffTest {
 
         ResultDiff diff = ResultDiff.between(List.of(legacy), List.of(modern));
 
-        assertEquals(1, diff.getSeverityChanged().size());
-        assertSame(legacy, diff.getSeverityChanged().get(0).legacy());
-        assertSame(modern, diff.getSeverityChanged().get(0).modern());
-        assertTrue(diff.getAdded().isEmpty());
-        assertTrue(diff.getMissing().isEmpty());
+        assertEquals(List.of(modern), diff.getAdded());
+        assertEquals(List.of(legacy), diff.getMissing());
+        assertTrue(diff.getSeverityChanged().isEmpty());
         assertEquals(0, diff.getMatchedCount());
     }
 
