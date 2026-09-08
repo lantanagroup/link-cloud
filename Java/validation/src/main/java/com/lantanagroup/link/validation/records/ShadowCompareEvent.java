@@ -22,9 +22,11 @@ public class ShadowCompareEvent {
     /** Which engine the primary consumer already ran (and whose output is in {@link #authoritativeResult}). */
     private boolean ranNewEngine;
 
-    /** Set only when {@link #ranNewEngine} is true -- the rubric engine's own request id (already
-     * generated for its rubric_result row), so the legacy run this event triggers can be stamped with the
-     * same id. Null when the legacy engine was primary; that direction has no rubric request to share. */
+    /**
+     * Set only when {@link #ranNewEngine} is true: the rubric engine's request ID, allowing the
+     * legacy run to use the same ID. Null when the legacy engine was primary because that direction
+     * has no rubric request to share.
+     */
     private UUID requestId;
 
     private List<ShadowFindingDto> authoritativeResult;

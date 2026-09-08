@@ -30,9 +30,8 @@ public class ResultEnvelopeAssembler {
     private final ScoringPolicyResolver scoringPolicyResolver;
     private final ValidationPolicyConfig policyConfig;
 
-    // Not @RequiredArgsConstructor-injected: BuildProperties only exists once the module has
-    // actually been built by Maven (spring-boot-maven-plugin's build-info goal generates it), so
-    // it's absent e.g. when running straight from an IDE/test without a package step first.
+    // Optional because BuildProperties is unavailable when build-info has not been generated,
+// such as running directly from an IDE or certain tests.
     @Autowired(required = false)
     private BuildProperties buildProperties;
 

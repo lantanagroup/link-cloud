@@ -22,14 +22,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * ADR-0003 shadow-run: TEMPORARY -- lets an engineer inspect a shadow comparison's diff (added/missing/
- * severity-changed findings) by the rubric request id it was compared against, alongside the rubric and
- * legacy engine results the diff was computed from, without querying {@code shadow_comparison_result},
- * {@code rubric_result}, or {@code legacy_shadow_result} directly, and download the {@code
- * ShadowComparisonDailyReportJob}'s daily CSV report straight from blob storage. Remove this
- * controller, {@link ShadowComparisonQueryService}, {@link LegacyShadowResultQueryService}, {@link
- * ShadowComparisonResultDto} and its sibling DTOs, and the report-download plumbing in {@link
- * ShadowCsvReportService} once the shadow period ends and ADR-0003 cuts over.
+ * Temporary ADR-0003 shadow-run controller for inspecting a comparison's diff (added, missing,
+ * or severity-changed findings) by rubric request id, alongside the rubric and legacy results
+ * used to compute it. Also provides access to {@link ShadowComparisonDailyReportJob}'s daily
+ * CSV report without querying {@code shadow_comparison_result}, {@code rubric_result}, or
+ * {@code legacy_shadow_result} directly.
+ * <p>Remove this controller, {@link ShadowComparisonQueryService},
+ * {@link LegacyShadowResultQueryService}, {@link ShadowComparisonResultDto} and its sibling
+ * DTOs, and the report-download plumbing in {@link ShadowCsvReportService} when the shadow
+ * period ends and ADR-0003 cuts over.
  */
 @RestController
 @RequestMapping("/api/validation/shadow/comparisons")

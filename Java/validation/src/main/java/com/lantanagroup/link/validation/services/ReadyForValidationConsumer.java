@@ -141,9 +141,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
         _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
-        // requestId is only ever non-null on the rubric-engine branch (the id already minted for its
-        // rubric_result row); the legacy engine has no such id. Only used below, to let a subsequent
-        // shadow-run legacy comparison share it -- never persisted by this consumer itself.
+        // Only set when the rubric engine runs, using the ID already created for its rubric_result.
+        // It is passed to the shadow run so the legacy comparison can share the same ID.
         List<Result> results;
         RubricResultStatus rubricStatus = null;
         UUID requestId = null;
@@ -175,9 +174,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private record RubricEngineResult(List<Result> results, RubricResultStatus status, UUID requestId) {}
 
     /**
-     * Hands the already-computed result to {@code ShadowValidationConsumer} so it only has to run the
-     * other engine. Sent async, unlike {@link #produceValidationCompleteRecord} -- a failure here must
-     * never affect the real publish that already happened above.
+     * Sends the already-computed result to {@code ShadowValidationConsumer}, which runs the other
+     * engine and compares the results. This is asynchronous so shadow failures never affect validation.
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
@@ -433,14 +431,11 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
         }
     }
-
     /**
-     * Derives the ValidationComplete.isValid gate. On the bridge path we trust the rubric's own
-     * verdict: ACCEPTABLE / ACCEPTABLE_WITH_WARNINGS / INCONCLUSIVE pass (an unresolvable-binding
-     * "not-evaluated" result is neutral, not a data failure), UNACCEPTABLE fails. Deriving from the
-     * status also closes the legacy gap where an uncategorized finding silently passed, because the
-     * rubric already scores an uncategorized error as UNACCEPTABLE. When there is no rubric status
-     * (legacy engine, or a bridge run with no findings) we fall back to the category rollup unchanged.
+     * Determines the ValidationComplete validity gate. On the bridge path, the rubric status is used:
+     * ACCEPTABLE, ACCEPTABLE_WITH_WARNINGS, and INCONCLUSIVE pass; UNACCEPTABLE fails. This also avoids
+     * the legacy behavior where uncategorized findings could pass. Otherwise, validity uses the legacy
+     * category rollup.
      */
     boolean checkIsValid(List<Result> results, RubricResultStatus status) {
         if (bridgeEnabled && status != null) {

@@ -33,8 +33,7 @@ public class RubricVersionResolver {
                 throw new RubricVersionNotFoundException(rubricId, semver);
             }
             if (publishedOnly && snapshot.getStatus() != RubricVersionStatus.PUBLISHED) {
-                // fetched-then-checked (rather than a status-scoped query) so the caller gets a clear
-                // 409 "not PUBLISHED" instead of a misleading 404.
+                // Fetch first so a non-PUBLISHED version returns 409 instead of a misleading 404.
                 throw new RubricLifecycleException(rubricId, semver, snapshot.getStatus(), "evaluate");
             }
             return new ResolvedRubric(snapshot.toVersionEntity(), snapshot.toCheckEntities());
