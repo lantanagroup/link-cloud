@@ -61,7 +61,6 @@ public class EpicAuth : IAuth
 
         try
         {
-            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-www-form-urlencoded"));
             var responseMessage = await _httpClient
                 .PostAsync($"{authSettings.TokenUrl}",
                 new StringContent($"grant_type=client_credentials&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_assertion={jwt}",
