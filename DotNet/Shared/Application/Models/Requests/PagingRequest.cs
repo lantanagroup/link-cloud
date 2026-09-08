@@ -16,6 +16,7 @@ public class PagingRequest
     public int PageSize { get; set; } = DefaultPageSize;
 
     [DefaultValue(1)]
+    [Range(1, int.MaxValue)]
     [DataMember]
     public int PageNumber { get; set; } = 1;
 }
