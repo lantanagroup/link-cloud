@@ -117,15 +117,24 @@ public class EpicAuth : IAuth
         {
             var algorithm = GetECDsaAlgorithm(ecdsa);
             if (algorithm is not null)
-                return GetToken(clientId, audience, new SigningCredentials(new ECDsaSecurityKey(ecdsa), algorithm));
+                return GetToken(clientId, audience,
+                    new SigningCredentials(new ECDsaSecurityKey(ecdsa) { CryptoProviderFactory = NonCachingCryptoProviderFactory() }, algorithm));
         }
 
         using var rsa = TryGetRSA(resolvedPem);
         if (rsa is not null)
-            return GetToken(clientId, audience, new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256));
+            return GetToken(clientId, audience,
+                new SigningCredentials(new RsaSecurityKey(rsa) { CryptoProviderFactory = NonCachingCryptoProviderFactory() }, SecurityAlgorithms.RsaSha256));
 
         throw new InvalidOperationException("PEM uses unsupported algorithm.");
     }
+
+    /// <summary>
+    /// The default <see cref="CryptoProviderFactory"/> is a static singleton that caches signature providers by a
+    /// key derived from the key material, so a provider built here would outlive the ECDsa/RSA instance disposed
+    /// below and throw ObjectDisposedException when the cached provider was reused on a later call.
+    /// </summary>
+    private static CryptoProviderFactory NonCachingCryptoProviderFactory() => new() { CacheSignatureProviders = false };
 
     private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
     {
