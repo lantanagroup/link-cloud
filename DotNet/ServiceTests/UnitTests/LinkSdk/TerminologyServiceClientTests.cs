@@ -144,6 +144,43 @@ public class TerminologyServiceClientTests
         Assert.Equal(9, response.Body.Metadata.TotalCount);
     }
 
+    /// <summary>
+    /// A rejected search is not swallowed: the caller sees the status and the body, which is what makes
+    /// the 400 the endpoint returns for an unloaded code system actionable rather than a silent empty.
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task SearchCodesAsync_SurfacesANonSuccessResponse()
+    {
+        const string problem = "{\"title\":\"Bad Request\",\"status\":400,\"errors\":{\"codeSystem\":[\"not loaded\"]}}";
+
+        using var server = new OneShotServer(problem, statusCode: 400);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.SearchCodesAsync(codeSystem: "http://example.org/nope");
+        await server.WaitForRequestAsync();
+        var response = await callTask;
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Equal(400, response.StatusCode);
+        Assert.Contains("codeSystem", response.RawBody);
+    }
+
+    /// <summary>
+    /// The client fails at construction with a message naming the service, rather than at the first call
+    /// with an opaque URL error.
+    /// </summary>
+    [Fact]
+    public void Constructing_WithoutATerminologyUrl_FailsWithATellingMessage()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => new TerminologyServiceClient(
+            Options.Create(new ServiceRegistry()),
+            Options.Create(new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }),
+            Options.Create(new LinkTokenServiceSettings { SigningKey = "test" }),
+            new Mock<ICreateSystemToken>().Object));
+
+        Assert.Contains("Terminology", ex.Message);
+    }
+
     private static TerminologyServiceClient CreateClient(string baseUrl)
     {
         return new TerminologyServiceClient(

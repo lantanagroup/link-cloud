@@ -268,7 +268,9 @@ public class CodesControllerHttpTests
     [Fact]
     public async Task Search_CodeSystemThatSanitizesAwayToNothing_IsRefused()
     {
-        var (status, body) = await GetAsync($"?search=burn&codeSystem={Encoded("<b></b>")}");
+        // A script tag, not a <b>: the sanitizer allows benign formatting tags, so those survive and the
+        // request would then be refused for naming an unloaded URI - passing, but for the wrong reason.
+        var (status, body) = await GetAsync($"?search=burn&codeSystem={Encoded("<script>alert(1)</script>")}");
 
         Assert.Equal(HttpStatusCode.BadRequest, status);
         AssertErrorFor(CodeSearchParameters.CodeSystem, body);
@@ -299,6 +301,26 @@ public class CodesControllerHttpTests
 
         Assert.Equal(HttpStatusCode.BadRequest, status);
         AssertErrorFor(CodeSearchParameters.CodeSystem, body);
+    }
+
+    /// <summary>
+    /// ArgumentException appends " (Parameter 'x')" to its message. That is framework detail, and the
+    /// parameter is already the error's key, so it must not reach the caller.
+    /// </summary>
+    [Fact]
+    public async Task Search_UnloadedCodeSystem_DoesNotLeakTheArgumentExceptionSuffix()
+    {
+        var (status, body) = await GetAsync($"?codeSystem={Encoded("http://example.org/CodeSystem/nope")}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+
+        var message = body.RootElement
+            .GetProperty("errors")
+            .GetProperty(CodeSearchParameters.CodeSystem)[0]
+            .GetString();
+
+        Assert.DoesNotContain("(Parameter", message);
+        Assert.Contains("http://example.org/CodeSystem/nope", message);
     }
 
     /// <summary>

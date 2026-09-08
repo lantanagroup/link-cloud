@@ -499,6 +499,67 @@ public class CodeSearchServiceTests
         Assert.Equal(CodeStatus.Inactive, Assert.Single(result.Records).Status);
     }
 
+    /// <summary>
+    /// The order must not shift with the server's culture. Ordinal puts "B-code" before "a-code" because
+    /// 'B' is 66 and 'a' is 97; a culture comparer puts "a-code" first. Swapping StringComparer.Ordinal
+    /// for the culture one would reorder these two and nothing else in this suite would notice.
+    /// </summary>
+    [Fact]
+    public async Task Search_OrdersOrdinallyRatherThanByCulture()
+    {
+        GivenCodeSystem(CodeSystemGroup(ActCode, "1.0.0",
+            new CodeSystemCode { Value = "a-code", Display = "Lower first" },
+            new CodeSystemCode { Value = "B-code", Display = "Upper second" }));
+
+        // "code" matches both and is equal to neither, so the exact-match rule does not decide this.
+        var result = await _service.Search(new CodeSearchQuery { Search = "code", CodeSystem = ActCode });
+
+        Assert.Collection(result.Records,
+            r => Assert.Equal("B-code", r.Code),
+            r => Assert.Equal("a-code", r.Code));
+    }
+
+    /// <summary>
+    /// The rejection case is covered above; without this one the canonical splitting could be broken to
+    /// refuse every piped version and the suite would stay green.
+    /// </summary>
+    [Fact]
+    public async Task Search_PipedCanonicalCarryingALoadedVersion_IsAccepted()
+    {
+        GivenCodeSystem(CodeSystemGroup(Hsloc, "1.0.0",
+            new CodeSystemCode { Value = "1026-4", Display = "Burn Critical Care" }));
+
+        var result = await _service.Search(new CodeSearchQuery { CodeSystem = $"{Hsloc}|1.0.0" });
+
+        Assert.Single(result.Records);
+    }
+
+    /// <summary>
+    /// Reachable from two value sets and no code system, the code still collapses to one record. Which of
+    /// the two supplies the display is deliberately not asserted: the rule is "the last group walked
+    /// wins", which is arbitrary, and the precedence question is still open on LEGLINK-1007. What has to
+    /// hold is that the answer is single and repeatable.
+    /// </summary>
+    [Fact]
+    public async Task Search_SameCodeInTwoValueSets_CollapsesToOneStableRecord()
+    {
+        GivenAllContent(
+            [],
+            [
+                ValueSetGroup("http://example.org/vs-one", ActCode,
+                    new ValueSetCode { Value = "AMB", Display = "From the first value set" }),
+                ValueSetGroup("http://example.org/vs-two", ActCode,
+                    new ValueSetCode { Value = "AMB", Display = "From the second value set" })
+            ]);
+
+        var first = await _service.Search(new CodeSearchQuery { Search = "AMB" });
+        var second = await _service.Search(new CodeSearchQuery { Search = "AMB" });
+
+        Assert.Single(first.Records);
+        Assert.Equal(1, first.Metadata.TotalCount);
+        Assert.Equal(first.Records[0].Display, second.Records[0].Display);
+    }
+
     // -------------------------------------------------------- cancellation
 
     [Fact]
