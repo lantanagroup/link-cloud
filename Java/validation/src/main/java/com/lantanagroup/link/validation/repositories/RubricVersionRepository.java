@@ -14,10 +14,9 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface RubricVersionRepository extends JpaRepository<RubricVersion, UUID> {
+public interface RubricVersionRepository extends JpaRepository<RubricVersion, Long> {
 
     // Semver ordering is semantic, not lexical — callers sort with Semver.versionComparator()
     List<RubricVersion> findByRubricId(String rubricId);
@@ -36,7 +35,7 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     @Modifying
     @Query("update RubricVersion v set v.dryRunCompletedAt = :completedAt, v.dryRunStatus = :status "
             + "where v.rubricVersionId = :rubricVersionId")
-    int recordDryRun(@Param("rubricVersionId") UUID rubricVersionId,
+    int recordDryRun(@Param("rubricVersionId") Long rubricVersionId,
                      @Param("status") RubricResultStatus status,
                      @Param("completedAt") OffsetDateTime completedAt);
 
@@ -47,7 +46,7 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update RubricVersion v set v.status = :target, v.publishedAt = :publishedAt, v.publishedBy = :publishedBy "
             + "where v.rubricVersionId = :rubricVersionId and v.status = :expected")
-    int publishIfStatus(@Param("rubricVersionId") UUID rubricVersionId,
+    int publishIfStatus(@Param("rubricVersionId") Long rubricVersionId,
                         @Param("expected") RubricVersionStatus expected,
                         @Param("target") RubricVersionStatus target,
                         @Param("publishedAt") OffsetDateTime publishedAt,
@@ -59,7 +58,7 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update RubricVersion v set v.status = :retired, v.retiredAt = :retiredAt, v.retiredBy = :retiredBy "
             + "where v.rubricVersionId = :rubricVersionId and v.status <> :retired")
-    int retireIfNotRetired(@Param("rubricVersionId") UUID rubricVersionId,
+    int retireIfNotRetired(@Param("rubricVersionId") Long rubricVersionId,
                            @Param("retired") RubricVersionStatus retired,
                            @Param("retiredAt") OffsetDateTime retiredAt,
                            @Param("retiredBy") String retiredBy);

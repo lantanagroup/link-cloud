@@ -20,9 +20,9 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RubricResultDto {
     private UUID requestId;
-    private UUID resultId;
+    private Long resultId;
     private String rubricId;
-    private UUID rubricVersionId;
+    private Long rubricVersionId;
     private String correlationId;
     private String requestor;
     private SubjectDto subject;

@@ -9,13 +9,12 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Repository
-public interface RubricCheckRepository extends JpaRepository<RubricCheck, UUID> {
+public interface RubricCheckRepository extends JpaRepository<RubricCheck, Long> {
 
     // live checks only, soft-deleted rows are hidden from evaluate/dry-run and the read APIs
-    List<RubricCheck> findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(UUID rubricVersionId);
+    List<RubricCheck> findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(Long rubricVersionId);
 
     // bulk update on purpose: it runs immediately, so the old rows are already flagged
     // before the replacement checks insert (otherwise the filtered unique index
@@ -24,5 +23,5 @@ public interface RubricCheckRepository extends JpaRepository<RubricCheck, UUID> 
     @Modifying
     @Query("update RubricCheck c set c.deleted = true "
             + "where c.rubricVersionId = :rubricVersionId and c.deleted = false")
-    int softDeleteByRubricVersionId(@Param("rubricVersionId") UUID rubricVersionId);
+    int softDeleteByRubricVersionId(@Param("rubricVersionId") Long rubricVersionId);
 }

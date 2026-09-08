@@ -28,13 +28,13 @@ class RubricVersionResolverTest {
 
     private static RubricVersionSnapshot snapshot(String semver, RubricVersionStatus status) {
         return RubricVersionSnapshot.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId("piqi.core")
                 .semver(semver)
                 .status(status)
                 .checksum("abc")
                 .checks(List.of(RubricVersionSnapshot.CheckSnapshot.builder()
-                        .checkId(UUID.randomUUID())
+                        .checkId(100L)
                         .checkLocalId("c1")
                         .type(CheckType.FHIRPATH)
                         .dimension(PiqiDimension.CONFORMANCE)

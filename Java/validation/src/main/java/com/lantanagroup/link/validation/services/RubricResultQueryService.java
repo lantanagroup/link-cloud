@@ -42,7 +42,7 @@ public class RubricResultQueryService {
 
     private RubricResultDto toDto(RubricResult r) {
         List<RubricFinding> findings = rubricFindingRepository.findByResultId(r.getResultId());
-        Map<UUID, String> localIdByCheckId = resolveCheckLocalIds(findings);
+        Map<Long, String> localIdByCheckId = resolveCheckLocalIds(findings);
 
         List<FindingDto> findingDtos = findings.stream()
                 .map(f -> FindingDto.builder()
@@ -83,8 +83,8 @@ public class RubricResultQueryService {
                 .build();
     }
 
-    private Map<UUID, String> resolveCheckLocalIds(List<RubricFinding> findings) {
-        List<UUID> checkIds = findings.stream()
+    private Map<Long, String> resolveCheckLocalIds(List<RubricFinding> findings) {
+        List<Long> checkIds = findings.stream()
                 .map(RubricFinding::getCheckId)
                 .filter(java.util.Objects::nonNull)
                 .distinct()

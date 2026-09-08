@@ -57,7 +57,7 @@ class RubricRegistryServiceTest {
 
     private RubricVersion draftVersion() {
         return RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId("piqi.core")
                 .semver("1.0.0")
                 .status(RubricVersionStatus.DRAFT)
@@ -127,7 +127,7 @@ class RubricRegistryServiceTest {
     @DisplayName("re-registering a DRAFT semver replaces the definition and checks in place")
     void reRegisterDraftReplacesDefinitionAndChecks() {
         RubricVersion draft = draftVersion();
-        UUID originalId = draft.getRubricVersionId();
+        Long originalId = draft.getRubricVersionId();
         when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
                 .thenReturn(Optional.of(draft));
         stubRubricUpsert();
@@ -427,7 +427,7 @@ class RubricRegistryServiceTest {
 
     private RubricVersion versionOf(String rubricId, String semver, RubricVersionStatus status) {
         return RubricVersion.builder()
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .rubricId(rubricId)
                 .semver(semver)
                 .status(status)
