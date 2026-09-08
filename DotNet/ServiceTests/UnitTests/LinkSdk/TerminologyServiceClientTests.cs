@@ -181,6 +181,67 @@ public class TerminologyServiceClientTests
         Assert.Contains("Terminology", ex.Message);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_ByUrl_CallsExpandRoute()
+    {
+        using var server = new OneShotServer("{\"resourceType\":\"ValueSet\"}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ExpandValueSetAsync(url: "http://example.org/vs/encounter-type");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet/$expand", request.Path);
+        Assert.Contains("url=http", request.Query);
+        Assert.Contains("ValueSet", result.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_ById_CallsIdScopedExpandRoute()
+    {
+        using var server = new OneShotServer("{}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ExpandValueSetAsync(id: "vs-1");
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet/vs-1/$expand", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetValueSetsAsync_CallsValueSetRoute()
+    {
+        using var server = new OneShotServer("{\"resourceType\":\"Bundle\"}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetValueSetsAsync(url: "http://example.org/vs/encounter-type");
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet", request.Path);
+        Assert.Contains("url=http", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemAsync_CallsLookupRouteWithQuery()
+    {
+        using var server = new OneShotServer("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.LookupCodeInCodeSystemAsync(system: "http://loinc.org", code: "1234-5");
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
+        Assert.Contains("system=http", request.Query);
+        Assert.Contains("code=1234-5", request.Query);
+    }
+
     private static TerminologyServiceClient CreateClient(string baseUrl)
     {
         return new TerminologyServiceClient(
