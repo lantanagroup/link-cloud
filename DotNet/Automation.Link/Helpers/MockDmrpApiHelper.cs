@@ -180,4 +180,8 @@ public sealed class MockDmrpEntryResponse
     public int ReportingYear { get; init; }
 
     public string IsReporting { get; init; } = string.Empty;
+
+    public DateTimeOffset CreateDate { get; init; }
+
+    public DateTimeOffset? ModifyDate { get; init; }
 }
