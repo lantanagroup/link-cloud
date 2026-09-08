@@ -40,7 +40,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -282,7 +281,7 @@ public class RubricRegistryService {
         return rubricVersionRepository.findByRubricIdAndSemver(rubricId, Semver.normalize(semver));
     }
 
-    public List<RubricCheck> getChecks(UUID rubricVersionId) {
+    public List<RubricCheck> getChecks(Long rubricVersionId) {
         return rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(rubricVersionId);
     }
 
