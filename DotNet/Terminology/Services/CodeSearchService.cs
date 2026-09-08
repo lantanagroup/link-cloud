@@ -52,14 +52,20 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
 
         var ordered = Order(candidates, query.Search).ToList();
 
+        // The offset is computed in 64-bit and bounded by the match count. Both operands are int, so
+        // a large pageNumber overflows the product and wraps negative, and Skip treats a negative count
+        // as zero - answering a far page with the first page's records while the metadata reports the
+        // page that was asked for.
+        var skip = Math.Min((long)(pageNumber - 1) * pageSize, ordered.Count);
+
         var records = ordered
-            .Skip((pageNumber - 1) * pageSize)
+            .Skip((int)skip)
             .Take(pageSize)
             .Select(c => new TerminologyCodeModel
             {
                 System = c.System,
-                Code = c.Code.Value,
-                Display = c.Code.Display,
+                Code = c.Code.Value ?? string.Empty,
+                Display = c.Code.Display ?? string.Empty,
                 Status = ResolveStatus(c)
             })
             .ToList();
@@ -212,9 +218,21 @@ public class CodeSearchService(ICodeGroupCacheService cacheService, FhirService 
             return true;
         }
 
-        return code.Value.Contains(search, StringComparison.OrdinalIgnoreCase)
-               || code.Display.Contains(search, StringComparison.OrdinalIgnoreCase);
+        return Contains(code.Value, search) || Contains(code.Display, search);
     }
+
+    /// <summary>
+    /// Case-insensitive ordinal contains, tolerating a null on the cached side.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Code.Value"/> and <see cref="Code.Display"/> are declared <c>required</c>, but that is a
+    /// compile-time guarantee about initialization and says nothing about what CsvHelper assigns. Both CSV
+    /// loaders run with <c>MissingFieldFound = null</c>, so a row supplying fewer fields than its header
+    /// leaves the property null rather than failing the load, and a search would then fault the whole
+    /// request over one malformed row.
+    /// </remarks>
+    private static bool Contains(string? value, string search) =>
+        value is not null && value.Contains(search, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Applies the total ordering: exact code matches first, then code, then system.

@@ -399,6 +399,66 @@ public class CodeSearchServiceTests
         Assert.Equal(1, result.Metadata.TotalCount);
     }
 
+    /// <summary>
+    /// A page number large enough to overflow the 32-bit offset must still answer an empty page. Before
+    /// this was bounded, (pageNumber - 1) * pageSize wrapped negative, Skip treated that as zero, and the
+    /// request came back with the first page's records under the far page's metadata - the same records
+    /// served twice under two different page numbers.
+    /// </summary>
+    [Theory]
+    [InlineData(2_000_000_000)]
+    [InlineData(int.MaxValue)]
+    public async Task Search_PageNumberLargeEnoughToOverflowTheOffset_ReturnsAnEmptyPage(int pageNumber)
+    {
+        GivenCodeSystem(CodeSystemGroup(ActCode, "1.0.0",
+            Enumerable.Range(1, 5)
+                .Select(i => new CodeSystemCode { Value = $"code-{i}", Display = "Match" })
+                .ToArray<Code>()));
+
+        var result = await _service.Search(new CodeSearchQuery
+        {
+            Search = "Match",
+            CodeSystem = ActCode,
+            PageSize = 100,
+            PageNumber = pageNumber
+        });
+
+        Assert.Empty(result.Records);
+        Assert.Equal(5, result.Metadata.TotalCount);
+    }
+
+    /// <summary>
+    /// Value and Display are declared required, but that binds the compiler, not CsvHelper - and both CSV
+    /// loaders suppress missing fields, so a malformed row reaches the cache with a null. One such row must
+    /// not fault every search that scans past it.
+    /// </summary>
+    [Fact]
+    public async Task Search_CodeWithANullDisplay_DoesNotFaultTheRequest()
+    {
+        GivenCodeSystem(CodeSystemGroup(ActCode, "1.0.0",
+            new CodeSystemCode { Value = "GOOD", Display = "Ambulatory match" },
+            new CodeSystemCode { Value = "BAD", Display = null! }));
+
+        var result = await _service.Search(new CodeSearchQuery { Search = "match", CodeSystem = ActCode });
+
+        Assert.Equal("GOOD", Assert.Single(result.Records).Code);
+    }
+
+    /// <summary>
+    /// And when the malformed row is the one returned, the response carries an empty string rather than a
+    /// null in a field the model declares required.
+    /// </summary>
+    [Fact]
+    public async Task Search_CodeWithANullDisplay_IsReturnedWithAnEmptyDisplay()
+    {
+        GivenCodeSystem(CodeSystemGroup(ActCode, "1.0.0",
+            new CodeSystemCode { Value = "BAD", Display = null! }));
+
+        var result = await _service.Search(new CodeSearchQuery { CodeSystem = ActCode });
+
+        Assert.Equal(string.Empty, Assert.Single(result.Records).Display);
+    }
+
     // ------------------------------------------------------- de-duplication
 
     /// <summary>
