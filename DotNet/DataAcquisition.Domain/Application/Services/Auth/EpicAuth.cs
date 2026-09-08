@@ -161,7 +161,7 @@ public class EpicAuth : IAuth
     /// <summary>
     /// The default <see cref="CryptoProviderFactory"/> is a static singleton that caches signature providers by a
     /// key derived from the key material, so a provider built here would outlive the ECDsa/RSA instance disposed
-    /// below and throw ObjectDisposedException when the cached provider was reused on a later call.
+    /// above and throw ObjectDisposedException when the cached provider was reused on a later call.
     /// </summary>
     private static CryptoProviderFactory NonCachingCryptoProviderFactory() => new() { CacheSignatureProviders = false };
 
