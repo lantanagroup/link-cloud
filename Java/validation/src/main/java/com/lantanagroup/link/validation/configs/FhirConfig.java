@@ -57,11 +57,11 @@ public class FhirConfig {
     }
 
     /**
-     * FHIRPath engine used by custom checks (e.g. {@code future-date}, {@code numeric-range}) to
-     * evaluate FHIRPath expressions against resources. Derived from the shared {@link FhirContext}.
+     * FHIRPath engine used by custom checks (e.g. {@code future-date}, {@code numeric-range})
+     * to evaluate expressions against resources. Derived from the shared {@link FhirContext}.
      *
-     * <p>FHIRPath is evaluated concurrently by the rubric check pool, and HAPI's engine is not safe to
-     * share across threads, so hand each thread its own.
+     * <p>FHIRPath is evaluated concurrently by the rubric check pool, and HAPI's engine is not
+     * thread-safe, so each thread gets its own instance.
      */
     @Bean
     public IFhirPath fhirPath(FhirContext fhirContext,
@@ -76,10 +76,8 @@ public class FhirConfig {
         fhirPath.setEvaluationContext(bundleReferenceResolver);
         return fhirPath;
     }
-
     /**
-     * Terminology/profile validation support chain used by the rubric execution engine's
-     * FHIR-conformance, terminology, and value-set check executors.
+     * Validation support chain used by FHIR-conformance, terminology, and value-set checks.
      *
      * <p>Composed to be identical to the legacy validator's chain ({@link ValidationService}) so
      * both engines produce the same findings for the same payload: base FHIR definitions, the
@@ -103,13 +101,15 @@ public class FhirConfig {
     }
 
     /**
-     * Delegates every conformance-resource lookup to {@link ArtifactService#getValidationSupport()}
-     * at call time. The artifact support is rebuilt whenever artifacts are saved, deleted, or
-     * re-initialized ({@code POST /api/validation/artifact/$initialize}), so holding a fixed
-     * instance in the singleton chain would go stale; resolving per call always sees the current
-     * packages while still benefiting from ArtifactService's internal caching. Terminology
-     * questions ({@code isCodeSystemSupported}/{@code isValueSetSupported}) keep the interface
-     * default of {@code false}, matching {@link com.lantanagroup.link.validation.services.ArtifactValidationSupport}.
+     * Delegates conformance-resource lookups to {@link ArtifactService#getValidationSupport()}
+     * at call time. Artifact support is rebuilt when artifacts are saved, deleted, or re-initialized
+     * ({@code POST /api/validation/artifact/$initialize}), so holding a fixed instance in the
+     * singleton chain could become stale. Resolving per call ensures the latest packages are used
+     * while still benefiting from ArtifactService's internal caching.
+     *
+     * <p>Terminology questions ({@code isCodeSystemSupported}/{@code isValueSetSupported}) retain
+     * the interface default of {@code false}, matching
+     * {@link com.lantanagroup.link.validation.services.ArtifactValidationSupport}.
      */
     // Package-private for testing.
     static class LazyArtifactValidationSupport implements IValidationSupport {

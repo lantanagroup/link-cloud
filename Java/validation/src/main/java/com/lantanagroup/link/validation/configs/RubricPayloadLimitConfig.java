@@ -76,9 +76,8 @@ public class RubricPayloadLimitConfig implements WebMvcConfigurer {
     }
 
     /**
-     * Counts body bytes as they are read and throws once the count passes the limit, so an
-     * oversized body is cut off mid-stream instead of being buffered wholesale. A body of
-     * exactly the limit is accepted.
+     * Counts body bytes as they are read and throws once the limit is exceeded, preventing an
+     * oversized body from being buffered wholesale. A body exactly at the limit is accepted.
      */
     public static class SizeLimitingRequestWrapper extends HttpServletRequestWrapper {
 

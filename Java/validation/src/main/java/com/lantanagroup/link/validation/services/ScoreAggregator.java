@@ -42,9 +42,7 @@ public class ScoreAggregator {
         };
     }
 
-    // ------------------------------------------------------------------
-    // PIQI_DIMENSION_SCORECARD
-    // ------------------------------------------------------------------
+
     private ScoreCardDto aggregateDimensionScorecard(List<CheckExecutionResult> checkResults, RollupStrategy rollup) {
         // Seeded only from dimensions that actually have an executed rubric check, not from every
         // PiqiDimension value. A dimension the rubric never checks (or one whose checks were all
@@ -65,9 +63,7 @@ public class ScoreAggregator {
                 .build();
     }
 
-    // ------------------------------------------------------------------
-    // PIQI_CHECK_SCORECARD
-    // ------------------------------------------------------------------
+
     private ScoreCardDto aggregateCheckScorecard(List<CheckExecutionResult> checkResults, RollupStrategy rollup) {
         Map<String, RubricResultStatus> byCheck = new LinkedHashMap<>();
         for (CheckExecutionResult result : checkResults) {
@@ -97,9 +93,6 @@ public class ScoreAggregator {
         return status;
     }
 
-    // ------------------------------------------------------------------
-    // PIQI_PASS_FAIL
-    // ------------------------------------------------------------------
     /**
      * Check-based pass/fail: any single failing check fails the whole result; otherwise it passes.
      * scoringPolicy.rollup has no effect here by design — WORST_OF/BEST_OF/MAJORITY/ALL_MUST_PASS

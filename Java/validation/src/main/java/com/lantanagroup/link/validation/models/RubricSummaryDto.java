@@ -19,7 +19,6 @@ public class RubricSummaryDto {
     private String rubricId;
     private String title;
     private String owner;
-    // All versions of this rubric with their status and per-version metadata.
     private List<RubricVersionSummaryDto> versions;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

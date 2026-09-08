@@ -36,13 +36,14 @@ import java.util.List;
 /**
  * Normalizes exceptions from the <b>rubric-governance APIs</b> into the uniform {@link ApiResponse}
  * error envelope ({@code status}, {@code message}, {@code timestamp}, optional {@code errors};
- * {@code data} omitted). Governance = the Rubric Registry under {@code /api/validation/rubrics/**}
- * and the v2 evaluation endpoints under {@code /api/validation/v2/rubrics/**}.
+ * {@code data} omitted). Governance includes the Rubric Registry under
+ * {@code /api/validation/rubrics/**} and the v2 evaluation endpoints under
+ * {@code /api/validation/v2/rubrics/**}.
  *
- * <p>The <b>legacy</b> validation endpoints ({@code /$validate}, {@code /$categorize}, pre-qual) are
- * deliberately left on Spring's default problem-detail handling: for the standard MVC exceptions this
- * advice delegates non-governance requests to {@link ResponseEntityExceptionHandler super}, so their
- * responses are unchanged. Governance vs legacy is decided by the request path.
+ * <p>The <b>legacy</b> validation endpoints ({@code /$validate}, {@code /$categorize}, pre-qual)
+ * deliberately retain Spring's default problem-detail handling. For standard MVC exceptions,
+ * this advice delegates non-governance requests to {@link ResponseEntityExceptionHandler super},
+ * leaving their responses unchanged. Governance vs legacy is determined by the request path.
  *
  * <p>Registered at {@link Ordered#HIGHEST_PRECEDENCE}. Envelope {@code timestamp} comes from
  * {@link ApiResponse#nowMillis()} (UTC, millisecond precision).
@@ -161,8 +162,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return envelope(statusCode, message, null);
     }
 
-    // --- Catch-all: envelope 500 for governance; framework-style ProblemDetail otherwise. Internal
-    //     details are logged but never returned. ---
+    // --- Catch-all: returns an envelope 500 for governance requests and a framework-style
+//     ProblemDetail otherwise. Internal details are logged but never returned. ---
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {

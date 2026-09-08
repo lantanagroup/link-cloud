@@ -11,27 +11,18 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * Configuration for the dedicated thread pool that fans out rubric check execution
- * The checks of a single {@code $rubric-validate} call are submitted to this
- * pool and merged after all complete.
+ * Dedicated thread pool for parallel rubric check execution.
+ * Used only when {@code vaas.checks.parallel} is enabled; threads are created
+ * lazily, so no {@code check-exec-} threads exist when the feature is disabled.
  *
- * <p>The pool is only used when {@code vaas.checks.parallel} is true, which is <b>not</b> the default.
- * It costs nothing when unused: {@link ThreadPoolTaskExecutor} starts its threads on first submission,
- * so with the flag off no {@code check-exec-} thread is ever created.
+ * Kept separate from HAPI's {@link java.util.concurrent.ForkJoinPool#commonPool()}
+ * to avoid competing for the same thread pool, although both ultimately share
+ * the same CPU cores.
  *
- * <p>The pool is intentionally <b>separate</b> from {@link java.util.concurrent.ForkJoinPool#commonPool()},
- * which HAPI's {@code setConcurrentBundleValidation(true)} already uses; sharing it would let the two
- * fight for the same threads. Separate is not independent, though: a {@code FHIR_CONFORMANCE} check
- * running on one of these threads still fans out into the common pool and blocks there, so both pools
- * draw on the same cores.
- *
- * <p><b>Why {@code queueCapacity} defaults to 0.</b> A {@link ThreadPoolExecutor} only starts threads
- * beyond {@code corePoolSize} once its queue is <i>full</i>. A queue deep enough to hold a whole
- * rubric therefore pins concurrency at {@code corePoolSize} and leaves {@code maxPoolSize}
- * unreachable. With capacity 0 the queue is a {@code SynchronousQueue}: each check is handed straight
- * to a thread, the pool grows to {@code maxPoolSize} under a burst, and anything beyond that runs on
- * the submitting request thread ({@link ThreadPoolExecutor.CallerRunsPolicy}) rather than queueing
- * behind another request's checks.
+ * {@code queueCapacity} defaults to 0 so checks are handed directly to threads,
+ * allowing the pool to grow to {@code maxPoolSize}. When the pool is saturated,
+ * {@link ThreadPoolExecutor.CallerRunsPolicy} runs additional checks on the
+ * submitting request thread instead of queueing them.
  */
 @Configuration
 @ConfigurationProperties("vaas.checks")

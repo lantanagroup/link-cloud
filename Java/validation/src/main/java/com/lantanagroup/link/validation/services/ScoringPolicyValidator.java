@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Set;
-
 /**
  * Validates the declarative {@code scoringPolicy} block of a rubric definition
  * (see Rubric JSON Field Reference §10/§11). The policy is not consumed by any

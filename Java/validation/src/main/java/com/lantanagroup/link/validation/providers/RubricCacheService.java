@@ -19,8 +19,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.Comparator;
 
 /**
- * Cache wrappers for the rubric lookups on the evaluate path. Lifecycle changes go through
- * {@link #evictVersion} so they take effect right away instead of waiting out the TTL.
+ * Caches rubric lookups on the evaluate path. Lifecycle changes evict affected entries
+ * immediately instead of waiting for the TTL.
  */
 @Service
 @RequiredArgsConstructor
@@ -56,9 +56,8 @@ public class RubricCacheService {
     // hotfix like 1.0.1 published after 2.0.0 was rolled back should still win.
     @Cacheable(value = LATEST_SEMVER_CACHE, key = "#rubricId", unless = "#result == null")
     public String getLatestPublishedSemver(String rubricId) {
-        // nullsFirst: a real PUBLISHED row always has publishedAt set (publish() writes it in the
-        // same transition), but treating a missing one as oldest rather than throwing keeps this
-        // safe against stale/hand-built rows instead of NPEing
+        // A PUBLISHED row normally has publishedAt set, but nullsFirst treats malformed or stale rows
+// as oldest instead of failing with an NPE.
         return rubricVersionRepository.findByRubricIdAndStatus(rubricId, RubricVersionStatus.PUBLISHED)
                 .stream()
                 .max(Comparator.comparing(RubricVersion::getPublishedAt, Comparator.nullsFirst(Comparator.naturalOrder())))

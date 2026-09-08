@@ -25,9 +25,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-// note: (rubric_version_id, check_local_id) uniqueness only applies to live rows, so it's a
-// filtered unique index in the migration (uq_check_rv_local_active) rather than a
-// @UniqueConstraint here since JPA can't express the filter
+// (rubric_version_id, check_local_id) uniqueness applies only to live rows, so the migration
+// uses a filtered unique index (uq_check_rv_local_active) rather than @UniqueConstraint,
+// which JPA cannot express with a filter.
 @Entity
 @Table(
         name = "rubric_check",
@@ -51,8 +51,9 @@ public class RubricCheck {
     @Column(name = "rubric_version_id", nullable = false)
     private Long rubricVersionId;
 
-    // Read-only association purely to emit a real FK (rubric_check.rubric_version_id -> rubric_version).
-    // The scalar rubricVersionId above remains the writable mapping; do not use this field in code.
+    // Read-only association used only to emit the FK
+// (rubric_check.rubric_version_id -> rubric_version). The scalar rubricVersionId remains
+// the writable mapping; do not use this field in code.
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "rubric_version_id", insertable = false, updatable = false,
             foreignKey = @ForeignKey(name = "fk_check_rubric_version"))
@@ -86,8 +87,8 @@ public class RubricCheck {
     @Column(nullable = false)
     private boolean enabled;
 
-    // soft delete, set when a draft re-registration replaces this version's checks.
-    // kept for history but hidden from evaluate/dry-run and the read APIs
+    // Soft-deleted when a draft re-registration replaces this version's checks.
+// Retained for history but excluded from evaluation, dry-runs, and read APIs.
     @Column(nullable = false)
     private boolean deleted;
 }

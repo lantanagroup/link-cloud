@@ -59,8 +59,8 @@ public class RubricController {
     private final RubricRegistryService registry;
     private final ObjectMapper objectMapper;
     private final Validator validator;
-    // Strict copies used only for request parsing: unknown payload keys are typos, not extensions.
-    // The shared Spring ObjectMapper stays lenient for response serialization.
+    // Strict copies used only for request parsing: unknown payload keys are treated as typos,
+// not extensions. The shared Spring ObjectMapper remains lenient for response serialization.
     private final ObjectMapper strictJsonMapper;
     private final YAMLMapper strictYamlMapper;
     private final int maxPayloadBytes;
@@ -144,8 +144,8 @@ public class RubricController {
             @RequestBody String rawBody,
             @RequestHeader(value = HttpHeaders.CONTENT_TYPE, required = false) String contentType,
             Principal principal) {
-        // secondary safeguard behind RubricPayloadLimitConfig for requests without a
-        // Content-Length header (chunked transfer encoding)
+        // Secondary safeguard behind RubricPayloadLimitConfig for chunked requests
+        // without a Content-Length header.
         if (utf8ByteLength(rawBody) > maxPayloadBytes) {
             throw new PayloadParseException(
                     "Rubric payload exceeds maximum size of " + maxPayloadBytes + " bytes", null);
@@ -158,8 +158,8 @@ public class RubricController {
         }
         RubricVersion version = registry.registerVersion(payload, actor(principal));
         RubricVersionSummaryDto dto = RubricVersionSummaryDto.from(version, objectMapper);
-        // build the Location from the persisted version's (canonical) semver, not the raw payload,
-        // so the header and body agree even when the input carried leading zeros
+        // Build the Location from the persisted version's canonical semver rather than the raw payload,
+        // so the header and body agree even when the input contains leading zeros.
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{semver}")
                 .buildAndExpand(version.getSemver())
@@ -195,7 +195,7 @@ public class RubricController {
                     ? strictYamlMapper.readValue(rawBody, RubricVersionPayloadDto.class)
                     : strictJsonMapper.readValue(rawBody, RubricVersionPayloadDto.class);
         } catch (UnrecognizedPropertyException e) {
-            // the document is well-formed; the key is just not part of the contract -> 400 with errors list
+            // The document is well-formed, but the key is not part of the contract, so return a 400 with an errors list.
             throw new InvalidRubricDefinitionException("Invalid rubric definition",
                     List.of(pathOf(e) + ": unknown property '" + e.getPropertyName() + "'"));
         } catch (JacksonException e) {

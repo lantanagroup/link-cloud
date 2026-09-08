@@ -49,8 +49,8 @@ public class RubricVersion {
     @Column(name = "rubric_id", length = 128, nullable = false)
     private String rubricId;
 
-    // Read-only association purely to emit a real FK (rubric_version.rubric_id -> rubric).
-    // The scalar rubricId above remains the writable mapping; do not use this field in code.
+    // Read-only association used to create the FK (rubric_version.rubric_id -> rubric).
+// The scalar rubricId remains the writable mapping; do not use this field in code.
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "rubric_id", insertable = false, updatable = false,
             foreignKey = @ForeignKey(name = "fk_rubric_version_rubric"))
@@ -77,8 +77,9 @@ public class RubricVersion {
     @Column(name = "retired_by", length = 128)
     private String retiredBy;
 
-    // set when a $dry-run completes for this version. publish checks these when
-    // link.rubric.dry-run.required-for-publish is on, null means no dry run yet
+    // Set when a $dry-run completes for this version. When
+// link.rubric.dry-run.required-for-publish is enabled, publish checks these fields.
+// Null means no dry run has completed yet.
     @Column(name = "dry_run_completed_at")
     private OffsetDateTime dryRunCompletedAt;
 
