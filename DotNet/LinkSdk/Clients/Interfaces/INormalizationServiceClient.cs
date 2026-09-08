@@ -25,4 +25,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(string mappingId, UpdateFacilityLocationLocalCodeMappingRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(string mappingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads the HSLOC reference code list: <c>GET /api/normalization/HSLOC</c>.</summary>
+    Task<LinkApiResponse> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
 }

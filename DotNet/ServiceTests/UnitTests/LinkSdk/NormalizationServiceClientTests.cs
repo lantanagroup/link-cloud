@@ -140,6 +140,21 @@ public class NormalizationServiceClientTests
         })];
     }
 
+    [Fact]
+    public async Task GetHslocCodesAsync_CallsHslocEndpoint()
+    {
+        using var server = new OneShotServer("[]");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetHslocCodesAsync(includeInactive: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/normalization/HSLOC", request.Path);
+        Assert.Contains("includeInactive=True", request.Query);
+    }
+
     private static NormalizationServiceClient CreateClient(string baseUrl) => new(
         Options.Create(new ServiceRegistry { NormalizationServiceUrl = baseUrl }),
         Options.Create(new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }),
