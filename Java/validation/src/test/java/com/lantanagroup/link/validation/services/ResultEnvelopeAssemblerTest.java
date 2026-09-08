@@ -43,7 +43,7 @@ class ResultEnvelopeAssemblerTest {
         return raw.stream().map(EvaluatedFinding::identity).toList();
     }
 
-    private static RawFinding finding(UUID checkId, PiqiDimension dimension, Severity severity, String code) {
+    private static RawFinding finding(Long checkId, PiqiDimension dimension, Severity severity, String code) {
         return RawFinding.builder()
                 .checkId(checkId)
                 .checkLocalId("c-" + code)
@@ -59,7 +59,7 @@ class ResultEnvelopeAssemblerTest {
         return RubricVersion.builder()
                 .rubricId("piqi.core")
                 .semver("1.3.0")
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(1L)
                 .checksum("checksum-abc")
                 .build();
     }
@@ -78,9 +78,9 @@ class ResultEnvelopeAssemblerTest {
                 .requestedAt(requestedAt)
                 .build();
 
-        UUID checkE1 = UUID.randomUUID();
-        UUID checkW1 = UUID.randomUUID();
-        UUID checkI1 = UUID.randomUUID();
+        Long checkE1 = 201L;
+        Long checkW1 = 202L;
+        Long checkI1 = 203L;
         List<RawFinding> raw = List.of(
                 finding(checkE1, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1"),
                 finding(checkW1, PiqiDimension.TERMINOLOGY, Severity.WARNING, "w1"),
@@ -182,7 +182,7 @@ class ResultEnvelopeAssemblerTest {
         RubricVersion version = RubricVersion.builder()
                 .rubricId("piqi.core")
                 .semver("1.3.0")
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(2L)
                 .checksum("checksum-abc")
                 .scoringPolicyJson("{\"type\":\"piqi-pass-fail\"}")
                 .build();
@@ -200,7 +200,7 @@ class ResultEnvelopeAssemblerTest {
         RubricVersion version = RubricVersion.builder()
                 .rubricId("piqi.core")
                 .semver("1.3.0")
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(3L)
                 .checksum("checksum-abc")
                 .scoringPolicyJson("{\"type\":\"piqi-pass-fail\",\"rollup\":\"worst-of\"}")
                 .build();
@@ -218,7 +218,7 @@ class ResultEnvelopeAssemblerTest {
         RubricVersion version = RubricVersion.builder()
                 .rubricId("piqi.core")
                 .semver("1.3.0")
-                .rubricVersionId(UUID.randomUUID())
+                .rubricVersionId(4L)
                 .checksum("checksum-abc")
                 .scoringPolicyJson(null)
                 .build();
@@ -249,7 +249,7 @@ class ResultEnvelopeAssemblerTest {
     @Test
     @DisplayName("a categorized finding exposes original/overridden severity, acceptability, and category ids in the DTO")
     void categorizedFindingCarriesOverrideFields() {
-        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+        RawFinding raw = finding(301L, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
 
         ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
                 ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
@@ -267,7 +267,7 @@ class ResultEnvelopeAssemblerTest {
     @Test
     @DisplayName("summary counts stay on the pre-override severities while the persisted finding stores the effective one")
     void summaryCountsPreOverrideAndEntityStoresEffective() {
-        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+        RawFinding raw = finding(301L, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
 
         ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
                 ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
@@ -281,7 +281,7 @@ class ResultEnvelopeAssemblerTest {
     @Test
     @DisplayName("an uncategorized finding emits no override diagnostics at all")
     void uncategorizedFindingHasNoOverrideFields() {
-        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+        RawFinding raw = finding(301L, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
 
         ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
                 ctx(), version(), identity(List.of(raw)), List.of(), Map.of(), OffsetDateTime.now());
@@ -298,7 +298,7 @@ class ResultEnvelopeAssemblerTest {
     void responseConfigSuppressesDiagnostics() {
         policyConfig.getResponse().setIncludeOriginalSeverity(false);
         policyConfig.getResponse().setIncludeCategoryIds(false);
-        RawFinding raw = finding(UUID.randomUUID(), PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
+        RawFinding raw = finding(301L, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
 
         ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
                 ctx(), version(), List.of(categorized(raw, Severity.WARNING, true)),
