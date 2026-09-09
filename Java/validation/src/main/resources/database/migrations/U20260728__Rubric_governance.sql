@@ -33,3 +33,15 @@ drop table if exists rubric_check;
 drop table if exists rubric_version;
 
 drop table if exists rubric;
+
+if exists (select 1 from sys.sequences where name = 'rubric_finding_sequence' and schema_name(schema_id) = 'dbo')
+    drop sequence dbo.rubric_finding_sequence;
+
+if exists (select 1 from sys.sequences where name = 'rubric_result_sequence' and schema_name(schema_id) = 'dbo')
+    drop sequence dbo.rubric_result_sequence;
+
+if exists (select 1 from sys.sequences where name = 'rubric_check_sequence' and schema_name(schema_id) = 'dbo')
+    drop sequence dbo.rubric_check_sequence;
+
+if exists (select 1 from sys.sequences where name = 'rubric_version_sequence' and schema_name(schema_id) = 'dbo')
+    drop sequence dbo.rubric_version_sequence;
