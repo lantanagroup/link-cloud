@@ -97,7 +97,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   resourceTypes: string[] = [];
 
-  readonly operationType = OperationType.CodeMap;
+  @Input() operationType: OperationType.CodeMap | OperationType.HSLOCMap = OperationType.CodeMap;
 
   protected readonly FormMode = FormMode;
 

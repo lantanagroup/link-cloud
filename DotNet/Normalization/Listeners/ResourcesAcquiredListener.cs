@@ -41,6 +41,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
+    private readonly HSLOCMapOperationService _hslocMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
     private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
@@ -61,6 +62,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IProducer<ResourceKey, ResourcesNormalizedValue> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
+        HSLOCMapOperationService hslocMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService,
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
@@ -89,6 +91,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
         _copyPropertyOperationService = copyPropertyOperationService;
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
+        _hslocMapOperationService = hslocMapOperationService ?? throw new ArgumentNullException(nameof(hslocMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
         _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
@@ -287,6 +290,7 @@ public class ResourcesAcquiredListener : BackgroundService
                             {
                                 OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, resource, resources, cancellationToken),
                                 OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken: cancellationToken),
@@ -483,7 +487,8 @@ public class ResourcesAcquiredListener : BackgroundService
             {
                 var dbEntity = sequence.OperationResourceType?.Operation;
 
-                if (dbEntity is null || dbEntity.IsDisabled || dbEntity.OperationType != OperationType.CodeMap.ToString())
+                if (dbEntity is null || dbEntity.IsDisabled ||
+                    (dbEntity.OperationType != OperationType.CodeMap.ToString() && dbEntity.OperationType != OperationType.HSLOCMap.ToString()))
                 {
                     continue;
                 }

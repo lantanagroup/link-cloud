@@ -100,6 +100,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton<CopyLocationOperationService>();
             builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
             builder.Services.AddSingleton<CodeMapOperationService>();
+            builder.Services.AddSingleton<HSLOCMapOperationService>();
             builder.Services.AddSingleton<ConditionalTransformOperationService>();
             builder.Services.AddSingleton<RemoveExtensionsOperationService>();
 

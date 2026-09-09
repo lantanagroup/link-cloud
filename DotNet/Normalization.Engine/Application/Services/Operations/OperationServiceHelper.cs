@@ -39,6 +39,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                OperationType.HSLOCMap => (object)(HSLOCMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
                 OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
