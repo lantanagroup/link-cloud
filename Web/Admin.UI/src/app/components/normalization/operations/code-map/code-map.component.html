@@ -38,7 +38,7 @@
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Name</mat-label>
       <input matInput formControlName="name" [readonly]="viewOnly"/>
-      @if (!viewOnly && nameControl.value) {
+      @if (!viewOnly && !isHSLOCMap && nameControl.value) {
         <button matSuffix mat-icon-button (click)="clearName()"
           aria-label="Clear name">
           <mat-icon>close</mat-icon>
@@ -55,7 +55,7 @@
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Description</mat-label>
       <textarea matInput formControlName="description" rows="3" [readonly]="viewOnly"></textarea>
-      @if (!viewOnly && descriptionControl.value) {
+      @if (!viewOnly && !isHSLOCMap && descriptionControl.value) {
         <button matSuffix mat-icon-button (click)="clearDescription()"
           aria-label="Clear description">
           <mat-icon>close</mat-icon>

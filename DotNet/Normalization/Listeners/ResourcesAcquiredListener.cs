@@ -290,7 +290,7 @@ public class ResourcesAcquiredListener : BackgroundService
                             {
                                 OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
-                                OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, resource, resources, cancellationToken),
+                                OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, resource, resources.OfType<Location>().ToList<DomainResource>(), cancellationToken),
                                 OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken: cancellationToken),

@@ -61,20 +61,35 @@ describe('CodeMapComponent', () => {
         };
         fixture.detectChanges();
         const isHSLOCMap = operationType === OperationType.HSLOCMap;
+        const expectedName = isHSLOCMap ? 'HSLOC Location Mapping' : 'Map locations';
+        const expectedDescription = isHSLOCMap
+          ? 'Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable Copy Location operation.'
+          : 'Map locations';
+        expect(component.nameControl.disabled).toBe(isHSLOCMap);
+        expect(component.descriptionControl.disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[formControlName="name"]').disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('textarea[formControlName="description"]').disabled).toBe(isHSLOCMap);
         expect(component.selectedResourceTypesControl.disabled).toBe(isHSLOCMap);
         expect(component.resourceTypeControl.disabled).toBe(isHSLOCMap);
         expect(component.fhirPathControl.disabled).toBe(isHSLOCMap);
         expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').disabled).toBe(isHSLOCMap);
         expect(fixture.nativeElement.querySelector('input[placeholder="Start typing to search"]').disabled).toBe(isHSLOCMap);
         if (isHSLOCMap) {
+          expect(fixture.nativeElement.querySelector('input[formControlName="name"]').value).toBe(expectedName);
+          expect(fixture.nativeElement.querySelector('textarea[formControlName="description"]').value).toBe(expectedDescription);
+          expect(fixture.nativeElement.querySelector('button[aria-label="Clear name"]')).toBeNull();
+          expect(fixture.nativeElement.querySelector('button[aria-label="Clear description"]')).toBeNull();
           expect(component.selectedResourceTypesControl.value).toEqual(['Location']);
           expect(component.resourceTypeControl.value).toBe('Location');
           expect(component.fhirPathControl.value).toBe('type');
           expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').value).toBe('type');
         }
         component.form.patchValue({
-          name: 'Map locations', selectedResourceTypes: ['Patient'], fhirPath: 'type.coding'
+          selectedResourceTypes: ['Patient'], fhirPath: 'type.coding'
         });
+        if (!isHSLOCMap) {
+          component.form.patchValue({name: expectedName, description: expectedDescription});
+        }
         if (formMode === FormMode.Create) {
           component.codeSystemMaps.at(0).patchValue({
             sourceSystem: 'urn:local', targetSystem: 'urn:hsloc',
@@ -89,8 +104,10 @@ describe('CodeMapComponent', () => {
           ? operationService.createOperationConfiguration
           : operationService.updateOperationConfiguration;
         expect(request).toHaveBeenCalledTimes(1);
+        expect(request.calls.mostRecent().args[0].description).toBe(expectedDescription);
         expect(request.calls.mostRecent().args[0].resourceTypes).toEqual(isHSLOCMap ? ['Location'] : ['Patient']);
         expect(request.calls.mostRecent().args[0].operation).toEqual(jasmine.objectContaining({
+          Name: expectedName, Description: expectedDescription,
           OperationType: operationType, FhirPath: isHSLOCMap ? 'type' : 'type.coding', CodeSystemMaps: codeSystemMaps
         }));
       });

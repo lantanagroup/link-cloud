@@ -6,9 +6,10 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         public override OperationType OperationType => OperationType.HSLOCMap;
 
-        public HSLOCMapOperation(string name, List<CodeSystemMap> codeSystemMaps, string description = "")
-            : base(name, "type", codeSystemMaps, description)
+        public HSLOCMapOperation(List<CodeSystemMap> codeSystemMaps)
+            : base("HSLOC Location Mapping", "type", codeSystemMaps, "Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable CopyLocation operation and the CopyLocationAliasToTypeIteratively operation.")
         {
+
         }
     }
 }

@@ -1,5 +1,7 @@
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations
 {
+    using LantanaGroup.Link.Shared.Application.Models.Mapping;
+
     /// <summary>
     /// What one configured code map did to a single resource: how many of its codings were rewritten, how
     /// many had no entry, and which codes those were.
@@ -28,10 +30,12 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     /// The distinct codes behind <paramref name="UnmappedCount"/> — the codes a facility would add to the
     /// map to close the gap.
     /// </param>
+    /// <param name="MappedCodes">The source codes rewritten and the target codes they were rewritten to.</param>
     public sealed record CodeMappingOutcome(
         string SourceSystem,
         string TargetSystem,
         int MappedCount,
         int UnmappedCount,
-        IReadOnlyList<string> UnmappedCodes);
+        IReadOnlyList<string> UnmappedCodes,
+        IReadOnlyList<CodeMapping>? MappedCodes = null);
 }

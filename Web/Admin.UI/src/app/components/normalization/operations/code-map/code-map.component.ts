@@ -193,6 +193,10 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     if (this.isHSLOCMap) {
+      this.nameControl.setValue('HSLOC Location Mapping');
+      this.nameControl.disable();
+      this.descriptionControl.setValue('Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable CopyLocation operation and the CopyLocationAliasToTypeIteratively operation.');
+      this.descriptionControl.disable();
       this.selectedResourceTypesControl.setValue(['Location']);
       this.selectedResourceTypesControl.disable();
       this.resourceTypeControl.setValue('Location');
