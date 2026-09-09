@@ -2,6 +2,7 @@ using LantanaGroup.Link.Normalization.Application.Models.FacilityLocationMapping
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models.Requests;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -26,20 +27,21 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         _mappingQueries = mappingQueries;
     }
 
+    /// <remarks>pageSize defaults to 10 and must be an integer between 1 and 100.</remarks>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> GetAll(
         bool? unmapped,
-        int pageSize = 10,
-        int pageNumber = 1,
+        [FromQuery] PagingRequest paging,
         CancellationToken cancellationToken = default)
     {
         return SearchInternal(new FacilityLocationLocalCodeMappingSearchModel
         {
             Unmapped = unmapped,
-            PageSize = pageSize,
-            PageNumber = pageNumber
+            PageSize = paging.PageSize,
+            PageNumber = paging.PageNumber
         }, cancellationToken);
     }
 
@@ -73,6 +75,7 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         }
     }
 
+    /// <remarks>pageSize defaults to 10 and must be an integer between 1 and 100.</remarks>
     [HttpGet("facilities/{facilityId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -80,18 +83,18 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
     public Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> GetForFacility(
         string facilityId,
         bool? unmapped,
-        int pageSize = 10,
-        int pageNumber = 1,
+        [FromQuery] PagingRequest paging,
         CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
             Unmapped = unmapped,
-            PageSize = pageSize,
-            PageNumber = pageNumber
+            PageSize = paging.PageSize,
+            PageNumber = paging.PageNumber
         }, cancellationToken);
     }
 
+    /// <remarks>pageSize defaults to 10 and must be an integer between 1 and 100.</remarks>
     [HttpGet("facilities/{facilityId}/locations/{locationId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -100,19 +103,19 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         string facilityId,
         string locationId,
         bool? unmapped,
-        int pageSize = 10,
-        int pageNumber = 1,
+        [FromQuery] PagingRequest paging,
         CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
             LocationId = locationId,
             Unmapped = unmapped,
-            PageSize = pageSize,
-            PageNumber = pageNumber
+            PageSize = paging.PageSize,
+            PageNumber = paging.PageNumber
         }, cancellationToken);
     }
 
+    /// <remarks>pageSize defaults to 10 and must be an integer between 1 and 100.</remarks>
     [HttpGet("facilities/{facilityId}/local-codes/{localCode}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -121,27 +124,39 @@ public class FacilityLocationLocalCodeMappingsController : ControllerBase
         string facilityId,
         string localCode,
         bool? unmapped,
-        int pageSize = 10,
-        int pageNumber = 1,
+        [FromQuery] PagingRequest paging,
         CancellationToken cancellationToken = default)
     {
         return SearchForFacilityInternal(facilityId, new FacilityLocationLocalCodeMappingSearchModel
         {
             LocalCode = localCode,
             Unmapped = unmapped,
-            PageSize = pageSize,
-            PageNumber = pageNumber
+            PageSize = paging.PageSize,
+            PageNumber = paging.PageNumber
         }, cancellationToken);
     }
 
+    /// <remarks>pageSize defaults to 10 and must be an integer between 1 and 100.</remarks>
     [HttpGet("search")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationLocalCodeMappingModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public Task<ActionResult<PagedConfigModel<FacilityLocationLocalCodeMappingModel>>> Search(
-        [FromQuery] FacilityLocationLocalCodeMappingSearchModel model,
+        [FromQuery] FacilityLocationLocalCodeMappingSearchRequest model,
         CancellationToken cancellationToken = default)
     {
-        return SearchInternal(model, cancellationToken);
+        return SearchInternal(new FacilityLocationLocalCodeMappingSearchModel
+        {
+            Id = model.Id,
+            FacilityId = model.FacilityId,
+            LocationId = model.LocationId,
+            LocalCodeSystem = model.LocalCodeSystem,
+            LocalCode = model.LocalCode,
+            HSLOCId = model.HSLOCId,
+            Unmapped = model.Unmapped,
+            PageSize = model.PageSize,
+            PageNumber = model.PageNumber
+        }, cancellationToken);
     }
 
     [HttpPost("facilities/{facilityId}")]
