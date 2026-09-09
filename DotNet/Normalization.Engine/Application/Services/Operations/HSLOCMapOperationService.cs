@@ -28,7 +28,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            copyIdentifierAndAliasToType(resource, supportingResources, cancellationToken);
+            var copyResult = copyIdentifierAndAliasToType(resource, supportingResources, cancellationToken);
+            if (copyResult.SuccessCode == OperationStatus.Failure)
+            {
+                return copyResult;
+            }
 
             //Now that location.type is normalized, execute the code map.
             var codeMapOperation = new CodeMapOperation(

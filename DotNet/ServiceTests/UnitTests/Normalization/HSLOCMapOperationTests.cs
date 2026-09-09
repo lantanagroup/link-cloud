@@ -15,7 +15,7 @@ public class HSLOCMapOperationTests
     [Fact]
     public void OperationType_IsPreservedThroughBaseAndInterface()
     {
-        CodeMapOperation operation = new HSLOCMapOperation("HSLOC map", [], "Description");
+        CodeMapOperation operation = new HSLOCMapOperation([]);
 
         Assert.Equal(OperationType.HSLOCMap, operation.OperationType);
         Assert.Equal("type", operation.FhirPath);
@@ -26,11 +26,11 @@ public class HSLOCMapOperationTests
     [Fact]
     public void PersistedOperation_RoundTripsAsHSLOCMap()
     {
-        var operation = new HSLOCMapOperation("HSLOC map",
+        var operation = new HSLOCMapOperation(
             [new CodeSystemMap("urn:local", "urn:hsloc", new Dictionary<string, CodeMap>
             {
                 ["ICU"] = new CodeMap("1027-4", "Medical critical care")
-            })], "Description");
+            })]);
         var json = JsonSerializer.Serialize(operation);
 
         var restored = Assert.IsType<HSLOCMapOperation>(OperationHelper.GetOperation("HSLOCMap", json));
@@ -55,7 +55,7 @@ public class HSLOCMapOperationTests
             PropertyNamingPolicy = camelCase ? JsonNamingPolicy.CamelCase : null,
             Converters = { new OperationConverter(), new JsonStringEnumConverter() }
         };
-        IOperation operation = new HSLOCMapOperation("HSLOC map", [], "Description");
+        IOperation operation = new HSLOCMapOperation([]);
 
         var json = JsonSerializer.Serialize(operation, options);
         var restored = Assert.IsType<HSLOCMapOperation>(JsonSerializer.Deserialize<IOperation>(json, options));
@@ -67,26 +67,34 @@ public class HSLOCMapOperationTests
     }
 
     [Fact]
-    public async Task Placeholder_ResolvesFromEngineRegistrationAndDoesNotModifyResource()
+    public async Task ResolvesFromEngineRegistrationAndMapsCopiedIdentifier()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddNormalizationEngine();
         using var provider = services.BuildServiceProvider();
         var engine = provider.GetRequiredService<NormalizationEngine>();
-        var operation = new HSLOCMapOperation("HSLOC map", []);
-        var resource = new Hl7.Fhir.Model.Location { Id = "location" };
-        var original = (Hl7.Fhir.Model.Location)resource.DeepCopy();
+        var operation = new HSLOCMapOperation(
+            [new CodeSystemMap("urn:local", "urn:hsloc", new Dictionary<string, CodeMap>
+            {
+                ["ICU"] = new CodeMap("1027-4", "Medical critical care")
+            })]);
+        var resource = new Hl7.Fhir.Model.Location
+        {
+            Id = "location",
+            Identifier = [new Hl7.Fhir.Model.Identifier("urn:local", "ICU")]
+        };
 
         var outcomes = await engine.ApplyAsync(resource, [new NormalizationWorkItem(1, operation, ["Location"])]);
         var result = Assert.Single(outcomes).Result;
 
         Assert.Same(operation, OperationServiceHelper.GetOperationImplementation(operation));
-        Assert.Equal(OperationStatus.Failure, result.SuccessCode);
-        Assert.Contains("not implemented", result.ErrorMessage);
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Same(resource, result.Resource);
-        Assert.True(resource.IsExactly(original));
-        Assert.Null(result.CodeMapping);
+        var coding = Assert.Single(Assert.Single(resource.Type).Coding);
+        Assert.Equal("urn:hsloc", coding.System);
+        Assert.Equal("1027-4", coding.Code);
+        Assert.NotNull(result.CodeMapping);
     }
 
     [Theory]
@@ -114,7 +122,7 @@ public class HSLOCMapOperationTests
     [InlineData(false)]
     public async Task Validation_RequiresOnlyLocation(bool expectedValid, params string[] resourceTypes)
     {
-        var operation = new HSLOCMapOperation("HSLOC map", []);
+        var operation = new HSLOCMapOperation([]);
 
         var result = await OperationServiceHelper.ValidateOperation(
             "HSLOCMap", JsonSerializer.Serialize(operation), resourceTypes.ToList());
