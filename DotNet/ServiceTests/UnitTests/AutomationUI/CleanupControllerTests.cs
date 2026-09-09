@@ -84,6 +84,36 @@ public class CleanupControllerTests
     }
 
     [Fact]
+    public async Task RunCustomRange_WhenNeitherOptionSelected_DoesNotStart()
+    {
+        var cleanup = MockCleanup();
+        var sut = Create(cleanup, MockStore());
+
+        var result = await sut.RunCustomRange(
+            new CleanupCustomRangeForm
+            {
+                FromDate = DateTime.UtcNow.Date.AddDays(-1),
+                ToDate = DateTime.UtcNow.Date,
+                TeardownFacilities = false,
+                PurgeHistory = false
+            },
+            CancellationToken.None);
+
+        cleanup.Verify(
+            c => c.StartCustomRangeInBackground(
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()),
+            Times.Never);
+        result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public void CustomRangeForm_DefaultsTeardownOffSoUncheckedPostsStayOff()
+        => new CleanupCustomRangeForm().TeardownFacilities.Should().BeFalse();
+
+    [Fact]
     public void CleanupActivity_Percent_IsZeroWhenIdle()
         => CleanupActivity.Idle.Percent.Should().Be(0);
 

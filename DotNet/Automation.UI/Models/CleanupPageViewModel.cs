@@ -43,6 +43,6 @@ public sealed class CleanupCustomRangeForm
 {
     public DateTime FromDate { get; set; }
     public DateTime ToDate { get; set; }
-    public bool TeardownFacilities { get; set; } = true;
+    public bool TeardownFacilities { get; set; }
     public bool PurgeHistory { get; set; }
 }
