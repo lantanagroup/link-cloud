@@ -15,9 +15,10 @@ public class HSLOCMapOperationTests
     [Fact]
     public void OperationType_IsPreservedThroughBaseAndInterface()
     {
-        CodeMapOperation operation = new HSLOCMapOperation("HSLOC map", "type.coding", [], "Description");
+        CodeMapOperation operation = new HSLOCMapOperation("HSLOC map", [], "Description");
 
         Assert.Equal(OperationType.HSLOCMap, operation.OperationType);
+        Assert.Equal("type", operation.FhirPath);
         Assert.Equal(OperationType.HSLOCMap, ((IOperation)operation).OperationType);
         Assert.Equal(OperationType.CodeMap, new CodeMapOperation("Code map", "type.coding", []).OperationType);
     }
@@ -25,7 +26,7 @@ public class HSLOCMapOperationTests
     [Fact]
     public void PersistedOperation_RoundTripsAsHSLOCMap()
     {
-        var operation = new HSLOCMapOperation("HSLOC map", "type.coding",
+        var operation = new HSLOCMapOperation("HSLOC map",
             [new CodeSystemMap("urn:local", "urn:hsloc", new Dictionary<string, CodeMap>
             {
                 ["ICU"] = new CodeMap("1027-4", "Medical critical care")
@@ -54,14 +55,14 @@ public class HSLOCMapOperationTests
             PropertyNamingPolicy = camelCase ? JsonNamingPolicy.CamelCase : null,
             Converters = { new OperationConverter(), new JsonStringEnumConverter() }
         };
-        IOperation operation = new HSLOCMapOperation("HSLOC map", "type.coding", [], "Description");
+        IOperation operation = new HSLOCMapOperation("HSLOC map", [], "Description");
 
         var json = JsonSerializer.Serialize(operation, options);
         var restored = Assert.IsType<HSLOCMapOperation>(JsonSerializer.Deserialize<IOperation>(json, options));
 
         Assert.Equal(OperationType.HSLOCMap, restored.OperationType);
         Assert.Equal(operation.Name, restored.Name);
-        Assert.Equal("type.coding", restored.FhirPath);
+        Assert.Equal("type", restored.FhirPath);
         Assert.NotNull(restored.CodeSystemMaps);
     }
 
@@ -73,7 +74,7 @@ public class HSLOCMapOperationTests
         services.AddNormalizationEngine();
         using var provider = services.BuildServiceProvider();
         var engine = provider.GetRequiredService<NormalizationEngine>();
-        var operation = new HSLOCMapOperation("HSLOC map", "type.coding", []);
+        var operation = new HSLOCMapOperation("HSLOC map", []);
         var resource = new Hl7.Fhir.Model.Location { Id = "location" };
         var original = (Hl7.Fhir.Model.Location)resource.DeepCopy();
 
@@ -88,9 +89,40 @@ public class HSLOCMapOperationTests
         Assert.Null(result.CodeMapping);
     }
 
-    [Fact]
-    public void InvalidFhirPath_UsesBaseValidation()
+    [Theory]
+    [InlineData("type.coding")]
+    [InlineData("name")]
+    [InlineData("(")]
+    [InlineData(null)]
+    public void Deserialization_CannotOverrideFixedFhirPath(string? fhirPath)
     {
-        Assert.Throws<ArgumentException>(() => new HSLOCMapOperation("HSLOC map", "(", []));
+        var json = JsonSerializer.Serialize(new
+        {
+            Name = "HSLOC map", FhirPath = fhirPath, CodeSystemMaps = Array.Empty<CodeSystemMap>()
+        });
+
+        var operation = Assert.IsType<HSLOCMapOperation>(OperationHelper.GetOperation("HSLOCMap", json));
+
+        Assert.Equal("type", operation.FhirPath);
+    }
+
+    [Theory]
+    [InlineData(true, "Location")]
+    [InlineData(false, "Patient")]
+    [InlineData(false, "Location", "Patient")]
+    [InlineData(false, "Location", "Location")]
+    [InlineData(false)]
+    public async Task Validation_RequiresOnlyLocation(bool expectedValid, params string[] resourceTypes)
+    {
+        var operation = new HSLOCMapOperation("HSLOC map", []);
+
+        var result = await OperationServiceHelper.ValidateOperation(
+            "HSLOCMap", JsonSerializer.Serialize(operation), resourceTypes.ToList());
+
+        Assert.Equal(expectedValid, result.IsValid);
+        if (!expectedValid)
+        {
+            Assert.Contains("only the Location", result.ErrorMessage);
+        }
     }
 }

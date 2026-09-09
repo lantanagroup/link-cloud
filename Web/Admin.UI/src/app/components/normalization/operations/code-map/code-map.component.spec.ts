@@ -59,9 +59,21 @@ describe('CodeMapComponent', () => {
             FhirPath: 'type.coding', CodeSystemMaps: codeSystemMaps
           }
         };
-        component.ngOnInit();
+        fixture.detectChanges();
+        const isHSLOCMap = operationType === OperationType.HSLOCMap;
+        expect(component.selectedResourceTypesControl.disabled).toBe(isHSLOCMap);
+        expect(component.resourceTypeControl.disabled).toBe(isHSLOCMap);
+        expect(component.fhirPathControl.disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[placeholder="Start typing to search"]').disabled).toBe(isHSLOCMap);
+        if (isHSLOCMap) {
+          expect(component.selectedResourceTypesControl.value).toEqual(['Location']);
+          expect(component.resourceTypeControl.value).toBe('Location');
+          expect(component.fhirPathControl.value).toBe('type');
+          expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').value).toBe('type');
+        }
         component.form.patchValue({
-          name: 'Map locations', selectedResourceTypes: ['Location'], fhirPath: 'type.coding'
+          name: 'Map locations', selectedResourceTypes: ['Patient'], fhirPath: 'type.coding'
         });
         if (formMode === FormMode.Create) {
           component.codeSystemMaps.at(0).patchValue({
@@ -77,8 +89,9 @@ describe('CodeMapComponent', () => {
           ? operationService.createOperationConfiguration
           : operationService.updateOperationConfiguration;
         expect(request).toHaveBeenCalledTimes(1);
+        expect(request.calls.mostRecent().args[0].resourceTypes).toEqual(isHSLOCMap ? ['Location'] : ['Patient']);
         expect(request.calls.mostRecent().args[0].operation).toEqual(jasmine.objectContaining({
-          OperationType: operationType, FhirPath: 'type.coding', CodeSystemMaps: codeSystemMaps
+          OperationType: operationType, FhirPath: isHSLOCMap ? 'type' : 'type.coding', CodeSystemMaps: codeSystemMaps
         }));
       });
     }

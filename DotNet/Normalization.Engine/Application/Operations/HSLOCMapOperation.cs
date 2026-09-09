@@ -6,8 +6,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         public override OperationType OperationType => OperationType.HSLOCMap;
 
-        public HSLOCMapOperation(string name, string fhirPath, List<CodeSystemMap> codeSystemMaps, string description = "")
-            : base(name, fhirPath, codeSystemMaps, description)
+        public HSLOCMapOperation(string name, List<CodeSystemMap> codeSystemMaps, string description = "")
+            : base(name, "type", codeSystemMaps, description)
         {
         }
     }

@@ -99,6 +99,10 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @Input() operationType: OperationType.CodeMap | OperationType.HSLOCMap = OperationType.CodeMap;
 
+  get isHSLOCMap(): boolean {
+    return this.operationType === OperationType.HSLOCMap;
+  }
+
   protected readonly FormMode = FormMode;
 
   destroy$ = new Subject<void>()
@@ -188,6 +192,15 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       this.addCodeSystemMap(); // Add initial empty for Create mode only
     }
 
+    if (this.isHSLOCMap) {
+      this.selectedResourceTypesControl.setValue(['Location']);
+      this.selectedResourceTypesControl.disable();
+      this.resourceTypeControl.setValue('Location');
+      this.resourceTypeControl.disable();
+      this.fhirPathControl.setValue('type');
+      this.fhirPathControl.disable();
+    }
+
     this.form.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
@@ -202,7 +215,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openAutocompletePanel() {
-    if (!this.viewOnly) {
+    if (!this.viewOnly && !this.isHSLOCMap) {
       // Reset the filter to show all
       this.filteredResourceTypes = this.resourceTypes.slice();
       if (this.userClicked) {
@@ -229,7 +242,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   ngAfterViewInit(): void {
     this.trigger.panelClosingActions.subscribe((event) => {
       // Only clear input if no option was selected (i.e., click outside or ESC)
-      if (!event) {
+      if (!event && !this.isHSLOCMap) {
         this.resourceTypeControl.setValue('');
       }
     });
@@ -459,13 +472,13 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       OperationType: this.operationType.toString(),
       Name: this.nameControl.value,
       Description: this.descriptionControl.value,
-      FhirPath: this.fhirPathControl.value,
+      FhirPath: this.isHSLOCMap ? 'type' : this.fhirPathControl.value,
       CodeSystemMaps: this.buildCodeSystemMapsPayload()
     };
 
     const saveModel: ISaveOperationModel = {
       id: this.operation.id,
-      resourceTypes: this.selectedResourceTypesControl.value,
+      resourceTypes: this.isHSLOCMap ? ['Location'] : this.selectedResourceTypesControl.value,
       facilityId: this.operation.facilityId,
       description: this.descriptionControl.value,
       operation: operationJsonObj,

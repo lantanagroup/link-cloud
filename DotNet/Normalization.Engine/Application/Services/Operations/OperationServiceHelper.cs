@@ -705,6 +705,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 var operation = OperationHelper.GetOperation(operationType, operationJson);
 
+                if (operation is HSLOCMapOperation &&
+                    (resources is not { Count: 1 } || resources[0] != nameof(Location)))
+                {
+                    return (false, "HSLOCMap operations must target only the Location resource type.");
+                }
+
                 if (operation is CopyPropertyOperation)
                 {
                     var op = (CopyPropertyOperation)operation;

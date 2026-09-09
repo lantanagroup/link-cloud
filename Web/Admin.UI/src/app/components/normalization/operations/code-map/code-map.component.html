@@ -71,12 +71,13 @@
     }
 
     <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Select Resource Types</mat-label>
+      <mat-label>{{ isHSLOCMap ? 'Resource Type' : 'Select Resource Types' }}</mat-label>
       <input
         matInput
         placeholder="Start typing to search"
         [formControl]="resourceTypeControl"
         [matAutocomplete]="auto"
+        [matAutocompleteDisabled]="isHSLOCMap"
         (keydown)="onInputKeydown($event)"
         (mousedown)="userClicked = true"
         [readonly]="viewOnly"
@@ -106,7 +107,7 @@
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>FHIR Path</mat-label>
         <input matInput formControlName="fhirPath" [readonly]="viewOnly"/>
-        @if (!viewOnly && fhirPathControl.value) {
+        @if (!viewOnly && !isHSLOCMap && fhirPathControl.value) {
           <button matSuffix mat-icon-button (click)="clearFhirPath()"
             aria-label="Clear description">
             <mat-icon>close</mat-icon>
