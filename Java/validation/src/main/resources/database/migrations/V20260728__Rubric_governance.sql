@@ -1,9 +1,35 @@
 -- Rubric governance schema: rubric registry (rubric, rubric_version, rubric_check),
--- lifecycle audit (rubric_lifecycle_event),
--- and evaluation results (rubric_result, rubric_finding).
+-- lifecycle audit (rubric_lifecycle_event), and evaluation results (rubric_result, rubric_finding).
+--
+-- Surrogate keys rubric_version_id, check_id, result_id and finding_id are bigint, backed by ascending
+-- sequences (allocationSize 50, matching the Hibernate @SequenceGenerator on each entity) so inserts append
+-- instead of page-splitting a random uniqueidentifier clustered index. rubric.rubric_id is a human-chosen
+-- business key and rubric_result.request_id is a client-supplied idempotency key; both stay as-is.
+-- rubric_lifecycle_event.event_id stays uniqueidentifier (low volume, no hot-path inserts).
 
 -- needed for the filtered unique index below, sqlcmd defaults this to OFF
 set quoted_identifier on;
+
+-- ---------------------------------------------------------------------------
+-- Sequences (created before the tables that reference them in a column default).
+-- Non-destructive: kept across re-runs so the counter is never reset.
+-- ---------------------------------------------------------------------------
+
+if not exists (select 1 from sys.sequences where name = 'rubric_version_sequence' and schema_name(schema_id) = 'dbo')
+    create sequence dbo.rubric_version_sequence as bigint start with 1 increment by 50;
+
+if not exists (select 1 from sys.sequences where name = 'rubric_check_sequence' and schema_name(schema_id) = 'dbo')
+    create sequence dbo.rubric_check_sequence as bigint start with 1 increment by 50;
+
+if not exists (select 1 from sys.sequences where name = 'rubric_result_sequence' and schema_name(schema_id) = 'dbo')
+    create sequence dbo.rubric_result_sequence as bigint start with 1 increment by 50;
+
+if not exists (select 1 from sys.sequences where name = 'rubric_finding_sequence' and schema_name(schema_id) = 'dbo')
+    create sequence dbo.rubric_finding_sequence as bigint start with 1 increment by 50;
+
+-- ---------------------------------------------------------------------------
+-- Tables
+-- ---------------------------------------------------------------------------
 
 if not exists (select 1 from sys.tables where name = 'rubric' and schema_id = schema_id('dbo'))
 begin
@@ -22,7 +48,7 @@ if not exists (select 1 from sys.tables where name = 'rubric_version' and schema
 begin
     create table rubric_version
     (
-        rubric_version_id       uniqueidentifier  not null,
+        rubric_version_id       bigint            not null primary key default (NEXT VALUE FOR dbo.rubric_version_sequence),
         rubric_id               varchar(128)      not null,
         semver                  varchar(32)       not null,
         status                  varchar(16)       not null check (status in ('DRAFT', 'PUBLISHED', 'RETIRED')),
@@ -41,8 +67,7 @@ begin
         applicable_context_json varchar(max),
         scoring_policy_json     varchar(max),
         created_at              datetimeoffset(6) not null,
-        created_by              varchar(128),
-        primary key (rubric_version_id)
+        created_by              varchar(128)
     );
 end;
 
@@ -50,8 +75,8 @@ if not exists (select 1 from sys.tables where name = 'rubric_check' and schema_i
 begin
     create table rubric_check
     (
-        check_id          uniqueidentifier not null,
-        rubric_version_id uniqueidentifier not null,
+        check_id          bigint           not null primary key default (NEXT VALUE FOR dbo.rubric_check_sequence),
+        rubric_version_id bigint           not null,
         check_local_id    varchar(128)     not null,
         type              varchar(32)      not null check (type in
                                                            ('FHIR_CONFORMANCE', 'TERMINOLOGY', 'FHIRPATH', 'VALUESET',
@@ -65,8 +90,7 @@ begin
         ordinal           int,
         enabled           bit              not null,
         -- soft delete, set when a draft re-registration replaces the version's checks
-        deleted           bit              not null default 0,
-        primary key (check_id)
+        deleted           bit              not null default 0
     );
 end;
 
@@ -74,10 +98,10 @@ if not exists (select 1 from sys.tables where name = 'rubric_result' and schema_
 begin
     create table rubric_result
     (
-        result_id                 uniqueidentifier  not null,
+        result_id                 bigint            not null primary key default (NEXT VALUE FOR dbo.rubric_result_sequence),
         request_id                uniqueidentifier  not null,
         rubric_id                 varchar(128)      not null,
-        rubric_version_id         uniqueidentifier  not null,
+        rubric_version_id         bigint            not null,
         status                    varchar(32)       not null check (status in
                                                                     ('ACCEPTABLE', 'ACCEPTABLE_WITH_WARNINGS',
                                                                      'UNACCEPTABLE', 'INCONCLUSIVE')),
@@ -96,8 +120,7 @@ begin
         stage                     varchar(64),
         requested_at              datetimeoffset(6) not null,
         completed_at              datetimeoffset(6) not null,
-        duration_ms               bigint            not null,
-        primary key (result_id)
+        duration_ms               bigint            not null
     );
 end;
 
@@ -105,9 +128,9 @@ if not exists (select 1 from sys.tables where name = 'rubric_finding' and schema
 begin
     create table rubric_finding
     (
-        finding_id uniqueidentifier not null,
-        result_id  uniqueidentifier not null,
-        check_id   uniqueidentifier not null,
+        finding_id bigint           not null primary key default (NEXT VALUE FOR dbo.rubric_finding_sequence),
+        result_id  bigint           not null,
+        check_id   bigint           not null,
         dimension  varchar(32)      not null check (dimension in
                                                     ('CONFORMANCE', 'TERMINOLOGY', 'COMPLETENESS', 'PLAUSIBILITY',
                                                      'CURRENCY')),
@@ -115,8 +138,7 @@ begin
         code       varchar(128)     not null,
         message    varchar(max)     not null,
         location   varchar(512),
-        expression varchar(max),
-        primary key (finding_id)
+        expression varchar(max)
     );
 end;
 
@@ -167,21 +189,6 @@ end;
 
 if not exists (select 1 from sys.indexes where name = 'ix_check_rv_ordinal' and object_id = object_id('rubric_check'))
     create index ix_check_rv_ordinal on rubric_check (rubric_version_id, ordinal);
-
-if not exists (select 1 from sys.indexes where name = 'ix_result_rubric' and object_id = object_id('rubric_result'))
-    create index ix_result_rubric on rubric_result (rubric_id, completed_at);
-
-if not exists (select 1 from sys.indexes where name = 'ix_result_facility_report' and object_id = object_id('rubric_result'))
-    create index ix_result_facility_report on rubric_result (facility_id, report_id);
-
-if not exists (select 1 from sys.indexes where name = 'ix_result_status' and object_id = object_id('rubric_result'))
-    create index ix_result_status on rubric_result (status, completed_at);
-
-if not exists (select 1 from sys.indexes where name = 'ix_result_workflow' and object_id = object_id('rubric_result'))
-    create index ix_result_workflow on rubric_result (workflow_tag, completed_at);
-
-if not exists (select 1 from sys.indexes where name = 'ix_finding_result' and object_id = object_id('rubric_finding'))
-    create index ix_finding_result on rubric_finding (result_id);
 
 if not exists (select 1 from sys.indexes where name = 'ix_finding_check' and object_id = object_id('rubric_finding'))
     create index ix_finding_check on rubric_finding (check_id);
