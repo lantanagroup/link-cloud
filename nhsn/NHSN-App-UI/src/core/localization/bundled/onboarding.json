@@ -405,7 +405,7 @@
     }
   },
   "report": {
-battle    "title": "Generate Test Report",
+    "title": "Generate Test Report",
     "subtitle": "With the necessary configurations set, NHSNLink is ready to connect and run reports for your facility. Prior to completing the enrollment process, let's run a test report to ensure that NHSNLink is accurately generating reports. Below, add the reporting period, measures and FHIR Patients you would like NHSNLink to evaluate against.",
     "pending": {
       "tag": "In progress",
