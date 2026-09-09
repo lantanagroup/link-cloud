@@ -1,4 +1,5 @@
 import React, {useRef} from 'react';
+import {Button} from './layout';
 
 export interface AddButtonProps {
   /** Already translated, e.g. "+ Add Code System". */
@@ -10,9 +11,9 @@ export interface AddButtonProps {
 /** The POC's `+ Add X` button, standalone - `RepeatableList` uses it internally for its own row add. */
 export function AddButton({label, onClick, disabled}: AddButtonProps) {
   return (
-    <button type="button" className="nhsn-link__repeatable-add" disabled={disabled} onClick={onClick}>
+    <Button variant="secondary" size="sm" disabled={disabled} onClick={onClick}>
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -88,14 +89,14 @@ export function RepeatableList<T>({
                 <div className="nhsn-link__repeatable-fields">
                   {renderItem(item, index, next => handleItemChange(index, next))}
                 </div>
-                <button
-                  type="button"
-                  className="nhsn-link__repeatable-remove"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   aria-label={`${removeLabel} ${index + 1}`}
                   disabled={disabled || atFloor}
                   onClick={() => handleRemove(index)}>
                   {removeLabel}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

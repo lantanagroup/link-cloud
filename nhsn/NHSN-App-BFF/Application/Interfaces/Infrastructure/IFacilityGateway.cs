@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 
@@ -23,4 +24,15 @@ public interface IFacilityGateway
     /// needs a per-facility write lock around both calls.
     /// </remarks>
     Task SaveAsync(FacilityInfo facilityInfo, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Requests an ad hoc report and returns the id Tenant assigned it.
+    /// </summary>
+    /// <remarks>
+    /// Ad hoc report generation is a Tenant write, not a Report write: Tenant validates every
+    /// measure against MeasureEval, answers synchronously with an id, and publishes the request for
+    /// the Report service to pick up under that same id. The report itself is not finished when
+    /// this returns.
+    /// </remarks>
+    Task<string> RequestAdHocReportAsync(AdHocReportCommand command, CancellationToken cancellationToken = default);
 }

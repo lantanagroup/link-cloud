@@ -22,6 +22,7 @@
 export * from './inputs';
 export * from './InfoTooltip';
 export * from './Select';
+export * from './ChipMultiSelect';
 export * from './DataTable';
 export * from './layout';
 export * from './overlays';

@@ -342,9 +342,12 @@ export class MockApiClient implements ApiClient {
 
   // ------------------------------------------------------------ reporting
 
+  // Pending, matching the real request: the id is assigned synchronously and
+  // the report is generated behind it. A step that navigated on Complete here
+  // would be built against a fiction.
   async requestReport(request: C.ReportRequest): Promise<Operation<C.ReportSummary>> {
-    const summary = this.buildReport(request);
-    return immediate(summary);
+    await tick();
+    return immediate({...this.buildReport(request), status: 'Pending'});
   }
 
   async listReports(page: C.PageRequest): Promise<C.Paged<C.ReportSummary>> {

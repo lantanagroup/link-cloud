@@ -4,6 +4,7 @@ import {parseHoursMinutesDuration} from '../shared/duration';
 import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
 import {CENSUS_LIST_KEYS} from './steps/census/validate';
+import {isReportComplete} from './steps/report/validate';
 import {WelcomeStep} from './steps/welcome/WelcomeStep';
 
 export interface StepProps {
@@ -123,7 +124,7 @@ export const STEPS: Step[] = [
     id: 'report',
     labelKey: 'onboarding:steps.report',
     Component: lazyStep(() => import('./steps/report/ReportStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: isReportComplete
   },
   {
     id: 'report-results',
