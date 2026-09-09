@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
 using LantanaGroup.Link.Sdk.Clients;
@@ -51,6 +52,27 @@ internal sealed class FacilityGateway : IFacilityGateway
         LinkResponseHandler.Require(updateResponse, ServiceName, nameof(SaveAsync));
 
         _logger.LogInformation("Updated Tenant facility {FacilityId}.", facilityInfo.FacilityId);
+    }
+
+    public async Task<string> RequestAdHocReportAsync(AdHocReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var request = new AdHocReportRequest
+        {
+            BypassSubmission = true,
+            StartDate = command.StartDate,
+            EndDate = command.EndDate,
+            ReportTypes = [.. command.ReportTypes],
+            PatientIds = [.. command.PatientIds]
+        };
+
+        var response = await _facilityClient.GenerateAdhocReportAsync(command.FacilityId, request, cancellationToken);
+        var generated = LinkResponseHandler.Require(response, ServiceName, nameof(RequestAdHocReportAsync));
+
+        _logger.LogInformation(
+            "Requested ad hoc report {ReportId} for facility {FacilityId} over {MeasureCount} measure(s) and {PatientCount} patient(s).",
+            generated.ReportId, command.FacilityId, command.ReportTypes.Count, command.PatientIds.Count);
+
+        return generated.ReportId.ToString();
     }
 
     private async Task<FacilityModel?> FetchAsync(string facilityId, CancellationToken cancellationToken)

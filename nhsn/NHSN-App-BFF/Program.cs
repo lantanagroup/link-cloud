@@ -11,6 +11,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.OrganizationIdentification;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reporting;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Errors;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.DependencyInjection;
@@ -170,6 +171,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IOrganizationIdentificationService, OrganizationIdentificationService>();
     builder.Services.AddScoped<IEncounterMappingService, EncounterMappingService>();
     builder.Services.AddScoped<IHslocMappingService, HslocMappingService>();
+    builder.Services.AddScoped<IReportingService, ReportingService>();
     builder.Services.Configure<OnboardingReadSettings>(builder.Configuration.GetSection(OnboardingReadSettings.SectionName));
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
@@ -189,6 +191,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, PatientsOfInterestEndpoints>();
     builder.Services.AddTransient<IApi, OrganizationIdentificationEndpoints>();
     builder.Services.AddTransient<IApi, HslocMappingsEndpoints>();
+    builder.Services.AddTransient<IApi, ReportsEndpoints>();
     builder.Services.AddTransient<IApi, DocumentsEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();

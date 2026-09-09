@@ -1170,6 +1170,272 @@
   cursor: not-allowed;
 }
 
+.nhsn-link .k-button.nhsn-link__button--sm {
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+
+.nhsn-link__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.nhsn-link__date-field {
+  position: relative;
+}
+
+.nhsn-link__date-popup .k-popup {
+  padding: 0;
+  border: 1px solid var(--kendo-color-border, #dde1e6);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  box-shadow: 0 4px 14px rgba(20, 30, 50, 0.14);
+  overflow: hidden;
+}
+
+.nhsn-link__date-popup .k-calendar {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+}
+
+.nhsn-link__date-popup .k-calendar.k-calendar-md {
+  --INTERNAL--kendo-calendar-view-width: calc(7 * 34px);
+}
+
+.nhsn-link__date-popup .k-calendar.k-calendar-md .k-calendar-monthview {
+  --INTERNAL--kendo-calendar-cell-size: 34px;
+}
+
+.nhsn-link__date-popup .k-calendar-infinite .k-calendar-view {
+  height: 306px;
+  min-height: 0;
+}
+
+.nhsn-link__date-popup .k-calendar-navigation {
+  display: none;
+}
+
+.nhsn-link__date-popup .k-calendar-infinite .k-calendar-header {
+  padding-block: 4px;
+}
+
+.nhsn-link__date-popup .k-calendar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--kendo-color-app-text, #2b323b);
+}
+
+.nhsn-link__date-popup .k-calendar-nav-today {
+  display: none;
+}
+
+.nhsn-link__date-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-top: 1px solid var(--kendo-color-border, #dde1e6);
+}
+
+.nhsn-link__date-popup-footer-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kendo-color-primary, #0b5cab);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nhsn-link__date-popup .k-calendar-th {
+  color: var(--kendo-color-subtle, #565e64);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.nhsn-link__date-popup .k-calendar-td {
+  color: var(--kendo-color-app-text, #2b323b);
+}
+
+.nhsn-link__date-popup .k-calendar-td .k-link {
+  border-radius: 6px;
+}
+
+.nhsn-link__date-popup .k-calendar-td:not(.k-empty):hover .k-link {
+  background: var(--kendo-color-base-hover, #eef0f3);
+}
+
+.nhsn-link__date-popup .k-calendar-td.k-empty {
+  background: transparent;
+}
+
+.nhsn-link__date-popup .k-calendar-td.k-today .k-link {
+  box-shadow: inset 0 0 0 1px var(--kendo-color-app-text-subtle, #9aa4b2);
+  color: inherit;
+}
+
+.nhsn-link__date-popup .k-calendar-td.k-selected .k-link {
+  background: var(--kendo-color-primary, #0b5cab);
+  color: var(--kendo-color-on-primary, #ffffff);
+  box-shadow: none;
+}
+
+/* ---- chip multi-select (core/fields/ChipMultiSelect.tsx) */
+
+.nhsn-link__chip-select-field {
+  margin-bottom: 18px;
+}
+
+.nhsn-link__chip-select-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__chip-select-required {
+  color: var(--kendo-color-error, #cc1b22);
+}
+
+.nhsn-link__chip-select-label .info-icon .tooltip-bubble {
+  left: 0;
+  transform: none;
+}
+
+.nhsn-link__chip-select-label .info-icon .tooltip-bubble::after {
+  left: 8px;
+  transform: none;
+}
+
+.nhsn-link__chip-select {
+  position: relative;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link__chip-select:focus-within {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 1px;
+}
+
+.nhsn-link__chip-select-input {
+  width: 100%;
+  border: none;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: 14px;
+  background: transparent;
+  color: inherit;
+}
+
+.nhsn-link__chip-select-input:focus {
+  outline: none;
+}
+
+.nhsn-link__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.nhsn-link__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--nhsn-link-chip-tone, #0b5cab);
+}
+in jump cleaning. List comments a minute she plumits live confidence of
+.nhsn-link__chip--tone-0 { --nhsn-link-chip-tone: #0b5cab; }
+.nhsn-link__chip--tone-1 { --nhsn-link-chip-tone: #7c3aed; }
+.nhsn-link__chip--tone-2 { --nhsn-link-chip-tone: #15803d; }
+.nhsn-link__chip--tone-3 { --nhsn-link-chip-tone: #b45309; }
+.nhsn-link__chip--tone-4 { --nhsn-link-chip-tone: #be185d; }
+.nhsn-link__chip--tone-5 { --nhsn-link-chip-tone: #0f766e; }
+.nhsn-link__chip--tone-6 { --nhsn-link-chip-tone: #4338ca; }
+.nhsn-link__chip--tone-7 { --nhsn-link-chip-tone: #a16207; }
+
+.nhsn-link__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+
+.nhsn-link__chip-remove:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.nhsn-link__chip-remove:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+.nhsn-link__chip-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nhsn-link__chip-select-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(20, 30, 50, 0.14);
+  z-index: 5;
+}
+
+.nhsn-link__chip-select-option {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.nhsn-link__chip-select-option--active {
+  background: var(--kendo-color-surface, #f7f9fc);
+}
+
+.nhsn-link__chip-select-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
 /* ---- repeatable list (core/fields/RepeatableList.tsx) */
 
 .nhsn-link__repeatable {
@@ -1201,7 +1467,7 @@
 .nhsn-link__repeatable-row {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: 8px;
   margin: 0;
 }
 
@@ -1222,6 +1488,10 @@
   padding-right: 0;
 }
 
+.nhsn-link__repeatable-fields .k-input {
+  border-radius: 6px;
+}
+
 /* Every row repeats the same labels, and the placeholder already carries them.
    Hidden visually, kept for assistive technology — never `display: none`. Rule
    is above, grouped with `.nhsn-link__field-group--labeled .k-label`. */
@@ -1230,36 +1500,9 @@
   margin-bottom: 10px;
 }
 
-.nhsn-link__repeatable-add,
-.nhsn-link__repeatable-remove {
-  border: 1px solid var(--kendo-color-primary, #0057b7);
-  border-radius: 8px;
-  background: var(--kendo-color-app-surface, #ffffff);
-  color: var(--kendo-color-primary, #0057b7);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-.nhsn-link__repeatable-remove {
+.nhsn-link__repeatable-row .k-button {
   flex: 0 0 auto;
-  align-self: stretch;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nhsn-link__repeatable-add:hover:not(:disabled),
-.nhsn-link__repeatable-remove:hover:not(:disabled) {
-  background: var(--kendo-color-base-hover, #f2f4f7);
-}
-
-.nhsn-link__repeatable-add:disabled,
-.nhsn-link__repeatable-remove:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  align-self: center;
 }
 
 /* ---- instruction box and document download (core/documents/) */

@@ -1,0 +1,316 @@
+.report-generate {
+  --report-blue: var(--kendo-color-primary, #0057b7);
+  --report-blue-dark: var(--kendo-color-primary-hover, #032659);
+  --report-gray-50: var(--kendo-color-surface, #f7f9fc);
+  --report-gray-100: var(--kendo-color-base-hover, #f2f4f7);
+  --report-gray-200: var(--kendo-color-border, #d0d7de);
+  --report-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
+  --report-gray-800: var(--kendo-color-app-text, #1f2328);
+  --report-red: var(--kendo-color-error, #cc1b22);
+  --report-radius: 8px;
+
+  color: var(--report-gray-800);
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.report-generate .card {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--report-gray-200);
+  border-radius: var(--report-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.report-generate .card-scroll {
+  padding: 0 32px 28px;
+  border-radius: inherit;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.report-generate .card-scroll > * {
+  flex-shrink: 0;
+}
+
+.report-generate .page-header {
+  padding: 0;
+  border-bottom: none !important;
+  display: block;
+}
+
+.report-generate .page-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.report-generate .page-header-title:focus {
+  outline: none;
+}
+
+.report-generate .page-header-buttons {
+  display: none;
+}
+
+.report-generate .subtitle {
+  color: var(--report-gray-600);
+  margin: 0 0 22px;
+  font-size: 14px;
+}
+
+.report-generate .card .nhsn-link__step-actions {
+  position: static;
+  margin: 0;
+  padding: 16px 32px 28px;
+}
+
+.report-generate .triplet {
+  display: flex;
+  gap: 1rem;
+}
+
+.report-generate .triplet .k-form-field {
+  flex: 1;
+}
+
+.report-generate .k-form-field {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.report-generate .nhsn-link__repeatable-fields .k-form-field {
+  margin-bottom: 0;
+}
+
+.report-generate .nhsn-link__repeatable-row .k-button {
+  align-self: stretch;
+}
+
+.report-generate .nhsn-link__repeatable-fields .k-input {
+  padding: 9px 11px;
+}
+
+.report-generate .k-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--report-gray-800);
+}
+
+.report-generate .k-label svg {
+  display: none;
+}
+
+.report-generate .k-input {
+  width: 100%;
+  border-radius: var(--report-radius);
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+
+.report-generate .k-input.k-invalid {
+  border-color: var(--report-red);
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker {
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--kendo-color-border, #dde1e6);
+  border-radius: 6px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--report-gray-800);
+  box-shadow: none;
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker:focus-within {
+  outline: 2px solid var(--report-blue);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker > .k-input {
+  border: none;
+  background: transparent;
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker > .k-input:focus,
+.report-generate .nhsn-link__date-field .k-datepicker > .k-input:focus-within {
+  outline: none;
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker.k-invalid {
+  border-color: var(--report-red);
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker.k-invalid:focus-within {
+  outline-color: var(--report-red);
+}
+
+.report-generate .nhsn-link__date-field .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: inherit;
+}
+
+.report-generate .nhsn-link__date-field .k-datepicker .k-input-inner .k-dateinput-wrap,
+.report-generate .nhsn-link__date-field .k-datepicker .k-input-inner::placeholder {
+  color: var(--report-gray-600);
+  opacity: 1;
+}
+
+.report-generate .nhsn-link__date-field .k-input-button {
+  border: none;
+  background: transparent;
+  color: var(--report-gray-600);
+}
+
+.report-generate .nhsn-link__date-field .k-input-button:hover {
+  background: var(--report-gray-100);
+  color: var(--report-blue);
+}
+
+.report-generate .k-form-error {
+  color: var(--report-red);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+
+/* ---- patient selection (PatientSelection.tsx) */
+
+.report-generate .report-patients-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--report-gray-800);
+}
+
+.report-generate .report-tab-body {
+  padding-top: 14px;
+}
+
+.report-generate .report-source-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.report-generate .report-source-btn {
+  padding: 7px 12px;
+  border: 1px solid var(--report-gray-200);
+  border-radius: 6px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--report-gray-800);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.report-generate .report-source-btn:hover {
+  background: var(--report-gray-100);
+}
+
+.report-generate .report-source-btn.is-selected {
+  border-color: var(--report-blue);
+  background: var(--report-blue);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.report-generate .report-source-btn:focus-visible {
+  outline: 2px solid var(--report-blue);
+  outline-offset: 2px;
+}
+
+.report-generate .report-patient-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--report-gray-200);
+  border-radius: var(--report-radius);
+  margin-bottom: 12px;
+}
+
+.report-generate .report-patient-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-generate .report-patient-scroll th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--report-gray-50);
+  color: var(--report-gray-600);
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--report-gray-200);
+}
+
+.report-generate .report-patient-scroll td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--report-gray-100);
+}
+
+.report-generate .report-patient-scroll tr:last-child td {
+  border-bottom: none;
+}
+
+.report-generate .report-census-results {
+  margin-top: 14px;
+}
+
+.report-generate .report-selected-patients {
+  margin-top: 20px;
+}
+
+.report-generate .form-hint {
+  font-size: 13px;
+  color: var(--report-gray-600);
+  margin: 0 0 12px;
+}
+
+.report-generate .nhsn-link__download-field {
+  margin: 0 0 14px;
+}
+
+.report-generate .nhsn-link__download-button {
+  padding: 0.4rem 0.75rem;
+  font-size: 13px;
+}
+
+.report-generate .nhsn-link__upload-field {
+  margin: 0;
+}
+
+.report-generate .nhsn-link__upload-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.report-generate .nhsn-link__upload-field input[type="file"] {
+  font-size: 13px;
+  padding: 0.3rem;
+}
+
+.report-generate .nhsn-link__upload-field input[type="file"]::file-selector-button {
+  padding: 0.35rem 0.65rem;
+  font-size: 13px;
+}

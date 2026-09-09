@@ -405,7 +405,89 @@
     }
   },
   "report": {
-    "title": "Generate Test Report"
+battle    "title": "Generate Test Report",
+    "subtitle": "With the necessary configurations set, NHSNLink is ready to connect and run reports for your facility. Prior to completing the enrollment process, let's run a test report to ensure that NHSNLink is accurately generating reports. Below, add the reporting period, measures and FHIR Patients you would like NHSNLink to evaluate against.",
+    "pending": {
+      "tag": "In progress",
+      "message": "A report requested earlier has not finished yet. You can still generate another — both appear on the Report Results page."
+    },
+    "fields": {
+      "measuresLabel": "Measures",
+      "measuresTooltip": "A list of NHSN measures that your facility has a reporting plan for.",
+      "measuresPlaceholder": "Search measures…",
+      "measuresEmpty": "No matching measures.",
+      "measuresRemove": "Remove {{measure}}",
+      "measuresSelected": "Selected measures",
+      "startDateLabel": "Report Start Date",
+      "endDateLabel": "Report End Date"
+    },
+    "actions": {
+      "generate": "Generate Report"
+    },
+    "status": {
+      "requesting": "Requesting report"
+    },
+    "messages": {
+      "requestError": "Unable to request the report.",
+      "requested": "Report {{reportId}} requested."
+    },
+    "errors": {
+      "measuresRequired": "Select at least one measure.",
+      "startDateRequired": "A report start date is required.",
+      "endDateRequired": "A report end date is required.",
+      "endBeforeStart": "The report end date cannot precede the start date.",
+      "patientIdsRequired": "Add at least one FHIR Patient ID."
+    },
+    "patients": {
+      "label": "FHIR Patient ID(s)",
+      "hint": "List the FHIR Patient Ids to report against. Prior to generating the report, NHSNLink will validate that each Patient Id returns a FHIR Patient resource. A maximum of {{limit}} Patient Ids are allowed, added via any combination of the methods below.",
+      "columnPatientId": "FHIR Patient Id",
+      "tabs": {
+        "manual": "Manual Entry",
+        "csv": "Upload CSV",
+        "previous": "From Previous Census Pull",
+        "newPull": "New Census Pull"
+      },
+      "manual": {
+        "inputLabel": "FHIR Patient Id",
+        "placeholder": "FHIR Patient ID",
+        "add": "+ Add Patient ID",
+        "empty": "None added yet."
+      },
+      "csv": {
+        "hint": "Upload a CSV file of FHIR Patient IDs to add to the list. Download the template below for the expected format.",
+        "template": "Download CSV Template",
+        "upload": "Upload Completed CSV",
+        "reading": "Reading file…",
+        "added": "Added {{added}} of {{total}} patient ID(s) from {{fileName}}.",
+        "noneFound": "No patient IDs were found in {{fileName}}.",
+        "unreadable": "Could not read that file — make sure it is a .csv file."
+      },
+      "newPull": {
+        "run": "Run Census Pull"
+      },
+      "census": {
+        "running": "Running census pull",
+        "sourceLabel": "Census pull source",
+        "selectSourceHint": "Select a list above to preview and select its patients.",
+        "selectColumn": "Select",
+        "selectPatient": "Select {{patientId}}",
+        "addSelected": "Add Selected Patients",
+        "emptySource": "This census source returned no patients.",
+        "noSources": "No census pull sources found.",
+        "vendorRequired": "Census pull data is not available until the facility's EHR vendor is set.",
+        "selectedTitle": "Selected Patients",
+        "removeSelected": "Remove {{patientId}}"
+      },
+      "messages": {
+        "limitReached": "Maximum of 10 FHIR Patient IDs reached.",
+        "noneAdded": "No new patient IDs were added (already in the list or the limit was reached)",
+        "selectAtLeastOne": "Select at least one patient to add.",
+        "addedSome": "Added {{added}} patient ID(s); skipped {{skipped}} already in the list or past the limit.",
+        "addedFromPull": "Added {{count}} patient ID(s) from the census pull.",
+        "pullError": "Unable to read the census pull."
+      }
+    }
   },
   "reportResults": {
     "title": "Report Results"

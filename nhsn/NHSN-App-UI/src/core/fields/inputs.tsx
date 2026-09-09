@@ -1,4 +1,5 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   FormCheckbox,
   FormDatePicker,
@@ -8,6 +9,7 @@ import {
   FormSwitch,
   FormTextArea
 } from '@nhsn/nhsn-react-core';
+import {Calendar, type CalendarChangeEvent, type CalendarProps} from '@progress/kendo-react-dateinputs';
 import {toRenderProps, useFieldId, valueOf, type BaseFieldProps} from './fieldProps';
 
 export interface TextFieldProps extends BaseFieldProps<string> {
@@ -147,24 +149,67 @@ export interface DateFieldProps extends BaseFieldProps<string> {
   max?: Date;
 }
 
+const DATE_DISPLAY_FORMAT = 'dd-MM-yyyy';
+const DATE_MASK = {year: 'yyyy', month: 'mm', day: 'dd'};
+
+function DateCalendarWithFooter(props: CalendarProps) {
+  const {t} = useTranslation('common');
+  const emitChange = (value: Date | null) =>
+    props.onChange?.({value} as unknown as CalendarChangeEvent);
+
+  return (
+    <>
+      <Calendar {...props} />
+      <div className="nhsn-link__date-popup-footer">
+        <button type="button" className="nhsn-link__date-popup-footer-link" onClick={() => emitChange(null)}>
+          {t('actions.clear')}
+        </button>
+        <button
+          type="button"
+          className="nhsn-link__date-popup-footer-link"
+          onClick={() => emitChange(new Date())}>
+          {t('actions.today')}
+        </button>
+      </div>
+    </>
+  );
+}
+
 /**
  * Exchanges ISO date strings, not Date objects — the draft is serialized to
  * JSON and round-tripped through the BFF, and a Date would not survive it.
  */
 export function DateField({min, max, ...base}: DateFieldProps) {
   const id = useFieldId(base.id);
-  const value = base.value ? new Date(base.value) : null;
-  return FormDatePicker(
-    toRenderProps({...base, id, value: undefined}, {
-      value,
-      min,
-      max,
-      customProps: {},
-      onFocus: () => undefined,
-      onChange: (event: unknown) => {
-        const next = valueOf<Date | null>(event);
-        base.onChange(next ? next.toISOString().slice(0, 10) : '');
-      }
-    })
+  const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null);
+
+  return (
+    <div className="nhsn-link__date-field" ref={setPopupContainer}>
+      {FormDatePicker(
+        toRenderProps({...base, id, value: toPickerDate(base.value)}, {
+          min,
+          max,
+          format: DATE_DISPLAY_FORMAT,
+          formatPlaceholder: DATE_MASK,
+          popupSettings: {
+            popupClass: 'nhsn-link__date-popup',
+            ...(popupContainer ? {appendTo: popupContainer} : {})
+          },
+          customProps: {calendar: DateCalendarWithFooter},
+          onFocus: () => undefined,
+          onChange: (event: unknown) => base.onChange(toIsoDate(valueOf<string | null>(event)))
+        })
+      )}
+    </div>
   );
+}
+
+function toPickerDate(value?: string): string | undefined {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[2]}/${match[3]}/${match[1]}` : undefined;
+}
+
+function toIsoDate(value: string | null): string {
+  const match = value?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return match ? `${match[3]}-${match[1]}-${match[2]}` : '';
 }
