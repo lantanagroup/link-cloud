@@ -10,8 +10,8 @@ validation. Non-integers, empty values, and integer overflow fail standard integ
 model binding. Error messages are supplied by ASP.NET rather than custom code.
 Repeated scalar parameters follow normal ASP.NET binding behavior (first value).
 
-`PageNumber` defaults to 1. This initial adoption does not add page-number range
-validation or change existing query-layer handling of page numbers.
+`PageNumber` defaults to 1. Values less than 1 fail validation and produce HTTP 400
+responses. Valid page numbers retain their existing query-layer handling.
 
 The property initializers provide runtime defaults; `[DefaultValue]` exposes those
 defaults to OpenAPI tooling, and `[Range]` supplies the page-size bounds. Document

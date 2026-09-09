@@ -16,7 +16,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
 
-[Trait("Category", "UnitTests")]
+[Trait("Category", "IntegrationTests")]
 public class FacilityLocationLocalCodeMappingsPagingTests
 {
     private static readonly string[] Routes =
