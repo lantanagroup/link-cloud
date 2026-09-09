@@ -34,6 +34,8 @@ public sealed class TestScenarioDocument
 
     public string? NhsnOrganizationId { get; set; }
 
+    public bool EnableDmrp { get; set; }
+
     [BsonRepresentation(BsonType.String)]
     public Guid? QueryPlanTemplateId { get; set; }
 
