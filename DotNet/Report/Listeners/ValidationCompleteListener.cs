@@ -183,11 +183,20 @@ namespace LantanaGroup.Link.Report.Listeners
             // (pre-qualification.write-pre-qual-operation-outcome). Report only records
             // the validation result and forwards the patient payload for submission.
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
-            reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
 
-            await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
-
-            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+            if (schedule.EnableSubmission)
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+            }
+            else
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+            }
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

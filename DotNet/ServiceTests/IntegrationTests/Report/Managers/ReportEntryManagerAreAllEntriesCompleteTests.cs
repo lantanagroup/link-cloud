@@ -42,6 +42,88 @@ public class ReportEntryManagerAreAllEntriesCompleteTests
         Assert.True(result);
     }
 
+    /// <summary>
+    /// A bypassed report's patients land on NotSubmitted rather than Submitted. If that
+    /// status is not treated as terminal, AreAllEntriesCompleteAsync never returns true,
+    /// ReportManifestProducer.Produce short-circuits on every call, and the manifest is
+    /// never written to internal/ at all -- a bypassed report that hangs silently rather
+    /// than failing. This is the regression most likely to be missed, because a hung
+    /// report looks like a slow one.
+    /// </summary>
+    [Fact]
+    public async Task AreAllEntriesCompleteAsync_BypassedSubmission_ReturnsTrue()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var scheduleId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedReportScheduleAsync(context, scheduleId, facilityId, enableSubmission: false);
+
+        await SeedEntryAsync(context, facilityId, scheduleId, "p1",
+            ReportingStatus.PassedValidation, SubmissionStatus.NotSubmitted);
+        await SeedEntryAsync(context, facilityId, scheduleId, "p2",
+            ReportingStatus.FailedValidation, SubmissionStatus.NotSubmitted);
+
+        var result = await sut.AreAllEntriesCompleteAsync(facilityId, scheduleId);
+
+        Assert.True(result);
+    }
+
+    /// <summary>
+    /// Bypass is decided per report, but a regenerated schedule can inherit patients from
+    /// a run that did submit, so the two statuses have to coexist within one schedule.
+    /// </summary>
+    [Fact]
+    public async Task AreAllEntriesCompleteAsync_MixedTerminalStatuses_ReturnsTrue()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var scheduleId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedReportScheduleAsync(context, scheduleId, facilityId);
+
+        await SeedEntryAsync(context, facilityId, scheduleId, "p1",
+            ReportingStatus.PassedValidation, SubmissionStatus.Submitted);
+        await SeedEntryAsync(context, facilityId, scheduleId, "p2",
+            ReportingStatus.PassedValidation, SubmissionStatus.NotSubmitted);
+        await SeedEntryAsync(context, facilityId, scheduleId, "p3",
+            ReportingStatus.NotReportable, SubmissionStatus.NotEligable);
+
+        var result = await sut.AreAllEntriesCompleteAsync(facilityId, scheduleId);
+
+        Assert.True(result);
+    }
+
+    /// <summary>
+    /// Submitting is the state ValidationCompleteListener assigns before producing, and it
+    /// is the state a bypassed entry would be stranded in if the gate skipped the produce
+    /// without assigning a terminal status.
+    /// </summary>
+    [Fact]
+    public async Task AreAllEntriesCompleteAsync_StrandedInSubmitting_ReturnsFalse()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var scheduleId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedReportScheduleAsync(context, scheduleId, facilityId, enableSubmission: false);
+
+        await SeedEntryAsync(context, facilityId, scheduleId, "p1",
+            ReportingStatus.PassedValidation, SubmissionStatus.NotSubmitted);
+        await SeedEntryAsync(context, facilityId, scheduleId, "p2",
+            ReportingStatus.PassedValidation, SubmissionStatus.Submitting);
+
+        var result = await sut.AreAllEntriesCompleteAsync(facilityId, scheduleId);
+
+        Assert.False(result);
+    }
+
     [Fact]
     public async Task AreAllEntriesCompleteAsync_OneIncomplete_ReturnsFalse()
     {
@@ -125,7 +207,11 @@ public class ReportEntryManagerAreAllEntriesCompleteTests
 
     #region Helpers
 
-    private static async Task SeedReportScheduleAsync(ReportDbContext context, Guid scheduleId, string facilityId)
+    private static async Task SeedReportScheduleAsync(
+        ReportDbContext context,
+        Guid scheduleId,
+        string facilityId,
+        bool enableSubmission = true)
     {
         if (await context.Set<ReportSchedule>().AnyAsync(rs => rs.Id == scheduleId))
             return;
@@ -137,7 +223,7 @@ public class ReportEntryManagerAreAllEntriesCompleteTests
             CreateDate = DateTime.UtcNow,
             ReportStartDate = DateTime.UtcNow.AddDays(-30),
             ReportEndDate = DateTime.UtcNow.AddDays(30),
-            EnableSubmission = true,
+            EnableSubmission = enableSubmission,
             EndOfReportPeriodJobHasRun = false,
             Frequency = 0,
             Status = 0,

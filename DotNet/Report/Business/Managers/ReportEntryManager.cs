@@ -825,7 +825,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private static readonly SubmissionStatus[] TerminalSubmissionStatuses =
         [
             SubmissionStatus.Submitted,
-            SubmissionStatus.NotEligable
+            SubmissionStatus.NotEligable,
+            SubmissionStatus.NotSubmitted,
         ];
 
         public async Task<bool> AreAllEntriesCompleteAsync(string facilityId, Guid reportScheduleId,
