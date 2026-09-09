@@ -13,6 +13,7 @@ public class ScenarioSeedServiceTests
     private static readonly Guid AdhocReportScenarioId = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid AdhocReportDailyAchScenarioId = new("00000000-0000-0000-0000-000000000009");
     private static readonly Guid MultiMeasureScenarioId = new("00000000-0000-0000-0000-000000000006");
+    private static readonly Guid DmrpScheduledReportScenarioId = new("00000000-0000-0000-0000-000000000010");
 
     [Fact]
     public async global::System.Threading.Tasks.Task Adhoc_report_daily_ach_scenario_uses_daily_measure_and_distinct_org_id()
@@ -63,6 +64,44 @@ public class ScenarioSeedServiceTests
         scenario!.PatientCohorts.Should().HaveCount(2);
         scenario.PatientCohorts.Should().OnlyContain(c =>
             c.ScheduledInpatientPattern == ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod);
+    }
+
+    [Fact]
+    public async global::System.Threading.Tasks.Task Dmrp_scheduled_report_scenario_is_seeded_with_expected_configuration()
+    {
+        var store = new InMemoryScenarioStore();
+        var sut = new ScenarioSeedService(
+            store,
+            NullLogger<ScenarioSeedService>.Instance);
+
+        await sut.StartAsync(CancellationToken.None);
+
+        var scenario = await store.GetByIdAsync(
+            DmrpScheduledReportScenarioId,
+            CancellationToken.None);
+
+        scenario.Should().NotBeNull();
+        scenario!.IsSystemScenario.Should().BeTrue();
+
+        scenario.Name.Should().Be("DMRP Scheduled Report Test");
+        scenario.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
+
+        scenario.EnableDmrp.Should().BeTrue();
+        scenario.NhsnOrganizationId.Should().Be("10765");
+
+        scenario.SelectedMeasures.Should().ContainSingle()
+            .Which.Should().Be(
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
+
+        scenario.PatientCount.Should().Be(1);
+
+        scenario.PatientCohorts.Should().ContainSingle();
+        scenario.PatientCohorts[0].PatientCount.Should().Be(1);
+        scenario.PatientCohorts[0].MeasureEligibilities.Should().ContainKey(
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
+
+        scenario.PatientCohorts[0].ScheduledInpatientPattern.Should().Be(
+            ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
     }
 
     private sealed class InMemoryScenarioStore : IScenarioStore

@@ -215,6 +215,7 @@ internal sealed class RunExecutor
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
             var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
+            var pipelineDataReader = services.GetRequiredService<PipelineDataReader>();
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
@@ -492,6 +493,7 @@ internal sealed class RunExecutor
                     cancellationToken);
 
                 var reportingPeriods = FacilitySetupHelper.GetDmrpReportingPeriods();
+                var seededDmrpEntries = new List<object>();
 
                 // Start from a clean mock enrollment for this NHSN organization.
                 // Facility-scoped cleanup is intentionally used instead of the global endpoint.
@@ -514,6 +516,17 @@ internal sealed class RunExecutor
                             IsReporting = "Y"
                         },
                         cancellationToken);
+
+                    seededDmrpEntries.Add(new
+                    {
+                        seeded.Id,
+                        FacilityId = facilityId,
+                        Component = component,
+                        Measure = nhsnMeasure,
+                        ReportingMonth = month,
+                        ReportingYear = year,
+                        IsReporting = "Y"
+                    });
 
                     output.WriteLine(
                         $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
@@ -579,6 +592,58 @@ internal sealed class RunExecutor
                     facilityClient,
                     output,
                     facilityId,
+                    cancellationToken);
+
+                pipelineDataReader.InvalidateCache();
+
+                var dmrpFacility = await pipelineDataReader.GetFacilityAsync(facilityId);
+
+                if (dmrpFacility == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
+                }
+
+                await _snapshotStore.SetDomainAsync(
+                    state.RunId,
+                    "dmrp",
+                    new
+                    {
+                        Enabled = true,
+                        NhsnOrganizationId = facilityId,
+
+                        Enrollment = new
+                        {
+                            Component = component,
+                            NhsnMeasure = nhsnMeasure,
+                            DqmMeasureId = measureId,
+                            MeasureMappingId = mappingId,
+                            Frequency = Frequency.Monthly.ToString(),
+
+                            ReportingPeriods = reportingPeriods
+                                .Select(p => new
+                                {
+                                    p.Month,
+                                    p.Year
+                                })
+                                .ToList(),
+
+                            SeededEntries = seededDmrpEntries
+                        },
+
+                        Tenant = new
+                        {
+                            RefreshCompleted = true,
+                            DerivedScheduleApplied = true,
+
+                            ScheduledReports = new
+                            {
+                                Daily = dmrpFacility.ScheduledReports?.Daily ?? [],
+                                Weekly = dmrpFacility.ScheduledReports?.Weekly ?? [],
+                                Monthly = dmrpFacility.ScheduledReports?.Monthly ?? []
+                            }
+                        }
+                    },
                     cancellationToken);
             }
             else
@@ -759,7 +824,7 @@ internal sealed class RunExecutor
 
                 // Refresh cached reads after the terminal-state wait so downstream
                 // snapshots/validators see committed entry statuses.
-                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+                pipelineDataReader.InvalidateCache();
             }
 
             // Scope ABS prediction to the same submitted-patient truth used by validators.
@@ -799,7 +864,7 @@ internal sealed class RunExecutor
                 output.WriteLine("---------------------------------------------------------------");
 
                 // Flush stale domain data so the regenerated report starts fresh.
-                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+                pipelineDataReader.InvalidateCache();
 
                 var originalReportId = reportId;
                 var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
@@ -916,7 +981,7 @@ internal sealed class RunExecutor
             }
 
             // Flush stale cache from diagnostics polling so validators read authoritative data.
-            services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+            pipelineDataReader.InvalidateCache();
 
             // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
@@ -1080,8 +1145,22 @@ internal sealed class RunExecutor
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
 
-            await RunValidator("TENANT DATABASE VALIDATION", () =>
-                tenantValidator.ValidateAllAsync(facilityId, measureId));
+            if (state.Options.EnableDmrp)
+            {
+                await RunValidator("TENANT DATABASE VALIDATION", () =>
+                    tenantValidator.ValidateAllAsync(
+                        facilityId,
+                        expectedDaily: [],
+                        expectedWeekly: [],
+                        expectedMonthly: [measureId]));
+            }
+            else
+            {
+                await RunValidator("TENANT DATABASE VALIDATION", () =>
+                    tenantValidator.ValidateAllAsync(
+                        facilityId,
+                        measureId));
+            }
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
                 validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
