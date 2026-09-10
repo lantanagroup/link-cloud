@@ -167,7 +167,12 @@ namespace LantanaGroup.Link.Report.Listeners
             var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, reportTrackingId, cancellationToken);
 
             if (schedule == null)
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {facilityId}).");
+            {
+                _logger.LogInformation(
+                    "{Name}: Skipping MeasureReportGenerated; no scheduled report remains (ReportId = {ReportId}, FacilityId = {FacilityId}).",
+                    Name, messageValue.ReportTrackingId, facilityId);
+                return;
+            }
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue, cancellationToken);
 

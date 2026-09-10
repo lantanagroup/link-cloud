@@ -4,7 +4,9 @@ using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 
@@ -216,8 +218,19 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
 
+        try
+        {
+            var leftoverCleanup = _hostServices.GetService<LeftoverRunCleanupService>();
+            if (leftoverCleanup != null)
+                await leftoverCleanup.QuiesceFacilityAsync(summary.FacilityId, summary.ReportId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Zombie-run quiesce failed for {RunId} facility {FacilityId}.", runId, summary.FacilityId);
+        }
+
         _logger.LogInformation(
-            "Cancelled zombie run {RunId} (no in-memory state). Downstream service cleanup skipped; operator may need to reset facility {FacilityId} manually if it was partially provisioned.",
+            "Cancelled zombie run {RunId}. Pipeline quiesced for facility {FacilityId}; resting data remains until teardown retention.",
             runId, summary.FacilityId);
 
         return true;
@@ -240,22 +253,23 @@ public class AutomationRunManager : IAutomationRunManager
             using var scope = _hostServices.CreateScope();
             var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
             var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
-            var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
-            var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
-            var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
+            var censusClient = scope.ServiceProvider.GetRequiredService<ICensusServiceClient>();
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            var abortTtl = scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
+                           ?? TimeSpan.FromDays(14);
             var fhirDataLoader = state.FhirDataLoader
                 ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
-                facilityClient,
-                normalizationClient,
                 dataAcqClient,
-                queryDispatchClient,
+                censusClient,
                 reportClient,
+                abortRegistry,
                 fhirDataLoader,
                 output,
                 state.FacilityId,
                 state.ReportId,
+                abortTtl,
                 CancellationToken.None);
 
             await _orchestrator.CompleteRunAsync(state.RunId);

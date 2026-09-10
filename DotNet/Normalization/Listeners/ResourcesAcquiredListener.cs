@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Normalization.Application.Models;
@@ -217,20 +218,36 @@ public class ResourcesAcquiredListener : BackgroundService
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
+        using var scope = _scopeFactory.CreateScope();
+        var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+        if (abortRegistry != null)
+        {
+            var reportId = result.Message.Value.ScheduledReports
+                .Select(sr => sr.ReportTrackingId)
+                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+            if (await abortRegistry.IsAbortedAsync(result.Message.Key.FacilityId, reportId, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Skipping ResourcesAcquired for aborted pipeline FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    result.Message.Key.FacilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+                await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
+                return;
+            }
+        }
+
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
-        using (var scope = _scopeFactory.CreateScope())
+        var mappingOutcomes = new MappingOutcomeAccumulator();
+
+        await RegisterConfiguredCodeMapsAsync(
+            scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
+
+        foreach (var cacheKey in cacheKeys)
         {
-            var mappingOutcomes = new MappingOutcomeAccumulator();
-
-            await RegisterConfiguredCodeMapsAsync(
-                scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
-
-            foreach (var cacheKey in cacheKeys)
-            {
-                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
+            ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -342,40 +359,39 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                 }
 
-                await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
-                copiedKeys.Add(cacheKey);
-            }
-
-            if (cacheKeys.Count == 0)
-            {
-                _logger.LogInformation(
-                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
-                    result.Message.Key.FacilityId.SanitizeForLog(),
-                    correlationId.SanitizeForLog());
-            }
-
-            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
-
-            // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
-            // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
-            // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
-            // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
-            // avoidable noise on the topic, and this order also means a produce failure here can be
-            // swallowed without the pipeline caring, because the pipeline's own message is already out.
-            //
-            // Produced even when nothing was acquired: the configured code maps are declared up front, so
-            // this still reports them with zero counts, which is what separates "nothing reached the map"
-            // from "no map is configured".
-            await ProduceMappingOutcomeEvaluatedMessage(
-                result.Message.Key.FacilityId,
-                result.Message.Key.PatientId,
-                correlationId,
-                result.Message.Value,
-                mappingOutcomes,
-                cancellationToken);
-
-            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+            await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            copiedKeys.Add(cacheKey);
         }
+
+        if (cacheKeys.Count == 0)
+        {
+            _logger.LogInformation(
+                "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                result.Message.Key.FacilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+
+        await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+
+        // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
+        // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
+        // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
+        // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
+        // avoidable noise on the topic, and this order also means a produce failure here can be
+        // swallowed without the pipeline caring, because the pipeline's own message is already out.
+        //
+        // Produced even when nothing was acquired: the configured code maps are declared up front, so
+        // this still reports them with zero counts, which is what separates "nothing reached the map"
+        // from "no map is configured".
+        await ProduceMappingOutcomeEvaluatedMessage(
+            result.Message.Key.FacilityId,
+            result.Message.Key.PatientId,
+            correlationId,
+            result.Message.Value,
+            mappingOutcomes,
+            cancellationToken);
+
+        await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
     }
 
     private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)

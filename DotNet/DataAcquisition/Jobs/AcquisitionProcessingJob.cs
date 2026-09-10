@@ -5,8 +5,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Quartz;
 using System.Diagnostics;
@@ -144,6 +146,14 @@ public class AcquisitionProcessingJob : IJob
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            if (abortRegistry != null &&
+                await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
+            {
+                _logger.LogInformation("Skipping pending logs for aborted facility {FacilityId}.", facilityId.SanitizeForLog());
+                return;
+            }
+
             var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var fhirQueryConfigurationQueries = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationQueries>();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
@@ -255,6 +265,15 @@ public class AcquisitionProcessingJob : IJob
                 foreach (var request in requests)
                 {
                     if (maxRetriesReachedIds.Contains(request.Id)) continue;
+
+                    if (abortRegistry != null &&
+                        await abortRegistry.IsAbortedAsync(null, request.ReportTrackingId, cancellationToken))
+                    {
+                        _logger.LogInformation(
+                            "Skipping ReadyToAcquire for aborted report {ReportTrackingId}, log {LogId}.",
+                            request.ReportTrackingId, request.Id);
+                        continue;
+                    }
 
                     try
                     {

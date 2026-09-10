@@ -255,6 +255,13 @@
               <fa-icon [icon]="faRotate"></fa-icon>
               Resubmit...
             </button>
+            <button type="button"
+                    *ngIf="(element.status === 'New' || element.status === 'EndOfPeriod') && !element.isDeleted"
+                    class="link-button secondary"
+                    (click)="onAbortReport(element.id)">
+              <mat-icon>cancel</mat-icon>
+              Abort...
+            </button>
           </td>
         </ng-container>
         <!-- Delete Column -->
