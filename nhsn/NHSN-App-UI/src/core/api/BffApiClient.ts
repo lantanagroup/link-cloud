@@ -11,7 +11,6 @@ import type {
   ConnectionResult,
   EncounterCode,
   FhirConfig,
-  FhirServerInfoResponse,
   HslocCode,
   HslocMapping,
   ImportResult,
@@ -153,11 +152,6 @@ export class BffApiClient implements ApiClient {
   }
 
   // ------------------------------------------------------------ fhir server
-
-  async getFhirServerInfo(): Promise<FhirServerInfoResponse> {
-    const {data} = await this.http.get<FhirServerInfoResponse>('/fhir-server');
-    return data;
-  }
 
   async testFhirConnection(config: FhirConfig): Promise<ConnectionResult> {
     const {data} = await this.http.post<ConnectionResult>('/fhir-server/test-connection', config);

@@ -463,9 +463,27 @@
   box-shadow: none !important;
 }
 
+.nhsn-link__step-actions .k-button.k-button-primary:focus,
+.nhsn-link__step-actions .k-button.k-button-primary.k-focus,
+.nhsn-link__step-actions .k-button.k-button-secondary:focus,
+.nhsn-link__step-actions .k-button.k-button-secondary.k-focus,
+.nhsn-link__step-actions .k-button.k-button-tertiary:focus,
+.nhsn-link__step-actions .k-button.k-button-tertiary.k-focus {
+  box-shadow: none !important;
+}
+
 .nhsn-link__step-actions .k-button:focus-visible {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 2px;
+  outline: none;
+}
+
+.nhsn-link__step-actions .k-button.k-button-primary:focus-visible:not(:disabled) {
+  background: var(--kendo-color-primary-hover, #063f78);
+  border-color: var(--kendo-color-primary-hover, #063f78);
+}
+
+.nhsn-link__step-actions .k-button.k-button-base:focus-visible:not(:disabled) {
+  background: var(--kendo-color-base-hover, #eef0f3);
+  border-color: var(--kendo-color-primary, #0057b7);
 }
 
 .nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {

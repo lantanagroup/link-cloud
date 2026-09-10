@@ -1,11 +1,10 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, InfoTooltip, NHSNLoadingIndicator, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
-import {useNotifications} from '../../../notifications/NotificationProvider';
+import {Button, InfoTooltip, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
-import {validateFhir, type FhirFieldValues} from './validate';
+import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
 import './FhirStep.css';
 
 /**
@@ -18,28 +17,22 @@ import './FhirStep.css';
 export function FhirStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
-  const {notifyError} = useNotifications();
-  const {patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const fhir = draft.fhir;
+  const [initialLagDays, initialLagHours, initialLagMinutes] = parseIso8601Duration(fhir.lagDuration);
 
-  const [loading, setLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [baseUrlError, setBaseUrlError] = useState<string | null>(null);
-  const [maxConcurrentRequestsError, setMaxConcurrentRequestsError] = useState<string | null>(null);
-  const [maxRetriesError, setMaxRetriesError] = useState<string | null>(null);
-  const [minPullTimeError, setMinPullTimeError] = useState<string | null>(null);
-  const [maxPullTimeError, setMaxPullTimeError] = useState<string | null>(null);
-  const [lagDaysError, setLagDaysError] = useState<string | null>(null);
-  const [lagHoursError, setLagHoursError] = useState<string | null>(null);
-  const [lagMinutesError, setLagMinutesError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const [baseUrl, setBaseUrl] = useState('');
-  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState<number | undefined>(undefined);
-  const [maxRetries, setMaxRetries] = useState<number | undefined>(undefined);
-  const [minPullTime, setMinPullTime] = useState('');
-  const [maxPullTime, setMaxPullTime] = useState('');
-  const [lagDays, setLagDays] = useState<number | undefined>(undefined);
-  const [lagHours, setLagHours] = useState<number | undefined>(undefined);
-  const [lagMinutes, setLagMinutes] = useState<number | undefined>(undefined);
+  const [baseUrl, setBaseUrl] = useState(fhir.fhirServerBaseUrl ?? '');
+  const [maxConcurrentRequests, setMaxConcurrentRequests] = useState<number | undefined>(fhir.maxConcurrentRequests);
+  const [maxRetries, setMaxRetries] = useState<number | undefined>(fhir.maxRetries);
+  const [minPullTime, setMinPullTime] = useState(fhir.minAcquisitionPullTime ?? '');
+  const [maxPullTime, setMaxPullTime] = useState(fhir.maxAcquisitionPullTime ?? '');
+  const [lagDays, setLagDays] = useState<number | undefined>(initialLagDays);
+  const [lagHours, setLagHours] = useState<number | undefined>(initialLagHours);
+  const [lagMinutes, setLagMinutes] = useState<number | undefined>(initialLagMinutes);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
@@ -64,39 +57,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
     }
   }, [testing, testResult]);
 
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-
-    api
-      .getFhirServerInfo()
-      .then(info => {
-        if (!mounted) {
-          return;
-        }
-        setBaseUrl(info.fhirServerBaseUrl ?? '');
-        setMaxConcurrentRequests(info.maxConcurrentRequests ?? undefined);
-        setMaxRetries(info.maxRetries ?? undefined);
-        setMinPullTime(info.minAcquisitionPullTime ?? '');
-        setMaxPullTime(info.maxAcquisitionPullTime ?? '');
-        setLagDays(info.lagDays ?? undefined);
-        setLagHours(info.lagHours ?? undefined);
-        setLagMinutes(info.lagMinutes ?? undefined);
-      })
-      .catch(cause => {
-        notifyError(cause instanceof Error ? cause.message : t('onboarding:fhirServerInfo.messages.loadError'));
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [api]);
-
   function handleBaseUrlChange(value: string) {
     setBaseUrl(value);
     setTestedBaseUrl(null);
@@ -116,19 +76,29 @@ export function FhirStep({onNext, onBack}: StepProps) {
     };
   }
 
-  function validateField(field: keyof FhirFieldValues, setError: (message: string | null) => void, overrides?: Partial<FhirFieldValues>) {
-    const errors = validateFhir(currentFieldValues(overrides));
-    setError(errors[field] ? t(errors[field]) : null);
+  function markTouched(field: string) {
+    setTouched(prev => ({...prev, [field]: true}));
+  }
+
+  function refreshErrors(overrides: Partial<FhirFieldValues> = {}) {
+    setErrors(validateFhir(currentFieldValues(overrides)));
+  }
+
+  /** Gates a field's rendered error on it having been touched, translating the i18n key only once shown. */
+  function fieldError(field: string): string | undefined {
+    return touched[field] && errors[field] ? t(errors[field]) : undefined;
   }
 
   function handleBaseUrlBlur() {
-    validateField('fhirServerBaseUrl', setBaseUrlError);
+    markTouched('fhirServerBaseUrl');
+    refreshErrors();
   }
 
-  function handlePullTimeBlur(value: string, setter: (value: string) => void, field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', setError: (message: string | null) => void) {
+  function handlePullTimeBlur(value: string, setter: (value: string) => void, field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime') {
     const normalized = normalizePullTime(value);
     setter(normalized);
-    validateField(field, setError, {[field]: normalized});
+    markTouched(field);
+    refreshErrors({[field]: normalized});
   }
 
   async function handleTestConnection() {
@@ -163,8 +133,18 @@ export function FhirStep({onNext, onBack}: StepProps) {
   }
 
   function handleNext() {
+    setTouched({
+      fhirServerBaseUrl: true,
+      maxConcurrentRequests: true,
+      maxRetries: true,
+      minAcquisitionPullTime: true,
+      maxAcquisitionPullTime: true,
+      lagDays: true,
+      lagHours: true,
+      lagMinutes: true
+    });
     const trimmedBaseUrl = baseUrl.trim();
-    const errors = validateFhir({
+    const nextErrors = validateFhir({
       fhirServerBaseUrl: baseUrl,
       maxConcurrentRequests,
       maxRetries,
@@ -174,17 +154,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
       lagHours,
       lagMinutes
     });
+    setErrors(nextErrors);
 
-    setBaseUrlError(errors.fhirServerBaseUrl ? t(errors.fhirServerBaseUrl) : null);
-    setMaxConcurrentRequestsError(errors.maxConcurrentRequests ? t(errors.maxConcurrentRequests) : null);
-    setMaxRetriesError(errors.maxRetries ? t(errors.maxRetries) : null);
-    setMinPullTimeError(errors.minAcquisitionPullTime ? t(errors.minAcquisitionPullTime) : null);
-    setMaxPullTimeError(errors.maxAcquisitionPullTime ? t(errors.maxAcquisitionPullTime) : null);
-    setLagDaysError(errors.lagDays ? t(errors.lagDays) : null);
-    setLagHoursError(errors.lagHours ? t(errors.lagHours) : null);
-    setLagMinutesError(errors.lagMinutes ? t(errors.lagMinutes) : null);
-
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(nextErrors).length > 0) {
       setValidationError(t('onboarding:fhirServerInfo.messages.incomplete'));
       return;
     }
@@ -206,10 +178,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
       connectionTested: testedBaseUrl === trimmedBaseUrl
     });
     setReadyToAdvance(true);
-  }
-
-  if (loading) {
-    return <NHSNLoadingIndicator />;
   }
 
   const jwksInstructionsKey = vendorProfile?.documentKeys.jwksInstructions;
@@ -236,7 +204,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
             placeholder={t('onboarding:fhirServerInfo.fields.baseUrlPlaceholder')}
             required
             value={baseUrl}
-            error={baseUrlError ?? undefined}
+            error={fieldError('fhirServerBaseUrl')}
             onChange={handleBaseUrlChange}
             onBlur={handleBaseUrlBlur} />
 
@@ -271,9 +239,16 @@ export function FhirStep({onNext, onBack}: StepProps) {
               min={1}
               step={1}
               value={maxConcurrentRequests}
-              error={maxConcurrentRequestsError ?? undefined}
-              onChange={setMaxConcurrentRequests}
-              onBlur={() => validateField('maxConcurrentRequests', setMaxConcurrentRequestsError)} />
+              error={fieldError('maxConcurrentRequests')}
+              onChange={value => {
+                setMaxConcurrentRequests(value);
+                markTouched('maxConcurrentRequests');
+                refreshErrors({maxConcurrentRequests: value});
+              }}
+              onBlur={() => {
+                markTouched('maxConcurrentRequests');
+                refreshErrors();
+              }} />
             <NumberField
               id="maxRetries"
               label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
@@ -283,9 +258,16 @@ export function FhirStep({onNext, onBack}: StepProps) {
               max={10}
               step={1}
               value={maxRetries}
-              error={maxRetriesError ?? undefined}
-              onChange={setMaxRetries}
-              onBlur={() => validateField('maxRetries', setMaxRetriesError)} />
+              error={fieldError('maxRetries')}
+              onChange={value => {
+                setMaxRetries(value);
+                markTouched('maxRetries');
+                refreshErrors({maxRetries: value});
+              }}
+              onBlur={() => {
+                markTouched('maxRetries');
+                refreshErrors();
+              }} />
           </div>
 
           <div className="triplet">
@@ -297,9 +279,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
               maxLength={5}
               required
               value={minPullTime}
-              error={minPullTimeError ?? undefined}
-              onChange={setMinPullTime}
-              onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime', setMinPullTimeError)} />
+              error={fieldError('minAcquisitionPullTime')}
+              onChange={value => setMinPullTime(digitsOnly(value))}
+              onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime')} />
             <TextField
               id="maxPullTime"
               label={t('onboarding:fhirServerInfo.fields.maxPullTimeLabel')}
@@ -308,9 +290,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
               maxLength={5}
               required
               value={maxPullTime}
-              error={maxPullTimeError ?? undefined}
-              onChange={setMaxPullTime}
-              onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime', setMaxPullTimeError)} />
+              error={fieldError('maxAcquisitionPullTime')}
+              onChange={value => setMaxPullTime(digitsOnly(value))}
+              onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime')} />
           </div>
 
           <div className="form-group">
@@ -327,11 +309,19 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
                 required
                 min={0}
+                max={30}
                 step={1}
                 value={lagDays}
-                error={lagDaysError ?? undefined}
-                onChange={setLagDays}
-                onBlur={() => validateField('lagDays', setLagDaysError)} />
+                error={fieldError('lagDays')}
+                onChange={value => {
+                  setLagDays(value);
+                  markTouched('lagDays');
+                  refreshErrors({lagDays: value});
+                }}
+                onBlur={() => {
+                  markTouched('lagDays');
+                  refreshErrors();
+                }} />
               <NumberField
                 id="lagHours"
                 label={t('onboarding:fhirServerInfo.fields.lagHoursLabel')}
@@ -340,9 +330,16 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 max={23}
                 step={1}
                 value={lagHours}
-                error={lagHoursError ?? undefined}
-                onChange={setLagHours}
-                onBlur={() => validateField('lagHours', setLagHoursError)} />
+                error={fieldError('lagHours')}
+                onChange={value => {
+                  setLagHours(value);
+                  markTouched('lagHours');
+                  refreshErrors({lagHours: value});
+                }}
+                onBlur={() => {
+                  markTouched('lagHours');
+                  refreshErrors();
+                }} />
               <NumberField
                 id="lagMinutes"
                 label={t('onboarding:fhirServerInfo.fields.lagMinutesLabel')}
@@ -351,10 +348,22 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 max={59}
                 step={1}
                 value={lagMinutes}
-                error={lagMinutesError ?? undefined}
-                onChange={setLagMinutes}
-                onBlur={() => validateField('lagMinutes', setLagMinutesError)} />
+                error={fieldError('lagMinutes')}
+                onChange={value => {
+                  setLagMinutes(value);
+                  markTouched('lagMinutes');
+                  refreshErrors({lagMinutes: value});
+                }}
+                onBlur={() => {
+                  markTouched('lagMinutes');
+                  refreshErrors();
+                }} />
             </div>
+            {touched.lagDays && touched.lagHours && touched.lagMinutes && errors.lagDuration && (
+              <p className="k-form-error" role="alert">
+                {t(errors.lagDuration)}
+              </p>
+            )}
           </div>
 
           {validationError && (
@@ -397,21 +406,20 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
 export default FhirStep;
 
+/** A letter can never be part of a valid HH:MM time, so it's blocked at every keystroke. */
+function digitsOnly(value: string): string {
+  return value.replace(/[^0-9]/g, '');
+}
+
 function normalizePullTime(value: string): string {
   const digits = value.replace(/[^0-9]/g, '').slice(0, 4);
   if (!digits) {
     return '';
   }
-
-  const raw = digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
-  const match = raw.match(/^(\d{1,2}):?(\d{0,2})$/);
-  if (!match) {
-    return '';
+  if (digits.length <= 2) {
+    return digits;
   }
-
-  const hours = Math.min(23, parseInt(match[1], 10) || 0);
-  const minutes = Math.min(59, parseInt(match[2] || '0', 10) || 0);
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
 function buildIso8601Duration(days?: number, hours?: number, minutes?: number): string {
@@ -420,4 +428,14 @@ function buildIso8601Duration(days?: number, hours?: number, minutes?: number): 
   const normalizedHours = Math.floor((totalMinutes % (24 * 60)) / 60);
   const normalizedMinutes = totalMinutes % 60;
   return `P${normalizedDays}DT${normalizedHours}H${normalizedMinutes}M`;
+}
+
+// Inverse of buildIso8601Duration: PxDTyHzM -> [days, hours, minutes].
+function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
+  const match = duration?.match(/^P(\d+)DT(\d+)H(\d+)M$/);
+  if (!match) {
+    return [undefined, undefined, undefined];
+  }
+
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
 }

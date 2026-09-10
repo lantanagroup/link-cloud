@@ -6,6 +6,7 @@ import {Button, NHSNLoadingIndicator, PageHeader, Select, StepActions} from '../
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import type {FacilityInfoDraft} from '../../types';
 import {validateFacilityInfo, type FieldErrors} from './validate';
 
 /**
@@ -23,6 +24,7 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
   const [loading, setLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [timezones, setTimezones] = useState<Timezone[]>([]);
   const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
 
@@ -55,7 +57,12 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
     };
   }, [api]);
 
+  function markTouched(field: string) {
+    setTouched(prev => ({...prev, [field]: true}));
+  }
+
   function handleNext() {
+    setTouched({timeZone: true, vendor: true});
     const fieldErrors = validateFacilityInfo(draft);
     setErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
@@ -67,17 +74,12 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
     onNext();
   }
 
-  function refreshFieldError(field: string) {
-    const nextErrors = validateFacilityInfo(draft);
-    setErrors(prev => {
-      const next = {...prev};
-      if (nextErrors[field]) {
-        next[field] = nextErrors[field];
-      } else {
-        delete next[field];
-      }
-      return next;
-    });
+  function refreshErrors(overrides: Partial<FacilityInfoDraft> = {}) {
+    const nextErrors = validateFacilityInfo({...draft, facilityInfo: {...draft.facilityInfo, ...overrides}});
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) {
+      setValidationError(null);
+    }
   }
 
   if (loading) {
@@ -96,12 +98,19 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
           hint={t('onboarding:facilityInfo.fields.timeZoneTooltip')}
           placeholder={t('onboarding:facilityInfo.fields.timeZonePlaceholder')}
           required
-          error={errors.timeZone ? t(errors.timeZone) : undefined}
+          error={touched.timeZone && errors.timeZone ? t(errors.timeZone) : undefined}
           value={timeZone}
           options={timezones.map(zone => ({value: zone.id, label: zone.displayName}))}
           popupClassName="nhsn-facility-info-popup"
-          onChange={value => patch('facilityInfo', {timeZone: value})}
-          onBlur={() => refreshFieldError('timeZone')} />
+          onChange={value => {
+            patch('facilityInfo', {timeZone: value});
+            markTouched('timeZone');
+            refreshErrors({timeZone: value});
+          }}
+          onBlur={() => {
+            markTouched('timeZone');
+            refreshErrors();
+          }} />
       </div>
 
       <div className="nhsn-link__field">
@@ -110,12 +119,19 @@ export function FacilityInfoStep({onNext, onBack}: StepProps) {
           label={t('onboarding:facilityInfo.fields.ehrVendorLabel')}
           placeholder={t('onboarding:facilityInfo.fields.ehrVendorPlaceholder')}
           required
-          error={errors.vendor ? t(errors.vendor) : undefined}
+          error={touched.vendor && errors.vendor ? t(errors.vendor) : undefined}
           value={ehrVendor}
           options={vendorProfiles.map(profile => ({value: profile.vendor, label: profile.displayName}))}
           popupClassName="nhsn-facility-info-popup"
-          onChange={value => patch('facilityInfo', {vendor: value as EhrVendor})}
-          onBlur={() => refreshFieldError('vendor')} />
+          onChange={value => {
+            patch('facilityInfo', {vendor: value as EhrVendor});
+            markTouched('vendor');
+            refreshErrors({vendor: value as EhrVendor});
+          }}
+          onBlur={() => {
+            markTouched('vendor');
+            refreshErrors();
+          }} />
       </div>
 
       {validationError && (

@@ -68,18 +68,6 @@ export interface FacilitySummaryResponse {
   isOnboarded: boolean;
 }
 
-export interface FhirServerInfoResponse {
-  fhirServerBaseUrl?: string;
-  maxConcurrentRequests?: number;
-  maxRetries?: number;
-  /** HH:MM, facility-local. */
-  minAcquisitionPullTime?: string;
-  maxAcquisitionPullTime?: string;
-  lagDays?: number;
-  lagHours?: number;
-  lagMinutes?: number;
-}
-
 // ---------------------------------------------------------------- reference data
 
 export type LocationMethod =

@@ -68,7 +68,6 @@ export class TestAuthApiClient implements ApiClient {
 
   getReportingPlan = () => this.inner.getReportingPlan();
 
-  getFhirServerInfo = () => this.inner.getFhirServerInfo();
   getJwksInstructionsUrl: ApiClient['getJwksInstructionsUrl'] = vendor =>
     this.inner.getJwksInstructionsUrl(vendor);
   getLocationOrgResolutionUrl: ApiClient['getLocationOrgResolutionUrl'] = () =>

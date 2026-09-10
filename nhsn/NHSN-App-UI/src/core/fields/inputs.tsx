@@ -12,6 +12,18 @@ import {
 import {Calendar, type CalendarChangeEvent, type CalendarProps} from '@progress/kendo-react-dateinputs';
 import {toRenderProps, useFieldId, valueOf, type BaseFieldProps} from './fieldProps';
 
+function trimOnBlur(base: BaseFieldProps<string>, skip?: boolean) {
+  return () => {
+    if (!skip && typeof base.value === 'string') {
+      const trimmed = base.value.trim();
+      if (trimmed !== base.value) {
+        base.onChange(trimmed);
+      }
+    }
+    base.onBlur?.();
+  };
+}
+
 export interface TextFieldProps extends BaseFieldProps<string> {
   placeholder?: string;
   maxLength?: number;
@@ -29,7 +41,8 @@ export function TextField({placeholder, maxLength, type = 'text', ...base}: Text
       // data, not something like a saved address - and its suggestion list
       // overlaps a repeatable list's rows when one is open.
       autoComplete: 'off',
-      onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? '')
+      onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? ''),
+      onBlur: trimOnBlur(base, type === 'password')
     })
   );
 }
@@ -40,16 +53,23 @@ export interface NumberFieldProps extends BaseFieldProps<number> {
   step?: number;
 }
 
-export function NumberField({min, max, step, ...base}: NumberFieldProps) {
+export function NumberField({min, max: _max, step, ...base}: NumberFieldProps) {
   const id = useFieldId(base.id);
+  const blockMinus = min !== undefined && min >= 0;
+
   return FormNumericTextBox(
     toRenderProps({...base, id}, {
-      min,
-      max,
       step,
       // The package destructures customProp and reads customProp?.onBlur.
       customProp: {},
-      onChange: (event: unknown) => base.onChange(valueOf<number>(event))
+      onChange: (event: unknown) => base.onChange(valueOf<number>(event)),
+      onKeyDown: blockMinus
+        ? (event: React.KeyboardEvent) => {
+            if (event.key === '-') {
+              event.preventDefault();
+            }
+          }
+        : undefined
     })
   );
 }
@@ -65,7 +85,8 @@ export function TextAreaField({rows = 4, placeholder, ...base}: TextAreaFieldPro
     toRenderProps({...base, id}, {
       rows,
       placeholder,
-      onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? '')
+      onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? ''),
+      onBlur: trimOnBlur(base)
     })
   );
 }
@@ -184,7 +205,7 @@ export function DateField({min, max, ...base}: DateFieldProps) {
   const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null);
 
   return (
-    <div className="nhsn-link__date-field" ref={setPopupContainer}>
+    <div className="nhsn-link__date-field" ref={setPopupContainer} aria-live="polite">
       {FormDatePicker(
         toRenderProps({...base, id, value: toPickerDate(base.value)}, {
           min,

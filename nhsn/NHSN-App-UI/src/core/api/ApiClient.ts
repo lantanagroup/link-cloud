@@ -8,7 +8,6 @@ import type {
   ConnectionResult,
   EncounterCode,
   FhirConfig,
-  FhirServerInfoResponse,
   HslocCode,
   HslocMapping,
   ImportResult,
@@ -116,7 +115,6 @@ export interface ApiClient {
   // reporting plan
   getReportingPlan(): Promise<ReportingPlan>;
 
-  getFhirServerInfo(): Promise<FhirServerInfoResponse>;
   getJwksInstructionsUrl(vendor: string): string;
   getLocationOrgResolutionUrl(): string;
   getCensusInstructionsUrl(vendor: string): string;
