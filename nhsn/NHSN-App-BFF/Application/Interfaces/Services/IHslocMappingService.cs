@@ -3,9 +3,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Hsloc;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 
 // The HSLOC Location Identification step's local-code-to-HSLOC rows, for the authenticated
-// caller's facility. Backed by Normalization's Code Map operation, not a BFF-owned table — mirrors
-// IEncounterMappingService / EncounterMappingService's INormalizationServiceClient wiring, on the
-// Location resource instead of Encounter. See HslocMappingService for the FhirPath/system caveats.
+// caller's facility. Backed by Normalization's dedicated HSLOC endpoints (hsloc-mappings/*, HSLOC),
 public interface IHslocMappingService
 {
     Task<IReadOnlyList<HslocMapping>> GetAsync(CancellationToken cancellationToken = default);

@@ -1,14 +1,27 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Normalization;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.EncounterCodes;
-using LantanaGroup.Link.Nhsn.App.Bff.Domain.HslocCodes;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
 
-// BFF-owned reference data: the vendor profiles and the time zone list.
+// BFF-owned reference data: the vendor profiles, the time zone list, and the encounter code
 public sealed class ReferenceDataService : IReferenceDataService
 {
+    private const string ServiceName = "Normalization";
+
+    private readonly INormalizationServiceClient _normalizationClient;
+    private readonly ILogger<ReferenceDataService> _logger;
+
+    public ReferenceDataService(INormalizationServiceClient normalizationClient, ILogger<ReferenceDataService> logger)
+    {
+        _normalizationClient = normalizationClient;
+        _logger = logger;
+    }
+
     // Curated US time zone ids, in display order.
     private static readonly string[] OrderedTimezoneIds =
     {
@@ -67,7 +80,38 @@ public sealed class ReferenceDataService : IReferenceDataService
             .ToArray();
     }
 
-    public IReadOnlyList<HslocCode> GetHslocCodes() => HslocCodeCatalog.All;
+    // The NHSN HSLOC reference vocabulary, read live from Normalization's HSLOC reference-data,
+    // Normalization's HSLOC entity has no Category/Type/Definition/
+    // FacilityTypes fields, so those stay null on every row; Code and Display are the only fields
+    // HslocCode requires.
+    public async Task<IReadOnlyList<HslocCode>> GetHslocCodesAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await _normalizationClient.GetHslocCodesAsync(includeInactive: false, cancellationToken: cancellationToken);
+        var rows = LinkResponseHandler.OptionalFromRawBody<List<HslocReferenceCodeJson>>(response, ServiceName, nameof(GetHslocCodesAsync))
+                   ?? [];
+
+        var codes = new List<HslocCode>(rows.Count);
+        foreach (var row in rows)
+        {
+            var display = string.IsNullOrWhiteSpace(row.ShortDescription) ? row.LongDescription : row.ShortDescription;
+
+            if (string.IsNullOrWhiteSpace(row.HSLOCCode) || string.IsNullOrWhiteSpace(display))
+            {
+                _logger.LogWarning(
+                    "Skipping HSLOC reference code {Id}: missing required field(s) (HSLOCCode={HSLOCCode}, ShortDescription={ShortDescription}, LongDescription={LongDescription}).",
+                    row.Id, row.HSLOCCode, row.ShortDescription, row.LongDescription);
+                continue;
+            }
+
+            codes.Add(new HslocCode
+            {
+                Code = row.HSLOCCode,
+                Display = display
+            });
+        }
+
+        return codes;
+    }
 
     private static IReadOnlyList<TimezoneResponse> BuildTimezones() =>
         OrderedTimezoneIds
