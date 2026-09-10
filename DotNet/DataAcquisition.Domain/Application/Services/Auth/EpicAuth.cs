@@ -73,7 +73,7 @@ public class EpicAuth : IAuth
             {
                 _logger.LogError(
                     "Token endpoint returned {StatusCode} acquiring an access token for facility {FacilityId}. Response: {Response}",
-                    (int)responseMessage.StatusCode, facilityId.SanitizeForLog(), Truncate(responseBody));
+                    (int)responseMessage.StatusCode, facilityId.SanitizeForLog(), Truncate(responseBody).SanitizeForLog());
                 return (false, null);
             }
 
