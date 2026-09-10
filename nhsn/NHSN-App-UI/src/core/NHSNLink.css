@@ -1818,3 +1818,412 @@ in jump cleaning. List comments a minute she plumits live confidence of
   gap: 14px;
   margin-top: 2px;
 }
+
+/* ---------------------------------------------- report results step */
+
+.nhsn-link__report-results .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__report-results .page-header-buttons {
+  display: none;
+}
+
+.nhsn-link__report-results .nhsn-link__subtitle {
+  max-width: none;
+}
+
+.nhsn-link__report-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.nhsn-link__report-results-actions .k-button svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.nhsn-link__report-results-table-scroll {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-link__report-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+/* Columns are set from a <colgroup> - table-layout:fixed makes those widths authoritative instead
+   of just a hint, so the table always fits its container width instead of overflowing into a
+   horizontal scrollbar. */
+.nhsn-link__report-results-table--fixed {
+  table-layout: fixed;
+}
+
+.nhsn-link__report-results-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 14px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.nhsn-link__report-results-table td {
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--kendo-color-border, #d0d7de);
+  vertical-align: middle;
+}
+
+.nhsn-link__report-results-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Small, deliberate gap between Report Id and Measures - not the default 12px, not zero. */
+.nhsn-link__report-results-table th:nth-child(1),
+.nhsn-link__report-results-table td:nth-child(1) {
+  padding-right: 10px;
+}
+
+/* Extra breathing room between the measures badges and patient count - badges can run right up
+   against the column edge otherwise. */
+.nhsn-link__report-results-table th:nth-child(2),
+.nhsn-link__report-results-table td:nth-child(2) {
+  padding-right: 0px;
+  padding-left: 10px;
+}
+
+.nhsn-link__report-results-table th:nth-child(3),
+.nhsn-link__report-results-table td:nth-child(3) {
+  padding-left: 22px;
+}
+
+/* Patient count, dates and status never wrap mid-value, so every row lines up the same way
+   regardless of how tall the measures column grows. */
+.nhsn-link__report-results-nowrap {
+  white-space: nowrap;
+}
+
+.nhsn-link__report-results-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nhsn-link__report-results-link {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--kendo-color-primary, #0057b7);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.nhsn-link__report-results-link:hover {
+  text-decoration: none;
+}
+
+.nhsn-link__report-results-measures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nhsn-link__measure-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.nhsn-link__status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Unstyled button wrapper so the pill itself is the click target for the Patient Status Timeline,
+   matching the onboarding POC's check-pill-link. */
+.nhsn-link__status-pill-button {
+  border: none;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nhsn-link__status-pill-button:hover .nhsn-link__status-pill {
+  filter: brightness(0.95);
+}
+
+.nhsn-link__status-pill--complete {
+  background: #dcf5e3;
+  color: #157a45;
+}
+
+.nhsn-link__status-pill--pending {
+  background: #fdecd2;
+  color: #b45309;
+}
+
+.nhsn-link__status-pill--failed {
+  background: #fbdada;
+  color: #b91c1c;
+}
+
+.nhsn-link__status-pill--cancelled {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.nhsn-link__status-pill--critical {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.nhsn-link__report-results-patient-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.nhsn-link__report-results-patient-detail-actions .k-button svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.nhsn-link__mapping-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.nhsn-link__mapping-pill--found {
+  background: #dcf5e3;
+  color: #157a45;
+}
+
+.nhsn-link__mapping-pill--not-found {
+  background: #fbdada;
+  color: #b91c1c;
+}
+
+/* This table's rows are single-line, so the main list's heavier 2px divider reads as too strong here
+   - a plain 1px light border matches the reference instead. */
+.nhsn-link__report-results-table--light-border td {
+  border-bottom: 1px solid #dde1e6;
+}
+
+.nhsn-link__report-results-empty {
+  padding: 18px 12px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  text-align: center;
+}
+
+.nhsn-link__report-results-ack {
+  margin-bottom: 6px;
+  font-size: 13.5px;
+}
+
+.nhsn-link__report-results-ack .k-checkbox {
+  width: 14px;
+  height: 14px;
+}
+
+.nhsn-link__report-results-ack .k-checkbox-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.nhsn-link__report-results-detail-list {
+  margin: 0 0 14px;
+}
+
+.nhsn-link__report-results-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
+}
+
+.nhsn-link__report-results-detail-list dt {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__report-results-detail-list dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--kendo-color-app-text, #1f2328);
+  text-align: right;
+}
+
+.nhsn-link__report-results-detail-section-title {
+  margin: 14px 0 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__report-results-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nhsn-link__report-results-detail-header-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.nhsn-link__report-results-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #b6bcc4;
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-primary, #0057b7);
+  cursor: pointer;
+}
+
+.nhsn-link__report-results-icon-button:hover:not(:disabled) {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+}
+
+/* A dimmed icon color reads as "not available" without fading the border to near-invisibility the
+   way a blanket opacity would. */
+.nhsn-link__report-results-icon-button:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.nhsn-link__report-results-chart-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 8px;
+}
+
+.nhsn-link__report-results-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.nhsn-link__report-results-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nhsn-link__report-results-legend-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.nhsn-link__report-results-legend-label {
+  flex: none;
+}
+
+.nhsn-link__report-results-legend-count {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+/* ---------------------------------------------- patient status timeline modal */
+
+.nhsn-link__report-results-timeline-subtitle {
+  margin: 0 0 16px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 13px;
+}
+
+.nhsn-link__report-results-timeline-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.nhsn-link__report-results-timeline-detail {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--kendo-color-border, #d0d7de);
+}
+
+.nhsn-link__report-results-timeline-detail p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--kendo-color-app-text-subtle, #333a45);
+}
+
+.nhsn-link__report-results-json {
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  margin: 0;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+

@@ -23,6 +23,8 @@ import type {
   QueryPlan,
   AcquisitionLogEntry,
   ReportDetail,
+  ReportPatientEntry,
+  PatientMappingEvidence,
   ReportRequest,
   ReportSummary,
   ReportingPlan,
@@ -103,12 +105,13 @@ export interface ApiClient {
   requestReport(request: ReportRequest): Promise<Operation<ReportSummary>>;
   listReports(page: PageRequest): Promise<Paged<ReportSummary>>;
   getReport(reportId: string): Promise<ReportDetail>;
+  getReportPatients(reportId: string): Promise<ReportPatientEntry[]>;
+  getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence>;
   getPatientStatuses(reportId: string): Promise<PatientPipeline[]>;
   getQueryPlan(reportId: string): Promise<QueryPlan>;
   getAcquisitionLogs(reportId: string): Promise<AcquisitionLogEntry[]>;
   exportReportSummary(reportId: string): Promise<Blob>;
   regenerateReport(reportId: string): Promise<Operation<ReportSummary>>;
-  acknowledgeReport(reportId: string, acknowledgement: Acknowledgement): Promise<void>;
 
   // reporting plan
   getReportingPlan(): Promise<ReportingPlan>;

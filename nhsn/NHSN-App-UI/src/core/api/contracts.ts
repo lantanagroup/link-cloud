@@ -333,6 +333,72 @@ export interface QueryPlan {
   planJson: string;
 }
 
+/** Link's per-entry reporting-status vocabulary, as the Report Details patient table sees it. */
+export type ReportingStatus =
+  | 'PatientIdentified'
+  | 'NotReportable'
+  | 'PendingValidation'
+  | 'PassedValidation'
+  | 'FailedValidation';
+
+/** One dQM this patient was evaluated against, with the resource count specific to it. */
+export interface PatientMeasureReport {
+  reportType: string;
+  resourceCount: number;
+  resourceCountsByType: Record<string, number>;
+}
+
+/** One patient's row in the Report Details patient table. */
+export interface ReportPatientEntry {
+  patientId: string;
+  reportingStatus: ReportingStatus;
+  resourceCount: number;
+  resourceCountsByType: Record<string, number>;
+  locationOrgMapped: boolean;
+  encounterMapped: boolean;
+  hslocMapped: boolean;
+  /** Whether Validation has recorded any pre-qualification results for this patient. */
+  hasPreQualResults: boolean;
+  /**
+   * Per-dQM resource counts. ReportingStatus above is one value for the whole patient -- Link
+   * has no per-dQM validation outcome -- but resource counts genuinely differ per dQM, which is
+   * what lets the Report Details view scope its population and counts to the active DQM tab.
+   */
+  measureReports: PatientMeasureReport[];
+}
+
+/** One location Acquisition matched against the patient's encounters, real evidence behind the Location Org indicator. */
+export interface LocationOrgMatch {
+  locationId: string;
+  locationName?: string;
+  locationAlias?: string;
+  partOfValue?: string;
+  isOrgLocation: boolean;
+}
+
+export interface LocationOrgEvidence {
+  encounterCount: number;
+  orgEncounterCount: number;
+  assumedOrgEncounterCount: number;
+  matches: LocationOrgMatch[];
+}
+
+/** One code map Normalization ran, real evidence behind the HSLOC/Encounter mapping indicators. */
+export interface CodeMapEvidence {
+  sourceSystem: string;
+  targetSystem: string;
+  mappedCount: number;
+  unmappedCount: number;
+  failureCount: number;
+  unmappedCodes: string[];
+}
+
+/** The real evidence behind one patient's Location Org / HSLOC / Encounter mapping indicators. */
+export interface PatientMappingEvidence {
+  locationOrg?: LocationOrgEvidence;
+  codeMaps: CodeMapEvidence[];
+}
+
 export interface AcquisitionLogEntry {
   timestamp: string;
   level: string;

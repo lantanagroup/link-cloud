@@ -25,6 +25,8 @@ import type {
   PatientPipeline,
   QueryPlan,
   ReportDetail,
+  ReportPatientEntry,
+  PatientMappingEvidence,
   ReportRequest,
   ReportSummary,
   ReportingPlan,
@@ -245,6 +247,20 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
+  async getReportPatients(reportId: string): Promise<ReportPatientEntry[]> {
+    const {data} = await this.http.get<ReportPatientEntry[]>(
+      `/reports/${encodeURIComponent(reportId)}/patients`
+    );
+    return data;
+  }
+
+  async getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence> {
+    const {data} = await this.http.get<PatientMappingEvidence>(
+      `/reports/${encodeURIComponent(reportId)}/patients/${encodeURIComponent(patientId)}/mapping-evidence`
+    );
+    return data;
+  }
+
   async getPatientStatuses(reportId: string): Promise<PatientPipeline[]> {
     const {data} = await this.http.get<PatientPipeline[]>(
       `/reports/${encodeURIComponent(reportId)}/patient-statuses`
@@ -279,13 +295,6 @@ export class BffApiClient implements ApiClient {
       `/reports/${encodeURIComponent(reportId)}/regenerations`
     );
     return pollOperation(this.http, initial, {isDone: isReportSettled});
-  }
-
-  async acknowledgeReport(reportId: string, acknowledgement: Acknowledgement): Promise<void> {
-    await this.http.put<void>(
-      `/reports/${encodeURIComponent(reportId)}/acknowledgement`,
-      acknowledgement
-    );
   }
 
   // ------------------------------------------------------------ reporting plan

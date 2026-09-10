@@ -60,7 +60,9 @@ export function ReportStep({onNext, onBack}: StepProps) {
       const operation = await api.requestReport({
         // The picker's values are placeholder ids, not measures Tenant knows
         // about -- resolve to the dQMs they stand in for before this goes out.
-        measures: toDigitalQualityMeasures(report.measures ?? []),
+        // Filtered to ids the picker still offers, so a stale id left over from
+        // an earlier draft can't silently resolve to nothing.
+        measures: toDigitalQualityMeasures(selectedMeasures),
         startDate: report.startDate!,
         endDate: report.endDate!,
         // Blank rows are an editing state, not patients.
@@ -72,6 +74,14 @@ export function ReportStep({onNext, onBack}: StepProps) {
       const summary = await operation.result();
 
       patch('report', {lastRequestedReportId: summary.reportId});
+      // Report only stores the resolved dQM -- several placeholders can share one -- so the
+      // original NHSN measure selection is kept here for Report Results/Details to display.
+      patch('reportResults', {
+        requestedMeasuresByReportId: {
+          ...draft.reportResults.requestedMeasuresByReportId,
+          [summary.reportId]: selectedMeasures
+        }
+      });
       notifySuccess(t('onboarding:report.messages.requested', {reportId: summary.reportId}));
       setAdvanceAfterRequest(true);
     } catch (cause) {
@@ -92,6 +102,12 @@ export function ReportStep({onNext, onBack}: StepProps) {
     label: measure.name
   }));
 
+  // A draft saved before this placeholder scheme existed can carry a raw dQM id (or any other
+  // id no longer offered) in report.measures. ChipMultiSelect renders an unrecognized value's raw
+  // id as its own chip label rather than dropping it, so it must be filtered out here instead.
+  const validPlaceholderIds = new Set(PLACEHOLDER_MEASURES.map(measure => measure.id));
+  const selectedMeasures = (report.measures ?? []).filter(id => validPlaceholderIds.has(id));
+
   return (
     <div className="report-generate">
       <div className="card">
@@ -104,7 +120,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
             label={t('onboarding:report.fields.measuresLabel')}
             hint={t('onboarding:report.fields.measuresTooltip')}
             options={measureOptions}
-            value={report.measures ?? []}
+            value={selectedMeasures}
             emptyText={t('onboarding:report.fields.measuresEmpty')}
             placeholder={t('onboarding:report.fields.measuresPlaceholder')}
             selectedLabel={t('onboarding:report.fields.measuresSelected')}

@@ -8,9 +8,13 @@
  * in for; `toDigitalQualityMeasures` resolves selected ids to it before a
  * report request goes out, since Tenant validates every report type against
  * MeasureEval and would refuse (in fact 500s on) the placeholder id itself.
- * All five currently point at the same dQM -- MeasureEval has exactly one
- * definition seeded (`NHSNAcuteCareHospitalMonthlyInitialPopulation`) in this
- * environment, and a report request naming any other dQM 500s the same way.
+ *
+ * The measure -> dQM mapping mirrors the NHSN-Onboarding-POC's
+ * `DIGITAL_QUALITY_MEASURES` table (index.html): most measures share the ACH
+ * Monthly dQM, RPS is ACH Daily, and AU/AR is LTC Monthly. Only the ACH
+ * Monthly and ACH Daily bundles are seeded into MeasureEval in this
+ * environment (DotNet/Automation/measures/) -- there is no LTC Monthly bundle
+ * in this repo yet, so AU/AR will 500 until one is added and seeded.
  *
  * The names are stand-in *data*, not UI copy, which is why they are literals
  * here rather than i18n keys — the real ones arrive from the service
@@ -30,7 +34,7 @@ export interface PlaceholderMeasure {
  * Ids carry the prefix so one appearing in a request, a log or a support ticket
  * is self-identifying rather than looking like a measure that has gone missing.
  * They are per-measure rather than per-dQM so the picker offers five distinct
- * chips even though every one currently resolves to the same dQM.
+ * chips even though several resolve to the same dQM.
  */
 export const PLACEHOLDER_MEASURES: readonly PlaceholderMeasure[] = [
   {
@@ -41,7 +45,7 @@ export const PLACEHOLDER_MEASURES: readonly PlaceholderMeasure[] = [
   {
     id: 'PLACEHOLDER-RESPIRATORY-PATHOGENS',
     name: 'Respiratory Pathogens Surveillance (RPS)',
-    digitalQualityMeasure: 'NHSNAcuteCareHospitalMonthlyInitialPopulation'
+    digitalQualityMeasure: 'NHSNAcuteCareHospitalDailyInitialPopulation'
   },
   {
     id: 'PLACEHOLDER-ADULT-SEPSIS',
@@ -56,7 +60,7 @@ export const PLACEHOLDER_MEASURES: readonly PlaceholderMeasure[] = [
   {
     id: 'PLACEHOLDER-ANTIMICROBIAL-USE',
     name: 'Antimicrobial Use and Resistance (AU/AR)',
-    digitalQualityMeasure: 'NHSNAcuteCareHospitalMonthlyInitialPopulation'
+    digitalQualityMeasure: 'NHSNLongTermCareMonthlyInitialPopulation'
   }
 ];
 
