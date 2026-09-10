@@ -50,7 +50,8 @@ public class ReportDatabaseValidator
         Frequency expectedFrequency = Frequency.Adhoc,
         string? expectedAdHocType = "Manual",
         List<string>? expectedSubmittedPatientIds = null,
-        GenerationManifest? manifest = null)
+        GenerationManifest? manifest = null,
+        bool expectSubmissionBypassed = false)
     {
         var errors = new List<string>();
 
@@ -62,7 +63,7 @@ public class ReportDatabaseValidator
             var scheduleId = Guid.Parse(reportId);
             var expectedSubmitted = expectedSubmittedPatientIds ?? expectedPatientIds;
 
-            await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, errors);
+            await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, expectSubmissionBypassed, errors);
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
@@ -95,7 +96,7 @@ public class ReportDatabaseValidator
             errors.Add(message);
     }
 
-    private async Task ValidateReportSchedule(Guid scheduleId, string facilityId, Frequency expectedFrequency, string? expectedAdHocType, List<string> errors)
+    private async Task ValidateReportSchedule(Guid scheduleId, string facilityId, Frequency expectedFrequency, string? expectedAdHocType, bool expectSubmissionBypassed, List<string> errors)
     {
         var schedule = await _reader.GetReportScheduleAsync(scheduleId);
         if (schedule == null)
@@ -117,8 +118,23 @@ public class ReportDatabaseValidator
             AddError(errors, $"ReportSchedule.AdHocType mismatch: expected {expectedAdHocType}, actual {schedule.AdHocType}");
         }
 
-        if (!string.Equals(schedule.Status, ScheduleStatus.Submitted.ToString(), StringComparison.OrdinalIgnoreCase)) AddError(errors, $"ReportSchedule.Status mismatch: expected {ScheduleStatus.Submitted}, actual {schedule.Status}");
-        if (!schedule.EnableSubmission) AddError(errors, "ReportSchedule.EnableSubmission should be true.");
+        // A bypassed report finishes on CompletedNotSubmitted with EnableSubmission false and no
+        // submit timestamp -- terminal and complete, but nothing was published to external/.
+        var expectedStatus = expectSubmissionBypassed
+            ? ScheduleStatus.CompletedNotSubmitted
+            : ScheduleStatus.Submitted;
+
+        if (!string.Equals(schedule.Status, expectedStatus.ToString(), StringComparison.OrdinalIgnoreCase)) AddError(errors, $"ReportSchedule.Status mismatch: expected {expectedStatus}, actual {schedule.Status}");
+
+        if (expectSubmissionBypassed)
+        {
+            if (schedule.EnableSubmission) AddError(errors, "ReportSchedule.EnableSubmission should be false for a bypassed report.");
+            if (schedule.SubmitReportDateTime.HasValue) AddError(errors, $"ReportSchedule.SubmitReportDateTime should be null for a bypassed report, actual {schedule.SubmitReportDateTime}.");
+        }
+        else if (!schedule.EnableSubmission)
+        {
+            AddError(errors, "ReportSchedule.EnableSubmission should be true.");
+        }
         if (!schedule.EndOfReportPeriodJobHasRun) AddError(errors, "ReportSchedule.EndOfReportPeriodJobHasRun should be true.");
         if (string.IsNullOrWhiteSpace(schedule.PayloadRootUri)) AddError(errors, "ReportSchedule.PayloadRootUri should be populated.");
         if (schedule.ReportStartDate >= schedule.ReportEndDate) AddError(errors, "ReportSchedule.ReportStartDate must be before ReportEndDate.");

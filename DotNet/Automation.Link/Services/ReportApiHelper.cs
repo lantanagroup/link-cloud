@@ -5,6 +5,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
@@ -322,7 +323,7 @@ public class ReportApiHelper
                 // to Submitted without ever emitting ReportEntriesCreated.
                 var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
                 if (scheduleProbe.IsSuccessStatusCode
-                    && scheduleProbe.Body?.Status == ScheduleStatus.Submitted)
+                    && scheduleProbe.Body?.Status.IsTerminal() == true)
                 {
                     milestoneReached = true;
                     var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
@@ -462,7 +463,7 @@ public class ReportApiHelper
             if (!entriesResponse.IsSuccessStatusCode || entriesResponse.Body == null)
             {
                 if (allowEntrylessTerminal
-                    && scheduleResponse.Body.Status == ScheduleStatus.Submitted)
+                    && scheduleResponse.Body.Status.IsTerminal())
                 {
                     _output.WriteLine(
                         $"Report {reportId} reached Submitted with no report-entry payload available; treating as terminal entryless report.");
@@ -483,7 +484,7 @@ public class ReportApiHelper
                 lastState = state;
             }
 
-            if (scheduleResponse.Body.Status == ScheduleStatus.Submitted && !hasIncompleteEntries)
+            if (scheduleResponse.Body.Status.IsTerminal() && !hasIncompleteEntries)
             {
                 var entryPatientIds = entries
                     .Select(e => e.PatientId)
@@ -518,7 +519,8 @@ public class ReportApiHelper
             or ReportingStatus.FailedValidation;
 
         var submissionTerminal = entry.SubmissionStatus is SubmissionStatus.Submitted
-            or SubmissionStatus.NotEligable;
+            or SubmissionStatus.NotEligable
+            or SubmissionStatus.NotSubmitted;
 
         return reportingTerminal && submissionTerminal;
     }
