@@ -40,6 +40,7 @@ internal sealed class MutableRunState(
     public List<string> Logs { get; } = [];
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }
+    public int TestRailPublished;
     public Task? ExecutionTask { get; set; }
     public FhirDataLoader? FhirDataLoader { get; set; }
     public Guid? GeneratedTemplateCacheVersionId { get; set; }

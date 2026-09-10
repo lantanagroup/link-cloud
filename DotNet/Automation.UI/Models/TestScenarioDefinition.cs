@@ -17,6 +17,8 @@ public class TestScenarioDefinition
     /// <summary>Optional description / notes.</summary>
     public string? Description { get; set; }
 
+    public int? TestRailCaseId { get; set; }
+
     /// <summary>
     /// When true, the scenario was seeded by the system and cannot be modified or deleted.
     /// It can still be cloned.

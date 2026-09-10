@@ -1,9 +1,10 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 
 namespace Automation.UI.Services.ApiHealth;
 
@@ -12,6 +13,7 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthSeedOrchestrator seedOrchestrator,
     IApiHealthSeedContextAccessor seedContext,
     IApiHealthRunStore store,
+    ITestRailPublisher testRailPublisher,
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
@@ -451,6 +453,24 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to persist completion status for API Health run {RunId}.", run.RunId);
+        }
+
+        try
+        {
+            await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
+            {
+                RunId = run.RunId,
+                Scope = run.Scope,
+                ServiceName = run.ServiceName,
+                Failed = failed,
+                Error = error,
+                StartedAt = run.StartedAt,
+                FinishedAt = finishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail publish failed for API Health run {RunId}.", run.RunId);
         }
 
         PruneCompletedRuns();
