@@ -89,8 +89,14 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
   ngOnDestroy(): void {
     this.reportIdSubscription?.unsubscribe();
     this.subscription?.unsubscribe();
+    this.clearPendingRefresh();
+  }
+
+  /** Cancels a queued post-resubmit refresh, if one is waiting. */
+  protected clearPendingRefresh(): void {
     if (this.refreshTimeoutId !== null) {
       clearTimeout(this.refreshTimeoutId);
+      this.refreshTimeoutId = null;
     }
   }
 
@@ -269,7 +275,12 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
               verticalPosition: 'top',
               panelClass: 'resubmit-snackbar'
             });
+            // Two resubmits inside the delay would leave the first timer pending and
+            // untracked, since only the last id is kept -- and ngOnDestroy clears only that
+            // one, so the orphan fires loadReportSchedules() after the component is gone.
+            this.clearPendingRefresh();
             this.refreshTimeoutId = setTimeout(() => {
+              this.refreshTimeoutId = null;
               this.paginationMetadata.pageNumber = 0;
               this.currentSortBy = 'CreateDate';
               this.currentSortOrder = 1;
