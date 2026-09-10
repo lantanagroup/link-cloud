@@ -31,10 +31,10 @@ parameters:
       alias: account
       artifact: account-db
       file: accountDb.sql
-    - name: app-bff
-      alias: app_bff
-      artifact: app-bff-db
-      file: app-bffDb.sql
+    # - name: app-bff
+    #   alias: app_bff
+    #   artifact: app-bff-db
+    #   file: app-bffDb.sql
     - name: audit
       alias: audit
       artifact: audit-db
@@ -128,7 +128,7 @@ stages:
             # .Data project, and the previous plain pattern silently skipped Submission.
             $migrationPaths = [ordered]@{
               "Account"         = "DotNet/Account/Migrations"
-              "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
+              # "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
               "Audit"           = "DotNet/Audit/Migrations"
               "Census"          = "DotNet/Census/Migrations"
               "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
