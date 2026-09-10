@@ -2468,7 +2468,7 @@ namespace IntegrationTests.Normalization
                     OperationHelper.GetOperation(fetched.OperationType, fetched.OperationJson));
                 var service = _scope.ServiceProvider.GetRequiredService<HSLOCMapOperationService>();
                 operationResult = await service.ProcessOperationAsync(hslocOperation, location);
-                Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
+                Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
             }
             else
             {

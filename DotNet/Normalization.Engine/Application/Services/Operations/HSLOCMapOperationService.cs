@@ -47,6 +47,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 supportingResources,
                 cancellationToken);
 
+            if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
+            {
+                return OperationResult.Success(resource, codeMapOperationResult.CodeMapping);
+            }
+
             return codeMapOperationResult;
         }
 
@@ -95,7 +100,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     }
 
                     // de-dupe on (system, code)
-                    var exists = location.Type.Any(cc =>
+                    var exists = originalLocation.Type.Any(cc =>
                     cc.Coding.Any(cd =>
                     string.Equals(cd.System, identifier.System, StringComparison.Ordinal) &&
                     string.Equals(cd.Code, identifier.Value, StringComparison.Ordinal)));
@@ -104,21 +109,24 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         continue;
 
                     CodeableConcept codeableConcept = new(identifier.System, identifier.Value);
-                    location.Type.Add(codeableConcept);
+                    originalLocation.Type.Add(codeableConcept);
                     changes++;
                 }
 
                 //3. move up the partOf hierarchy
-                var parentLocation = supportingResources?.FirstOrDefault(r => r is Location && r.Id == location.PartOf?.Reference?.SplitReference());
+                var parentReference = location.PartOf?.Reference?.SplitReference();
+                var parentLocation = string.IsNullOrWhiteSpace(parentReference)
+                    ? null
+                    : supportingResources?.FirstOrDefault(r => r is Location && r.Id == parentReference);
                 if (parentLocation is Location parentLoc)
                 {
                     location = parentLoc;
                 }
                 else
                 {
-                    if(location.PartOf != null)
+                    if(!string.IsNullOrWhiteSpace(parentReference))
                     {
-                        _logger.LogWarning("Parent location with reference {Reference} not found in supporting resources for Location {ResourceId}.", location.PartOf.Reference.SanitizeForLog(), location.Id.SanitizeForLog());
+                        _logger.LogWarning("Parent location with reference {Reference} not found in supporting resources for Location {ResourceId}.", location.PartOf?.Reference.SanitizeForLog(), location.Id.SanitizeForLog());
                     }
                     location = null;
                 }

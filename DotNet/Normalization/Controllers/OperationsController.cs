@@ -1,4 +1,4 @@
-﻿﻿﻿using Hl7.Fhir.Model;
+﻿﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -197,6 +198,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> PostOperation(PostOperationModel model)
         {
             try
@@ -296,6 +298,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> PutOperation(PutOperationModel model)
         {
             try
@@ -359,6 +362,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> OperationTest(TestOperationModel model, CancellationToken cancellationToken = default)
         {
             try
@@ -415,6 +419,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null, CancellationToken cancellationToken = default)
         {
             try
@@ -465,6 +470,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+         [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
         {
             try
@@ -501,6 +507,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null)
         {
             try

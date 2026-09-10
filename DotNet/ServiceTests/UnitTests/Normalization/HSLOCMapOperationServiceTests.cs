@@ -31,7 +31,7 @@ public class HSLOCMapOperationServiceTests
 
         var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
 
-        Assert.Equal(OperationStatus.NoAction, result.SuccessCode);
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Same(location, result.Resource);
         AssertCode(location, "urn:local", "123");
         AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "ICU");
@@ -66,11 +66,16 @@ public class HSLOCMapOperationServiceTests
 
         var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
 
-        Assert.Equal(OperationStatus.NoAction, result.SuccessCode);
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Equal(3, location.Type.Count);
         AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "ICU");
         AssertCode(location, "urn:local", "123");
         AssertCode(location, "urn:other", "123");
+
+        var repeatedResult = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.NoAction, repeatedResult.SuccessCode);
+        Assert.Equal(3, location.Type.Count);
     }
 
     [Theory]
@@ -84,7 +89,7 @@ public class HSLOCMapOperationServiceTests
 
         var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), child, [parent, grandparent]);
 
-        Assert.Equal(OperationStatus.NoAction, result.SuccessCode);
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Same(child, result.Resource);
         Assert.Equal(3, child.Type.Count);
         AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
@@ -103,6 +108,24 @@ public class HSLOCMapOperationServiceTests
 
         AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
         VerifyWarning("Parent location with reference missing-parent not found");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task BlankParentReferenceStopsWithoutLookupOrWarning(string? reference)
+    {
+        var location = new Location { Id = "child", Alias = ["Child"], PartOf = new ResourceReference(reference) };
+        var unrelatedLocation = new Location { Id = reference, Alias = ["Unrelated"] };
+
+        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location, [unrelatedLocation]);
+
+        Assert.Single(location.Type);
+        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
+        _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(), It.IsAny<Exception>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
     }
 
     [Fact]
