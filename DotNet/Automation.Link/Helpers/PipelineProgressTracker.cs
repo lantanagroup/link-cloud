@@ -120,7 +120,11 @@ public class PipelineProgressTracker
                     completedUnits++;
                 }
 
-                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                // Any terminal submission state counts: a bypassed patient ends on NotSubmitted
+                // and is just as finished, so without this the report never reaches 100% and
+                // stall detection eventually fires on a run that completed correctly.
+                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.SubmissionStatus, "NotSubmitted", StringComparison.OrdinalIgnoreCase))
                 {
                     patientsSubmitted++;
                     completedUnits++;
