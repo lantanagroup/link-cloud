@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Xml;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
@@ -86,6 +87,13 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         }
     }
 
+    private static bool HasRealDomain(string host)
+    {
+        var normalized = host.EndsWith('.') ? host[..^1] : host;
+        var labels = normalized.Split('.');
+        return labels.Length >= 2 && labels.All(label => label.Length > 0);
+    }
+
     private static bool IsValidFhirServerUrl(string? value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var parsedBaseUrl) ||
@@ -98,7 +106,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         return host == "localhost" || Uri.CheckHostName(host) switch
         {
             UriHostNameType.IPv4 or UriHostNameType.IPv6 => true,
-            UriHostNameType.Dns => host.Contains('.'),
+            UriHostNameType.Dns => HasRealDomain(host),
             _ => false
         };
     }
