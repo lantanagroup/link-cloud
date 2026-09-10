@@ -86,32 +86,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         }
     }
 
-    public async Task<FhirServerInfoResponse?> GetFhirServerInfoAsync(CancellationToken cancellationToken = default)
-    {
-        var facilityId = _userContext.RequireFacilityId();
-
-        var fhirConfig = await _fhirConfigurationGateway.GetAsync(facilityId, cancellationToken);
-        var lagDuration = await _queryDispatchGateway.GetLagDurationAsync(facilityId, cancellationToken);
-        var (lagDays, lagHours, lagMinutes) = ParseLagDuration(lagDuration);
-
-        // fhirConfig's pull times arrive from Data Acquisition as a "date-span" wire value (e.g.
-        // "08:00:00"), not the two-digit HH:MM this response contracts for — reparse before formatting.
-        TimeSpan? minPullTime = TimeSpan.TryParse(fhirConfig?.MinAcquisitionPullTime, System.Globalization.CultureInfo.InvariantCulture, out var parsedMin) ? parsedMin : null;
-        TimeSpan? maxPullTime = TimeSpan.TryParse(fhirConfig?.MaxAcquisitionPullTime, System.Globalization.CultureInfo.InvariantCulture, out var parsedMax) ? parsedMax : null;
-
-        return new FhirServerInfoResponse
-        {
-            FhirServerBaseUrl = fhirConfig?.FhirServerBaseUrl,
-            MaxConcurrentRequests = fhirConfig?.MaxConcurrentRequests,
-            MaxRetries = fhirConfig?.MaxRetries,
-            MinAcquisitionPullTime = FormatPullTime(minPullTime),
-            MaxAcquisitionPullTime = FormatPullTime(maxPullTime),
-            LagDays = lagDays,
-            LagHours = lagHours,
-            LagMinutes = lagMinutes
-        };
-    }
-
     public async Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(request.FhirServerBaseUrl, UriKind.Absolute, out var parsedBaseUrl) ||
@@ -222,7 +196,4 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
         return parsed;
     }
-
-    private static string? FormatPullTime(TimeSpan? value) =>
-        value?.ToString(@"hh\:mm", System.Globalization.CultureInfo.InvariantCulture);
 }

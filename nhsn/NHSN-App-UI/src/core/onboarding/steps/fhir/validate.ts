@@ -61,7 +61,7 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   if (values.lagDays === undefined) {
     errors.lagDays = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0) {
+  } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > 30) {
     errors.lagDays = 'onboarding:fhirServerInfo.messages.invalidLagDays';
   }
 
@@ -75,6 +75,11 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
     errors.lagMinutes = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagMinutes) || values.lagMinutes < 0 || values.lagMinutes > 59) {
     errors.lagMinutes = 'onboarding:fhirServerInfo.messages.invalidLagMinutes';
+  }
+
+  const lagFieldsValid = !errors.lagDays && !errors.lagHours && !errors.lagMinutes;
+  if (lagFieldsValid && (values.lagDays! + values.lagHours! + values.lagMinutes!) === 0) {
+    errors.lagDuration = 'onboarding:fhirServerInfo.messages.lagDurationRequired';
   }
 
   return errors;

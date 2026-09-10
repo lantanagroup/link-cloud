@@ -451,24 +451,6 @@ export class MockApiClient implements ApiClient {
     };
   }
 
-  async getFhirServerInfo(): Promise<C.FhirServerInfoResponse> {
-    await tick();
-    const raw = window.localStorage.getItem(this.draftKey);
-    const fhir = (raw ? migrateDraft(JSON.parse(raw)) : createEmptyDraft()).fhir;
-    const [lagDays, lagHours, lagMinutes] = parseIso8601Duration(fhir.lagDuration);
-
-    return {
-      fhirServerBaseUrl: fhir.fhirServerBaseUrl,
-      maxConcurrentRequests: fhir.maxConcurrentRequests,
-      maxRetries: fhir.maxRetries,
-      minAcquisitionPullTime: fhir.minAcquisitionPullTime,
-      maxAcquisitionPullTime: fhir.maxAcquisitionPullTime,
-      lagDays,
-      lagHours,
-      lagMinutes
-    };
-  }
-
   getJwksInstructionsUrl(vendor: string): string {
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
     return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
@@ -521,14 +503,4 @@ function isValidHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-// Inverse of FhirStep's buildIso8601Duration: PxDTyHzM -> [days, hours, minutes].
-function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
-  const match = duration?.match(/^P(\d+)DT(\d+)H(\d+)M$/);
-  if (!match) {
-    return [undefined, undefined, undefined];
-  }
-
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
 }

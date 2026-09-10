@@ -14,13 +14,6 @@ public interface IFacilityAdministrationService
     /// </remarks>
     Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Reads the facility's FHIR server configuration (Data Acquisition's query configuration,
-    /// merged with Query Dispatch's discharge-lag schedule). Facility comes from
-    /// <see cref="INhsnUserContext"/>, never the route.
-    /// </summary>
-    Task<FhirServerInfoResponse?> GetFhirServerInfoAsync(CancellationToken cancellationToken = default);
-
     /// <summary>Writes the facility's FHIR server configuration. FACADMIN only.</summary>
     Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default);
 

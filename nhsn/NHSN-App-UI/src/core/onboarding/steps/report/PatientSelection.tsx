@@ -213,7 +213,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     if (state.error) {
       return (
         <MessageContainer type="error" showIcon>
-          <span>{state.error}</span>
+          <span role="alert">{state.error}</span>
         </MessageContainer>
       );
     }
@@ -221,7 +221,11 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
       return null;
     }
     if (state.sources.length === 0) {
-      return <p className="form-hint">{t('onboarding:report.patients.census.noSources')}</p>;
+      return (
+        <p className="form-hint" role="status">
+          {t('onboarding:report.patients.census.noSources')}
+        </p>
+      );
     }
 
     const activeKey = selectedSource[which];
@@ -251,7 +255,9 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
         ) : (
           <>
             {available.length === 0 ? (
-              <p className="form-hint">{t('onboarding:report.patients.census.emptySource')}</p>
+              <p className="form-hint" role="status">
+                {t('onboarding:report.patients.census.emptySource')}
+              </p>
             ) : (
               <>
                 <div className="report-patient-scroll">
@@ -396,7 +402,11 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
               accept=".csv"
               disabled={disabled || atLimit}
               onSelect={file => void handleCsv(file)} />
-            {csvStatus && <p className="form-hint">{csvStatus}</p>}
+            {csvStatus && (
+              <p className="form-hint" role="status">
+                {csvStatus}
+              </p>
+            )}
           </div>
         )}
 
@@ -419,7 +429,11 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
       </Tabs>
 
       {atLimit && <p className="form-hint">{t('onboarding:report.patients.messages.limitReached')}</p>}
-      {error && <p className="k-form-error">{error}</p>}
+      {error && (
+        <p className="k-form-error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
