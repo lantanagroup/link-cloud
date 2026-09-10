@@ -65,7 +65,7 @@ public class ReportDatabaseValidator
 
             await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, expectSubmissionBypassed, errors);
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
-            await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
+            await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, expectSubmissionBypassed, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
             var reportableMeasureTypeMap = await BuildHasReportableMeasureRowsByTypeAsync(scheduleId);
             await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, expectedSubmitted, reportableMeasureTypeMap, errors);
@@ -162,6 +162,7 @@ public class ReportDatabaseValidator
         string facilityId,
         List<string> expectedPatientIds,
         List<string> expectedSubmittedPatientIds,
+        bool expectSubmissionBypassed,
         List<string> errors)
     {
         var entries = await _reader.GetReportEntriesAsync(scheduleId);
@@ -183,8 +184,12 @@ public class ReportDatabaseValidator
 
             if (submittedSet.Contains(entry.PatientId))
             {
-                if (!string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
-                    AddError(errors, $"ReportEntry {entry.Id} for patient {entry.PatientId} should be Submitted, actual {entry.SubmissionStatus}");
+                // A reportable patient on a bypassed report is evaluated and validated exactly as
+                // usual; only the submission is skipped, so it ends on NotSubmitted instead.
+                var expectedStatus = expectSubmissionBypassed ? "NotSubmitted" : "Submitted";
+
+                if (!string.Equals(entry.SubmissionStatus, expectedStatus, StringComparison.OrdinalIgnoreCase))
+                    AddError(errors, $"ReportEntry {entry.Id} for patient {entry.PatientId} should be {expectedStatus}, actual {entry.SubmissionStatus}");
             }
             else
             {
