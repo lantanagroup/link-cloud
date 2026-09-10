@@ -196,6 +196,21 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
                 await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
+                // The per-patient SubmitPayload we just skipped is normally what drives report
+                // completion: it comes back as PayloadSubmitted, and PayloadSubmittedListener
+                // calls ReportManifestProducer.Produce after each patient. With submission
+                // bypassed that event never exists, and the other callers cannot stand in for
+                // it -- MeasureReportGeneratedListener runs before validation, and an ad-hoc
+                // report never schedules EndOfReportPeriodJob. Without this call the manifest
+                // is never written to internal/ and the schedule sits at its pre-report status
+                // forever.
+                //
+                // Produce is gated on EndOfReportPeriodJobHasRun and AreAllEntriesCompleteAsync,
+                // so it is a no-op on every patient but the last, exactly as on the submitting
+                // path.
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
+                await reportManifestProducer.Produce(schedule, correlationIdStr, cancellationToken);
             }
         }
 

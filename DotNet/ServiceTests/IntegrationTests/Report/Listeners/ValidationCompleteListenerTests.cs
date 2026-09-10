@@ -6,8 +6,10 @@ using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System.Text;
@@ -472,6 +474,88 @@ public class ValidationCompleteListenerTests
                     m.Value.PatientId == patientId),
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Once);
+    }
+
+    /// <summary>
+    /// The per-patient SubmitPayload is not only a submission -- it is what drives report
+    /// completion, because it returns as PayloadSubmitted and PayloadSubmittedListener calls
+    /// ReportManifestProducer.Produce after each patient. Bypassing submission removes that
+    /// event, and nothing else stands in for it: MeasureReportGeneratedListener's calls happen
+    /// before validation, and an ad-hoc report never schedules EndOfReportPeriodJob.
+    ///
+    /// Without the producer call on the bypass branch the schedule never leaves its pre-report
+    /// status and no manifest reaches internal/ -- a report that did all of its work and shows
+    /// none of it. Observed on a live run before this test existed.
+    /// </summary>
+    [Fact]
+    public async Task ProcessMessageAsync_SubmissionDisabledAndLastPatient_DrivesReportToTerminal()
+    {
+        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var facilityId = "test-facility-validation-terminal";
+        var reportId = Guid.NewGuid();
+        var patientId = "pat-terminal-001";
+
+        _fixture.TenantApiServiceMock
+            .Setup(t => t.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FacilityModel { FacilityId = facilityId, FacilityName = "Terminal Test Facility" });
+
+        // EndOfReportPeriodJobHasRun mirrors an ad-hoc report, which sets it at creation and
+        // therefore never runs the job that would otherwise produce the manifest.
+        var schedule = new ReportScheduleModel
+        {
+            Id = reportId,
+            FacilityId = facilityId,
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            Frequency = Frequency.Adhoc,
+            ReportTypes = { "DE-111" },
+            Status = ScheduleStatus.New,
+            EnableSubmission = false,
+            EndOfReportPeriodJobHasRun = true,
+            CreateDate = DateTime.UtcNow
+        };
+        await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
+
+        // The only patient, so this ValidationComplete is the last one.
+        var entry = new ReportEntryModel
+        {
+            PatientId = patientId,
+            ReportScheduleId = reportId,
+            FacilityId = facilityId,
+            ReportingStatus = ReportingStatus.PatientIdentified,
+            SubmissionStatus = SubmissionStatus.PendingValidation,
+            CreateDate = DateTime.UtcNow,
+            AggregateReportBlobName = "test-aggregate-terminal.ndjson",
+            AggregateReportUri = "https://blob.example.com/test-aggregate-terminal.ndjson"
+        };
+        await reportEntryManager.AddAsync(entry, CancellationToken.None);
+        await CreateAppendBlobForTest(entry.AggregateReportBlobName);
+
+        await listener.ProcessMessageAsync(
+            BuildConsumeResult(facilityId, reportId, patientId, isValid: true), CancellationToken.None);
+
+        using var verifyScope = _fixture.ScopeFactory.CreateScope();
+        var verifyScheduleManager = verifyScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var updated = await verifyScheduleManager.SingleOrDefaultAsync(s => s.Id == reportId);
+
+        Assert.NotNull(updated);
+        Assert.Equal(ScheduleStatus.CompletedNotSubmitted, updated!.Status);
+        Assert.True(updated.Status.IsTerminal());
+        Assert.Null(updated.SubmitReportDateTime);
+
+        // Still no submission of any kind.
+        _fixture.SubmitPayloadKafkaProducerMock.Verify(
+            p => p.Produce(
+                It.IsAny<string>(),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+            Times.Never);
     }
 
     private static ConsumeResult<string, ValidationCompleteValue> BuildConsumeResult(
