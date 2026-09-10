@@ -319,8 +319,8 @@ public class ReportApiHelper
                 }
 
                 // Entryless scheduled runs are valid when prediction says no
-                // patients should participate. In that case the report can transition
-                // to Submitted without ever emitting ReportEntriesCreated.
+                // patients should participate. In that case the report can reach a terminal
+                // status without ever emitting ReportEntriesCreated.
                 var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
                 if (scheduleProbe.IsSuccessStatusCode
                     && scheduleProbe.Body?.Status.IsTerminal() == true)
@@ -328,7 +328,7 @@ public class ReportApiHelper
                     milestoneReached = true;
                     var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
                     _output.WriteLine(
-                        $"Milestone '{milestoneToAwait}' was not observed, but report is already Submitted after {elapsed:F0}s. Continuing.");
+                        $"Milestone '{milestoneToAwait}' was not observed, but report is already terminal ({scheduleProbe.Body.Status}) after {elapsed:F0}s. Continuing.");
                     break;
                 }
 
@@ -466,7 +466,7 @@ public class ReportApiHelper
                     && scheduleResponse.Body.Status.IsTerminal())
                 {
                     _output.WriteLine(
-                        $"Report {reportId} reached Submitted with no report-entry payload available; treating as terminal entryless report.");
+                        $"Report {reportId} reached terminal status {scheduleResponse.Body.Status} with no report-entry payload available; treating as terminal entryless report.");
                     return new ReportTerminalState([], []);
                 }
 
