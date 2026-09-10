@@ -387,10 +387,22 @@ export interface PatientMappingEvidence {
   codeMaps: CodeMapEvidence[];
 }
 
+/**
+ * One FHIR query DataAcquisition ran while acquiring a report -- one row per query, matching the
+ * granularity of the onboarding POC's acquisition log table. There is no timeline/timestamp here:
+ * DataAcquisition only records completion time once a log finishes, which the POC's own log view
+ * never showed either.
+ */
 export interface AcquisitionLogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
+  patientId: string;
+  /** The FHIR resource type(s) this query acquired, e.g. "Encounter". */
+  resource: string;
+  /** "Initial" or "Supplemental". */
+  queryPhase: string;
+  /** "Read", "Search", "SearchPost", "BulkDataRequest" or "BulkDataPoll" -- absent for a log with no dispatched query yet. */
+  queryType?: string;
+  parameters: string[];
+  status: string;
 }
 
 // ---------------------------------------------------------------- reporting plan

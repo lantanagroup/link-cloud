@@ -423,14 +423,62 @@ export class MockApiClient implements ApiClient {
 
   async getQueryPlan(reportId: string): Promise<C.QueryPlan> {
     await tick();
-    return {reportId, planJson: '{ "simulated": true }'};
+    // Shaped like DataAcquisition's real query plan JSON (PlanName/EHRDescription/LookBack plus
+    // numerically-keyed Initial/SupplementalQueries dictionaries) so the structured modal view --
+    // not just its raw-JSON fallback -- is exercised in mock mode.
+    const planJson = JSON.stringify({
+      PlanName: 'Simulated-ACHMonthly',
+      EHRDescription: 'Epic (simulated)',
+      LookBack: 'P0D',
+      InitialQueries: {
+        '0': {
+          ResourceType: 'Patient',
+          QueryConfigType: 'Parameter',
+          Parameters: [{Name: '_id', Variable: 'patientId'}]
+        },
+        '1': {
+          ResourceType: 'Encounter',
+          QueryConfigType: 'Parameter',
+          Parameters: [
+            {Name: 'patient', Variable: 'patientId'},
+            {Name: 'date', Literal: 'ge2026-01-01'}
+          ]
+        }
+      },
+      SupplementalQueries: {
+        '0': {
+          ResourceType: 'Location',
+          QueryConfigType: 'Reference',
+          OperationType: 'Search',
+          Paged: true,
+          Parameters: [{Name: '_id', Variable: 'locationId'}]
+        }
+      }
+    });
+    return {reportId, planJson};
   }
 
   async getAcquisitionLogs(): Promise<C.AcquisitionLogEntry[]> {
     await tick();
-    return [
-      {timestamp: '2026-01-01T00:00:00Z', level: 'Information', message: 'Simulated log entry'}
-    ];
+    return ids(3).flatMap(patientId => [
+      {patientId, resource: 'Patient', queryPhase: 'Initial', queryType: 'Read', parameters: [], status: 'Completed'},
+      {
+        patientId,
+        resource: 'Encounter',
+        queryPhase: 'Initial',
+        queryType: 'Search',
+        parameters: [`patient=${patientId}`, 'date=ge2026-01-01'],
+        status: 'Completed'
+      },
+      {
+        patientId,
+        resource: 'Location',
+        queryPhase: 'Supplemental',
+        queryType: 'Search',
+        parameters: ['_id=SIMULATED-LOC-1'],
+        status: 'Pending'
+      }
+    ]);
   }
 
   async exportReportSummary(): Promise<Blob> {

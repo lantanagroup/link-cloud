@@ -530,12 +530,35 @@
       "actions": {
         "viewQueryPlan": "View Query Plan",
         "viewAcquisitionLog": "View Acquisition Log",
-        "exportSummary": "Export Report Summary"
+        "exportSummary": "Export Report Summary",
+        "exportToExcel": "Export to Excel"
+      },
+      "queryPlan": {
+        "ehrType": "EHR Type",
+        "planDetails": "Plan Details",
+        "planName": "Plan Name",
+        "lookBack": "Look Back",
+        "queries": "Queries",
+        "section": "Section",
+        "resourceType": "Resource Type",
+        "queryType": "Query Type",
+        "operationType": "Operation Type",
+        "paged": "Paged",
+        "parameters": "Parameters",
+        "empty": "No query plan is configured for this facility yet."
       },
       "acquisitionLog": {
-        "timestamp": "Timestamp",
-        "level": "Status",
-        "message": "Message",
+        "resource": "Resource",
+        "queryPhase": "Query Phase",
+        "queryType": "Query Type",
+        "parameters": "Parameters",
+        "status": "Status",
+        "filterPatientPlaceholder": "Filter by Patient Id…",
+        "allResources": "All Resources",
+        "allPhases": "All Phases",
+        "allTypes": "All Types",
+        "allStatuses": "All Statuses",
+        "resultCount": "{{shown}} of {{total}} queries",
         "empty": "No acquisition log entries recorded for this report yet."
       },
       "columns": {

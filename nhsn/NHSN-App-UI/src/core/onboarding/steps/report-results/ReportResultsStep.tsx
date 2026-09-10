@@ -10,13 +10,36 @@ import {
   Modal,
   NHSNLoadingIndicator,
   PageHeader,
+  Select,
   StepActions,
-  Tabs
+  Tabs,
+  TextField
 } from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {PLACEHOLDER_MEASURES} from '../report/placeholderMeasures';
+import {parseQueryPlan, type ParsedQueryPlan, type ParsedQueryPlanQuery} from './queryPlan';
+import {buildXlsxBlob, downloadBlob, type XlsxSheet} from './reportExport';
+
+/** A field's `t` narrowed to the plain-string-key shape the sheet builders below need. */
+type TFn = (key: string) => string;
+
+interface AcquisitionLogFilters {
+  patientId: string;
+  resource: string;
+  queryPhase: string;
+  queryType: string;
+  status: string;
+}
+
+const EMPTY_ACQUISITION_LOG_FILTERS: AcquisitionLogFilters = {
+  patientId: '',
+  resource: '',
+  queryPhase: '',
+  queryType: '',
+  status: ''
+};
 
 // nhsn-react-core's Badge defaults to a small `shape="circle"` icon-count indicator and is
 // `aria-hidden` - it's the wrong shape for a readable status label, so status renders as its own
@@ -119,6 +142,13 @@ const DQM_LINK_BY_NAME: Record<string, string> = {
 // than hand-duplicated, since every placeholder already carries both.
 const REAL_REPORT_TYPE_BY_DQM_NAME: Record<string, string> = Object.fromEntries(
   PLACEHOLDER_MEASURES.map(measure => [DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure.name], measure.digitalQualityMeasure])
+);
+
+// The reverse of the map above, for turning a patient's real per-dQM report type back into the
+// DQM tab name it belongs under -- used by the Export Report Summary sheet, which isn't scoped to
+// whichever tab happens to be active on screen.
+const DQM_NAME_BY_REPORT_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(REAL_REPORT_TYPE_BY_DQM_NAME).map(([dqmName, reportType]) => [reportType, dqmName])
 );
 
 /**
@@ -335,10 +365,85 @@ function DownloadIcon() {
   );
 }
 
+// ---------------------------------------------------------------- report summary export
+//
+// Builds the "Export Report Summary" workbook: one .xlsx with a sheet per section of the
+// onboarding POC's zip-of-files export (Report Summary, Selected Measures, Patient Reporting
+// Status, Acquisition Log, Query Plan), rather than a zip of separate files -- see reportExport.ts.
+// Each sheet covers every measure/patient/query, not just whichever DQM tab is active on screen.
+
+function buildReportSummarySheet(detail: ReportDetail): XlsxSheet {
+  const rows: Array<[string, string]> = [['Report Id', detail.reportId]];
+  if (detail.regeneratedFrom) {
+    rows.push(['Regenerated From', detail.regeneratedFrom]);
+  }
+  rows.push(
+    ['Reporting Period', `${formatDate(detail.startDate)} to ${formatDate(detail.endDate)}`],
+    ['Create Date', formatDateTime(detail.createDate)],
+    ['Patient Count', String(detail.patientCount)],
+    ['Status', demoDisplayStatus(detail.status, detail.reportId)]
+  );
+  return {name: 'Report Summary', headers: ['Field', 'Value'], rows};
+}
+
+function buildSelectedMeasuresSheet(detail: ReportDetail, requestedMeasuresByReportId: Record<string, string[]> | undefined): XlsxSheet {
+  const measures = friendlyMeasuresFor(detail.measures, detail.reportId, requestedMeasuresByReportId);
+  const rows = measures.map(measure => [measure, DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure] ?? '']);
+  return {name: 'Selected Measures', headers: ['NHSN Measure', 'Digital Quality Measure'], rows};
+}
+
+function buildPatientReportingStatusSheet(patients: ReportPatientEntry[], t: TFn): XlsxSheet {
+  const rows = patients.flatMap(patient => {
+    const reports = patient.measureReports.length > 0 ? patient.measureReports : [null];
+    return reports.map(measureReport => [
+      patient.patientId,
+      measureReport ? (DQM_NAME_BY_REPORT_TYPE[measureReport.reportType] ?? measureReport.reportType) : '—',
+      String(measureReport?.resourceCount ?? patient.resourceCount),
+      t(`onboarding:reportResults.detail.statusCategories.${toStatusCategory(patient.reportingStatus)}`),
+      patient.locationOrgMapped ? t('onboarding:reportResults.detail.mapping.found') : t('onboarding:reportResults.detail.mapping.notFound'),
+      patient.hslocMapped ? t('onboarding:reportResults.detail.mapping.found') : t('onboarding:reportResults.detail.mapping.notFound'),
+      patient.encounterMapped ? t('onboarding:reportResults.detail.mapping.found') : t('onboarding:reportResults.detail.mapping.notFound')
+    ]);
+  });
+  return {
+    name: 'Patient Reporting Status',
+    headers: ['Patient Id', 'Measure', 'FHIR Resource Count', 'Report Status', 'Location Org Found', 'HSLOC Mapping Found', 'Encounter Mapping Found'],
+    rows
+  };
+}
+
+function buildAcquisitionLogSheet(entries: AcquisitionLogEntry[]): XlsxSheet {
+  return {
+    name: 'Acquisition Log',
+    headers: ['Patient Id', 'Resource', 'Query Phase', 'Query Type', 'Parameters', 'Status'],
+    rows: entries.map(entry => [entry.patientId, entry.resource, entry.queryPhase, entry.queryType ?? '', entry.parameters.join('; '), entry.status])
+  };
+}
+
+function queryPlanRows(plan: ParsedQueryPlan): Array<Array<string>> {
+  const row = (section: string, query: ParsedQueryPlanQuery) => [
+    section,
+    query.resourceType,
+    query.queryConfigType ?? '',
+    query.operationType ?? '',
+    query.paged === undefined ? '' : query.paged ? 'Yes' : 'No',
+    query.parameters.join('; ')
+  ];
+  return [...plan.initialQueries.map(query => row('Initial', query)), ...plan.supplementalQueries.map(query => row('Supplemental', query))];
+}
+
+function buildQueryPlanSheet(plan: ParsedQueryPlan): XlsxSheet {
+  return {
+    name: 'Query Plan',
+    headers: ['Section', 'Resource Type', 'Query Type', 'Operation Type', 'Paged', 'Parameters'],
+    rows: queryPlanRows(plan)
+  };
+}
+
 /**
- * The Report Details modal covers the report's own fields and the selected
- * measures' digital quality measure links. The patient pipeline, query plan
- * and acquisition logs seen in the POC are not built here - LEGLINK story:
+ * The Report Details modal covers the report's own fields, the selected measures' digital
+ * quality measure links, and the View Query Plan / View Acquisition Log / Export Report Summary
+ * actions from the onboarding POC. The patient pipeline is not built here - LEGLINK story:
  * Report Details sub-view.
  *
  * What is already wired and should not be rebuilt: draft access and patching
@@ -383,6 +488,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const [acquisitionLogs, setAcquisitionLogs] = useState<AcquisitionLogEntry[]>([]);
   const [acquisitionLogLoading, setAcquisitionLogLoading] = useState(false);
   const [acquisitionLogError, setAcquisitionLogError] = useState<string | null>(null);
+  const [acquisitionLogFilters, setAcquisitionLogFilters] = useState<AcquisitionLogFilters>(EMPTY_ACQUISITION_LOG_FILTERS);
 
   const [exporting, setExporting] = useState(false);
 
@@ -407,6 +513,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
       return;
     }
     setAcquisitionLogOpen(true);
+    setAcquisitionLogFilters(EMPTY_ACQUISITION_LOG_FILTERS);
     setAcquisitionLogLoading(true);
     setAcquisitionLogError(null);
     try {
@@ -418,19 +525,55 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     }
   }
 
+  function handleExportQueryPlan() {
+    if (!queryPlan) {
+      return;
+    }
+    const parsed = parseQueryPlan(queryPlan.planJson);
+    if (!parsed) {
+      return;
+    }
+    downloadBlob(buildXlsxBlob([buildQueryPlanSheet(parsed)]), `Query_Plan_${queryPlan.reportId}.xlsx`);
+  }
+
+  function handleExportAcquisitionLog(entries: AcquisitionLogEntry[]) {
+    if (!detail) {
+      return;
+    }
+    downloadBlob(buildXlsxBlob([buildAcquisitionLogSheet(entries)]), `Acquisition_Log_${detail.reportId}.xlsx`);
+  }
+
+  // Bundles every section the onboarding POC zips into separate files (mappings/report
+  // details/acquisition log/query plan) into one .xlsx workbook instead -- see reportExport.ts.
+  // Covers every measure and patient, not just whichever DQM tab happens to be on screen, and
+  // fetches the acquisition log / query plan fresh rather than relying on those modals having
+  // been opened first.
   async function handleExportSummary() {
     if (!detail) {
       return;
     }
     setExporting(true);
     try {
-      const blob = await api.exportReportSummary(detail.reportId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `report-${detail.reportId}-summary.json`;
-      link.click();
-      URL.revokeObjectURL(url);
+      const [acquisitionLog, plan] = await Promise.all([
+        api.getAcquisitionLogs(detail.reportId).catch(() => [] as AcquisitionLogEntry[]),
+        api.getQueryPlan(detail.reportId).catch(() => null)
+      ]);
+
+      const sheets: XlsxSheet[] = [buildReportSummarySheet(detail), buildSelectedMeasuresSheet(detail, reportResults.requestedMeasuresByReportId)];
+
+      const patientSheet = buildPatientReportingStatusSheet(patients, t);
+      if (patientSheet.rows.length > 0) {
+        sheets.push(patientSheet);
+      }
+
+      sheets.push(buildAcquisitionLogSheet(acquisitionLog));
+
+      const parsedPlan = plan ? parseQueryPlan(plan.planJson) : null;
+      if (parsedPlan) {
+        sheets.push(buildQueryPlanSheet(parsedPlan));
+      }
+
+      downloadBlob(buildXlsxBlob(sheets), `${detail.reportId}_Report_Summary.xlsx`);
     } catch (cause) {
       notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
     } finally {
@@ -597,6 +740,33 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
       const path = describePieSlice(60, 60, 60, resourceSliceStart, resourceSliceStart + sweep);
       resourceSliceStart += sweep;
       return {...slice, path};
+    });
+
+    const parsedQueryPlan = queryPlan ? parseQueryPlan(queryPlan.planJson) : null;
+
+    // Filter options are derived from whatever the report actually returned, not a fixed list --
+    // a report with no Location queries simply shows no "Location" option, matching the data.
+    const acquisitionResourceOptions = Array.from(new Set(acquisitionLogs.map(entry => entry.resource))).filter(Boolean).sort();
+    const acquisitionPhaseOptions = Array.from(new Set(acquisitionLogs.map(entry => entry.queryPhase))).filter(Boolean).sort();
+    const acquisitionTypeOptions = Array.from(new Set(acquisitionLogs.map(entry => entry.queryType).filter((value): value is string => Boolean(value)))).sort();
+    const acquisitionStatusOptions = Array.from(new Set(acquisitionLogs.map(entry => entry.status))).filter(Boolean).sort();
+    const filteredAcquisitionLogs = acquisitionLogs.filter(entry => {
+      if (acquisitionLogFilters.patientId && !entry.patientId.toLowerCase().includes(acquisitionLogFilters.patientId.toLowerCase())) {
+        return false;
+      }
+      if (acquisitionLogFilters.resource && entry.resource !== acquisitionLogFilters.resource) {
+        return false;
+      }
+      if (acquisitionLogFilters.queryPhase && entry.queryPhase !== acquisitionLogFilters.queryPhase) {
+        return false;
+      }
+      if (acquisitionLogFilters.queryType && entry.queryType !== acquisitionLogFilters.queryType) {
+        return false;
+      }
+      if (acquisitionLogFilters.status && entry.status !== acquisitionLogFilters.status) {
+        return false;
+      }
+      return true;
     });
 
     return (
@@ -862,9 +1032,17 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           onClose={() => setQueryPlanOpen(false)}
           size="large"
           footer={
-            <Button variant="secondary" onClick={() => setQueryPlanOpen(false)}>
-              {t('common:actions.close')}
-            </Button>
+            <>
+              {parsedQueryPlan && (
+                <Button variant="secondary" onClick={handleExportQueryPlan}>
+                  <DownloadIcon />
+                  {t('onboarding:reportResults.detail.actions.exportToExcel')}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => setQueryPlanOpen(false)}>
+                {t('common:actions.close')}
+              </Button>
+            </>
           }>
           {queryPlanLoading && <NHSNLoadingIndicator />}
           {!queryPlanLoading && queryPlanError && (
@@ -872,8 +1050,69 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
               <span role="alert">{queryPlanError}</span>
             </MessageContainer>
           )}
-          {!queryPlanLoading && !queryPlanError && (
-            <pre className="nhsn-link__report-results-json">{queryPlan?.planJson ?? '{}'}</pre>
+          {!queryPlanLoading && !queryPlanError && parsedQueryPlan && (
+            <>
+              <ul className="nhsn-link__summary-list">
+                <li>
+                  <span>{t('onboarding:reportResults.detail.queryPlan.ehrType')}</span>
+                  <span>{parsedQueryPlan.ehrDescription ?? '—'}</span>
+                </li>
+              </ul>
+
+              <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.queryPlan.planDetails')}</h3>
+              <div className="nhsn-link__report-results-table-scroll">
+                <table className="nhsn-link__report-results-table">
+                  <tbody>
+                    <tr>
+                      <td>{t('onboarding:reportResults.detail.queryPlan.planName')}</td>
+                      <td>{parsedQueryPlan.planName ?? '—'}</td>
+                    </tr>
+                    <tr>
+                      <td>{t('onboarding:reportResults.detail.queryPlan.lookBack')}</td>
+                      <td>{parsedQueryPlan.lookBack ?? '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.queryPlan.queries')}</h3>
+              <div className="nhsn-link__report-results-table-scroll">
+                <table className="nhsn-link__report-results-table">
+                  <thead>
+                    <tr>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.section')}</th>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.resourceType')}</th>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.queryType')}</th>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.operationType')}</th>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.paged')}</th>
+                      <th>{t('onboarding:reportResults.detail.queryPlan.parameters')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ...parsedQueryPlan.initialQueries.map(query => ({section: 'Initial', query})),
+                      ...parsedQueryPlan.supplementalQueries.map(query => ({section: 'Supplemental', query}))
+                    ].map(({section, query}, index) => (
+                      <tr key={`${section}-${query.resourceType}-${index}`}>
+                        <td>{section}</td>
+                        <td>{query.resourceType}</td>
+                        <td>{query.queryConfigType ?? '—'}</td>
+                        <td>{query.operationType ?? '—'}</td>
+                        <td>{query.paged === undefined ? '—' : query.paged ? t('common:actions.yes') : t('common:actions.no')}</td>
+                        <td>{query.parameters.length > 0 ? query.parameters.join(', ') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          {!queryPlanLoading && !queryPlanError && !parsedQueryPlan && (
+            queryPlan ? (
+              <pre className="nhsn-link__report-results-json">{queryPlan.planJson}</pre>
+            ) : (
+              <p>{t('onboarding:reportResults.detail.queryPlan.empty')}</p>
+            )
           )}
         </Modal>
 
@@ -883,9 +1122,17 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           onClose={() => setAcquisitionLogOpen(false)}
           size="large"
           footer={
-            <Button variant="secondary" onClick={() => setAcquisitionLogOpen(false)}>
-              {t('common:actions.close')}
-            </Button>
+            <>
+              {acquisitionLogs.length > 0 && (
+                <Button variant="secondary" onClick={() => handleExportAcquisitionLog(filteredAcquisitionLogs)}>
+                  <DownloadIcon />
+                  {t('onboarding:reportResults.detail.actions.exportToExcel')}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => setAcquisitionLogOpen(false)}>
+                {t('common:actions.close')}
+              </Button>
+            </>
           }>
           {acquisitionLogLoading && <NHSNLoadingIndicator />}
           {!acquisitionLogLoading && acquisitionLogError && (
@@ -895,26 +1142,81 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           )}
           {!acquisitionLogLoading && !acquisitionLogError && (
             acquisitionLogs.length > 0 ? (
-              <div className="nhsn-link__report-results-table-scroll">
-                <table className="nhsn-link__report-results-table">
-                  <thead>
-                    <tr>
-                      <th>{t('onboarding:reportResults.detail.acquisitionLog.timestamp')}</th>
-                      <th>{t('onboarding:reportResults.detail.acquisitionLog.level')}</th>
-                      <th>{t('onboarding:reportResults.detail.acquisitionLog.message')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {acquisitionLogs.map((entry, index) => (
-                      <tr key={`${entry.timestamp}-${index}`}>
-                        <td className="nhsn-link__report-results-nowrap">{formatDateTime(entry.timestamp)}</td>
-                        <td>{entry.level}</td>
-                        <td>{entry.message}</td>
+              <>
+                <div className="nhsn-link__report-results-filters">
+                  <TextField
+                    id="acquisition-log-filter-patient-id"
+                    label={t('onboarding:reportResults.detail.columns.patientId')}
+                    placeholder={t('onboarding:reportResults.detail.acquisitionLog.filterPatientPlaceholder')}
+                    value={acquisitionLogFilters.patientId}
+                    onChange={value => setAcquisitionLogFilters(prev => ({...prev, patientId: value}))}
+                  />
+                  <Select
+                    id="acquisition-log-filter-resource"
+                    label={t('onboarding:reportResults.detail.acquisitionLog.resource')}
+                    placeholder={t('onboarding:reportResults.detail.acquisitionLog.allResources')}
+                    options={acquisitionResourceOptions.map(value => ({value, label: value}))}
+                    value={acquisitionLogFilters.resource}
+                    onChange={value => setAcquisitionLogFilters(prev => ({...prev, resource: value}))}
+                  />
+                  <Select
+                    id="acquisition-log-filter-phase"
+                    label={t('onboarding:reportResults.detail.acquisitionLog.queryPhase')}
+                    placeholder={t('onboarding:reportResults.detail.acquisitionLog.allPhases')}
+                    options={acquisitionPhaseOptions.map(value => ({value, label: value}))}
+                    value={acquisitionLogFilters.queryPhase}
+                    onChange={value => setAcquisitionLogFilters(prev => ({...prev, queryPhase: value}))}
+                  />
+                  <Select
+                    id="acquisition-log-filter-type"
+                    label={t('onboarding:reportResults.detail.acquisitionLog.queryType')}
+                    placeholder={t('onboarding:reportResults.detail.acquisitionLog.allTypes')}
+                    options={acquisitionTypeOptions.map(value => ({value, label: value}))}
+                    value={acquisitionLogFilters.queryType}
+                    onChange={value => setAcquisitionLogFilters(prev => ({...prev, queryType: value}))}
+                  />
+                  <Select
+                    id="acquisition-log-filter-status"
+                    label={t('onboarding:reportResults.detail.acquisitionLog.status')}
+                    placeholder={t('onboarding:reportResults.detail.acquisitionLog.allStatuses')}
+                    options={acquisitionStatusOptions.map(value => ({value, label: value}))}
+                    value={acquisitionLogFilters.status}
+                    onChange={value => setAcquisitionLogFilters(prev => ({...prev, status: value}))}
+                  />
+                </div>
+                <p className="nhsn-link__report-results-result-count">
+                  {t('onboarding:reportResults.detail.acquisitionLog.resultCount', {
+                    shown: filteredAcquisitionLogs.length,
+                    total: acquisitionLogs.length
+                  })}
+                </p>
+                <div className="nhsn-link__report-results-table-scroll">
+                  <table className="nhsn-link__report-results-table">
+                    <thead>
+                      <tr>
+                        <th>{t('onboarding:reportResults.detail.columns.patientId')}</th>
+                        <th>{t('onboarding:reportResults.detail.acquisitionLog.resource')}</th>
+                        <th>{t('onboarding:reportResults.detail.acquisitionLog.queryPhase')}</th>
+                        <th>{t('onboarding:reportResults.detail.acquisitionLog.queryType')}</th>
+                        <th>{t('onboarding:reportResults.detail.acquisitionLog.parameters')}</th>
+                        <th>{t('onboarding:reportResults.detail.acquisitionLog.status')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filteredAcquisitionLogs.map((entry, index) => (
+                        <tr key={`${entry.patientId}-${entry.resource}-${index}`}>
+                          <td>{entry.patientId}</td>
+                          <td>{entry.resource}</td>
+                          <td>{entry.queryPhase}</td>
+                          <td>{entry.queryType ?? '—'}</td>
+                          <td>{entry.parameters.length > 0 ? entry.parameters.join(', ') : '—'}</td>
+                          <td>{entry.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <p>{t('onboarding:reportResults.detail.acquisitionLog.empty')}</p>
             )
