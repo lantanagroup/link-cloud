@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
@@ -257,6 +259,53 @@ public class ReportScheduledManagerTests
     #region Helper Methods
 
     #region Bypassed submission (LEGLINK-1083)
+
+    /// <summary>
+    /// Pins the EF behaviour the whole feature rests on. EnableSubmission is configured with
+    /// HasDefaultValue(true), which makes EF infer ValueGeneratedOnAdd on top of the column's
+    /// DEFAULT 1 constraint -- the classic shape of a bool that silently reverts to its store
+    /// default on insert.
+    ///
+    /// It does not revert, because since EF Core 7 HasDefaultValue(v) also sets the property's
+    /// sentinel to v: the value omitted from the INSERT is true, so an explicit false is sent.
+    /// Nothing else covers this, and it is subtle enough that an EF upgrade or an edit to that
+    /// one line could flip it without any other test noticing -- at which point bypassSubmission
+    /// would be accepted, appear to work, and submit anyway.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AddAsync_PersistsEnableSubmissionExactlyAsGiven(bool enableSubmission)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var model = new ReportScheduleModel
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            Frequency = Frequency.Adhoc,
+            ReportTypes = { "DE-111" },
+            Status = ScheduleStatus.New,
+            EnableSubmission = enableSubmission,
+            CreateDate = DateTime.UtcNow
+        };
+
+        await sut.AddAsync(model, CancellationToken.None);
+
+        // Read through the raw entity rather than the manager, so a projection that happened to
+        // default the value could not mask a bad write.
+        context.ChangeTracker.Clear();
+        var stored = await context.ReportSchedule.FindAsync(model.Id);
+
+        Assert.NotNull(stored);
+        Assert.Equal(enableSubmission, stored.EnableSubmission);
+    }
+
 
     /// <summary>
     /// A bypassed report completed its work, so the facility-facing status is Completed --
