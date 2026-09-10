@@ -1,23 +1,116 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {MatDialog} from '@angular/material/dialog';
+import {of} from 'rxjs';
 
 import { CodeMapComponent } from './code-map.component';
+import {OperationService} from '../../../../services/gateway/normalization/operation.service';
+import {OperationType} from '../../../../interfaces/normalization/operation-type-enumeration';
+import {FormMode} from '../../../../models/FormMode.enum';
 
 describe('CodeMapComponent', () => {
   let component: CodeMapComponent;
   let fixture: ComponentFixture<CodeMapComponent>;
+  let operationService: jasmine.SpyObj<OperationService>;
 
   beforeEach(async () => {
+    operationService = jasmine.createSpyObj('OperationService', [
+      'getResourceTypes', 'getVendorVersions', 'createOperationConfiguration', 'updateOperationConfiguration'
+    ]);
+    operationService.getResourceTypes.and.returnValue(of(['Location']));
+    operationService.getVendorVersions.and.returnValue(of([]));
+    operationService.createOperationConfiguration.and.returnValue(of({id: 'operation-id', message: ''}));
+    operationService.updateOperationConfiguration.and.returnValue(of({id: 'operation-id', message: ''}));
     await TestBed.configureTestingModule({
-      imports: [CodeMapComponent]
+      imports: [CodeMapComponent],
+      providers: [
+        {provide: OperationService, useValue: operationService},
+        {provide: MatSnackBar, useValue: jasmine.createSpyObj('MatSnackBar', ['open'])},
+        {provide: MatDialog, useValue: jasmine.createSpyObj('MatDialog', ['open'])}
+      ]
     })
     .compileComponents();
 
     fixture = TestBed.createComponent(CodeMapComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+    expect(component.operationType).toBe(OperationType.CodeMap);
   });
+
+  for (const operationType of [OperationType.CodeMap, OperationType.HSLOCMap] as const) {
+    for (const formMode of [FormMode.Create, FormMode.Edit]) {
+      it(`preserves ${operationType} in ${formMode} submissions`, () => {
+        const codeSystemMaps = [{
+          SourceSystem: 'urn:local',
+          TargetSystem: 'urn:hsloc',
+          CodeMaps: {ICU: {Code: '1027-4', Display: 'Medical critical care'}}
+        }];
+        fixture.componentRef.setInput('operationType', operationType);
+        component.formMode = formMode;
+        component.operation = {
+          id: 'operation-id', facilityId: 'test-facility', operationType,
+          operationJson: '', description: 'Map locations', isDisabled: false, createDate: '',
+          operationResourceTypes: [], vendorPresets: [],
+          parsedOperationJson: {
+            OperationType: operationType, Name: 'Map locations', Description: 'Map locations',
+            FhirPath: 'type.coding', CodeSystemMaps: codeSystemMaps
+          }
+        };
+        fixture.detectChanges();
+        const isHSLOCMap = operationType === OperationType.HSLOCMap;
+        const expectedName = isHSLOCMap ? 'HSLOC Location Mapping' : 'Map locations';
+        const expectedDescription = isHSLOCMap
+          ? 'Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable Copy Location operation.'
+          : 'Map locations';
+        expect(component.nameControl.disabled).toBe(isHSLOCMap);
+        expect(component.descriptionControl.disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[formControlName="name"]').disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('textarea[formControlName="description"]').disabled).toBe(isHSLOCMap);
+        expect(component.selectedResourceTypesControl.disabled).toBe(isHSLOCMap);
+        expect(component.resourceTypeControl.disabled).toBe(isHSLOCMap);
+        expect(component.fhirPathControl.disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[placeholder="Start typing to search"]').disabled).toBe(isHSLOCMap);
+        if (isHSLOCMap) {
+          expect(fixture.nativeElement.querySelector('input[formControlName="name"]').value).toBe(expectedName);
+          expect(fixture.nativeElement.querySelector('textarea[formControlName="description"]').value).toBe(expectedDescription);
+          expect(fixture.nativeElement.querySelector('button[aria-label="Clear name"]')).toBeNull();
+          expect(fixture.nativeElement.querySelector('button[aria-label="Clear description"]')).toBeNull();
+          expect(component.selectedResourceTypesControl.value).toEqual(['Location']);
+          expect(component.resourceTypeControl.value).toBe('Location');
+          expect(component.fhirPathControl.value).toBe('type');
+          expect(fixture.nativeElement.querySelector('input[formControlName="fhirPath"]').value).toBe('type');
+        }
+        component.form.patchValue({
+          selectedResourceTypes: ['Patient'], fhirPath: 'type.coding'
+        });
+        if (!isHSLOCMap) {
+          component.form.patchValue({name: expectedName, description: expectedDescription});
+        }
+        if (formMode === FormMode.Create) {
+          component.codeSystemMaps.at(0).patchValue({
+            sourceSystem: 'urn:local', targetSystem: 'urn:hsloc',
+            codeMaps: [{key: 'ICU', value: {code: '1027-4', display: 'Medical critical care'}}]
+          });
+        }
+
+        expect(component.form.valid).toBeTrue();
+        component.submitConfiguration();
+
+        const request = formMode === FormMode.Create
+          ? operationService.createOperationConfiguration
+          : operationService.updateOperationConfiguration;
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.calls.mostRecent().args[0].description).toBe(expectedDescription);
+        expect(request.calls.mostRecent().args[0].resourceTypes).toEqual(isHSLOCMap ? ['Location'] : ['Patient']);
+        expect(request.calls.mostRecent().args[0].operation).toEqual(jasmine.objectContaining({
+          Name: expectedName, Description: expectedDescription,
+          OperationType: operationType, FhirPath: isHSLOCMap ? 'type' : 'type.coding', CodeSystemMaps: codeSystemMaps
+        }));
+      });
+    }
+  }
 });

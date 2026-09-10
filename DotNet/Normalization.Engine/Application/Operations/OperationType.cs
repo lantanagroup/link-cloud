@@ -8,6 +8,7 @@
         CodeMap = 3,
         CopyLocation = 4,
         RemoveExtensions = 5,
-        CopyLocationAliasToTypeIteratively = 6
+        CopyLocationAliasToTypeIteratively = 6,
+        HSLOCMap = 7
     }
 }

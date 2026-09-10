@@ -148,6 +148,13 @@ public class CodeMapOutcomeApiModel
     /// Capped; <see cref="UnmappedCount"/> is the true total.
     /// </summary>
     public List<string> UnmappedCodes { get; set; } = [];
+    public List<CodeMappingApiModel> MappedCodes { get; set; } = [];
+}
+
+public class CodeMappingApiModel
+{
+    public string SourceCode { get; set; } = string.Empty;
+    public string TargetCode { get; set; } = string.Empty;
 }
 
 /// <summary>

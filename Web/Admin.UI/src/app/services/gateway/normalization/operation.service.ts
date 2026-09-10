@@ -13,6 +13,7 @@ import {
 } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {IOperationModel, IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
+import {HSLOCMapOperation} from 'src/app/interfaces/normalization/hsloc-map-operation-interface';
 import {IVendor, IVendorVersion} from "../../../interfaces/tenant/vendor-interface";
 import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
@@ -281,6 +282,9 @@ export class OperationService {
                         break;
                     case OperationType.CodeMap:
                         record.parsedOperationJson = parsedJson as CodeMapOperation;
+                        break;
+                    case OperationType.HSLOCMap:
+                        record.parsedOperationJson = parsedJson as HSLOCMapOperation;
                         break;
                     case OperationType.CopyLocation:
                         record.parsedOperationJson = parsedJson as IOperation;

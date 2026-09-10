@@ -2,6 +2,7 @@
 using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
@@ -90,11 +91,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 if (codeSystemMap.CodeMaps.TryGetValue(coding.Code, out var matchingCodeMap))
                 {
+                    var sourceCode = coding.Code;
                     coding.System = codeSystemMap.TargetSystem;
                     coding.Code = matchingCodeMap.Code;
                     coding.Display = matchingCodeMap.Display;
                     updated = true;
                     tally.MappedCount++;
+                    tally.MappedCodes.Add(new CodeMapping(sourceCode, matchingCodeMap.Code));
                 }
                 else
                 {
@@ -128,7 +131,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     entry.Key.TargetSystem,
                     entry.Value.MappedCount,
                     entry.Value.UnmappedCount,
-                    entry.Value.UnmappedCodes.ToList()))
+                    entry.Value.UnmappedCodes.ToList(),
+                    entry.Value.MappedCodes.ToList()))
                 .ToList();
 
         /// <summary>
@@ -139,6 +143,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             public int MappedCount { get; set; }
             public int UnmappedCount { get; set; }
+            public List<CodeMapping> MappedCodes { get; } = [];
 
             /// <summary>
             /// Distinct unmapped codes. A resource repeating the same missing code says nothing new about

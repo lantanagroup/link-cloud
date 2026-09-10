@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 OperationType.CopyProperty => JsonSerializer.Deserialize<CopyPropertyOperation>(operationJson),
                 OperationType.CodeMap => JsonSerializer.Deserialize<CodeMapOperation>(operationJson),
+                OperationType.HSLOCMap => JsonSerializer.Deserialize<HSLOCMapOperation>(operationJson),
                 OperationType.ConditionalTransform => JsonSerializer.Deserialize<ConditionalTransformOperation>(operationJson),
                 OperationType.CopyLocation => JsonSerializer.Deserialize<CopyLocationOperation>(operationJson),
                 OperationType.RemoveExtensions => JsonSerializer.Deserialize<RemoveExtensionsOperation>(operationJson),

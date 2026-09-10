@@ -216,7 +216,7 @@ public class CodeMapIndicatorTests
     }
 
     [Fact]
-    public void CombiningTwoCappedCodeLists_StaysWithinTheCap()
+    public void CombiningCodeListsRetainsCodesFromEveryPass()
     {
         var first = Enumerable.Range(0, 20).Select(index => $"FIRST-{index}").ToList();
         var second = Enumerable.Range(0, 20).Select(index => $"SECOND-{index}").ToList();
@@ -226,10 +226,9 @@ public class CodeMapIndicatorTests
             "Supplemental",
             CodeMap(HslocSystem, mapped: 0, unmapped: 20, unmappedCodes: second));
 
-        // Each pass caps its own list, so combining two full ones would otherwise double the blob on every
-        // pass. The counts are unaffected -- they are totals, not a list length.
+        // The counts are unaffected -- they are totals, not a list length.
         var outcome = Assert.Single(details.CodeMaps);
-        Assert.Equal(20, outcome.UnmappedCodes.Count);
+        Assert.Equal(40, outcome.UnmappedCodes.Count);
         Assert.Equal(40, outcome.UnmappedCount);
     }
 

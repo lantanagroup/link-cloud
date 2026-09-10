@@ -42,8 +42,11 @@ namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 /// </param>
 /// <param name="UnmappedCodes">
 /// A de-duplicated, case-insensitive sample of the codes counted by <paramref name="UnmappedCount"/>,
-/// capped so a facility with an empty code map cannot put every code it saw on the wire. Intended for
-/// troubleshooting — which codes to go add — not for counting.
+/// intended to show which codes a facility needs to add to the map. It is not used for counting.
+/// </param>
+/// <param name="MappedCodes">
+/// A sample of the source codes rewritten and the target codes they were rewritten to. Intended for
+/// troubleshooting, not for counting.
 /// </param>
 public sealed record CodeMapOutcome(
     string SourceSystem,
@@ -52,4 +55,8 @@ public sealed record CodeMapOutcome(
     int MappedCount,
     int UnmappedCount,
     int FailureCount,
-    IReadOnlyList<string> UnmappedCodes);
+    IReadOnlyList<string> UnmappedCodes,
+    IReadOnlyList<CodeMapping>? MappedCodes = null);
+
+/// <summary>A source code and the code it was rewritten to by a configured map.</summary>
+public sealed record CodeMapping(string SourceCode, string TargetCode);

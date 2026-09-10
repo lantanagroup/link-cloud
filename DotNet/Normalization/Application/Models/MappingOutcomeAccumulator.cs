@@ -16,12 +16,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models;
 public sealed class MappingOutcomeAccumulator
 {
     /// <summary>
-    /// Maximum distinct unmapped codes retained per (source, target) pair. The true total is always
-    /// carried in <c>UnmappedCount</c>; the list is a troubleshooting sample, and a facility whose
-    /// code map is empty would otherwise put every code it saw on the wire.
+    /// Distinct unmapped codes retained per (source, target) pair. The true total is carried in
+    /// <c>UnmappedCount</c>; the list identifies the codes a facility needs to configure.
     /// </summary>
-    private const int MaxUnmappedCodeSamples = 20;
-
     private readonly Dictionary<(string SourceSystem, string TargetSystem), Tally> _tallies = new();
 
     /// <summary>
@@ -46,12 +43,12 @@ public sealed class MappingOutcomeAccumulator
 
             foreach (var code in outcome.UnmappedCodes)
             {
-                if (tally.UnmappedCodes.Count >= MaxUnmappedCodeSamples)
-                {
-                    break;
-                }
-
                 tally.UnmappedCodes.Add(code);
+            }
+
+            foreach (var mapping in outcome.MappedCodes ?? [])
+            {
+                tally.MappedCodes.Add(mapping);
             }
         }
     }
@@ -102,7 +99,8 @@ public sealed class MappingOutcomeAccumulator
                 entry.Value.MappedCount,
                 entry.Value.UnmappedCount,
                 entry.Value.FailureCount,
-                entry.Value.UnmappedCodes.ToList()))
+                entry.Value.UnmappedCodes.ToList(),
+                entry.Value.MappedCodes.ToList()))
             .ToList();
 
     /// <summary>
@@ -152,5 +150,6 @@ public sealed class MappingOutcomeAccumulator
         public int UnmappedCount { get; set; }
         public int FailureCount { get; set; }
         public HashSet<string> UnmappedCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<CodeMapping> MappedCodes { get; } = [];
     }
 }

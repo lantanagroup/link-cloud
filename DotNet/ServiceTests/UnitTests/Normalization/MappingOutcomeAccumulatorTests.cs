@@ -43,14 +43,19 @@ public class MappingOutcomeAccumulatorTests
     {
         var accumulator = new MappingOutcomeAccumulator();
 
-        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 2, 1, ["PHARMACY"])]);
-        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 3, 2, ["LAB", "IMAGING"])]);
+        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 2, 1, ["PHARMACY"],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ER", "1108-0")])]);
+        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 3, 2, ["LAB", "IMAGING"],
+            [new CodeMapping("WARD", "1160-1")])]);
 
         // One correlation is one patient, so the totals span every resource that patient contributed.
         var outcome = Assert.Single(accumulator.BuildAll());
         Assert.Equal(5, outcome.MappedCount);
         Assert.Equal(3, outcome.UnmappedCount);
         Assert.Equal(["IMAGING", "LAB", "PHARMACY"], outcome.UnmappedCodes.OrderBy(code => code));
+        Assert.Equal(3, outcome.MappedCodes.Count);
+        Assert.Contains(new CodeMapping("ICU", "1027-4"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("WARD", "1160-1"), outcome.MappedCodes);
     }
 
     [Fact]
@@ -142,22 +147,21 @@ public class MappingOutcomeAccumulatorTests
     }
 
     [Fact]
-    public void UnmappedCodeSampleIsCapped_WhileTheCountStaysTrue()
+    public void UnmappedCodesAreRetainedWhileTheCountStaysTrue()
     {
         var accumulator = new MappingOutcomeAccumulator();
 
         var codes = Enumerable.Range(0, 50).Select(index => $"CODE-{index}").ToList();
         accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 0, codes.Count, codes)]);
 
-        // The list is a troubleshooting sample; a facility whose code map is empty would otherwise put
-        // every code it saw on the wire. UnmappedCount remains the authoritative total.
+        // UnmappedCount remains the authoritative total, while the list retains every distinct code.
         var outcome = Assert.Single(accumulator.BuildAll());
         Assert.Equal(50, outcome.UnmappedCount);
-        Assert.Equal(20, outcome.UnmappedCodes.Count);
+        Assert.Equal(50, outcome.UnmappedCodes.Count);
     }
 
     [Fact]
-    public void CapAppliesAcrossResources_NotPerResource()
+    public void UnmappedCodesAccumulateAcrossResources()
     {
         var accumulator = new MappingOutcomeAccumulator();
 
@@ -167,11 +171,10 @@ public class MappingOutcomeAccumulatorTests
             accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 0, codes.Count, codes)]);
         }
 
-        // The budget belongs to the patient, not to each resource, or a patient with many resources would
-        // put an unbounded list on the wire.
+        // The list spans every resource contributing to the patient outcome.
         var outcome = Assert.Single(accumulator.BuildAll());
         Assert.Equal(50, outcome.UnmappedCount);
-        Assert.Equal(20, outcome.UnmappedCodes.Count);
+        Assert.Equal(50, outcome.UnmappedCodes.Count);
     }
 
     [Fact]

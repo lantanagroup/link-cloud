@@ -128,6 +128,8 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             Mock.Of<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
+            new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
+                new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>())),
             new ConditionalTransformOperationService(Mock.Of<ILogger<ConditionalTransformOperationService>>()),
             new CopyLocationOperationService(Mock.Of<ILogger<CopyLocationOperationService>>()),
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),

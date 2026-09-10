@@ -39,6 +39,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                OperationType.HSLOCMap => (object)(HSLOCMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
                 OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
@@ -703,6 +704,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             try
             {
                 var operation = OperationHelper.GetOperation(operationType, operationJson);
+
+                if (operation is HSLOCMapOperation &&
+                    (resources is not { Count: 1 } || resources[0] != nameof(Location)))
+                {
+                    return (false, "HSLOCMap operations must target only the Location resource type.");
+                }
 
                 if (operation is CopyPropertyOperation)
                 {

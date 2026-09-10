@@ -2,6 +2,7 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -36,6 +37,9 @@ public class CodeMapOperationServiceTests
         Assert.Equal(2, outcome.MappedCount);
         Assert.Equal(0, outcome.UnmappedCount);
         Assert.Empty(outcome.UnmappedCodes);
+        Assert.Equal(
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ER", "1108-0")],
+            outcome.MappedCodes);
     }
 
     [Fact]
@@ -53,6 +57,7 @@ public class CodeMapOperationServiceTests
         Assert.Equal(1, outcome.MappedCount);
         Assert.Equal(2, outcome.UnmappedCount);
         Assert.Equal(["ER", "PHARMACY"], outcome.UnmappedCodes.OrderBy(code => code));
+        Assert.Equal(new CodeMapping("ICU", "1027-4"), Assert.Single(outcome.MappedCodes));
     }
 
     [Fact]
