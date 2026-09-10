@@ -27,6 +27,8 @@
     "back": "Back",
     "returnToHome": "Return to Home",
     "reload": "Reload",
+    "refresh": "Refresh",
+    "close": "Close",
     "download": "Download",
     "testConnection": "Test Connection"
   },

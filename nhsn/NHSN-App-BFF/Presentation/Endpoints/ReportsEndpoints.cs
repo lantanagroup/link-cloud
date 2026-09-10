@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -46,6 +48,127 @@ public class ReportsEndpoints : IApi
                     "\"pending\" never clears and refusing on it would block every report after " +
                     "the first. Requested reports bypass submission: this is a test report for a " +
                     "facility that is not enrolled yet.";
+                return operation;
+            });
+
+        group.MapGet("/", async (
+                IReportingService service,
+                CancellationToken cancellationToken,
+                int page = 1,
+                int pageSize = 10) =>
+                Results.Ok(await service.ListReportsAsync(page < 1 ? 1 : page, pageSize < 1 ? 10 : pageSize, cancellationToken)))
+            .WithName("ListReports")
+            .Produces<Paged<ReportSummary>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Lists the current facility's reports, newest first.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+            {
+                var detail = await service.GetReportAsync(reportId, cancellationToken);
+                return detail is null ? Results.NotFound() : Results.Ok(detail);
+            })
+            .WithName("GetReport")
+            .Produces<ReportDetail>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads one report's full detail.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}/patients", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await service.GetReportPatientsAsync(reportId, cancellationToken)))
+            .WithName("GetReportPatients")
+            .Produces<List<ReportPatientEntry>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads the per-patient rows behind the Report Details patient table.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}/patients/{patientId}/mapping-evidence", async (
+                string reportId,
+                string patientId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+            {
+                var evidence = await service.GetPatientMappingEvidenceAsync(reportId, patientId, cancellationToken);
+                return evidence is null ? Results.NotFound() : Results.Ok(evidence);
+            })
+            .WithName("GetPatientMappingEvidence")
+            .Produces<PatientMappingEvidence>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads the real evidence behind one patient's Location Org / HSLOC / Encounter mapping indicators.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}/query-plan", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+            {
+                var plan = await service.GetQueryPlanAsync(reportId, cancellationToken);
+                return plan is null ? Results.NotFound() : Results.Ok(plan);
+            })
+            .WithName("GetQueryPlan")
+            .Produces<QueryPlan>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads the facility's configured DataAcquisition query plan for this report's vendor.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}/acquisition-logs", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await service.GetAcquisitionLogsAsync(reportId, cancellationToken)))
+            .WithName("GetAcquisitionLogs")
+            .Produces<List<AcquisitionLogEntry>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads DataAcquisition's acquisition log entries recorded for this report.";
+                return operation;
+            });
+
+        group.MapGet("/{reportId}/summary-export", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+            {
+                var summary = await service.GetAcquisitionSummaryAsync(reportId, cancellationToken);
+                if (summary is null)
+                {
+                    return Results.NotFound();
+                }
+                var json = JsonSerializer.Serialize(summary, new JsonSerializerOptions {WriteIndented = true});
+                return Results.File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"report-{reportId}-summary.json");
+            })
+            .WithName("ExportReportSummary")
+            .Produces(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Downloads DataAcquisition's summary counts for this report as a JSON file.";
                 return operation;
             });
     }

@@ -1,7 +1,7 @@
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
 
 // One report, as the UI's report list and report request both see it.
-public sealed record ReportSummary
+public record ReportSummary
 {
     public required string ReportId { get; init; }
 

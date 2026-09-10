@@ -490,7 +490,102 @@
     }
   },
   "reportResults": {
-    "title": "Report Results"
+    "title": "Report Results",
+    "subtitle": "Details on the reporting progress along with patient reporting statuses can be found in the table below. Click a Report Id to view its full details.",
+    "actions": {
+      "generateNewReport": "+ Generate New Report"
+    },
+    "columns": {
+      "reportId": "Report Id",
+      "measures": "Measures",
+      "patientCount": "Patient Count",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "createDate": "Create Date",
+      "status": "Status"
+    },
+    "status": {
+      "Pending": "Pending",
+      "Complete": "Complete",
+      "Failed": "Failed",
+      "Cancelled": "Cancelled"
+    },
+    "fields": {
+      "accuracyAck": "I acknowledge that the generated reports are accurate."
+    },
+    "messages": {
+      "loadError": "Unable to load report results.",
+      "detailLoadError": "Unable to load this report's details.",
+      "refreshed": "Report list refreshed.",
+      "reportPending": "A report is already pending. Wait for it to complete before generating another.",
+      "noReports": "No reports have been generated yet.",
+      "notAcknowledged": "Please acknowledge that the generated reports are accurate before continuing."
+    },
+    "detail": {
+      "title": "Report Details",
+      "reportingPeriod": "Reporting Period",
+      "reportingPeriodValue": "{{start}} to {{end}}",
+      "selectedMeasures": "Selected Measures & Digital Quality Measures",
+      "actions": {
+        "viewQueryPlan": "View Query Plan",
+        "viewAcquisitionLog": "View Acquisition Log",
+        "exportSummary": "Export Report Summary"
+      },
+      "acquisitionLog": {
+        "timestamp": "Timestamp",
+        "level": "Status",
+        "message": "Message",
+        "empty": "No acquisition log entries recorded for this report yet."
+      },
+      "columns": {
+        "nhsnMeasure": "NHSN Measure",
+        "digitalQualityMeasure": "Digital Quality Measure",
+        "patientId": "Patient Id",
+        "fhirResourceCount": "FHIR Resource Count",
+        "reportStatus": "Report Status",
+        "preQualResults": "Pre-Qual Results",
+        "locationOrg": "Location Org",
+        "hslocMapping": "HSLOC Mapping",
+        "encounterMapping": "Encounter Mapping"
+      },
+      "dqmTabsLabel": "Digital quality measure",
+      "reportStatus": "Report Status",
+      "patientReportingStatus": "Patient Reporting Status (Population: {{count}})",
+      "statusCategories": {
+        "notEligible": "Not Eligible",
+        "failedValidation": "Failed Validation",
+        "passedValidation": "Passed Validation",
+        "pendingValidation": "Pending Validation"
+      },
+      "mapping": {
+        "found": "Found",
+        "notFound": "Not Found"
+      },
+      "mappingEvidence": {
+        "locationId": "Location Type Code",
+        "locationAlias": "Location Alias",
+        "isOrgLocation": "Matches Organization",
+        "sourceSystem": "Source System",
+        "targetSystem": "Target System",
+        "unmappedCodes": "Unmapped Codes",
+        "noEvidence": "No evidence recorded for this patient yet."
+      },
+      "notApplicable": "N/A",
+      "downloadUnavailable": "Export isn't available yet.",
+      "patientDetail": {
+        "title": "Patient Reporting Detail",
+        "measure": "Measure",
+        "reportingStatus": "Reporting Status",
+        "fhirResourceCount": "FHIR Resource Count",
+        "downloadResourceBundle": "Download Resource Bundle",
+        "downloadReport": "Download Report"
+      },
+      "patientTimeline": {
+        "title": "Patient Status Timeline",
+        "subtitle": "Patient {{patientId}} — {{measure}}",
+        "current": "CURRENT"
+      }
+    }
   },
   "mrnIntake": {
     "title": "MRN Identifier Intake"

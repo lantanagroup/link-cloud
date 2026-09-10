@@ -364,6 +364,45 @@ export class MockApiClient implements ApiClient {
     };
   }
 
+  async getPatientMappingEvidence(): Promise<C.PatientMappingEvidence> {
+    await tick();
+    return {
+      locationOrg: {
+        encounterCount: 3,
+        orgEncounterCount: 3,
+        assumedOrgEncounterCount: 0,
+        matches: [
+          {locationId: '783', locationName: 'UI Health', locationAlias: 'UI Health', isOrgLocation: true},
+          {locationId: '783', locationName: 'Endeavor Health', locationAlias: 'Endeavor Health', isOrgLocation: true}
+        ]
+      },
+      codeMaps: [
+        {sourceSystem: 'http://mysite.org/fhir/encounter-type', targetSystem: 'CPT', mappedCount: 2, unmappedCount: 1, failureCount: 0, unmappedCodes: ['UNMAPPED-32']}
+      ]
+    };
+  }
+
+  async getReportPatients(): Promise<C.ReportPatientEntry[]> {
+    await tick();
+    return ids(3).map(patientId => ({
+      patientId,
+      reportingStatus: 'PassedValidation' as const,
+      resourceCount: 12,
+      resourceCountsByType: {Patient: 1, Encounter: 4, Location: 2, MedicationRequest: 5},
+      locationOrgMapped: true,
+      encounterMapped: true,
+      hslocMapped: true,
+      hasPreQualResults: true,
+      measureReports: [
+        {
+          reportType: 'NHSNAcuteCareHospitalMonthlyInitialPopulation',
+          resourceCount: 12,
+          resourceCountsByType: {Patient: 1, Encounter: 4, Location: 2, MedicationRequest: 5}
+        }
+      ]
+    }));
+  }
+
   async getPatientStatuses(): Promise<C.PatientPipeline[]> {
     await tick();
     return ids(3).map(patientId => ({
@@ -401,10 +440,6 @@ export class MockApiClient implements ApiClient {
   async regenerateReport(reportId: string): Promise<Operation<C.ReportSummary>> {
     const summary = this.buildReport({measures: [], startDate: '', endDate: '', patientIds: []});
     return immediate({...summary, regeneratedFrom: reportId});
-  }
-
-  async acknowledgeReport(): Promise<void> {
-    await tick();
   }
 
   // ------------------------------------------------------------ reporting plan

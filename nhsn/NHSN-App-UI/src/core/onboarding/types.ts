@@ -132,6 +132,12 @@ export interface ReportResultsDraft {
   viewingReportId?: string;
   accuracyAcknowledged?: boolean;
   latestStatus?: ReportStatus;
+  /**
+   * The picker's placeholder measure ids originally selected for each generated report, keyed by
+   * report id. Report only stores the resolved digital quality measure (several placeholders can
+   * share one), so this is the only place the original NHSN measure names survive for display.
+   */
+  requestedMeasuresByReportId?: Record<string, string[]>;
 }
 
 export interface ManualUploadDraft {
