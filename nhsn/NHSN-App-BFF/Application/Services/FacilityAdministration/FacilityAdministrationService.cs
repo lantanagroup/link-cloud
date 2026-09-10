@@ -86,12 +86,28 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         }
     }
 
-    public async Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default)
+    private static bool IsValidFhirServerUrl(string? value)
     {
-        if (!Uri.TryCreate(request.FhirServerBaseUrl, UriKind.Absolute, out var parsedBaseUrl) ||
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var parsedBaseUrl) ||
             (parsedBaseUrl.Scheme != Uri.UriSchemeHttp && parsedBaseUrl.Scheme != Uri.UriSchemeHttps))
         {
-            throw new InvalidOperationException("FhirServerBaseUrl must be a valid absolute URL using http or https.");
+            return false;
+        }
+
+        var host = parsedBaseUrl.Host;
+        return host == "localhost" || Uri.CheckHostName(host) switch
+        {
+            UriHostNameType.IPv4 or UriHostNameType.IPv6 => true,
+            UriHostNameType.Dns => host.Contains('.'),
+            _ => false
+        };
+    }
+
+    public async Task<FhirServerInfoResponse?> UpdateFhirServerInfoAsync(string facilityId, UpdateFhirServerInfoRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!IsValidFhirServerUrl(request.FhirServerBaseUrl))
+        {
+            throw new InvalidOperationException("FhirServerBaseUrl must be a valid absolute URL using http or https with a real host.");
         }
 
         if (request.MaxConcurrentRequests < 1)
@@ -157,8 +173,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
     public Task<ConnectionResult> TestFhirConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
     {
-        if (!Uri.TryCreate(fhirServerBaseUrl, UriKind.Absolute, out var parsedBaseUrl) ||
-            (parsedBaseUrl.Scheme != Uri.UriSchemeHttp && parsedBaseUrl.Scheme != Uri.UriSchemeHttps))
+        if (!IsValidFhirServerUrl(fhirServerBaseUrl))
         {
             return Task.FromResult(new ConnectionResult { Success = false, MessageKey = "fhirServerInfo.messages.invalidBaseUrl" });
         }
