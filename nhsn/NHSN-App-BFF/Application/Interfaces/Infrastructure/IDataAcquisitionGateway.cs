@@ -6,8 +6,14 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 /// Plan" / "View Acquisition Log" / "Export Report Summary" actions.</summary>
 public interface IDataAcquisitionGateway
 {
-    /// <summary>Reads the facility's configured query plan for the given vendor type.</summary>
-    Task<QueryPlan?> GetQueryPlanAsync(string facilityId, string vendorType, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Reads the facility's configured query plan. DataAcquisition scopes one query plan per
+    /// facility+<c>type</c>, where <c>type</c> is a reporting Frequency (Discharge/Daily/Weekly/
+    /// Monthly/Adhoc) -- not the facility's EHR vendor, despite how similar-looking code elsewhere
+    /// reads. See ReportingService.GetQueryPlanAsync for why "Discharge" is the value that
+    /// actually reflects what governs acquisition, not "Adhoc" as the name would suggest.
+    /// </summary>
+    Task<QueryPlan?> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
 
     /// <summary>Reads the acquisition log entries recorded for this report.</summary>
     Task<List<AcquisitionLogEntry>> GetAcquisitionLogsAsync(string facilityId, string reportId, CancellationToken cancellationToken = default);

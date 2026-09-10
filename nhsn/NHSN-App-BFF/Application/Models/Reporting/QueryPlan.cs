@@ -9,13 +9,27 @@ public sealed record QueryPlan
     public required string PlanJson { get; init; }
 }
 
+// One FHIR query DataAcquisition ran (or is about to run) while acquiring a report -- one row
+// per DataAcquisitionLogApiModel.FhirQuery entry, which is what the "View Acquisition Log" /
+// "Export Report Summary" queries table in the onboarding POC shows. There is no acquisition
+// timeline/timestamp in this shape -- DataAcquisition only records CompletionDate once a log
+// finishes, which the POC's own log view never showed either.
 public sealed record AcquisitionLogEntry
 {
-    public required string Timestamp { get; init; }
+    public required string PatientId { get; init; }
 
-    public required string Level { get; init; }
+    /// <summary>The FHIR resource type(s) this query acquired, e.g. "Encounter".</summary>
+    public required string Resource { get; init; }
 
-    public required string Message { get; init; }
+    /// <summary>"Initial" or "Supplemental".</summary>
+    public required string QueryPhase { get; init; }
+
+    /// <summary>"Read", "Search", "SearchPost", "BulkDataRequest" or "BulkDataPoll".</summary>
+    public string? QueryType { get; init; }
+
+    public IReadOnlyList<string> Parameters { get; init; } = [];
+
+    public required string Status { get; init; }
 }
 
 // DataAcquisition's own summary counts for a report -- distinct from Report's ReportSummaryApiModel,

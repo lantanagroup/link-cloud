@@ -88,12 +88,26 @@ public sealed class ReportingService : IReportingService
     public Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default) =>
         _reportGateway.GetPatientMappingEvidenceAsync(reportId, patientId, cancellationToken);
 
-    public async Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default)
+    // DataAcquisition scopes one query plan per facility+Frequency (Discharge/Daily/Weekly/
+    // Monthly/Adhoc) -- not per EHR vendor; there is no vendor lookup to make here.
+    //
+    // "Discharge", not "Adhoc": DataAcquisition's real acquisition trigger
+    // (PatientDataService.CreateLogEntries) resolves a facility's plan via
+    // ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent, which maps
+    // ReportableEvent.Adhoc -> Frequency.Discharge (not Frequency.Adhoc). More fundamentally, the
+    // only producer of the DataAcquisitionRequested message that trigger reads
+    // (QueryDispatchJob) hardcodes ReportableEvent.Discharge -- nothing in this platform ever
+    // requests acquisition tagged Adhoc. Frequency.Adhoc exists as a plan-type option but nothing
+    // live reads a plan filed under it. Tenant's ad hoc report request (RequestAdHocReportAsync,
+    // BypassSubmission = true) evaluates against whatever the facility's normal Discharge-driven
+    // feed has already acquired rather than triggering its own acquisition run, so "Discharge" is
+    // the plan that actually governs what an ad hoc report can see.
+    private const string OperationalQueryPlanType = "Discharge";
+
+    public Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default)
     {
         var facilityId = _userContext.RequireFacilityId();
-        var facility = await _facilityGateway.GetAsync(facilityId, cancellationToken);
-        var vendorType = facility?.Vendor?.ToString() ?? string.Empty;
-        return await _dataAcquisitionGateway.GetQueryPlanAsync(facilityId, vendorType, cancellationToken);
+        return _dataAcquisitionGateway.GetQueryPlanAsync(facilityId, OperationalQueryPlanType, cancellationToken);
     }
 
     public Task<List<AcquisitionLogEntry>> GetAcquisitionLogsAsync(string reportId, CancellationToken cancellationToken = default)
