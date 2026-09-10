@@ -39,8 +39,8 @@ public class ReferenceEndpoints : IApi
                 return operation;
             });
 
-        group.MapGet("/hsloc-codes", (IReferenceDataService referenceData) =>
-                Results.Ok(referenceData.GetHslocCodes()))
+        group.MapGet("/hsloc-codes", async (IReferenceDataService referenceData, CancellationToken cancellationToken) =>
+                Results.Ok(await referenceData.GetHslocCodesAsync(cancellationToken)))
             .WithName("GetHslocCodes")
             .Produces<IReadOnlyList<HslocCode>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
