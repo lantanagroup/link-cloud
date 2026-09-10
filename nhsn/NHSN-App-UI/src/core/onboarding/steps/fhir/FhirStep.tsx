@@ -34,9 +34,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const [lagHours, setLagHours] = useState<number | undefined>(initialLagHours);
   const [lagMinutes, setLagMinutes] = useState<number | undefined>(initialLagMinutes);
 
+  const persistedTestedBaseUrl = fhir.connectionTested && fhir.fhirServerBaseUrl ? fhir.fhirServerBaseUrl.trim() : null;
+
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
-  const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(
+    persistedTestedBaseUrl ? {success: true, message: t('onboarding:fhirServerInfo.messages.testSuccess')} : null
+  );
+  const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(persistedTestedBaseUrl);
   const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [readyToAdvance, setReadyToAdvance] = useState(false);
@@ -60,6 +64,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
   function handleBaseUrlChange(value: string) {
     setBaseUrl(value);
     setTestedBaseUrl(null);
+    setTestResult(null);
   }
 
   function currentFieldValues(overrides: Partial<FhirFieldValues> = {}): FhirFieldValues {
@@ -182,6 +187,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
   const jwksInstructionsKey = vendorProfile?.documentKeys.jwksInstructions;
   const vendorDisplayName = vendorProfile?.displayName ?? '';
+  const connectionVerified = testedBaseUrl !== null && testedBaseUrl === baseUrl.trim();
+  const isFormValid = Object.keys(validateFhir(currentFieldValues())).length === 0;
 
   return (
     <div className="fhir-server-info">
@@ -395,7 +402,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
           <Button onClick={handleTestConnection} disabled={testing}>
             {t('common:actions.testConnection')}
           </Button>
-          <Button onClick={handleNext} disabled={saving} loading={saving}>
+          <Button onClick={handleNext} disabled={saving || !isFormValid || !connectionVerified} loading={saving}>
             {t('common:actions.continue')}
           </Button>
         </StepActions>

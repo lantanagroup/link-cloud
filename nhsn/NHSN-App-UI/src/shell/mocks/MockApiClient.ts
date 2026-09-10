@@ -4,6 +4,7 @@ import {createEmptyDraft, migrateDraft} from '../../core/onboarding/types';
 import type {Operation} from '../../core/api/http';
 import type * as C from '../../core/api/contracts';
 import {ENCOUNTER_REFERENCE_CODES} from './fixtures/encounterReferenceCodes';
+import {isValidHttpUrl} from '../../core/onboarding/steps/fhir/validate';
 
 /**
  * Offline implementation of the port.
@@ -494,13 +495,4 @@ function immediate<T>(value: T): Operation<T> {
     result: () => Promise.resolve(value),
     cancel: () => undefined
   };
-}
-
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }

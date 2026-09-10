@@ -13,10 +13,17 @@ export interface FhirFieldValues {
   lagMinutes?: number;
 }
 
+function hasRealDomain(hostname: string): boolean {
+  const normalized = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
+  const labels = normalized.split('.');
+  return labels.length >= 2 && labels.every(label => label.length > 0);
+}
+
 export function isValidHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (url.hostname === 'localhost' || hasRealDomain(url.hostname));
   } catch {
     return false;
   }

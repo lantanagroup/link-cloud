@@ -414,7 +414,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
 
         {tab === 'new-pull' && (
           <div className="report-tab-body">
-            {acquisition && !newPull.sources?.some(source => source.simulated) && (
+            {acquisition && (
               <Button
                 size="sm"
                 variant="secondary"
