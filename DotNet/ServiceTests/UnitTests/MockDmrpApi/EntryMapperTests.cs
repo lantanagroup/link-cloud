@@ -14,7 +14,7 @@ public class EntryMapperTests
     private static ReportingPlanEntryEntity Entry(
         string measure = "HOB",
         string isReporting = "Y",
-        int? month = 5,
+        int month = 5,
         string component = ReportingComponents.Msc) => new()
         {
             Id = "11111111-1111-1111-1111-111111111111",
@@ -49,16 +49,16 @@ public class EntryMapperTests
     }
 
     [Fact]
-    public void ToReportingPlan_ForAnAnnualPlan_OmitsTheReportingMonth()
+    public void ToReportingPlan_ForAPatientSafetyPlan_ReportsTheMonthLikeAnyOther()
     {
-        // /ps/annual has no month to report. Emitting a zero or a stale value would tell a
-        // consumer the plan covers one particular month, which is the opposite of the truth.
+        // /ps/annual/mrp is reported monthly, so its plan echoes the month it was narrowed to
+        // exactly as the medicine plan does.
         var plan = EntryMapper.ToReportingPlan(
-            "F1", null, 2026,
-            [Entry(measure: "HAI", month: null, component: ReportingComponents.Ps)],
+            "F1", 5, 2026,
+            [Entry(measure: "HAI", month: 5, component: ReportingComponents.Ps)],
             DateTimeOffset.UtcNow);
 
-        plan.Month.Should().BeNull();
+        plan.Month.Should().Be(5);
         plan.Year.Should().Be(2026);
         plan.Plans.Should().ContainSingle();
     }

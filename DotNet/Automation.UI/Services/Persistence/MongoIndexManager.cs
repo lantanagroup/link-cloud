@@ -40,6 +40,7 @@ public sealed class MongoIndexManager
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
         EnsureApiHealthRunIndexes();
+        EnsureApiHealthRunResultIndexes();
         EnsureApiHealthExecutionRunIndexes();
     }
 
@@ -209,6 +210,34 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "StartedAt", -1 } }, unique: false, "idx_startedAt_desc");
         CreateIndexSafe(collection, new BsonDocument { { "ServiceName", 1 }, { "StartedAt", -1 } }, unique: false, "idx_serviceName_startedAt");
         CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
+    }
+
+    // --- api_health_run_results ---
+
+    private void EnsureApiHealthRunResultIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_run_results");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "EndpointKey", 1 },
+            { "StartedAt", -1 }
+            },
+            unique: false,
+            "idx_endpointKey_startedAt");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "RunId", 1 },
+            { "ServiceName", 1 },
+            { "EndpointKey", 1 }
+            },
+            unique: true,
+            "ux_runId_serviceName_endpointKey");
     }
 
     // --- api_health_execution_runs ---

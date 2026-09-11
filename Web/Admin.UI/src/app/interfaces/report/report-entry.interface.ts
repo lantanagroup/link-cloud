@@ -52,6 +52,9 @@ export enum SubmissionStatus {
   Submitted,
   FailedSubmission,
   NotEligable,
+  // Terminal: the patient was evaluated and validated normally, but its report was
+  // requested with bypassSubmission so the payload was never submitted.
+  NotSubmitted,
 }
 
 export enum MeasureReportStatus {

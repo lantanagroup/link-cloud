@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -14,12 +13,22 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 
+import org.hl7.fhir.r4.model.ValueSet;
+
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -130,6 +140,69 @@ class ValidationCacheServiceCachingTest {
     }
 
     @Test
+    void cachedValidateCode_coalescesConcurrentMissesIntoOneRemoteCall() throws Exception {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CaffeineCacheTestConfiguration.class)) {
+            ValidationCacheService cacheService = context.getBean(ValidationCacheService.class);
+            RemoteTermServiceValidation delegate = mock(RemoteTermServiceValidation.class);
+            AtomicInteger remoteCalls = new AtomicInteger();
+            when(delegate.invokeRemoteValidateCode(anyString(), anyString(), anyString(), anyString(), isNull()))
+                    .thenAnswer(invocation -> {
+                        remoteCalls.incrementAndGet();
+                        Thread.sleep(150);
+                        return negativeResult(invocation.getArgument(1));
+                    });
+
+            int workers = 8;
+            ExecutorService pool = Executors.newFixedThreadPool(workers);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<IValidationSupport.CodeValidationResult>> futures = new ArrayList<>();
+            for (int i = 0; i < workers; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return cacheService.cachedValidateCode(delegate, CODE_SYSTEM, "code", DISPLAY, VALUE_SET_URL);
+                }));
+            }
+            start.countDown();
+            for (Future<IValidationSupport.CodeValidationResult> future : futures) {
+                assertEquals("code", future.get(5, TimeUnit.SECONDS).getCode());
+            }
+            pool.shutdownNow();
+
+            assertEquals(1, remoteCalls.get(), "concurrent cache misses for one tuple must share a single terminology call");
+            verify(delegate, times(1)).invokeRemoteValidateCode(
+                    anyString(), anyString(), anyString(), anyString(), isNull());
+        }
+    }
+
+    @Test
+    void isValueSetSupportedAndFetchValueSet_shareOneRemoteGet() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CaffeineCacheTestConfiguration.class)) {
+            ValidationCacheService cacheService = context.getBean(ValidationCacheService.class);
+            RemoteTermServiceValidation delegate = mock(RemoteTermServiceValidation.class);
+            ValueSet valueSet = new ValueSet();
+            valueSet.setUrl(VALUE_SET_URL);
+            when(delegate.invokeFetchValueSet(VALUE_SET_URL)).thenReturn(valueSet);
+
+            assertTrue(cacheService.cachedIsValueSetSupported(delegate, VALUE_SET_URL));
+            assertSame(valueSet, cacheService.cachedFetchValueSet(delegate, VALUE_SET_URL));
+            verify(delegate, times(1)).invokeFetchValueSet(VALUE_SET_URL);
+        }
+    }
+
+    @Test
+    void missingValueSet_isNegativelyCached() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CaffeineCacheTestConfiguration.class)) {
+            ValidationCacheService cacheService = context.getBean(ValidationCacheService.class);
+            RemoteTermServiceValidation delegate = mock(RemoteTermServiceValidation.class);
+            when(delegate.invokeFetchValueSet(VALUE_SET_URL)).thenReturn(null);
+
+            assertNull(cacheService.cachedFetchValueSet(delegate, VALUE_SET_URL));
+            assertNull(cacheService.cachedFetchValueSet(delegate, VALUE_SET_URL));
+            verify(delegate, times(1)).invokeFetchValueSet(VALUE_SET_URL);
+        }
+    }
+
+    @Test
     void cachedValidateCode_resolvesItsKeyWithoutApplicationClassInThreadContext() throws InterruptedException {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CaffeineCacheTestConfiguration.class)) {
             ValidationCacheService cacheService = context.getBean(ValidationCacheService.class);
@@ -177,18 +250,21 @@ class ValidationCacheServiceCachingTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableCaching
     static class CaffeineCacheTestConfiguration {
         @Bean
         CacheManager cacheManager() {
-            CaffeineCacheManager cacheManager = new CaffeineCacheManager("validateCodeCache");
+            CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+                    "validateCodeCache",
+                    "lookupCodeCache",
+                    "isCodeSystemSupportedCache",
+                    "isValueSetSupportedCache");
             cacheManager.setCaffeine(Caffeine.newBuilder());
             return cacheManager;
         }
 
         @Bean
-        ValidationCacheService validationCacheService() {
-            return new ValidationCacheService();
+        ValidationCacheService validationCacheService(CacheManager cacheManager) {
+            return new ValidationCacheService(cacheManager, null, null);
         }
     }
 }

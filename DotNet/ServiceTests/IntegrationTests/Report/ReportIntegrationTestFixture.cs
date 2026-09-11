@@ -119,6 +119,7 @@ namespace IntegrationTests.Report
             builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
             builder.Services.AddScoped<IReportPopulationManager, ReportPopulationManager>();
             builder.Services.AddScoped<IReportResourceManager, ReportResourceManager>();
+            builder.Services.AddScoped<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
 
             builder.Services.AddTransient<IReportServiceMetrics, ReportServiceMetrics>();
 
@@ -162,7 +163,8 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>(),
-                    sp.GetRequiredService<IReportEntryManager>()));
+                    sp.GetRequiredService<IReportEntryManager>(),
+                    sp.GetRequiredService<IReportScheduledManager>()));
 
             builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);

@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -494,11 +496,11 @@
 <ul>
 <li>
 <a href="event-auditableeventoccurred.html">Auditable Event Occurred</a>
-<div class="text-muted"><small>## Overview    Emitted whenever important user or system activity happens so the audit service can maintain a comprehensive log.    &lt;NodeGraph /&gt;</small></div>
+<div class="text-muted"><small>Overview Emitted whenever important user or system activity happens so the audit service can maintain a comprehensive log.</small></div>
 </li>
 <li>
 <a href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a>
-<div class="text-muted"><small>## Overview    Used to update admission or discharge status and to trigger additional processing for each patient.    &lt;NodeGraph /&gt;</small></div>
+<div class="text-muted"><small>Overview Used to update admission or discharge status and to trigger additional processing for each patient.</small></div>
 </li>
 <li>
 <a href="event-measurereportgenerated.html">Measure Report Generated</a>
@@ -506,47 +508,47 @@
 </li>
 <li>
 <a href="event-patientcensusscheduled.html">Patient Census Scheduled</a>
-<div class="text-muted"><small>## Overview    Signals that the most recent census should be gathered, allowing downstream components to keep their patient lists up  to date.    &lt;NodeGraph /&gt;</small></div>
+<div class="text-muted"><small>Overview Signals that the most recent census should be gathered, allowing downstream components to keep their patient lists up to date.</small></div>
 </li>
 <li>
 <a href="event-patientevent.html">Patient Event</a>
-<div class="text-muted"><small>## Overview    Marks a change in patient status so other components know when to start their waiting period before requesting data.    &lt;NodeGraph /&gt;    ## Event Schema    ### Key...</small></div>
+<div class="text-muted"><small>Overview Marks a change in patient status so other components know when to start their waiting period before requesting data. Event Schema Key The facility ID (string) is used as t...</small></div>
 </li>
 <li>
 <a href="event-patientlistsacquired.html">Patient Lists Acquired</a>
-<div class="text-muted"><small>## Overview    Used to update admission or discharge status and to trigger additional processing for each patient.    &lt;NodeGraph /&gt;    ## Event Schema    ### Key    The facility ID...</small></div>
+<div class="text-muted"><small>Overview Used to update admission or discharge status and to trigger additional processing for each patient. Event Schema Key The facility ID (string) is used as the Kafka message...</small></div>
 </li>
 <li>
 <a href="event-payloadsubmitted.html">Payload Submitted</a>
-<div class="text-muted"><small>## Overview    Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.    &lt;NodeGraph /&gt;    ## Event Schema    ### Key    A...</small></div>
+<div class="text-muted"><small>Overview Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status. Event Schema Key A JSON object containing the facility ID...</small></div>
 </li>
 <li>
 <a href="event-readyforvalidation.html">Ready for Validation</a>
-<div class="text-muted"><small>## Overview    Emitted after all patient resources have been stored, allowing the validation component to fetch the bundle and perform   checks.    &lt;NodeGraph /&gt;</small></div>
+<div class="text-muted"><small>Overview Emitted after all patient resources have been stored, allowing the validation component to fetch the bundle and perform checks.</small></div>
 </li>
 <li>
 <a href="event-readytoacquire.html">Ready to Acquire</a>
-<div class="text-muted"><small>## Overview    The `ReadyToAcquire` event is produced by the Data Acquisition Service when a data acquisition log is ready to be processed.  The Data Acquisition Service sends the...</small></div>
+<div class="text-muted"><small>Overview The `ReadyToAcquire` event is produced by the Data Acquisition Service when a data acquisition log is ready to be processed. The Data Acquisition Service sends the event t...</small></div>
 </li>
 <li>
 <a href="event-reportscheduled.html">Report Scheduled</a>
-<div class="text-muted"><small>## Overview    This message carries the reporting window and other configuration details so scheduling and reporting components  can persist the information and begin their respect...</small></div>
+<div class="text-muted"><small>Overview This message carries the reporting window and other configuration details so scheduling and reporting components can persist the information and begin their respective wor...</small></div>
 </li>
 <li>
 <a href="event-resources-acquired.html">Resources Acquired</a>
-<div class="text-muted"><small>## Description    The Data Acquisition Worker service will cache all retrieved FHIR resources prior to producing the `ResourcesAcquired` event. Depending on configuration and capac...</small></div>
+<div class="text-muted"><small>Description The Data Acquisition Worker service will cache all retrieved FHIR resources prior to producing the `ResourcesAcquired` event. Depending on configuration and capacity, t...</small></div>
 </li>
 <li>
 <a href="event-resources-normalized.html">Resources Normalized</a>
-<div class="text-muted"><small>## Description    After the Normalization service performs its tasks against the acquired FHIR resources, the service will produce a `ResourcesNormalized` event. Depending on confi...</small></div>
+<div class="text-muted"><small>Description After the Normalization service performs its tasks against the acquired FHIR resources, the service will produce a `ResourcesNormalized` event. Depending on configurati...</small></div>
 </li>
 <li>
 <a href="event-submitpayload.html">Submit Payload</a>
-<div class="text-muted"><small>## Overview    The `SubmitPayload` is an event that&#39;s produced by the Report service when one of the following has occurred:    - A patient has completed the reporting process and...</small></div>
+<div class="text-muted"><small>Overview The `SubmitPayload` is an event that&#39;s produced by the Report service when one of the following has occurred: - A patient has completed the reporting process and is ready...</small></div>
 </li>
 <li>
 <a href="event-validationcomplete.html">Validation Complete</a>
-<div class="text-muted"><small>## Overview    Sent once validation is finished, indicating whether the submission met all validation rules.    &lt;NodeGraph /&gt;</small></div>
+<div class="text-muted"><small>Overview Sent once validation is finished, indicating whether the submission met all validation rules.</small></div>
 </li>
 </ul>
             </main>

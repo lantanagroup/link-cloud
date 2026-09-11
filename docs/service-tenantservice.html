@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,36 +497,36 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-auditableeventoccurred.html">Auditable Event Occurred [event]</a>, <a href="event-reportscheduled.html">Report Scheduled [event]</a>, <a href="command-generatereportrequested.html">Generate Report Requested [command]</a>, <a href="query-getfacilitieslist.html">Get Facilities List [query]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="query-getfacilitieslist.html">Get Facilities List [query]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Tenant service is the entry point for configuring a tenant into Link Cloud. The service is responsible for maintaining and generating events for the scheduled measure reporting periods that the tenant is configured for. These events contain the initial information needed for Link Cloud to query resources and perform measure evaluations based on a specific reporting period.</p>
 <p>The Tenant service uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for producing ReportScheduled Kafka events.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nTenantService_F25B55["Service: Tenant Service"]
-  nTenantService_F25B55 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nTenantService_F25B55 -->|produces| nReportScheduled_BC6D32E["Event: ReportScheduled"]
-  nTenantService_F25B55 -->|sends| nGenerateReportRequested_7BC99734["Command: GenerateReportRequested"]
-  nTenantService_F25B55 -->|provides| nGetFacilitiesList_5CEDF833["Query: GetFacilitiesList"]
-  nTenantService_F25B55 -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nTenantService_F25B55 -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  nTenantService_F25B55 -->|requests| nGetFacilitiesList_5CEDF833["Query: GetFacilitiesList"]
-  nTenantService_F25B55 -->|requests| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nTenantService_F25B55 -->|requests| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
+nTenantService_7F5659F3["Service: Tenant Service"]
+  nTenantService_7F5659F3 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nTenantService_7F5659F3 -->|produces| nReportScheduled_4BA62BDB["Event: ReportScheduled"]
+  nTenantService_7F5659F3 -->|sends| nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"]
+  nTenantService_7F5659F3 -->|provides| nGetFacilitiesList_7612A70C["Query: GetFacilitiesList"]
+  nTenantService_7F5659F3 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nTenantService_7F5659F3 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  nTenantService_7F5659F3 -->|requests| nGetFacilitiesList_7612A70C["Query: GetFacilitiesList"]
+  nTenantService_7F5659F3 -->|requests| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nTenantService_7F5659F3 -->|requests| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nGenerateReportRequested_7BC99734
-    nReportScheduled_BC6D32E
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nGenerateReportRequested_150FD8B0
+    nReportScheduled_4BA62BDB
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilitiesList_5CEDF833
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
-    nTenantService_F25B55
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilitiesList_7612A70C
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
+    nTenantService_7F5659F3
   end
 </pre></div>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -536,7 +538,7 @@ nTenantService_F25B55["Service: Tenant Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
 </ul>
-<h2 id="custom-configuration" class="content-heading">Custom Configuration <a id="custom-configuration" href="#custom-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="custom-configuration" class="content-heading">Custom Configuration <a href="#custom-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -553,9 +555,9 @@ nTenantService_F25B55["Service: Tenant Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="soft-delete" class="content-heading">Soft Delete <a id="soft-delete" href="#soft-delete" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Soft Delete"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="soft-delete" class="content-heading">Soft Delete <a href="#soft-delete" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Soft Delete"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Tenant service supports soft deletion of facilities. Rather than permanently removing a facility record, the soft delete endpoint marks the facility with an <code>isDeleted</code> flag set to <code>true</code>. This preserves the facility's configuration and historical data while effectively removing it from active use.</p>
-<h3 id="delete-apifacilitysoftdeletefacilityid" class="content-heading">DELETE /api/Facility/softDelete/{facilityId} <a id="delete-api-facility-softdelete-facilityid" href="#delete-api-facility-softdelete-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/Facility/softDelete/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="delete-api-facility-softdelete-facilityid" class="content-heading">DELETE /api/Facility/softDelete/{facilityId} <a href="#delete-api-facility-softdelete-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/Facility/softDelete/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Soft deletes a facility by setting its <code>isDeleted</code> flag to <code>true</code>.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
@@ -568,8 +570,8 @@ nTenantService_F25B55["Service: Tenant Service"]
 <li><code>404 Not Found</code>: If no facility exists for the specified facilityId.</li>
 <li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
 </ul>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="key-management" class="content-heading">Key Management <a id="key-management" href="#key-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="key-management" class="content-heading">Key Management <a href="#key-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Keys are managed independently by the tenant service, and then associated with tenants. These keys are used for signing
 authentication JWTs that are passed to /token endpoints at the EHRs. EHRs check that the JWTs are signed using a key
 found in the JWKS endpoint exposed by Link.</p>
@@ -650,7 +652,262 @@ found in the JWKS endpoint exposed by Link.</p>
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityName</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledReports</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">TimeZone</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IsDeleted</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Vendor</span></td><td>string</td><td>No</td><td>50</td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityName</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledReports</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">TimeZone</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IsDeleted</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">VendorVersionId</span></td><td>string</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-2" aria-expanded="false"><strong>dbo.FacilityReportingPlans</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-2" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>100</td></tr><tr><td><span style="padding-left:0px">IsReporting</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">MeasureMappingId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">ReportingMonth</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportingYear</span></td><td>integer</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-3" aria-expanded="false"><strong>dbo.MeasureMappings</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-3" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">DQM</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">Frequency</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Measure</span></td><td>string</td><td>Yes</td><td>255</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-4" aria-expanded="false"><strong>dbo.Vendor</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-4" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Name</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">Authentication</span></td><td>string</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-5" aria-expanded="false"><strong>dbo.VendorVersion</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-5" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">VendorId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Version</span></td><td>string</td><td>Yes</td><td>255</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-6" aria-expanded="false"><strong>quartz.QRTZ_BLOB_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-6" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">BLOB_DATA</span></td><td>string</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-7" aria-expanded="false"><strong>quartz.QRTZ_CALENDARS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-7" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">CALENDAR_NAME</span></td><td>string</td><td>Yes</td><td>200</td></tr><tr><td><span style="padding-left:0px">CALENDAR</span></td><td>string</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-8" aria-expanded="false"><strong>quartz.QRTZ_CRON_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-8" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">CRON_EXPRESSION</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TIME_ZONE_ID</span></td><td>string</td><td>No</td><td>120</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-9" aria-expanded="false"><strong>quartz.QRTZ_FIRED_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-9" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">ENTRY_ID</span></td><td>string</td><td>Yes</td><td>140</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">INSTANCE_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">FIRED_TIME</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SCHED_TIME</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">PRIORITY</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">STATE</span></td><td>string</td><td>Yes</td><td>16</td></tr><tr><td><span style="padding-left:0px">JOB_NAME</span></td><td>string</td><td>No</td><td>150</td></tr><tr><td><span style="padding-left:0px">JOB_GROUP</span></td><td>string</td><td>No</td><td>150</td></tr><tr><td><span style="padding-left:0px">IS_NONCONCURRENT</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">REQUESTS_RECOVERY</span></td><td>boolean</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-10" aria-expanded="false"><strong>quartz.QRTZ_JOB_DETAILS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-10" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">JOB_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">JOB_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">DESCRIPTION</span></td><td>string</td><td>No</td><td>250</td></tr><tr><td><span style="padding-left:0px">JOB_CLASS_NAME</span></td><td>string</td><td>Yes</td><td>250</td></tr><tr><td><span style="padding-left:0px">IS_DURABLE</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IS_NONCONCURRENT</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IS_UPDATE_DATA</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">REQUESTS_RECOVERY</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">JOB_DATA</span></td><td>string</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-11" aria-expanded="false"><strong>quartz.QRTZ_LOCKS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-11" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">LOCK_NAME</span></td><td>string</td><td>Yes</td><td>40</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-12" aria-expanded="false"><strong>quartz.QRTZ_PAUSED_TRIGGER_GRPS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-12" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-13" aria-expanded="false"><strong>quartz.QRTZ_SCHEDULER_STATE</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-13" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">INSTANCE_NAME</span></td><td>string</td><td>Yes</td><td>200</td></tr><tr><td><span style="padding-left:0px">LAST_CHECKIN_TIME</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CHECKIN_INTERVAL</span></td><td>integer</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-14" aria-expanded="false"><strong>quartz.QRTZ_SIMPLE_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-14" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">REPEAT_COUNT</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">REPEAT_INTERVAL</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">TIMES_TRIGGERED</span></td><td>integer</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-15" aria-expanded="false"><strong>quartz.QRTZ_SIMPROP_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-15" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">STR_PROP_1</span></td><td>string</td><td>Yes</td><td>512</td></tr><tr><td><span style="padding-left:0px">STR_PROP_2</span></td><td>string</td><td>Yes</td><td>512</td></tr><tr><td><span style="padding-left:0px">STR_PROP_3</span></td><td>string</td><td>Yes</td><td>512</td></tr><tr><td><span style="padding-left:0px">INT_PROP_1</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">INT_PROP_2</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">LONG_PROP_1</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">LONG_PROP_2</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">DEC_PROP_1</span></td><td>number</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">DEC_PROP_2</span></td><td>number</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">BOOL_PROP_1</span></td><td>boolean</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">BOOL_PROP_2</span></td><td>boolean</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TIME_ZONE_ID</span></td><td>string</td><td>No</td><td>80</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-tenantservice-16" aria-expanded="false"><strong>quartz.QRTZ_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-tenantservice-16" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">SCHED_NAME</span></td><td>string</td><td>Yes</td><td>120</td></tr><tr><td><span style="padding-left:0px">TRIGGER_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">TRIGGER_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">JOB_NAME</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">JOB_GROUP</span></td><td>string</td><td>Yes</td><td>150</td></tr><tr><td><span style="padding-left:0px">DESCRIPTION</span></td><td>string</td><td>No</td><td>250</td></tr><tr><td><span style="padding-left:0px">NEXT_FIRE_TIME</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">PREV_FIRE_TIME</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">PRIORITY</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TRIGGER_STATE</span></td><td>string</td><td>Yes</td><td>16</td></tr><tr><td><span style="padding-left:0px">TRIGGER_TYPE</span></td><td>string</td><td>Yes</td><td>8</td></tr><tr><td><span style="padding-left:0px">START_TIME</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">END_TIME</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CALENDAR_NAME</span></td><td>string</td><td>No</td><td>200</td></tr><tr><td><span style="padding-left:0px">MISFIRE_INSTR</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">JOB_DATA</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MISFIRE_ORIG_FIRE_TIME</span></td><td>integer</td><td>No</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -671,7 +928,7 @@ found in the JWKS endpoint exposed by Link.</p>
     <thead>
       <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
     </thead>
-    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>facilityName</td><td></td><td>No</td><td></td></tr><tr><td>timeZone</td><td></td><td>No</td><td></td></tr><tr><td>vendor</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr><tr><td>includeDeleted</td><td></td><td>No</td><td></td></tr></tbody>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>facilityName</td><td></td><td>No</td><td></td></tr><tr><td>timeZone</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr><tr><td>includeDeleted</td><td></td><td>No</td><td></td></tr></tbody>
   </table>
 </div>
   </div>
@@ -831,8 +1088,415 @@ found in the JWKS endpoint exposed by Link.</p>
   </div>
 </div>
 <div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-reporting-plans" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/reporting-plans</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-reporting-plans" class="card-body export-collapsible">
+    <p class="text-muted">Gets a paged list of every facility reporting plan.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>sortBy</td><td></td><td>No</td><td>Column to sort by: Id, FacilityId, MeasureMappingId, ReportingMonth, ReportingYear,
+IsReporting, CreateDate or ModifyDate. Defaults to Id. Any other value is refused.</td></tr><tr><td>sortOrder</td><td></td><td>No</td><td>Ascending or Descending. Defaults to Descending.</td></tr><tr><td>pageSize</td><td></td><td>No</td><td>Rows per page, 1 to 100. Defaults to 10.</td></tr><tr><td>pageNumber</td><td></td><td>No</td><td>One-based page number. Defaults to 1.</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-post-api-dmrp-reporting-plans" aria-expanded="false"><strong>POST</strong> <code>/api/dmrp/reporting-plans</code></a></div>
+  <div id="openapi-card-tenantservice-post-api-dmrp-reporting-plans" class="card-body export-collapsible">
+    <p class="text-muted">Creates a facility reporting plan.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-dmrp-reporting-plans" aria-expanded="false"><strong>DELETE</strong> <code>/api/dmrp/reporting-plans</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-dmrp-reporting-plans" class="card-body export-collapsible">
+    <p class="text-muted">Deletes every facility reporting plan.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-reporting-plans-search" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/reporting-plans/search</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-reporting-plans-search" class="card-body export-collapsible">
+    <p class="text-muted">Searches facility reporting plans by any combination of facility, measure mapping, reporting
+period and reporting state.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>FacilityId</td><td></td><td>No</td><td></td></tr><tr><td>MeasureMappingId</td><td></td><td>No</td><td></td></tr><tr><td>Month</td><td></td><td>No</td><td></td></tr><tr><td>Year</td><td></td><td>No</td><td></td></tr><tr><td>IsReporting</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td>Column to sort by: Id, FacilityId, MeasureMappingId, ReportingMonth, ReportingYear,
+IsReporting, CreateDate or ModifyDate. Defaults to Id. Any other value is refused.</td></tr><tr><td>sortOrder</td><td></td><td>No</td><td>Ascending or Descending. Defaults to Descending.</td></tr><tr><td>pageSize</td><td></td><td>No</td><td>Rows per page, 1 to 100. Defaults to 10.</td></tr><tr><td>pageNumber</td><td></td><td>No</td><td>One-based page number. Defaults to 1.</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-reporting-plans-facilities-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/reporting-plans/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-reporting-plans-facilities-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">Gets all reporting plans for a facility, optionally narrowed to a reporting period or
+reporting state.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td>The reporting facility, as the Tenant service knows it (the NHSN Org Id).</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>month</td><td></td><td>No</td><td>Optional reporting month, 1 to 12. Omit to return every month.</td></tr><tr><td>year</td><td></td><td>No</td><td>Optional reporting year, 2000 to 2100. Omit to return every year.</td></tr><tr><td>isReporting</td><td></td><td>No</td><td>Optional. True returns only measures the facility is enrolled in, false only those it has
+withdrawn from. Omit to return both.</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-dmrp-reporting-plans-facilities-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/dmrp/reporting-plans/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-dmrp-reporting-plans-facilities-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">Deletes every reporting plan belonging to a facility.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td>The facility whose plans are removed.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-reporting-plans-id" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/reporting-plans/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-reporting-plans-id" class="card-body export-collapsible">
+    <p class="text-muted">Gets a facility reporting plan by Id.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The reporting plan&#39;s own identifier, as returned by create or search.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-put-api-dmrp-reporting-plans-id" aria-expanded="false"><strong>PUT</strong> <code>/api/dmrp/reporting-plans/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-put-api-dmrp-reporting-plans-id" class="card-body export-collapsible">
+    <p class="text-muted">Updates a facility reporting plan.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The reporting plan to replace.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-dmrp-reporting-plans-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/dmrp/reporting-plans/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-dmrp-reporting-plans-id" class="card-body export-collapsible">
+    <p class="text-muted">Deletes a facility reporting plan.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The reporting plan to delete.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-measure-mappings-search" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/measure-mappings/search</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-measure-mappings-search" class="card-body export-collapsible">
+    <p class="text-muted">Gets a paged list of measure mappings, optionally filtered by measure, dQM or frequency.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>SortBy</td><td></td><td>No</td><td></td></tr><tr><td>SortOrder</td><td></td><td>No</td><td></td></tr><tr><td>PageSize</td><td></td><td>No</td><td></td></tr><tr><td>PageNumber</td><td></td><td>No</td><td></td></tr><tr><td>Measure</td><td></td><td>No</td><td></td></tr><tr><td>DQM</td><td></td><td>No</td><td></td></tr><tr><td>Frequency</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-dmrp-measure-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/dmrp/measure-mappings/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-dmrp-measure-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">Gets a measure mapping by Id.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The mapping&#39;s own identifier, as returned by create or search.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-put-api-dmrp-measure-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/dmrp/measure-mappings/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-put-api-dmrp-measure-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">Updates a measure mapping.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The mapping to replace. This wins over any id in the body.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-dmrp-measure-mappings-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/dmrp/measure-mappings/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-dmrp-measure-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">Deletes a measure mapping.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td>The mapping to delete.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-post-api-dmrp-measure-mappings" aria-expanded="false"><strong>POST</strong> <code>/api/dmrp/measure-mappings</code></a></div>
+  <div id="openapi-card-tenantservice-post-api-dmrp-measure-mappings" class="card-body export-collapsible">
+    <p class="text-muted">Creates a measure mapping.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-dmrp-measure-mappings" aria-expanded="false"><strong>DELETE</strong> <code>/api/dmrp/measure-mappings</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-dmrp-measure-mappings" class="card-body export-collapsible">
+    <p class="text-muted">Deletes all measure mappings.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-facility-info" aria-expanded="false"><strong>GET</strong> <code>/api/facility/info</code></a></div>
   <div id="openapi-card-tenantservice-get-api-facility-info" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-vendor-id" aria-expanded="false"><strong>GET</strong> <code>/api/Vendor/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-vendor-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-put-api-vendor-id" aria-expanded="false"><strong>PUT</strong> <code>/api/Vendor/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-put-api-vendor-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-vendor-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/Vendor/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-vendor-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-vendor" aria-expanded="false"><strong>GET</strong> <code>/api/Vendor</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-vendor" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-post-api-vendor" aria-expanded="false"><strong>POST</strong> <code>/api/Vendor</code></a></div>
+  <div id="openapi-card-tenantservice-post-api-vendor" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-vendorversion-id" aria-expanded="false"><strong>GET</strong> <code>/api/VendorVersion/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-vendorversion-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-put-api-vendorversion-id" aria-expanded="false"><strong>PUT</strong> <code>/api/VendorVersion/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-put-api-vendorversion-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-delete-api-vendorversion-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/VendorVersion/{id}</code></a></div>
+  <div id="openapi-card-tenantservice-delete-api-vendorversion-id" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-get-api-vendorversion" aria-expanded="false"><strong>GET</strong> <code>/api/VendorVersion</code></a></div>
+  <div id="openapi-card-tenantservice-get-api-vendorversion" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>vendorId</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-tenantservice-post-api-vendorversion" aria-expanded="false"><strong>POST</strong> <code>/api/VendorVersion</code></a></div>
+  <div id="openapi-card-tenantservice-post-api-vendorversion" class="card-body export-collapsible">
     
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -855,28 +1519,28 @@ found in the JWKS endpoint exposed by Link.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nTenantService_F25B55["Service: Tenant Service"]
-  nTenantService_F25B55 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nTenantService_F25B55 -->|produces| nReportScheduled_BC6D32E["Event: ReportScheduled"]
-  nTenantService_F25B55 -->|sends| nGenerateReportRequested_7BC99734["Command: GenerateReportRequested"]
-  nTenantService_F25B55 -->|provides| nGetFacilitiesList_5CEDF833["Query: GetFacilitiesList"]
-  nTenantService_F25B55 -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nTenantService_F25B55 -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  nTenantService_F25B55 -->|requests| nGetFacilitiesList_5CEDF833["Query: GetFacilitiesList"]
-  nTenantService_F25B55 -->|requests| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nTenantService_F25B55 -->|requests| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
+nTenantService_7F5659F3["Service: Tenant Service"]
+  nTenantService_7F5659F3 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nTenantService_7F5659F3 -->|produces| nReportScheduled_4BA62BDB["Event: ReportScheduled"]
+  nTenantService_7F5659F3 -->|sends| nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"]
+  nTenantService_7F5659F3 -->|provides| nGetFacilitiesList_7612A70C["Query: GetFacilitiesList"]
+  nTenantService_7F5659F3 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nTenantService_7F5659F3 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  nTenantService_7F5659F3 -->|requests| nGetFacilitiesList_7612A70C["Query: GetFacilitiesList"]
+  nTenantService_7F5659F3 -->|requests| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nTenantService_7F5659F3 -->|requests| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nGenerateReportRequested_7BC99734
-    nReportScheduled_BC6D32E
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nGenerateReportRequested_150FD8B0
+    nReportScheduled_4BA62BDB
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilitiesList_5CEDF833
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
-    nTenantService_F25B55
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilitiesList_7612A70C
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
+    nTenantService_7F5659F3
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
