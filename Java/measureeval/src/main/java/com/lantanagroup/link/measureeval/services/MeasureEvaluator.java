@@ -79,8 +79,10 @@ public class MeasureEvaluator {
 
     /**
      * Optional remote FHIR terminology client. When non-null, the CQL evaluation IRepository
-     * is a {@link FederatedFhirRepository} that falls through to this client for ValueSet /
-     * CodeSystem lookups not present in the bundle. Null means "bundle-only, no federation."
+     * is a {@link FederatedFhirRepository} that routes every {@code ValueSet} and
+     * {@code CodeSystem} lookup to this client — the in-memory bundle is not consulted for
+     * terminology types even when it carries embedded copies. Null means "bundle-only, no
+     * remote TS."
      */
     private IGenericClient remoteTerminologyClient;
 
@@ -447,14 +449,21 @@ public class MeasureEvaluator {
     /**
      * Constructs the IRepository the CQF stack consumes. Without a remote terminology client
      * this returns the plain in-memory bundle repo. With one, we return a
-     * {@link FederatedFhirRepository} that provides <em>bundle-first, fall-through-on-empty</em>
-     * federation for ValueSet and CodeSystem lookups only. Patient data, Measure, Library, and
-     * every other resource type continue to be served locally from the bundle.
+     * {@link FederatedFhirRepository} that routes every {@code ValueSet} and {@code CodeSystem}
+     * lookup to the remote client — the bundle is not consulted for terminology types even when
+     * it carries embedded copies. Patient data, Measure, Library, and every other resource type
+     * continue to be served locally from the bundle.
+     *
+     * <p>TS-authoritative was chosen so a deployment can point at a single terminology service
+     * and know that measure evaluations reflect that server's current expansions rather than
+     * whatever was baked into the bundle at authoring time. A remote miss (null / empty) is
+     * returned as-is and CQL fails naturally on the unresolved binding; a remote error
+     * propagates. See {@link FederatedFhirRepository}'s Javadoc for the full semantics.
      *
      * <h4>Why not CQF's endpoint parameters or {@code Repositories.proxy(...)}?</h4>
      *
      * <p>Two upstream mechanisms exist that look like they could handle this natively.
-     * Neither actually gives us the semantics we want.
+     * Neither gives us the semantics we want.
      *
      * <p><strong>1. {@code R4MultiMeasureService.evaluate(...)} endpoint parameters.</strong>
      * The service accepts three {@code Endpoint} parameters (content, terminology, data).
@@ -467,25 +476,12 @@ public class MeasureEvaluator {
      * each). Feedback worth sending upstream.
      *
      * <p><strong>2. Composing {@code Repositories.proxy + FederatedRepository + RestRepository}
-     * ourselves.</strong> Also doesn't work — but only reveals its flaw at runtime. Reading
-     * {@code FederatedRepository}'s bytecode: {@code read(...)} implements sequential
-     * first-non-null-wins semantics, but {@code search(...)} submits a
-     * {@link java.util.concurrent.CompletableFuture} per constituent repository, joins all
-     * of them, and merges the returned entries into a single searchset bundle. That means:
-     * <ul>
-     *   <li>The remote TS is called on every ValueSet search even when the bundle has the
-     *       VS. Bundle-embedded expansions no longer take precedence — they get merged
-     *       with remote expansions, which can silently change measure results if the two
-     *       diverge.</li>
-     *   <li>Any remote failure throws a {@code CompletionException} from
-     *       {@code CompletableFuture.join()}, which propagates through the CQL engine and
-     *       aborts evaluation. There is no graceful degradation.</li>
-     * </ul>
-     *
-     * <p>For measure evaluation, reproducibility depends on bundle-embedded ValueSets being
-     * authoritative — the measure author validated against those specific expansions.
-     * {@code FederatedFhirRepository} enforces that with true sequential fall-through: local
-     * first, remote only if local is empty, remote failure degrades to (empty) local result.
+     * ourselves.</strong> Also doesn't work. Reading {@code FederatedRepository}'s bytecode:
+     * {@code search(...)} submits a {@link java.util.concurrent.CompletableFuture} per
+     * constituent repository, joins all of them, and merges the returned entries into a
+     * single searchset bundle. That merges local and remote terminology copies into one
+     * result, which violates the "TS is authoritative" invariant when the two diverge —
+     * we want the remote answer, not a union of remote and stale-bundle expansions.
      *
      * <h4>Alignment with the CQF upgrade path</h4>
      *
