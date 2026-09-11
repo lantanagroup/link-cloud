@@ -3,6 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ReportDetail, ReportingStatus, ReportPatientEntry, ReportStatus, ReportSummary, PatientMappingEvidence, QueryPlan, AcquisitionLogEntry} from '../../../api/contracts';
 import {PatientStatusTimelineModal} from './PatientStatusTimeline';
+import {PreQualResultsModal} from './PreQualResults';
 import {
   Button,
   CheckboxField,
@@ -131,10 +132,23 @@ const DIGITAL_QUALITY_MEASURE_BY_MEASURE: Record<string, string> = {
   'Antimicrobial Use and Resistance (AU/AR)': 'LTC Monthly'
 };
 
-const DQM_LINK_BY_NAME: Record<string, string> = {
-  'ACH Monthly': 'https://measures-ci.nhsnlink.org/Measure-NHSNAcuteCareHospitalMonthlyInitialPopulation.html',
-  'ACH Daily': 'https://measures-ci.nhsnlink.org/Measure-NHSNAcuteCareHospitalDailyInitialPopulation.html',
-  'LTC Monthly': 'https://measures-ci.nhsnlink.org/Measure-NHSNLongTermCareMonthlyInitialPopulation.html'
+const DQM_INFO_BY_REAL_ID: Record<string, {name: string; url: string}> = {
+  NHSNGlycemicControlHypoglycemicInitialPopulation: {
+    name: 'ACH Monthly',
+    url: 'https://measures-ci.nhsnlink.org/Measure-NHSNAcuteCareHospitalMonthlyInitialPopulation.html'
+  },
+  NHSNAcuteCareHospitalMonthlyInitialPopulation: {
+    name: 'ACH Monthly',
+    url: 'https://measures-ci.nhsnlink.org/Measure-NHSNAcuteCareHospitalMonthlyInitialPopulation.html'
+  },
+  NHSNAcuteCareHospitalDailyInitialPopulation: {
+    name: 'ACH Daily',
+    url: 'https://measures-ci.nhsnlink.org/Measure-NHSNAcuteCareHospitalDailyInitialPopulation.html'
+  },
+  NHSNLongTermCareMonthlyInitialPopulation: {
+    name: 'LTC Monthly',
+    url: 'https://measures-ci.nhsnlink.org/Measure-NHSNLongTermCareMonthlyInitialPopulation.html'
+  }
 };
 
 // A DQM tab ("ACH Monthly") to the real report type Report stores measure reports under
@@ -473,6 +487,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const [activeDqm, setActiveDqm] = useState<string | undefined>();
   const [selectedPatientRow, setSelectedPatientRow] = useState<PatientStatusRow | null>(null);
   const [timelinePatientRow, setTimelinePatientRow] = useState<PatientStatusRow | null>(null);
+  const [preQualPatientRow, setPreQualPatientRow] = useState<PatientStatusRow | null>(null);
   const [mappingEvidenceColumn, setMappingEvidenceColumn] = useState<'locationOrg' | 'hsloc' | 'encounter' | null>(null);
   const [mappingEvidencePatientId, setMappingEvidencePatientId] = useState<string | null>(null);
   const [mappingEvidence, setMappingEvidence] = useState<PatientMappingEvidence | null>(null);
@@ -491,6 +506,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const [acquisitionLogFilters, setAcquisitionLogFilters] = useState<AcquisitionLogFilters>(EMPTY_ACQUISITION_LOG_FILTERS);
 
   const [exporting, setExporting] = useState(false);
+  const [downloadingPatientId, setDownloadingPatientId] = useState<string | null>(null);
 
   async function handleViewQueryPlan() {
     if (!detail) {
@@ -578,6 +594,30 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
       notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleDownloadPatientReport(patientId: string, dqmName: string | undefined) {
+    if (!detail || !dqmName) {
+      return;
+    }
+    const reportType = REAL_REPORT_TYPE_BY_DQM_NAME[dqmName];
+    if (!reportType) {
+      return;
+    }
+    setDownloadingPatientId(patientId);
+    try {
+      const blob = await api.exportPatientReport(detail.reportId, patientId, reportType);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${patientId}_${dqmName.replace(/\s+/g, '_')}_report.ndjson`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+    } finally {
+      setDownloadingPatientId(null);
     }
   }
 
@@ -840,22 +880,22 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 </thead>
                 <tbody>
                   {friendlyDetailMeasures.map(measure => {
-                    const dqm = DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure];
-                    const dqmUrl = dqm ? DQM_LINK_BY_NAME[dqm] : undefined;
+                    const realDqmId = PLACEHOLDER_MEASURES.find(placeholder => placeholder.name === measure)?.digitalQualityMeasure;
+                    const dqmInfo = realDqmId ? DQM_INFO_BY_REAL_ID[realDqmId] : undefined;
                     return (
                       <tr key={measure}>
                         <td>{measure}</td>
                         <td>
-                          {dqm && dqmUrl ? (
+                          {dqmInfo ? (
                             <a
                               className="nhsn-link__report-results-link"
-                              href={dqmUrl}
+                              href={dqmInfo.url}
                               target="_blank"
                               rel="noopener noreferrer">
-                              {dqm}
+                              {dqmInfo.name}
                             </a>
                           ) : (
-                            dqm ?? '—'
+                            '—'
                           )}
                         </td>
                       </tr>
@@ -952,7 +992,18 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                             </button>
                           </td>
                           <td>
-                            {row.hasPreQualResults ? <ChartIcon /> : t('onboarding:reportResults.detail.notApplicable')}
+                            {row.hasPreQualResults ? (
+                              <button
+                                type="button"
+                                className="nhsn-link__report-results-icon-button"
+                                onClick={() => setPreQualPatientRow(row)}
+                                aria-label={t('onboarding:reportResults.detail.columns.preQualResults')}
+                                title={t('onboarding:reportResults.detail.columns.preQualResults')}>
+                                <ChartIcon />
+                              </button>
+                            ) : (
+                              t('onboarding:reportResults.detail.notApplicable')
+                            )}
                           </td>
                           <td>
                             <button
@@ -994,9 +1045,10 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                             <button
                               type="button"
                               className="nhsn-link__report-results-icon-button"
-                              disabled
-                              aria-label={t('onboarding:reportResults.detail.downloadUnavailable')}
-                              title={t('onboarding:reportResults.detail.downloadUnavailable')}>
+                              onClick={() => handleDownloadPatientReport(row.patientId, currentDqm)}
+                              disabled={downloadingPatientId === row.patientId}
+                              aria-label={t('onboarding:reportResults.detail.downloadPatientReport')}
+                              title={t('onboarding:reportResults.detail.downloadPatientReport')}>
                               <DownloadIcon />
                             </button>
                           </td>
@@ -1309,6 +1361,17 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             patientId={timelinePatientRow.patientId}
             measureName={currentDqm}
             reportingStatus={timelinePatientRow.reportingStatus}
+          />
+        )}
+
+        {preQualPatientRow && detail && (
+          <PreQualResultsModal
+            open
+            onClose={() => setPreQualPatientRow(null)}
+            patientId={preQualPatientRow.patientId}
+            measureName={currentDqm}
+            reportingStatus={preQualPatientRow.reportingStatus}
+            reportId={detail.reportId}
           />
         )}
 

@@ -119,6 +119,9 @@ public sealed class ReportingService : IReportingService
     public Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default) =>
         _dataAcquisitionGateway.GetReportSummaryAsync(reportId, cancellationToken);
 
+    public Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default) =>
+        _reportGateway.GetPatientMeasureReportExportAsync(reportId, patientId, reportType, cancellationToken);
+
     private static DateTime ParseDate(string? value) =>
         DateTime.SpecifyKind(
             DateTime.ParseExact(value!, "yyyy-MM-dd", CultureInfo.InvariantCulture),

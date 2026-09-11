@@ -110,6 +110,7 @@ export interface ApiClient {
   getQueryPlan(reportId: string): Promise<QueryPlan>;
   getAcquisitionLogs(reportId: string): Promise<AcquisitionLogEntry[]>;
   exportReportSummary(reportId: string): Promise<Blob>;
+  exportPatientReport(reportId: string, patientId: string, reportType: string): Promise<Blob>;
   regenerateReport(reportId: string): Promise<Operation<ReportSummary>>;
 
   // reporting plan

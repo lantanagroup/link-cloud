@@ -396,7 +396,7 @@ export class MockApiClient implements ApiClient {
       hasPreQualResults: true,
       measureReports: [
         {
-          reportType: 'NHSNAcuteCareHospitalMonthlyInitialPopulation',
+          reportType: 'NHSNGlycemicControlHypoglycemicInitialPopulation',
           resourceCount: 12,
           resourceCountsByType: {Patient: 1, Encounter: 4, Location: 2, MedicationRequest: 5}
         }
@@ -484,6 +484,22 @@ export class MockApiClient implements ApiClient {
   async exportReportSummary(): Promise<Blob> {
     await tick();
     return new Blob(['simulated report summary'], {type: 'text/plain'});
+  }
+
+  async exportPatientReport(reportId: string, patientId: string, reportType: string): Promise<Blob> {
+    await tick();
+    const measureReport = {
+      resourceType: 'MeasureReport',
+      id: `${reportId}-${patientId}-${reportType}`,
+      status: 'complete',
+      type: 'individual',
+      measure: reportType,
+      subject: {reference: `Patient/${patientId}`},
+      extension: [{url: 'urn:nhsn-link:reportingStatus', valueString: 'PassedValidation (simulated)'}]
+    };
+    const patient = {resourceType: 'Patient', id: patientId};
+    const ndjson = [measureReport, patient].map(resource => JSON.stringify(resource)).join('\n');
+    return new Blob([ndjson], {type: 'application/x-ndjson'});
   }
 
   async regenerateReport(reportId: string): Promise<Operation<C.ReportSummary>> {

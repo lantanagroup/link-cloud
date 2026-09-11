@@ -727,6 +727,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  font-size: 12.5px;
 }
 
 .nhsn-link__reporting-plan-table th:first-child,
@@ -744,10 +745,6 @@
 .nhsn-link__reporting-plan-table th:last-child,
 .nhsn-link__reporting-plan-table td:last-child {
   width: 54%;
-}
-
-.nhsn-link__reporting-plan-table {
-  font-size: 12.5px;
 }
 
 .nhsn-link__reporting-plan-table th {
@@ -1273,8 +1270,8 @@
   cursor: pointer;
 }
 
-.nhsn-link__date-popup .k-calendar-th {
-  color: var(--kendo-color-subtle, #565e64);
+.nhsn-link__date-popup .k-calendar .k-calendar-th {
+  color: var(--kendo-color-app-text-subtle, #565e64);
   font-size: 12.5px;
   font-weight: 700;
 }
@@ -1381,7 +1378,6 @@
   color: #ffffff;
   background: var(--nhsn-link-chip-tone, #0b5cab);
 }
-in jump cleaning. List comments a minute she plumits live confidence of
 .nhsn-link__chip--tone-0 { --nhsn-link-chip-tone: #0b5cab; }
 .nhsn-link__chip--tone-1 { --nhsn-link-chip-tone: #7c3aed; }
 .nhsn-link__chip--tone-2 { --nhsn-link-chip-tone: #15803d; }
@@ -1692,6 +1688,12 @@ in jump cleaning. List comments a minute she plumits live confidence of
   width: 340px;
 }
 
+.nhsn-link__modal--xlarge {
+  width: 1300px;
+  max-width: 96%;
+  max-height: 92vh;
+}
+
 .nhsn-link__modal-title {
   flex: none;
   margin: 0 0 10px 0;
@@ -1788,13 +1790,10 @@ in jump cleaning. List comments a minute she plumits live confidence of
 
 .nhsn-link__location-org .nhsn-link__subtitle {
   max-width: none;
-}
-
-.nhsn-link__location-org .nhsn-link__field-group {
   margin-bottom: 16px;
 }
 
-.nhsn-link__location-org .nhsn-link__subtitle {
+.nhsn-link__location-org .nhsn-link__field-group {
   margin-bottom: 16px;
 }
 
@@ -2025,11 +2024,6 @@ in jump cleaning. List comments a minute she plumits live confidence of
 .nhsn-link__status-pill--cancelled {
   background: #e5e7eb;
   color: #4b5563;
-}
-
-.nhsn-link__status-pill--critical {
-  background: #ede9fe;
-  color: #5b21b6;
 }
 
 .nhsn-link__report-results-patient-detail-actions {

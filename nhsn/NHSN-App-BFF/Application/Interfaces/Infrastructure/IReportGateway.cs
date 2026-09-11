@@ -34,4 +34,11 @@ public interface IReportGateway
     /// indicators, or null when Report has no entry for that patient in this report.
     /// </summary>
     Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads one patient's measure-report data and evaluated-resource references for the given
+    /// report type, for the patient report download -- or null when Report has no entry, or no
+    /// measure report of that type, for this patient.
+    /// </summary>
+    Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
 }

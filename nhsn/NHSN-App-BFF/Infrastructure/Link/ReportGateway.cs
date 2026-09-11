@@ -182,6 +182,38 @@ internal sealed class ReportGateway : IReportGateway
         };
     }
 
+    public async Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
+    {
+        var entryResponse = await _reportClient.GetEntryByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
+        var entry = LinkResponseHandler.Optional(entryResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync));
+        var measureReport = entry?.MeasureReports.FirstOrDefault(report => report.ReportType == reportType);
+        if (entry is null || measureReport is null)
+        {
+            return null;
+        }
+
+        var resourcesResponse = await _reportClient.GetResourcesByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
+        var resources = LinkResponseHandler.Optional(resourcesResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync)) ?? [];
+
+        var scheduleResponse = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
+        var schedule = LinkResponseHandler.Optional(scheduleResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync));
+
+        return new PatientMeasureReportExport
+        {
+            PatientId = patientId,
+            ReportType = reportType,
+            MeasureReportId = measureReport.MeasureReportId,
+            ReportingStatus = entry.ReportingStatus.ToString(),
+            PeriodStart = schedule?.ReportStartDate,
+            PeriodEnd = schedule?.ReportEndDate,
+            ResourceCountsByType = measureReport.ResourceCount,
+            EvaluatedResources = resources
+                .Where(resource => resource.MeasureReportId == measureReport.MeasureReportId)
+                .Select(resource => new EvaluatedResourceReference {ResourceType = resource.ResourceType, ResourceId = resource.ResourceId})
+                .ToList()
+        };
+    }
+
     private static bool IsMapped(MappingIndicatorStatus status) =>
         status is MappingIndicatorStatus.Mapped or MappingIndicatorStatus.PartiallyMapped or MappingIndicatorStatus.Assumed;
 }

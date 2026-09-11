@@ -284,6 +284,14 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
+  async exportPatientReport(reportId: string, patientId: string, reportType: string): Promise<Blob> {
+    const {data} = await this.http.get<Blob>(
+      `/reports/${encodeURIComponent(reportId)}/patients/${encodeURIComponent(patientId)}/export?measure=${encodeURIComponent(reportType)}`,
+      {responseType: 'blob'}
+    );
+    return data;
+  }
+
   async regenerateReport(reportId: string): Promise<Operation<ReportSummary>> {
     const initial = await this.http.post<ReportSummary>(
       `/reports/${encodeURIComponent(reportId)}/regenerations`
