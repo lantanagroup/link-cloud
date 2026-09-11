@@ -843,6 +843,9 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--kendo-color-app-text, #1f2328);
+  /* The label text itself shouldn't be clickable - only the input and (for
+     hinted fields) the "?" badge below should react to clicks. */
+  pointer-events: none;
 }
 
 .nhsn-facility-info .k-label svg {
@@ -870,6 +873,7 @@
   font-weight: 700;
   cursor: pointer;
   anchor-name: --facility-hint-badge;
+  pointer-events: auto;
 }
 
 .nhsn-facility-info .k-form-field--hint-open .k-label::after {
@@ -1008,6 +1012,9 @@
   font-weight: 700;
   margin-bottom: 0.5rem;
   color: var(--kendo-color-app-text, #1f2328);
+  /* Keeps the accessible name (via `for`) without letting a click anywhere on
+     this caption text open the file dialog - only the input/button should. */
+  pointer-events: none;
 }
 
 .nhsn-link__upload-field input[type="file"] {
@@ -1315,6 +1322,13 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--kendo-color-app-text, #1f2328);
+  /* Keeps the accessible name (via `for`) without letting a click anywhere on
+     this caption text activate the field - only the input/icon should. */
+  pointer-events: none;
+}
+
+.nhsn-link__chip-select-label .info-icon {
+  pointer-events: auto;
 }
 
 .nhsn-link__chip-select-required {

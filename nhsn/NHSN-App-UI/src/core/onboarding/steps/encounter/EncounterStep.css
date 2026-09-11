@@ -102,6 +102,9 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--encounter-gray-800);
+  /* Keeps the accessible name (via `for`) without letting a click anywhere
+     on this caption text focus the input - only the input itself should. */
+  pointer-events: none;
 }
 
 .encounter-mapping .form-hint {

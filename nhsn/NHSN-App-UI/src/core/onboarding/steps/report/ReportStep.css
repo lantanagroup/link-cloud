@@ -108,6 +108,8 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--report-gray-800);
+  /* The label text itself shouldn't be clickable - only the input should. */
+  pointer-events: none;
 }
 
 .report-generate .k-label svg {

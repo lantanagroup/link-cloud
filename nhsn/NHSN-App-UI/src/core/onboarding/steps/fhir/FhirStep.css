@@ -94,6 +94,16 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--fhir-gray-800);
+  /* This label has no `for` and only wraps the "?" button below, so the
+     browser implicitly treats that button as its labeled control and
+     forwards any click on the label (e.g. blank space beside the text) to
+     it. Disabling pointer-events on the label - and re-enabling them only
+     on the button - keeps just the icon itself clickable. */
+  pointer-events: none;
+}
+
+.fhir-server-info .form-group > label .info-icon {
+  pointer-events: auto;
 }
 
 /* .info-icon / .tooltip-bubble are now shared, generalized rules in NHSNLink.css. */
@@ -203,6 +213,9 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--fhir-gray-800);
+  /* The label text itself shouldn't be clickable - only the input and (for
+     hinted fields) the "?" badge below should react to clicks. */
+  pointer-events: none;
 }
 
 .fhir-server-info .k-label svg {
@@ -263,6 +276,7 @@
   font-weight: 700;
   cursor: pointer;
   anchor-name: --fhir-hint-badge;
+  pointer-events: auto;
 }
 
 .fhir-server-info .k-form-field--hint-open .k-label::after {

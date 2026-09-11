@@ -288,7 +288,11 @@ function useHintTooltips() {
         return;
       }
 
-      if (fieldTrigger) {
+      if (trigger) {
+        // Clicking the badge/icon itself must only toggle the tooltip - not
+        // also fall through to the label's native "focus the associated
+        // control" behavior (fieldTrigger) or bubble into anything else
+        // listening for clicks on the icon (infoIconTrigger).
         event.preventDefault();
         event.stopPropagation();
       }
