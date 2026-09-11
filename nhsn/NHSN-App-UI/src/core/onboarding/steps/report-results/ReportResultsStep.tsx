@@ -1,7 +1,21 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {ReportDetail, ReportingStatus, ReportPatientEntry, ReportStatus, ReportSummary, PatientMappingEvidence, QueryPlan, AcquisitionLogEntry} from '../../../api/contracts';
+import type {
+  CodeMapEvidence,
+  HslocCode,
+  HslocMapping,
+  LocationMethod,
+  ReportDetail,
+  ReportingStatus,
+  ReportPatientEntry,
+  ReportStatus,
+  ReportSummary,
+  PatientMappingEvidence,
+  QueryPlan,
+  AcquisitionLogEntry
+} from '../../../api/contracts';
+import {HttpError} from '../../../api/http';
 import {PatientStatusTimelineModal} from './PatientStatusTimeline';
 import {PreQualResultsModal} from './PreQualResults';
 import {
@@ -19,8 +33,23 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import type {LocationOrgDraft} from '../../types';
+import {buildGroups} from '../encounter/EncounterStep';
+import {METHOD_LABEL_KEYS} from '../location-org/LocationOrgStep';
+import {PLACEHOLDER_MEASURES} from '../report/placeholderMeasures';
 import {parseQueryPlan, type ParsedQueryPlan, type ParsedQueryPlanQuery} from './queryPlan';
 import {buildXlsxBlob, downloadBlob, type XlsxSheet} from './reportExport';
+
+/**
+ * `PatientMappingEvidence.codeMaps` backs both the HSLOC and Encounter mapping indicators (see its
+ * doc comment in contracts.ts) with no field of its own naming which one a given entry is for.
+ * HSLOC's target vocabulary is the fixed NHSN HSLOC code list -- Normalization names it literally
+ * "HSLOC" as the target system -- while Encounter mapping always targets a real coding system
+ * (CPT, SNOMED CT, ...). Splitting on that literal is the only signal available without a new field.
+ */
+function isHslocCodeMap(codeMap: CodeMapEvidence): boolean {
+  return codeMap.targetSystem.trim().toUpperCase() === 'HSLOC';
+}
 
 /** A field's `t` narrowed to the plain-string-key shape the sheet builders below need. */
 type TFn = (key: string) => string;
@@ -298,6 +327,41 @@ function toPatientRows(patients: ReportPatientEntry[], dqmName: string | undefin
   });
 }
 
+/** The facility's configured Location Org mapping table, shaped per-method like LocationOrgStep's own lists. */
+interface LocationOrgConfigInfo {
+  method: LocationMethod;
+  headers: string[];
+  rows: string[][];
+}
+
+// Mirrors the onboarding POC's locationOrgConfigInfo(): which configured list backs the "Configured
+// Location Org Mappings" table in the Report Details modal depends on the facility's chosen method.
+// Custom FHIRPath (and no method at all) has no structured list to show, matching the POC.
+function locationOrgConfigInfo(locationOrg: LocationOrgDraft, t: TFn): LocationOrgConfigInfo | null {
+  if (locationOrg.method === 'location-identifier') {
+    return {
+      method: locationOrg.method,
+      headers: [t('onboarding:locationOrg.locationIdentifier.systemLabel'), t('onboarding:locationOrg.locationIdentifier.codeLabel')],
+      rows: (locationOrg.locationIdentifiers ?? []).map(row => [row.system, row.code])
+    };
+  }
+  if (locationOrg.method === 'location-type') {
+    return {
+      method: locationOrg.method,
+      headers: [t('onboarding:locationOrg.locationType.codeLabel'), t('onboarding:locationOrg.locationType.aliasLabel')],
+      rows: (locationOrg.locationTypes ?? []).map(row => [row.code, row.alias])
+    };
+  }
+  if (locationOrg.method === 'managing-org') {
+    return {
+      method: locationOrg.method,
+      headers: [t('onboarding:locationOrg.managingOrg.listLabel')],
+      rows: (locationOrg.managingOrganizationIds ?? []).map(value => [value])
+    };
+  }
+  return null;
+}
+
 // Resource type names are FHIR resource types (Patient, Encounter, MedicationRequest, ...) as Report
 // returns them -- data, not UI copy, so they render as-is rather than through an i18n lookup.
 const RESOURCE_TYPE_COLOR_PALETTE = ['#0b5cab', '#7c3aed', '#15803d', '#b45309', '#be185d', '#0f766e', '#4338ca', '#a16207'];
@@ -470,7 +534,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifySuccess, notifyError} = useNotifications();
-  const {draft, patch, saving, goTo, openView, closeView} = useOnboarding();
+  const {draft, patch, saving, goTo, openView, closeView, vendorProfile} = useOnboarding();
   const reportResults = draft.reportResults;
 
   const [reports, setReports] = useState<ReportSummary[]>([]);
@@ -496,6 +560,21 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const [mappingEvidenceLoading, setMappingEvidenceLoading] = useState(false);
   const [mappingEvidenceError, setMappingEvidenceError] = useState<string | null>(null);
 
+  // HSLOC reference codes, the facility's live configured mappings, and in-progress "+ Add Mapping"
+  // selections for the HSLOC mapping modal's unmapped values, keyed by the unmapped source code.
+  // Mappings are fetched fresh via getHslocMappings() -- the same call HslocStep itself makes --
+  // rather than read off draft.hsloc.mappings: the draft only picks up HslocStep's edits when that
+  // step's own Continue button patches it, so it can lag behind what saveHslocMappings actually
+  // persisted (e.g. right after this modal's own "+ Add Mapping" adds one). Location Org / Encounter
+  // have no equivalent -- unlike saveHslocMappings, neither has a save call that isn't gated to its
+  // own onboarding step (see saveDraft's doc comment), so those two modals stay read-only and link
+  // to the real step instead.
+  const [hslocCodes, setHslocCodes] = useState<HslocCode[]>([]);
+  const [hslocMappings, setHslocMappings] = useState<HslocMapping[]>([]);
+  const [hslocDataLoading, setHslocDataLoading] = useState(false);
+  const [hslocSelections, setHslocSelections] = useState<Record<string, string>>({});
+  const [addingHslocCode, setAddingHslocCode] = useState<string | null>(null);
+
   const [queryPlanOpen, setQueryPlanOpen] = useState(false);
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null);
   const [queryPlanLoading, setQueryPlanLoading] = useState(false);
@@ -517,10 +596,16 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     setQueryPlanOpen(true);
     setQueryPlanLoading(true);
     setQueryPlanError(null);
+    setQueryPlan(null);
     try {
       setQueryPlan(await api.getQueryPlan(detail.reportId));
     } catch (cause) {
-      setQueryPlanError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+      // A 404 means the facility simply has no query plan configured yet -- expected, not a
+      // failure. Leave queryPlan at null so the "no plan configured" empty state renders instead
+      // of the raw HTTP error.
+      if (!(cause instanceof HttpError && cause.status === 404)) {
+        setQueryPlanError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+      }
     } finally {
       setQueryPlanLoading(false);
     }
@@ -634,6 +719,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     setMappingEvidence(null);
     setMappingEvidenceError(null);
     setMappingEvidenceLoading(true);
+    setHslocSelections({});
     try {
       const evidence = await api.getPatientMappingEvidence(detail.reportId, patientId);
       setMappingEvidence(evidence);
@@ -641,6 +727,53 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
       setMappingEvidenceError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
     } finally {
       setMappingEvidenceLoading(false);
+    }
+    if (column === 'hsloc') {
+      setHslocDataLoading(true);
+      try {
+        // Mappings are always refetched (unlike the reference code list, cached once loaded) --
+        // they can change between openings, including from this same modal's own "+ Add Mapping".
+        const [codes, mappings] = await Promise.all([
+          hslocCodes.length === 0 ? api.getHslocCodes() : Promise.resolve(hslocCodes),
+          api.getHslocMappings()
+        ]);
+        setHslocCodes(codes);
+        setHslocMappings(mappings);
+      } catch (cause) {
+        notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+      } finally {
+        setHslocDataLoading(false);
+      }
+    }
+  }
+
+  // The only one of the three mapping indicators with a save call that isn't gated to its own
+  // onboarding step (see saveHslocMappings vs. the note on ApiClient.saveDraft) -- so it is the only
+  // one this screen can persist a new mapping through. Appends to the live hslocMappings (fetched
+  // fresh when the modal opened, not draft.hsloc.mappings -- see the state comment above) rather
+  // than replacing, mirroring the onboarding POC's "add to configuration" behavior. Also mirrors the
+  // full result into the draft so the Location Identification step reflects it without a refetch.
+  async function handleAddHslocMapping(unmappedCode: string) {
+    const hslocCode = hslocSelections[unmappedCode];
+    if (!hslocCode) {
+      return;
+    }
+    setAddingHslocCode(unmappedCode);
+    try {
+      const nextMappings = [...hslocMappings, {sourceCode: unmappedCode, hslocCode}];
+      await api.saveHslocMappings(nextMappings);
+      setHslocMappings(nextMappings);
+      patch('hsloc', {mappings: nextMappings});
+      notifySuccess(t('onboarding:reportResults.detail.mappingEvidence.hslocMappingAdded'));
+      setHslocSelections(prev => {
+        const next = {...prev};
+        delete next[unmappedCode];
+        return next;
+      });
+    } catch (cause) {
+      notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+    } finally {
+      setAddingHslocCode(null);
     }
   }
 
@@ -766,6 +899,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     }));
     const statusBreakdown = buildReportStatusBreakdown(dqmScopedPatients);
     const patientRows = toPatientRows(dqmScopedPatients, currentDqm);
+    const mappingEvidencePatientRow = patientRows.find(row => row.patientId === mappingEvidencePatientId) ?? null;
+    const locationOrgConfig = locationOrgConfigInfo(draft.locationOrg, t);
+    const hslocUnmappedCodes = mappingEvidence
+      ? Array.from(new Set(mappingEvidence.codeMaps.filter(isHslocCodeMap).flatMap(codeMap => codeMap.unmappedCodes)))
+      : [];
+    const encounterCodeMaps = mappingEvidence ? mappingEvidence.codeMaps.filter(codeMap => !isHslocCodeMap(codeMap)) : [];
+    const encounterGroups = buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? []);
 
     let sliceStart = 0;
     const pieSlices = statusBreakdown.map(slice => {
@@ -1378,12 +1518,16 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           />
         )}
 
+        {/* Location Org Mapping -- read-only: the facility's configured mappings plus the real
+            per-patient evidence Report recorded. Unlike HSLOC below, there is no save call for
+            Location Org config that isn't gated to the Organization Identification step itself
+            (see ApiClient.saveDraft), so "fixing" a miss here just links there instead of faking
+            an inline edit that wouldn't persist. */}
         <Modal
-          open={Boolean(mappingEvidenceColumn)}
-          title={t(`onboarding:reportResults.detail.columns.${
-            mappingEvidenceColumn === 'locationOrg' ? 'locationOrg' : mappingEvidenceColumn === 'hsloc' ? 'hslocMapping' : 'encounterMapping'
-          }`)}
+          open={mappingEvidenceColumn === 'locationOrg'}
+          title={t('onboarding:reportResults.detail.mappingEvidence.locationOrgTitle')}
           onClose={() => setMappingEvidenceColumn(null)}
+          size="large"
           footer={
             <Button variant="secondary" onClick={() => setMappingEvidenceColumn(null)}>
               {t('common:actions.close')}
@@ -1394,16 +1538,58 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
               <dt>{t('onboarding:reportResults.detail.columns.patientId')}</dt>
               <dd>{mappingEvidencePatientId}</dd>
             </div>
+            <div>
+              <dt>{t('onboarding:reportResults.detail.mappingEvidence.resolutionMethod')}</dt>
+              <dd>{locationOrgConfig ? t(METHOD_LABEL_KEYS[locationOrgConfig.method]) : t('onboarding:reportResults.detail.notApplicable')}</dd>
+            </div>
           </dl>
 
+          <h3 className="nhsn-link__report-results-detail-section-title">
+            {t('onboarding:reportResults.detail.mappingEvidence.configuredLocationOrgMappings')}
+          </h3>
+          {locationOrgConfig ? (
+            <div className="nhsn-link__report-results-table-scroll">
+              <table className="nhsn-link__report-results-table">
+                <thead>
+                  <tr>
+                    {locationOrgConfig.headers.map(header => (
+                      <th key={header}>{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {locationOrgConfig.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={locationOrgConfig.headers.length}>
+                        {t('onboarding:reportResults.detail.mappingEvidence.noConfiguredMappings')}
+                      </td>
+                    </tr>
+                  ) : (
+                    locationOrgConfig.rows.map((cells, index) => (
+                      <tr key={index}>
+                        {cells.map((cell, cellIndex) => (
+                          <td key={cellIndex}>{cell || '—'}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="nhsn-link__hint-text">{t('onboarding:reportResults.detail.mappingEvidence.noStructuredMethod')}</p>
+          )}
+
+          <h3 className="nhsn-link__report-results-detail-section-title">
+            {t('onboarding:reportResults.detail.mappingEvidence.locationEvidenceHeading')}
+          </h3>
           {mappingEvidenceLoading && <NHSNLoadingIndicator />}
           {!mappingEvidenceLoading && mappingEvidenceError && (
             <MessageContainer type="error" showIcon>
               <span role="alert">{mappingEvidenceError}</span>
             </MessageContainer>
           )}
-
-          {!mappingEvidenceLoading && !mappingEvidenceError && mappingEvidence && mappingEvidenceColumn === 'locationOrg' && (
+          {!mappingEvidenceLoading && !mappingEvidenceError && mappingEvidence && (
             mappingEvidence.locationOrg && mappingEvidence.locationOrg.matches.length > 0 ? (
               <div className="nhsn-link__report-results-table-scroll">
                 <table className="nhsn-link__report-results-table">
@@ -1436,31 +1622,241 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             )
           )}
 
-          {!mappingEvidenceLoading && !mappingEvidenceError && mappingEvidence && mappingEvidenceColumn !== 'locationOrg' && (
-            mappingEvidence.codeMaps.length > 0 ? (
+          {mappingEvidencePatientRow && !mappingEvidencePatientRow.locationOrgFound && (
+            <MessageContainer type="info" showIcon>
+              <p>{t('onboarding:reportResults.detail.mappingEvidence.notFoundLocationOrgHint')}</p>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setMappingEvidenceColumn(null);
+                  goTo('location-org');
+                }}>
+                {t('onboarding:reportResults.detail.mappingEvidence.goToLocationOrg')}
+              </Button>
+            </MessageContainer>
+          )}
+        </Modal>
+
+        {/* HSLOC Mapping -- the one mapping type this screen can actually fix: saveHslocMappings is
+            a standalone call, not gated to the Location Identification step the way saveDraft is
+            (see handleAddHslocMapping above), so an unmapped value acquired for this patient gets a
+            real "+ Add Mapping" control. */}
+        <Modal
+          open={mappingEvidenceColumn === 'hsloc'}
+          title={t('onboarding:reportResults.detail.mappingEvidence.hslocTitle')}
+          onClose={() => setMappingEvidenceColumn(null)}
+          size="large"
+          footer={
+            <Button variant="secondary" onClick={() => setMappingEvidenceColumn(null)}>
+              {t('common:actions.close')}
+            </Button>
+          }>
+          <dl className="nhsn-link__report-results-detail-list">
+            <div>
+              <dt>{t('onboarding:reportResults.detail.columns.patientId')}</dt>
+              <dd>{mappingEvidencePatientId}</dd>
+            </div>
+          </dl>
+
+          <h3 className="nhsn-link__report-results-detail-section-title">
+            {t('onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings')}
+          </h3>
+          <div className="nhsn-link__report-results-table-scroll">
+            <table className="nhsn-link__report-results-table">
+              <thead>
+                <tr>
+                  <th>{t('onboarding:reportResults.detail.mappingEvidence.yourCode')}</th>
+                  <th>{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
+                  <th>{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hslocDataLoading ? (
+                  <tr>
+                    <td colSpan={3}>
+                      <NHSNLoadingIndicator />
+                    </td>
+                  </tr>
+                ) : hslocMappings.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>{t('onboarding:reportResults.detail.mappingEvidence.noConfiguredMappings')}</td>
+                  </tr>
+                ) : (
+                  hslocMappings.map((mapping, index) => (
+                    <tr key={`${mapping.sourceCode}-${index}`}>
+                      <td>{mapping.sourceDisplay || '—'}</td>
+                      <td>{mapping.sourceCode}</td>
+                      <td>{mapping.hslocCode}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {mappingEvidenceLoading && <NHSNLoadingIndicator />}
+          {!mappingEvidenceLoading && mappingEvidenceError && (
+            <MessageContainer type="error" showIcon>
+              <span role="alert">{mappingEvidenceError}</span>
+            </MessageContainer>
+          )}
+
+          {!mappingEvidenceLoading && !mappingEvidenceError && hslocUnmappedCodes.length > 0 && (
+            <>
+              <h3 className="nhsn-link__report-results-detail-section-title">
+                {t('onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading')}
+              </h3>
+              {hslocDataLoading ? (
+                <NHSNLoadingIndicator />
+              ) : (
+                <div className="nhsn-link__report-results-table-scroll">
+                  <table className="nhsn-link__report-results-table">
+                    <thead>
+                      <tr>
+                        <th>{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
+                        <th>{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
+                        <th aria-hidden="true" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hslocUnmappedCodes.map(code => (
+                        <tr key={code}>
+                          <td>{code}</td>
+                          <td>
+                            <Select
+                              id={`hsloc-add-${code}`}
+                              label={t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}
+                              placeholder={t('onboarding:reportResults.detail.mappingEvidence.selectHslocCode')}
+                              options={hslocCodes.map(hslocCode => ({value: hslocCode.code, label: `${hslocCode.code} - ${hslocCode.display}`}))}
+                              value={hslocSelections[code] ?? ''}
+                              onChange={value => setHslocSelections(prev => ({...prev, [code]: value}))}
+                            />
+                          </td>
+                          <td>
+                            <Button
+                              variant="secondary"
+                              onClick={() => handleAddHslocMapping(code)}
+                              disabled={!hslocSelections[code] || addingHslocCode === code}
+                              loading={addingHslocCode === code}>
+                              {t('onboarding:reportResults.detail.mappingEvidence.addMapping')}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="nhsn-link__hint-text">{t('onboarding:reportResults.detail.mappingEvidence.hslocAddedHint')}</p>
+            </>
+          )}
+        </Modal>
+
+        {/* Encounter Mapping -- read-only, same reasoning as Location Org above: Encounter Mapping
+            config only saves through the Encounter Mapping step's own saveDraft call. */}
+        <Modal
+          open={mappingEvidenceColumn === 'encounter'}
+          title={t('onboarding:reportResults.detail.mappingEvidence.encounterTitle')}
+          onClose={() => setMappingEvidenceColumn(null)}
+          size="large"
+          footer={
+            <Button variant="secondary" onClick={() => setMappingEvidenceColumn(null)}>
+              {t('common:actions.close')}
+            </Button>
+          }>
+          <dl className="nhsn-link__report-results-detail-list">
+            <div>
+              <dt>{t('onboarding:reportResults.detail.columns.patientId')}</dt>
+              <dd>{mappingEvidencePatientId}</dd>
+            </div>
+          </dl>
+
+          {mappingEvidenceLoading && <NHSNLoadingIndicator />}
+          {!mappingEvidenceLoading && mappingEvidenceError && (
+            <MessageContainer type="error" showIcon>
+              <span role="alert">{mappingEvidenceError}</span>
+            </MessageContainer>
+          )}
+
+          {!mappingEvidenceLoading && !mappingEvidenceError && encounterCodeMaps.length > 0 && (
+            <>
+              <h3 className="nhsn-link__report-results-detail-section-title">
+                {t('onboarding:reportResults.detail.mappingEvidence.acquiredEncounterValueHeading')}
+              </h3>
               <div className="nhsn-link__report-results-table-scroll">
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
                       <th>{t('onboarding:reportResults.detail.mappingEvidence.sourceSystem')}</th>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.targetSystem')}</th>
                       <th>{t('onboarding:reportResults.detail.mappingEvidence.unmappedCodes')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {mappingEvidence.codeMaps.map((codeMap, index) => (
-                      <tr key={`${codeMap.sourceSystem}-${codeMap.targetSystem}-${index}`}>
+                    {encounterCodeMaps.map((codeMap, index) => (
+                      <tr key={`${codeMap.sourceSystem}-${index}`}>
                         <td>{codeMap.sourceSystem}</td>
-                        <td>{codeMap.targetSystem}</td>
                         <td>{codeMap.unmappedCodes.length > 0 ? codeMap.unmappedCodes.join(', ') : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p>{t('onboarding:reportResults.detail.mappingEvidence.noEvidence')}</p>
-            )
+            </>
+          )}
+
+          <h3 className="nhsn-link__report-results-detail-section-title">
+            {t('onboarding:reportResults.detail.mappingEvidence.configuredEncounterCodeSystems')}
+          </h3>
+          {encounterGroups.length === 0 ? (
+            <p className="nhsn-link__hint-text">{t('onboarding:reportResults.detail.mappingEvidence.noCodeSystemsConfigured')}</p>
+          ) : (
+            encounterGroups.map(group => (
+              <div key={group.groupKey} className="nhsn-link__field-group">
+                <h4 className="nhsn-link__report-results-detail-section-title">
+                  {group.codeSystem || t('onboarding:reportResults.detail.mappingEvidence.codeSystem')}
+                </h4>
+                <div className="nhsn-link__report-results-table-scroll">
+                  <table className="nhsn-link__report-results-table">
+                    <thead>
+                      <tr>
+                        <th>{t('onboarding:reportResults.detail.mappingEvidence.localValue')}</th>
+                        <th>{t('onboarding:reportResults.detail.mappingEvidence.standardSystem')}</th>
+                        <th>{t('onboarding:reportResults.detail.mappingEvidence.standardCode')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.mappings.length === 0 ? (
+                        <tr>
+                          <td colSpan={3}>{t('onboarding:reportResults.detail.mappingEvidence.noConfiguredMappings')}</td>
+                        </tr>
+                      ) : (
+                        group.mappings.map(row => (
+                          <tr key={row.rowKey}>
+                            <td>{row.localValue}</td>
+                            <td>{row.targetSystem || '—'}</td>
+                            <td>{row.targetCode || '—'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
+
+          {mappingEvidencePatientRow && !mappingEvidencePatientRow.encounterFound && (
+            <MessageContainer type="info" showIcon>
+              <p>{t('onboarding:reportResults.detail.mappingEvidence.notFoundEncounterHint')}</p>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setMappingEvidenceColumn(null);
+                  goTo('encounter');
+                }}>
+                {t('onboarding:reportResults.detail.mappingEvidence.goToEncounterMapping')}
+              </Button>
+            </MessageContainer>
           )}
         </Modal>
       </div>

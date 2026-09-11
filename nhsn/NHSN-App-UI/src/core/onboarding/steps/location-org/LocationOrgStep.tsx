@@ -267,8 +267,11 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
 export default LocationOrgStep;
 
-/** i18n key per method, so no kebab-case identifier is built by string concatenation. */
-const METHOD_LABEL_KEYS: Record<LocationMethod, string> = {
+/**
+ * i18n key per method, so no kebab-case identifier is built by string concatenation. Exported for
+ * the Report Details "Location Org Mapping" modal, which shows the same method label read-only.
+ */
+export const METHOD_LABEL_KEYS: Record<LocationMethod, string> = {
   'managing-org': 'onboarding:locationOrg.methods.managingOrg',
   'location-identifier': 'onboarding:locationOrg.methods.locationIdentifier',
   'location-type': 'onboarding:locationOrg.methods.locationType',
