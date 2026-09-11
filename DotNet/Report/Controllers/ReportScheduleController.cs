@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 {
                     reportSchedules = await _reportScheduledManager.FindAsync(x =>
                         x.FacilityId == facilityId &&
-                        x.Status != Shared.Application.Enums.ScheduleStatus.Submitted &&
+                        !Shared.Application.Extensions.ScheduleStatusExtensions.TerminalStatuses.Contains(x.Status) &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
                 }
                 else

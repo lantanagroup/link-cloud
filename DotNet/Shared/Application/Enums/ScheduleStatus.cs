@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.Shared.Application.Enums
         New = 0,
         Scheduled = 100,
         EndOfPeriod = 200,
-        Submitted = 500
+        Submitted = 500,
+        CompletedNotSubmitted = 600,
     }
 }

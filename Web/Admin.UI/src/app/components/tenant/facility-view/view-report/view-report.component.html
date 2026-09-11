@@ -89,12 +89,7 @@
       </div>
       <div>
          <span class="data-value">
-          @switch (reportSummary?.status) {
-            @case ('New') { <span class="status-new">New</span> }
-            @case ('Scheduled') { <span class="status-scheduled">Scheduled</span> }
-            @case ('EndOfPeriod') { <span class="status-endOfPeriod">End of Period</span> }
-            @case ('Submitted') { <span class="status-submitted">Submitted</span> }
-          }
+          <span [ngClass]="statusBadgeClass(reportSummary?.status ?? '')">{{ statusLabel(reportSummary?.status ?? '') }}</span>
         </span>
         <div style="margin-top:5px" *ngIf="reportSummary?.submitReportDateTime">
           {{reportSummary.submitReportDateTime | date:'M/d/yy h:mm a'}}
