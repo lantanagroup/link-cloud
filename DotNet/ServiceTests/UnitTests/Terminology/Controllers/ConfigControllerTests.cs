@@ -1,5 +1,6 @@
 using System.Globalization;
 using CsvHelper;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
