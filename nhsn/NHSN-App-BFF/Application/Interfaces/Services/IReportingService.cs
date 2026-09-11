@@ -40,4 +40,7 @@ public interface IReportingService
 
     /// <summary>Reads DataAcquisition's own summary counts for this report, for the export action.</summary>
     Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads one patient's measure-report export data for the given report type, for the patient report download action.</summary>
+    Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
 }

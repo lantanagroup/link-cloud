@@ -8,7 +8,7 @@ export interface ModalProps {
   children: React.ReactNode;
   /** Action buttons. The caller supplies them so the dialog owns no verbs. */
   footer?: React.ReactNode;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'large' | 'xlarge';
 }
 
 const FOCUSABLE =

@@ -595,7 +595,25 @@
         "noEvidence": "No evidence recorded for this patient yet."
       },
       "notApplicable": "N/A",
+      "preQual": {
+        "title": "Pre-Qual Validation Results",
+        "subtitle": "Patient {{patientId}} — {{measure}}",
+        "issuesSummary": "Issues Summary",
+        "downloadResults": "Download Pre-Qual Results",
+        "unacceptableCategories": "Unacceptable Categories",
+        "acceptableCategories": "Acceptable Categories",
+        "category": "Category",
+        "numberOfIssues": "Number of Issues",
+        "guidance": "Guidance",
+        "noIssues": "None.",
+        "back": "Back",
+        "detailSubtitle": "{{count}} record(s) — Patient {{patientId}} — {{measure}}",
+        "message": "Message",
+        "expression": "Expression",
+        "location": "Location"
+      },
       "downloadUnavailable": "Export isn't available yet.",
+      "downloadPatientReport": "Download Patient Report",
       "patientDetail": {
         "title": "Patient Reporting Detail",
         "measure": "Measure",

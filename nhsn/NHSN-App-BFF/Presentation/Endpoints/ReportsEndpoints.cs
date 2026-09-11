@@ -171,6 +171,69 @@ public class ReportsEndpoints : IApi
                 operation.Summary = "Downloads DataAcquisition's summary counts for this report as a JSON file.";
                 return operation;
             });
+
+        group.MapGet("/{reportId}/patients/{patientId}/export", async (
+                string reportId,
+                string patientId,
+                string measure,
+                IReportingService service,
+                INhsnUserContext userContext,
+                CancellationToken cancellationToken) =>
+            {
+                var export = await service.GetPatientMeasureReportExportAsync(reportId, patientId, measure, cancellationToken);
+                if (export is null)
+                {
+                    return Results.NotFound();
+                }
+
+                var measureReportResource = new
+                {
+                    resourceType = "MeasureReport",
+                    id = export.MeasureReportId ?? $"{reportId}-{patientId}-{measure}",
+                    status = "complete",
+                    type = "individual",
+                    measure = export.ReportType,
+                    date = DateTime.UtcNow.ToString("O"),
+                    reporter = userContext.FacilityName is null
+                        ? null
+                        : new {display = userContext.FacilityName},
+                    period = export.PeriodStart is null || export.PeriodEnd is null
+                        ? null
+                        : new
+                        {
+                            start = export.PeriodStart.Value.ToString("yyyy-MM-dd"),
+                            end = export.PeriodEnd.Value.ToString("yyyy-MM-dd")
+                        },
+                    subject = new {reference = $"Patient/{patientId}"},
+                    evaluatedResource = export.EvaluatedResources
+                        .Select(resource => new {reference = $"{resource.ResourceType}/{resource.ResourceId}"})
+                        .ToArray(),
+                    extension = new[]
+                    {
+                        new {url = "urn:nhsn-link:reportingStatus", valueString = export.ReportingStatus}
+                    }
+                };
+
+                var ndjson = JsonSerializer.Serialize(measureReportResource);
+                return Results.File(
+                    System.Text.Encoding.UTF8.GetBytes(ndjson),
+                    "application/x-ndjson",
+                    $"{patientId}_{measure}_report.ndjson");
+            })
+            .WithName("ExportPatientReport")
+            .Produces(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Downloads one patient's MeasureReport for a report type as an ndjson file.";
+                operation.Description =
+                    "Carries the MeasureReport resource and its evaluated-resource references only -- " +
+                    "Report exposes no operation that returns the underlying clinical resources' " +
+                    "content, so the Patient/Encounter/MedicationRequest bodies those references " +
+                    "point to are not included.";
+                return operation;
+            });
     }
 
     private static Dictionary<string, string[]> Validate(ReportRequest request)
