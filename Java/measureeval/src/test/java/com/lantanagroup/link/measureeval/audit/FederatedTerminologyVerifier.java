@@ -36,18 +36,18 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMoc
  * Manual verifier for the federated-terminology wire-up in {@link MeasureEvaluator}. Point it at
  * a real IG measure bundle (Measure + Library + ValueSets) and a directory of subject bundles;
  * it runs three scenarios per subject and reports whether the results agree and whether the mock
- * terminology server was consulted the way we expect.
+ * terminology server was consulted the way TS-authoritative semantics demand.
  *
  * <p>Scenarios (per subject bundle):
  * <ol>
- *   <li><b>No federation</b> — evaluate against the full measure bundle, no remote client.
- *       Captures the baseline initial-population count.</li>
- *   <li><b>Federation on, full bundle</b> — evaluate again with a remote client pointed at
- *       WireMock. Bundle carries all the ValueSets it needs, so WireMock should record zero
- *       requests. Results must match scenario 1.</li>
- *   <li><b>Federation on, stripped bundle</b> — remove every ValueSet from the bundle before
- *       evaluating; WireMock is pre-stubbed to serve those same ValueSets. Results must match
- *       scenario 1; WireMock records requests for the stripped ValueSets.</li>
+ *   <li><b>No TS</b> — evaluate against the full measure bundle, no remote client. Captures
+ *       the baseline initial-population count.</li>
+ *   <li><b>TS on, full bundle</b> — evaluate with a remote client pointed at WireMock; the
+ *       bundle carries its own ValueSets. Under TS-authoritative semantics the mock TS must
+ *       still be consulted, and (since WireMock is stubbed to serve the same VSes) the result
+ *       must match scenario 1.</li>
+ *   <li><b>TS on, stripped bundle</b> — remove every ValueSet from the bundle; WireMock is
+ *       pre-stubbed to serve those same VSes. Results must match scenario 1.</li>
  * </ol>
  *
  * <p>Not committed as a JUnit test because it depends on large IG bundles that don't belong in
@@ -126,30 +126,29 @@ public class FederatedTerminologyVerifier {
             IGenericClient client,
             WireMockServer wm,
             Args a) {
-        // Scenario A: no federation, full bundle
+        // Scenario A: no TS, full bundle
         wm.resetRequests();
         int countA = runAndCount(ctx, fullBundle, subjectRef, subjectBundle, null, a);
-        int callsA = wm.getAllServeEvents().size();  // sanity: should be 0
 
-        // Scenario B: federation on, full bundle — remote should NOT be consulted
+        // Scenario B: TS on, full bundle — remote MUST be consulted (TS is authoritative)
         wm.resetRequests();
         int countB = runAndCount(ctx, fullBundle, subjectRef, subjectBundle, client, a);
         int callsB = wm.getAllServeEvents().size();
 
-        // Scenario C: federation on, stripped bundle — remote MUST be consulted
+        // Scenario C: TS on, stripped bundle — remote MUST be consulted
         wm.resetRequests();
         int countC = runAndCount(ctx, strippedBundle, subjectRef, subjectBundle, client, a);
         int callsC = wm.getAllServeEvents().size();
 
         boolean resultsMatch = countA == countB && countB == countC;
-        boolean bWasSilent = callsB == 0;
+        boolean bUsedRemote = callsB > 0;
         boolean cUsedRemote = callsC > 0;
-        boolean pass = resultsMatch && bWasSilent && cUsedRemote;
+        boolean pass = resultsMatch && bUsedRemote && cUsedRemote;
 
         String verdict = pass ? "✓ PASS"
                 : (!resultsMatch ? "✗ FAIL results diverge"
-                : !bWasSilent ? "✗ FAIL scenario B hit remote"
-                : "✗ FAIL scenario C did not use remote");
+                : !bUsedRemote ? "✗ FAIL scenario B did not consult TS (TS should be authoritative)"
+                : "✗ FAIL scenario C did not consult TS");
 
         System.out.printf("  %-45s | %-4d | %-4d | %-4d | %-4d | %-4d | %s%n",
                 truncate(subjectFileName, 45), countA, countB, countC, callsB, callsC, verdict);
@@ -257,10 +256,10 @@ public class FederatedTerminologyVerifier {
         System.out.println();
         System.out.printf("Overall: %d/%d PASS%n%n", passed, total);
         System.out.println("Legend:");
-        System.out.println("  A     = initial-population, no federation, full bundle");
-        System.out.println("  B     = initial-population, federation on, full bundle (must equal A)");
-        System.out.println("  C     = initial-population, federation on, stripped bundle (must equal A)");
-        System.out.println("  Bcalls= mock TS requests during scenario B (must be 0)");
+        System.out.println("  A     = initial-population, no TS, full bundle");
+        System.out.println("  B     = initial-population, TS on, full bundle (must equal A)");
+        System.out.println("  C     = initial-population, TS on, stripped bundle (must equal A)");
+        System.out.println("  Bcalls= mock TS requests during scenario B (must be > 0 — TS is authoritative)");
         System.out.println("  Ccalls= mock TS requests during scenario C (must be > 0)");
     }
 

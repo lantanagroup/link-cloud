@@ -27,25 +27,26 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Exercises the federated terminology wire-up added to {@link MeasureEvaluator}. Uses the same
  * fixtures as {@link MeasureEvaluatorEvaluationTests} — no NHSN bundles, no on-disk data.
  *
- * <p>Four scenarios verify the invariants that matter:
+ * <p>Four scenarios verify the invariants that matter under the TS-authoritative model:
  * <ol>
- *   <li><b>No federation:</b> bundle carries its own ValueSet; report computes as usual.</li>
- *   <li><b>Federation on, bundle self-sufficient:</b> report is identical AND the mock TS
- *       receives zero requests. This is the load-bearing test — if a change to
- *       {@code FederatedFhirRepository} ever calls the remote before consulting the bundle
- *       (or in parallel), this fires. The custom class exists specifically because CQF's
- *       stock {@code FederatedRepository} does <em>not</em> guarantee this — see
- *       {@code MeasureEvaluator.buildRepository()} Javadoc for the rationale.</li>
- *   <li><b>Federation on, bundle missing the VS:</b> mock TS serves the missing VS,
- *       report matches the self-sufficient case.</li>
- *   <li><b>Federation on, remote unreachable:</b> evaluation degrades gracefully to an
- *       empty result (initial-population = 0) rather than throwing.</li>
+ *   <li><b>No TS configured:</b> bundle carries its own ValueSet; report computes from the
+ *       bundle.</li>
+ *   <li><b>TS configured, bundle also has the VS:</b> the mock TS is consulted (even though the
+ *       bundle has a copy) and its response is used. The TS-authoritative invariant lives here
+ *       — if a change to {@code FederatedFhirRepository} ever short-circuits back to the bundle
+ *       for terminology, this fires. The custom class exists specifically to guarantee this
+ *       routing — see {@code MeasureEvaluator.buildRepository()} Javadoc.</li>
+ *   <li><b>TS configured, bundle missing the VS:</b> mock TS serves the VS, report matches the
+ *       no-TS case.</li>
+ *   <li><b>TS configured, remote unreachable:</b> the failure propagates — evaluation throws
+ *       rather than silently falling back to any bundle-embedded expansions.</li>
  * </ol>
  */
 @WireMockTest
@@ -57,8 +58,7 @@ class MeasureEvaluatorFederationTests {
 
     // ---------- fixture helpers ----------
 
-    /** Rebuilds the CohortMeasureWithValueSetTrue bundle without its embedded ValueSet, forcing
-     *  the terminology tier to fall through to the remote. */
+    /** Rebuilds the CohortMeasureWithValueSetTrue bundle without its embedded ValueSet. */
     private Bundle bundleWithoutValueSets() {
         var full = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
         var stripped = new Bundle();
@@ -86,8 +86,7 @@ class MeasureEvaluatorFederationTests {
      * Stubs HAPI's client-bootstrap capability-statement fetch. HAPI's IGenericClient validates
      * the server base URL once per base URL by calling {@code GET /metadata}. Without this stub,
      * WireMock's default 404 response makes the client bootstrap fail before any actual search
-     * can run. Tests that exercise the remote path need this stub; scenario 2 (bundle-first,
-     * remote never touched) doesn't.
+     * can run.
      */
     private void stubMetadata() {
         var cs = new CapabilityStatement();
@@ -120,8 +119,8 @@ class MeasureEvaluatorFederationTests {
     // ---------- scenarios ----------
 
     @Test
-    @DisplayName("1: no federation — bundle-embedded VS is sufficient")
-    void noFederation_bundleHasTerminology_producesReport() {
+    @DisplayName("1: no TS — bundle-embedded VS is used directly")
+    void noTs_bundleHasTerminology_producesReport() {
         var bundle = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
 
         var result = MeasureEvaluator.compileAndEvaluate(
@@ -133,9 +132,11 @@ class MeasureEvaluatorFederationTests {
     }
 
     @Test
-    @DisplayName("2: federation on but bundle self-sufficient — mock TS not called")
-    void federation_bundleHasTerminology_mockTsNotCalled(WireMockRuntimeInfo wm) {
+    @DisplayName("2: TS configured, bundle also has VS — TS is consulted (TS is authoritative)")
+    void ts_bundleAlsoHasTerminology_mockTsIsCalled(WireMockRuntimeInfo wm) {
         var bundle = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
+        stubMetadata();
+        stubValueSetSearch(ValueSetBuilder.inpatientEncounter());
 
         var result = MeasureEvaluator.compileAndEvaluate(
                 fhirContext, bundle, evaluateParams(), EnumSet.noneOf(DebugSections.class),
@@ -143,16 +144,17 @@ class MeasureEvaluatorFederationTests {
 
         assertNotNull(result.getMeasureReport());
         assertEquals(1, initialPopulationCount(result),
-                "initial-population should still be 1 — federation must not change results when the bundle has the VS");
+                "initial-population should be 1 — TS returned the same VS content the bundle carries");
 
-        var events = getAllServeEvents();
-        assertTrue(events.isEmpty(),
-                "Bundle contains the VS; the remote TS should not have been consulted. Recorded requests: " + events);
+        assertTrue(
+                getAllServeEvents().stream()
+                        .anyMatch(e -> e.getRequest().getUrl().startsWith("/ValueSet")),
+                "TS is authoritative — the mock TS must have been consulted for the ValueSet even though the bundle also has it");
     }
 
     @Test
-    @DisplayName("3: federation on, bundle missing VS — mock TS serves it, same result")
-    void federation_bundleMissingTerminology_mockTsCalled_sameReport(WireMockRuntimeInfo wm) {
+    @DisplayName("3: TS configured, bundle missing VS — TS serves it, same result")
+    void ts_bundleMissingTerminology_mockTsCalled_sameReport(WireMockRuntimeInfo wm) {
         var strippedBundle = bundleWithoutValueSets();
         stubMetadata();
         stubValueSetSearch(ValueSetBuilder.inpatientEncounter());
@@ -168,25 +170,21 @@ class MeasureEvaluatorFederationTests {
         assertTrue(
                 getAllServeEvents().stream()
                         .anyMatch(e -> e.getRequest().getUrl().startsWith("/ValueSet")),
-                "Expected the terminology tier to fall through to the mock TS for the missing VS");
+                "Expected the terminology tier to consult the mock TS for the VS");
     }
 
     @Test
-    @DisplayName("4: federation on, remote unreachable — evaluation degrades gracefully to empty result")
-    void federation_bundleMissingTerminology_mockTsDown_degradesToEmpty(WireMockRuntimeInfo wm) {
-        var strippedBundle = bundleWithoutValueSets();
-        // Every request (including /metadata) fails. FederatedFhirRepository's search() must catch
-        // the failure and return the (empty) local result rather than propagating the exception
-        // through the CQL engine.
+    @DisplayName("4: TS configured, remote unreachable — evaluation propagates the failure")
+    void ts_remoteUnreachable_propagatesFailure(WireMockRuntimeInfo wm) {
+        var bundle = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
+        // Every request fails (including /metadata). Under TS-authoritative semantics the
+        // failure must propagate rather than silently degrading to bundle-embedded expansions.
         stubFor(get(anyUrl()).willReturn(aResponse().withStatus(503)));
 
-        var result = MeasureEvaluator.compileAndEvaluate(
-                fhirContext, strippedBundle, evaluateParams(), EnumSet.noneOf(DebugSections.class),
-                clientAgainst(wm));
-
-        assertNotNull(result.getMeasureReport(),
-                "Even when remote TS is down, evaluation should complete and produce a MeasureReport");
-        assertEquals(0, initialPopulationCount(result),
-                "With the VS unresolved (bundle empty, remote failing), the population check has no members — count 0");
+        assertThrows(Exception.class,
+                () -> MeasureEvaluator.compileAndEvaluate(
+                        fhirContext, bundle, evaluateParams(), EnumSet.noneOf(DebugSections.class),
+                        clientAgainst(wm)),
+                "Remote TS is down; evaluation must not silently fall back to the bundle's ValueSets");
     }
 }
