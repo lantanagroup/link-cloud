@@ -142,6 +142,13 @@
   color: var(--census-gray-800);
 }
 
+/* The label text itself shouldn't be clickable - only the input and (for
+   hinted fields) the "?" badge below should react to clicks. Checkboxes are
+   exempt: clicking their label is expected to toggle the checkbox. */
+.census-poi .k-label:not(.k-checkbox-label) {
+  pointer-events: none;
+}
+
 .census-poi .k-label.k-checkbox-label {
   margin-bottom: 0;
 }
@@ -204,6 +211,7 @@
   font-weight: 700;
   cursor: pointer;
   anchor-name: --census-hint-badge;
+  pointer-events: auto;
 }
 
 .census-poi .k-form-field--hint-open .k-label::after {
@@ -331,6 +339,10 @@
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--census-gray-800);
+  /* This heading is `for`-bound to the Hours input below it so screen
+     readers still announce the association, but clicking the caption text
+     itself shouldn't focus that field - only the input should. */
+  pointer-events: none;
 }
 
 .census-poi .census-inline-actions {
