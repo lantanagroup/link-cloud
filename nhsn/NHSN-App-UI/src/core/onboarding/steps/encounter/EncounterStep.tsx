@@ -17,7 +17,8 @@ import './EncounterStep.css';
  * the provider, and every control through core/fields.
  */
 
-interface MappingRowState {
+/** Exported for the Report Details "Encounter Mapping" modal, which reads the same shape read-only. */
+export interface MappingRowState {
   rowKey: string;
   localValue: string;
   targetSystem: string;
@@ -25,7 +26,7 @@ interface MappingRowState {
   targetDisplay: string;
 }
 
-interface CodeSystemGroupState {
+export interface CodeSystemGroupState {
   groupKey: string;
   codeSystem: string;
   mappings: MappingRowState[];
@@ -681,7 +682,8 @@ function encodeTarget(system: string, code: string): string {
   return system && code ? `${system}|${code}` : '';
 }
 
-function decodeTarget(value: string): [string, string] {
+/** Exported for the Report Details "Encounter Mapping" modal, which decodes the same `encounterType` shape read-only. */
+export function decodeTarget(value: string): [string, string] {
   const separatorIndex = value.indexOf('|');
   if (separatorIndex === -1) {
     return ['', ''];
@@ -693,7 +695,8 @@ function makeKey(): string {
   return crypto.randomUUID();
 }
 
-function buildGroups(codeSystems: string[], mappings: EncounterMapping[]): CodeSystemGroupState[] {
+/** Exported for the Report Details "Encounter Mapping" modal, which renders the same grouping read-only. */
+export function buildGroups(codeSystems: string[], mappings: EncounterMapping[]): CodeSystemGroupState[] {
   const bySystem = new Map<string, MappingRowState[]>();
   mappings.forEach(mapping => {
     const [targetSystem, targetCode] = decodeTarget(mapping.encounterType);

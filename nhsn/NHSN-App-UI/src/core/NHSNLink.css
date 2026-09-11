@@ -1728,6 +1728,15 @@
   margin-top: 20px;
 }
 
+/* Matches the icon+text button fix used elsewhere (e.g. .nhsn-link__report-results-actions
+   .k-button svg) -- without it, an inline SVG icon sits at text baseline with no gap, which reads
+   as the icon and label sitting on separate lines. Every Modal footer button (Export to Excel,
+   Export Report Summary, ...) needs this, not just the two containers that already had it. */
+.nhsn-link__modal-actions .k-button svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
 /* ---- plain data table (pickers and reference tables) */
 
 .nhsn-link__table-scroll {

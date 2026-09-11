@@ -378,7 +378,11 @@ export class MockApiClient implements ApiClient {
         ]
       },
       codeMaps: [
-        {sourceSystem: 'http://mysite.org/fhir/encounter-type', targetSystem: 'CPT', mappedCount: 2, unmappedCount: 1, failureCount: 0, unmappedCodes: ['UNMAPPED-32']}
+        {sourceSystem: 'http://mysite.org/fhir/encounter-type', targetSystem: 'CPT', mappedCount: 2, unmappedCount: 1, failureCount: 0, unmappedCodes: ['UNMAPPED-32']},
+        // targetSystem 'HSLOC' is what the Report Details "HSLOC Mapping" modal filters on --
+        // see isHslocCodeMap in ReportResultsStep.tsx -- so mock mode exercises its "+ Add Mapping"
+        // flow for an unmapped value the same way a real unmapped HSLOC location code would.
+        {sourceSystem: 'Location.identifier', targetSystem: 'HSLOC', mappedCount: 0, unmappedCount: 1, failureCount: 0, unmappedCodes: ['UNMAPPED-LOC-0']}
       ]
     };
   }
