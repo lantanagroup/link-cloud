@@ -1,5 +1,6 @@
 using System.Net;
 using CsvHelper;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
@@ -371,7 +372,7 @@ public class ConfigController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceValueSetCodes(
         [FromRoute] string id,
-        [FromForm] IFormFile? file,
+        IFormFile? file,
         [FromQuery] string? version = null,
         CancellationToken cancellationToken = default) =>
         ReplaceCodesAsync(CodeGroup.CodeGroupTypes.ValueSet, id, file, version, cancellationToken);
@@ -417,7 +418,7 @@ public class ConfigController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<ActionResult<ReplaceCodesResponse>> ReplaceCodeSystemCodes(
         [FromRoute] string id,
-        [FromForm] IFormFile? file,
+        IFormFile? file,
         [FromQuery] string? version = null,
         CancellationToken cancellationToken = default) =>
         ReplaceCodesAsync(CodeGroup.CodeGroupTypes.CodeSystem, id, file, version, cancellationToken);

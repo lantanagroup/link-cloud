@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -496,7 +498,7 @@
     <div class="col-md-8">
         
         <p>The Link Admin BFF (Backend for Frontend) implements a secure authentication flow using OAuth 2.0 with cookie-based session management. This provides a robust security model where the BFF acts as the OAuth client and manages user sessions through secure HTTP-only cookies.</p>
-<h1 id="authentication-flow" class="content-heading">Authentication Flow <a id="authentication-flow" href="#authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="authentication-flow" class="content-heading">Authentication Flow <a href="#authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ol>
 <li><strong>Initial Login Request</strong></li>
 </ol>
@@ -524,27 +526,27 @@
 <li>Token refresh is handled transparently by the BFF when needed</li>
 <li>The BFF generates a short lived JWT token and adds it to the Authorization header when making requests to backend services</li>
 </ul>
-<h1 id="cookie-security" class="content-heading">Cookie Security <a id="cookie-security" href="#cookie-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cookie Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="cookie-security" class="content-heading">Cookie Security <a href="#cookie-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cookie Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ul>
 <li>Cookies are HTTP-only to prevent XSS attacks</li>
 <li>Secure flag ensures cookies only sent over HTTPS</li>
 <li>Anti-forgery protection enabled</li>
 <li>Session cookies with server-side storage</li>
 </ul>
-<h1 id="token-security" class="content-heading">Token Security <a id="token-security" href="#token-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="token-security" class="content-heading">Token Security <a href="#token-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ul>
 <li>OAuth tokens never exposed to the frontend</li>
 <li>Tokens stored securely server-side</li>
 <li>Token refresh handled by BFF</li>
 <li>Short-lived access tokens with automatic refresh</li>
 </ul>
-<h1 id="cors-protection" class="content-heading">CORS Protection <a id="cors-protection" href="#cors-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="cors-protection" class="content-heading">CORS Protection <a href="#cors-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ul>
 <li>Strict CORS policy configured</li>
 <li>Credentials mode enabled for cookie transmission</li>
 <li>Only trusted origins allowed</li>
 </ul>
-<h1 id="pkce-proof-key-for-code-exchange" class="content-heading">PKCE (Proof Key for Code Exchange) <a id="pkce-proof-key-for-code-exchange" href="#pkce-proof-key-for-code-exchange" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PKCE (Proof Key for Code Exchange)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="pkce-proof-key-for-code-exchange" class="content-heading">PKCE (Proof Key for Code Exchange) <a href="#pkce-proof-key-for-code-exchange" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PKCE (Proof Key for Code Exchange)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>PKCE is implemented to secure the OAuth authorization code flow and prevent authorization code interception attacks:</p>
 <p><strong>Code Verifier Generation</strong></p>
 <ul>
@@ -564,7 +566,7 @@
 <li>OAuth provider validates the code challenge/verifier pair</li>
 <li>Prevents malicious actors from using intercepted auth codes</li>
 </ul>
-<h1 id="state-parameter-protection" class="content-heading">State Parameter Protection <a id="state-parameter-protection" href="#state-parameter-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: State Parameter Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="state-parameter-protection" class="content-heading">State Parameter Protection <a href="#state-parameter-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: State Parameter Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The state parameter provides CSRF protection during the OAuth flow:</p>
 <p><strong>State Generation</strong></p>
 <ul>
@@ -579,7 +581,7 @@
 <li>Requests with invalid/missing state are rejected</li>
 <li>Protects against CSRF and replay attacks</li>
 </ul>
-<h1 id="scope-restrictions" class="content-heading">Scope Restrictions <a id="scope-restrictions" href="#scope-restrictions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope Restrictions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="scope-restrictions" class="content-heading">Scope Restrictions <a href="#scope-restrictions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope Restrictions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>OAuth scopes are strictly controlled to limit access:</p>
 <p><strong>Required Scopes</strong></p>
 <p>openid profile email</p>
@@ -596,7 +598,7 @@
 <li>Access tokens only receive approved scopes</li>
 <li>Resource access is restricted by granted scopes</li>
 </ul>
-<h1 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The BFF's OAuth and cookie settings are configured in <code>appsettings.json</code>:</p>
 <pre><code class="language-json">&quot;Authentication&quot;: {
   &quot;DefaultScheme&quot;: &quot;link_cookie&quot;,
@@ -621,19 +623,19 @@
   }
 }
 </code></pre>
-<h1 id="ui-integration" class="content-heading">UI Integration <a id="ui-integration" href="#ui-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UI Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="ui-integration" class="content-heading">UI Integration <a href="#ui-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UI Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The UI application interacts with the BFF's authentication system through:</p>
-<h2 id="login" class="content-heading">Login <a id="login" href="#login" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Login"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="login" class="content-heading">Login <a href="#login" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Login"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-javascript">// Redirect to BFF login endpoint
 window.location.href = '/api/login';
 </code></pre>
-<h2 id="session-status" class="content-heading">Session Status <a id="session-status" href="#session-status" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Session Status"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="session-status" class="content-heading">Session Status <a href="#session-status" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Session Status"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-javascript">// Check if user is authenticated
 fetch('/api/user', {
 credentials: 'include' // Important for cookie transmission
 });
 </code></pre>
-<h2 id="logout" class="content-heading">Logout <a id="logout" href="#logout" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logout"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="logout" class="content-heading">Logout <a href="#logout" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logout"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-javascript">// Redirect to BFF logout endpoint
     window.location.href = '/api/logout';
 </code></pre>
@@ -646,7 +648,7 @@ credentials: 'include' // Important for cookie transmission
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nauth_flow_5628E6A4["Design: Link Inner-Service Auth Flow"]</pre>
+nauth_flow_69A1C27D["Design: Link Inner-Service Auth Flow"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

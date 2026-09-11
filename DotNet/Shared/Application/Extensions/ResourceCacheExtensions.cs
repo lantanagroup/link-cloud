@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         /// <code>
         /// "ResourceCache": {
         ///   "CacheImplementation": "Hybrid",
-        ///   "Redis": { "ConnectionString": "", "Password": "", "PoolSize": 5, "MemoryThresholdPercent": 80.0 },
+        ///   "Redis": { "ConnectionString": "", "Password": "", "PoolSize": 5, "CacheEntryTtlDays": 7, "MemoryThresholdPercent": 80.0 },
         ///   "BlobStorage": { "ConnectionString": "", "BlobContainerName": "", "BlobRoot": "" }
         /// }
         /// </code>

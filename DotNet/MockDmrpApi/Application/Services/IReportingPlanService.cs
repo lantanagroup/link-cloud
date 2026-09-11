@@ -37,9 +37,9 @@ public interface IReportingPlanService
     /// conveys "not enrolled".
     /// </para>
     /// <para>
-    /// Annual components carry no reporting month, so the caller passes null for
-    /// <paramref name="reportingMonth"/> there. Matching on a month would exclude every row
-    /// it is supposed to return.
+    /// Every component is reported monthly, so a stored entry always carries a month. A null
+    /// <paramref name="reportingMonth"/> means "do not narrow by month" rather than "this
+    /// component has none", and returns the facility's plan across every period.
     /// </para>
     /// </remarks>
     Task<IReadOnlyList<ReportingPlanEntryEntity>> GetReportingPlanAsync(
@@ -54,7 +54,7 @@ public interface IReportingPlanService
     /// Creates an entry.
     /// </summary>
     /// <exception cref="InvalidReportingPlanEntryException">
-    /// The component is unknown, or the reporting month does not match the component's cadence.
+    /// The component is unknown, or the reporting month is outside 1-12.
     /// </exception>
     /// <exception cref="DuplicateReportingPlanEntryException">
     /// An entry already exists for the same facility, component, measure and period.
@@ -66,7 +66,7 @@ public interface IReportingPlanService
     /// identifier -- this never creates one.
     /// </summary>
     /// <exception cref="InvalidReportingPlanEntryException">
-    /// The component is unknown, or the reporting month does not match the component's cadence.
+    /// The component is unknown, or the reporting month is outside 1-12.
     /// </exception>
     /// <exception cref="DuplicateReportingPlanEntryException">
     /// The update would collide with another entry's facility, component, measure and period.
@@ -109,14 +109,12 @@ public class DuplicateReportingPlanEntryException : Exception
 }
 
 /// <summary>
-/// Raised when an entry's component and reporting period disagree.
+/// Raised when an entry cannot be stored as a reporting plan entry.
 /// </summary>
 /// <remarks>
-/// The rule is conditional -- a monthly component must carry a month, an annual one must
-/// not -- so it cannot be expressed as a column constraint or a range annotation. Rejecting
-/// it here matters: a patient-safety entry saved with a stray month still satisfies the
-/// unique index, but would sit in a different index slot than the annual query looks in and
-/// so become invisible rather than wrong.
+/// Rejecting here rather than leaving it to the database matters, because the failures are
+/// silent ones: an entry stored against a period nothing queries is returned by no plan at
+/// all, and the plan simply comes back short with nothing to indicate a row was skipped.
 /// </remarks>
 public class InvalidReportingPlanEntryException : Exception
 {

@@ -22,7 +22,7 @@ properties:
       $ref: "#/$defs/serviceMetaEntry"
   environments:
     type: "object"
-    description: "The environments this catalog is checked against, keyed by the suffix of their export file (Config/app-config.<key>.json). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
+    description: "The environments this catalog is checked against, keyed by the suffix of their export file (app-config.<key>.json, in the private link-cac repository's Config/). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
     additionalProperties:
       $ref: "#/$defs/environmentEntry"
 required:
@@ -40,8 +40,9 @@ required:
 # Each service selects unlabeled keys first, then its own label, so a labeled row
 # overrides an unlabeled one for that service only. Changing a label requires a redeploy.
 # The environments every required: true key must be present in. Each key is the suffix of its
-# export file, so `qa2` means Config/app-config.qa2.json. A declared environment with no export
-# is an error, not a quietly smaller check.
+# export file, so `qa2` means app-config.qa2.json. Those exports are in the private link-cac
+# repository, not this one; the tooling defaults to a sibling clone at ../link-cac/Config. A
+# declared environment with no export is an error, not a quietly smaller check.
 #
 # The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
 # `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
@@ -383,25 +384,64 @@ global:
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
     consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
-  # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
-  # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
-  # .NET side puts none there. Neither failure is loud, so treat these as a single change.
-  # They are separate keys because Spring cannot bind a colon-separated key, and the Java services are
-  # being retired: a shared key would leave the surviving .NET services carrying a translation layer
-  # for a platform that no longer exists. When Validation is retired, drop the dotted key below and
-  # keep the .NET one.
-  # In Azure App Configuration these are two rows, each in its runtime's convention:
-  #   PreQualification:WritePreQualOperationOutcome        (.NET, as with other Section:Key rows)
-  #   /pre-qualification/write-pre-qual-operation-outcome  (Java, as with /link/report/base-url)
-  - key: "PreQualification:WritePreQualOperationOutcome"
-    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
+  # SYSTEM FEATURE SWITCH — one decision for the whole deployment, not a Tenant setting.
+  # It is catalogued here, unlabeled, so every service sees the same answer: today only Tenant acts
+  # on it, but the switch decides whether this deployment does NHSN measure-enrollment reporting at
+  # all, and further services are expected to read it as the workflow lands (LEGLINK-698/701).
+  #
+  # The Angular Admin UI needs the same answer and cannot read App Configuration. It is served by a
+  # container that maps LINK_DMRP_ENABLED into its runtime app.config, so the switch reaches the UI
+  # out of band. The two MUST agree, and the failure modes are not symmetric:
+  #   UI off, services on  -> the facility form asks for a schedule the Tenant API then refuses. Loud.
+  #   UI on, services off  -> the form sends an empty schedule Tenant accepts, quietly creating a
+  #                           facility with no scheduled reports and no jobs. Silent.
+  # So the UI must never be switched on ahead of the services.
+  #
+  # Expected to end up permanently on, at which point this row and LINK_DMRP_ENABLED both go away.
+  - key: "DMRP:Enabled"
+    description: "Boolean flag (default false) that turns on DMRP integration for the deployment. When enabled, facility reporting plans are sourced from the NHSN DMRP API rather than chosen per facility, the DMRP controllers are served under api/dmrp by their host service, and a facility's scheduled reports are derived from its reporting plans. When disabled, Link performs facility dQM reporting on its own and the api/dmrp routes do not exist. Must be set to the same value as the Admin UI container's LINK_DMRP_ENABLED."
     required: false
-    consumers: ["Report"]
-  - key: "pre-qualification.write-pre-qual-operation-outcome"
-    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
+    defaultValue: "false"
+    consumers: ["Tenant"]
+
+  # How the DMRP module reaches the DMRP API itself. Nothing here is required: an environment
+  # with DMRP:Enabled on still serves the api/dmrp routes and reads the reporting plans it has
+  # already recorded, and only a caller that actually asks the API for a plan needs these. Left
+  # unset, that call refuses with a message naming this section rather than failing somewhere
+  # further in. In the lower environments all four point at the mock (MockDmrpApi), whose token
+  # endpoint is POST /api/mock-dmrp/oauth2/token.
+  - key: "DMRP:Api:BaseUrl"
+    description: "Base URL of the DMRP API. The reporting-plan operations sit at its root, so this is the host and any path prefix in front of /msc and /ps/annual/mrp - not a URL including either of them."
     required: false
-    runtime: "java"
-    consumers: ["Report", "Validation"]
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenUrl"
+    description: "Full URL of the token endpoint the client-credentials grant is posted to. Separate from DMRP:Api:BaseUrl because the authorization server need not live under the API's root, and against the mock it does not."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientId"
+    description: "Client id presented to the DMRP API's token endpoint."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:ClientSecret"
+    description: "Client secret presented to the DMRP API's token endpoint. Provision as a Key Vault reference; there is no code default, so an environment that has not provisioned it cannot obtain a token and says so."
+    required: false
+    sensitive: true
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:Scope"
+    description: "Optional scope requested with the client-credentials grant. Omitted from the token request when unset, which is what the mock expects; a real authorization server may require one."
+    required: false
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TokenExpiryMarginSeconds"
+    description: "How long before a token's stated expiry it stops being reused, in seconds (default 60). A token that expires in flight fails the call it was fetched for; renewing slightly early costs one extra token request per lifetime and removes that class of failure."
+    required: false
+    defaultValue: "60"
+    consumers: ["Tenant"]
+  - key: "DMRP:Api:TimeoutSeconds"
+    description: "How long a single DMRP call may take before it is abandoned, in seconds (default 30, accepted range 1-600). These calls run inside an admin GET, so HttpClient's 100-second default would hold the request open long past the point the operator has given up and past most gateway timeouts in front of it. A value outside the range falls back to the default rather than failing the call."
+    required: false
+    defaultValue: "30"
+    consumers: ["Tenant"]
+
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -509,6 +549,10 @@ services:
       description: "The cron expression defining how often data acquisition jobs should run."
       required: false
       defaultValue: "0/10 * * * * ?"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200)."
+      required: false
+      defaultValue: "100"
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: false
@@ -522,6 +566,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -547,6 +595,10 @@ services:
       description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
       required: false
       defaultValue: "8"
+    - key: "FhirSearch:PageSize"
+      description: "FHIR result page size sent as _count when a search does not already set one. This is not filter-ID chunking (ResourceIdsParameter Paged). Values less than 1 fall back to 100. HAPI may cap this at max_page_size (often 200). The worker is the process that pages FHIR searches."
+      required: false
+      defaultValue: "100"
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
@@ -559,6 +611,10 @@ services:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
       required: false
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -584,21 +640,21 @@ services:
   # only where the mock is deployed, and never in a production store.
   MockDmrpApi:
     - key: "MockDmrpApi:Enabled"
-      description: "Master switch for the mock DMRP surface. When false, every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped. Absent means enabled, so provision a row only where the mock should be off. A production row would be misleading rather than effective: the service refuses to serve in the Production environment regardless of configuration."
+      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped, so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
       required: false
-      defaultValue: "true"
+      defaultValue: "false"
     - key: "MockDmrpApi:AuthClientId"
       description: "Client id the mock's token endpoint accepts. Provision per environment to move off the shipped non-production value."
       required: false
       defaultValue: "link-cloud-dev"
     - key: "MockDmrpApi:AuthClientSecret"
-      description: "Client secret the mock's token endpoint accepts. There is no code default: a deployed environment that does not provision this refuses to issue tokens rather than fall back to a value published in the repository. Supply it as a Key Vault reference. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      description: "Client secret the mock's token endpoint accepts. There is no code default: a deployed environment that does not provision this refuses to issue tokens rather than fall back to a value published in the repository. Held as a literal rather than a Key Vault reference: the mock is never provisioned in a production store, so this authenticates nothing beyond the simulated DMRP surface and is not marked sensitive. Scripts/AzureAppConfig/validate_aac_secrets.py exempts it from the secret-shaped-key warning on the same grounds (NON_PRODUCTION_FIXTURE_SECRET_KEYS); value-based credential checks still apply to it."
       required: false
-      sensitive: true
+      sensitive: false
     - key: "MockDmrpApi:SigningKey"
-      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Marked optional only because no environment has been provisioned yet; make it required once rows exist."
+      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key). There is no code default, so an unprovisioned deployment cannot sign with a value published in the repository. An enabled deployment that does not provision it fails to start -- the token service is resolved during startup, so the process stops before it serves rather than reporting healthy and answering 500 on the first token issued or validated. A disabled deployment skips that resolution and does not need the key. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another. Held as a literal rather than a Key Vault reference and not marked sensitive: the mock is never provisioned in a production store, so a token signed with this key is accepted only by the simulated DMRP surface. Scripts/AzureAppConfig/validate_aac_secrets.py exempts it from the secret-shaped-key warning on the same grounds (NON_PRODUCTION_FIXTURE_SECRET_KEYS); value-based credential checks still apply to it."
       required: false
-      sensitive: true
+      sensitive: false
 
   MeasureEval:
     - key: "spring.data.mongodb.uri"
@@ -629,6 +685,22 @@ services:
     - key: "resource-cache.blob-storage.blob-root"
       description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
+    - key: "resource-cache.blob-storage.max-tries"
+      description: "Azure SDK in-process tries per ABS resource-cache call (initial call + quick retries). Kept low deliberately: the Kafka retry-topic ladder owns real retrying, and the SDK default of 4 exponential tries blocked the single-threaded consumer executor for minutes during an ABS outage. Defaults to 2."
+      required: false
+      defaultValue: "2"
+    - key: "resource-cache.blob-storage.try-timeout-seconds"
+      description: "Cap in seconds on a single ABS resource-cache network attempt; the SDK default is effectively unbounded. Defaults to 10."
+      required: false
+      defaultValue: "10"
+    - key: "spring.kafka.retry.consumer-retry-duration"
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      required: false
+      defaultValue: "PT3S,PT3S"
+    - key: "spring.kafka.retry.disable-retry-consumer"
+      description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
+      required: false
+      defaultValue: "false"
   Normalization:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
@@ -640,6 +712,10 @@ services:
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
       sensitive: true
+    - key: "ResourceCache:Redis:CacheEntryTtlDays"
+      description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
+      required: false
+      defaultValue: "7"
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -728,10 +804,6 @@ services:
       description: "Boolean flag to restrict facility IDs to numeric values only."
       required: false
       defaultValue: "false"
-    - key: "DMRP:Enabled"
-      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
-      required: false
-      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
@@ -757,9 +829,8 @@ services:
       description: "Kafka bootstrap servers for the validation service."
       required: true
     - key: "spring.data.redis.host"
-      description: "The Redis host for the validation service."
+      description: "The Redis host for the validation service. Not marked sensitive: a hostname is not a credential, and this one is already carried in the clear by ConnectionStrings:Redis and ResourceCache:Redis:ConnectionString, which address the same instance from the .NET services. The credential is spring.data.redis.password, which stays a Key Vault reference."
       required: true
-      sensitive: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
       required: true
@@ -773,12 +844,28 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
-    # The master gate, pre-qualification.write-pre-qual-operation-outcome, is registered under
-    # global instead of here: the .NET Report service reads that same key (LEGLINK-466). Only the
-    # expression toggle below is Validation-only.
+    - key: "pre-qualification.write-pre-qual-operation-outcome"
+      description: "Boolean flag (default false). When true, the Validation service writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is the sole writer of that resource. When false, no OperationOutcome is written. Automation.UI reads the same key to predict ABS OperationOutcome counts for failed-validation patients."
+      required: false
     - key: "pre-qualification.write-expressions-in-operation-outcome"
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
+    - key: "spring.kafka.retry.consumer-retry-duration"
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      required: false
+      defaultValue: "PT3S,PT3S"
+    - key: "spring.kafka.retry.disable-retry-consumer"
+      description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
+      required: false
+      defaultValue: "false"
+    - key: "internal-blob-storage.max-tries"
+      description: "Azure SDK in-process tries per Validation blob call (patient NDJSON download and pre-qual append, both on the consumer path). Kept low deliberately: the Kafka retry-topic ladder owns real retrying, and the SDK default of 4 exponential tries blocked the single-threaded consumer executor for minutes during an ABS outage. Defaults to 2."
+      required: false
+      defaultValue: "2"
+    - key: "internal-blob-storage.try-timeout-seconds"
+      description: "Cap in seconds on a single Validation blob network attempt; the SDK default is effectively unbounded. Defaults to 10."
+      required: false
+      defaultValue: "10"
 $defs:
   serviceMetaEntry:
     type: "object"

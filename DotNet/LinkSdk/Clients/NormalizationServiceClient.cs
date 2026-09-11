@@ -115,4 +115,69 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(
+        string facilityId,
+        string locationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationApiModel>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations/{locationId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationApiModel>> CreateFacilityLocationAsync(
+        string facilityId,
+        CreateFacilityLocationRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationApiModel>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>> SearchFacilityLocationLocalCodeMappingsAsync(
+        SearchFacilityLocationLocalCodeMappingsRequestApiModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var apiRequest = Request("normalization/hsloc-mappings/search");
+        if (!string.IsNullOrWhiteSpace(request.Id)) apiRequest = apiRequest.SetQueryParam("id", request.Id);
+        if (!string.IsNullOrWhiteSpace(request.FacilityId)) apiRequest = apiRequest.SetQueryParam("facilityId", request.FacilityId);
+        if (!string.IsNullOrWhiteSpace(request.LocationId)) apiRequest = apiRequest.SetQueryParam("locationId", request.LocationId);
+        if (!string.IsNullOrWhiteSpace(request.LocalCodeSystem)) apiRequest = apiRequest.SetQueryParam("localCodeSystem", request.LocalCodeSystem);
+        if (!string.IsNullOrWhiteSpace(request.LocalCode)) apiRequest = apiRequest.SetQueryParam("localCode", request.LocalCode);
+        if (request.HSLOCId.HasValue) apiRequest = apiRequest.SetQueryParam("HSLOCId", request.HSLOCId.Value);
+        if (request.Unmapped.HasValue) apiRequest = apiRequest.SetQueryParam("unmapped", request.Unmapped.Value);
+        if (request.PageSize.HasValue) apiRequest = apiRequest.SetQueryParam("pageSize", request.PageSize.Value);
+        if (request.PageNumber.HasValue) apiRequest = apiRequest.SetQueryParam("pageNumber", request.PageNumber.Value);
+
+        return SendAsync<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>(() => apiRequest
+            .GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> GetFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> CreateFacilityLocationLocalCodeMappingAsync(
+        string facilityId,
+        CreateFacilityLocationLocalCodeMappingRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        UpdateFacilityLocationLocalCodeMappingRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 }

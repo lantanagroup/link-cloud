@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,26 +497,26 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-measurereportgenerated.html">Measure Report Generated [event]</a>, <a href="command-dataacquisitionrequested.html">Data Acquisition Requested [command]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-resources-normalized.html">Resources Normalized [event]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the CQF framework to perform the measure evaluations.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
-  nMeasureEvalService_67DBAC12 -->|produces| nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"]
-  nresources_normalized_28215193["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_67DBAC12
-  nMeasureEvalService_67DBAC12 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nMeasureReportGenerated_38AFFB54
-    nresources_normalized_28215193
+nMeasureEvalService_655B21CF["Service: Measure Evaluation Service"]
+  nMeasureEvalService_655B21CF -->|produces| nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"]
+  nresources_normalized_47A49D1["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_655B21CF
+  nMeasureEvalService_655B21CF -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nMeasureReportGenerated_6D344E8F
+    nresources_normalized_47A49D1
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nMeasureEvalService_67DBAC12
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nMeasureEvalService_655B21CF
   end
 </pre></div>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=java#azure-app-config">Azure App Config</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#telemetry">Telemetry</a></li>
@@ -523,7 +525,7 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 <li><a href="Entities/Details?type=design&amp;id=java#kafka">Kafka</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#service-authentication">Service Authentication</a></li>
 </ul>
-<h2 id="service-configurations" class="content-heading">Service Configurations <a id="service-configurations" href="#service-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="service-configurations" class="content-heading">Service Configurations <a href="#service-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -586,17 +588,17 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 </tr>
 </tbody>
 </table>
-<h3 id="reportability-predicates" class="content-heading">Reportability Predicates <a id="reportability-predicates" href="#reportability-predicates" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reportability Predicates"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="reportability-predicates" class="content-heading">Reportability Predicates <a href="#reportability-predicates" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reportability Predicates"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The <code>link.reportability-predicate</code> property is used to determine if a patient is reportable. The default value is &quot;com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation&quot;, whichi s a class that implements <code>Predicate&lt;MeasureReport&gt;</code>. Other predicate implementations may be built over time in the same package and should be listed here.</p>
 <p>Package <code>com.lantanagroup.link.measureeval.reportability</code>:</p>
 <ul>
 <li><code>IsInInitialPopulation</code>: Determines if a patient is reportable if they are in the initial population (a count of 1 or more for the &quot;InitialPopulation&quot; population of the patient's MeasureReport).</li>
 </ul>
-<h2 id="azure-cosmosdb-for-mongodb" class="content-heading">Azure CosmosDB for MongoDB <a id="azure-cosmosdb-for-mongodb" href="#azure-cosmosdb-for-mongodb" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure CosmosDB for MongoDB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="azure-cosmosdb-for-mongodb" class="content-heading">Azure CosmosDB for MongoDB <a href="#azure-cosmosdb-for-mongodb" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure CosmosDB for MongoDB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The <code>resource</code> collection in the database needs to be created in the Azure portal and configured to shard based on the <code>correlationId</code> property</p>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p><strong>Measure Evaluation</strong> is a critical process in assessing clinical data against FHIR digital quality measures. It ensures that healthcare data is analyzed consistently and accurately using standardized logic and definitions.</p>
-<h3 id="key-concepts" class="content-heading">Key Concepts <a id="key-concepts" href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="key-concepts" class="content-heading">Key Concepts <a href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>FHIR Digital Quality Measures</strong>: Defined standards that outline how clinical data is measured for quality reporting and compliance.</li>
 <li><strong>Measure Package</strong>: A comprehensive bundle (in FHIR JSON Bundle format) required for evaluation, including:
@@ -607,7 +609,7 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 </ul>
 </li>
 </ul>
-<h3 id="evaluation-process" class="content-heading">Evaluation Process <a id="evaluation-process" href="#evaluation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="evaluation-process" class="content-heading">Evaluation Process <a href="#evaluation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>Pre-preparation</strong>:</li>
 </ol>
@@ -619,16 +621,16 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 <li><strong>Execution</strong>: Measures are executed systematically against the acquired data for each patient, including multiple evaluations during <strong>progressive querying</strong> as described in <a href="docs/services/DataAcquisitionService">Progressive Querying</a>.</li>
 <li><strong>Results</strong>: Each measure produces results indicating compliance or performance, which can be consumed by reporting or downstream systems. These results are in the form of a MeasureReport resource specific to the individual patient that the measure was executed against.</li>
 </ol>
-<h3 id="role-in-progressive-querying" class="content-heading">Role in Progressive Querying <a id="role-in-progressive-querying" href="#role-in-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Role in Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="role-in-progressive-querying" class="content-heading">Role in Progressive Querying <a href="#role-in-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Role in Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Measure evaluation is performed multiple times for each patient during <strong>progressive querying</strong> to support an efficient and focused reporting pipeline:</p>
 <ul>
 <li>Determines whether the patient from the census meets the initial criteria for submission.</li>
 <li>Identifies what data should be submitted for the reporting scenario if the patient is relevant.</li>
 <li>Includes &quot;FHIR Profile&quot; assertion statements in the resulting data to support the validation service in determining which profiles to validate the data against.</li>
 </ul>
-<h3 id="resource-caching" class="content-heading">Resource Caching <a id="resource-caching" href="#resource-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="resource-caching" class="content-heading">Resource Caching <a href="#resource-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The <code>CacheType</code> value on consumed <code>ResourcesNormalized</code> events will inform the Measure Eval service whether patient FHIR resources are stored on Redis or Azure Blob Storage. The event contains a CacheKey that details which collection of FHIR resources are needed for measure evaluation.</p>
-<h3 id="integration" class="content-heading">Integration <a id="integration" href="#integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="integration" class="content-heading">Integration <a href="#integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Measure evaluation is often part of a broader workflow:</p>
 <ul>
 <li><strong>Data Acquisition</strong>: Data is collected and normalized to a standard format.</li>
@@ -636,9 +638,9 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 <li><strong>Result Propagation</strong>: Evaluated results are consumed by the report service.</li>
 </ul>
 <p>This approach ensures consistent, reliable evaluation of healthcare quality measures, supporting improved care outcomes and regulatory adherence.</p>
-<h3 id="testing" class="content-heading">Testing <a id="testing" href="#testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="testing" class="content-heading">Testing <a href="#testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The measure engine may be tested against arbitrary data using the $evaluate operation (which is custom-built for this purpose in the measure evaluation service) or using the <code>measureeval-cli.jar</code> that can be built separately from the service; see <a href="https://github.com/lantanagroup/link-cloud/blob/dev/Java/measureeval/README.md" target="new">measureeval/README.md</a> for more information.</p>
-<h3 id="upload-storage" class="content-heading">Upload &amp; Storage <a id="upload-amp-storage" href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="upload-amp-storage" class="content-heading">Upload &amp; Storage <a href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Bundles are uploaded via: <code>PUT /api/measureeval/measureDefinition</code></li>
 <li>The uploaded bundle is a FHIR JSON Bundle and typically includes: <code>Measure</code>, <code>Library</code>, <code>StructureDefinition</code> (Profile), <code>ValueSet</code>, <code>CodeSystem</code></li>
@@ -647,7 +649,7 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 <Admonition type="info">
   Measure definition bundles that are generated by CQF Tooling do not include StructureDefinition resources that are necessary for validation.
 </Admonition>
-<h3 id="evaluation-execution" class="content-heading">Evaluation Execution <a id="evaluation-execution" href="#evaluation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="evaluation-execution" class="content-heading">Evaluation Execution <a href="#evaluation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Evaluation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When a request is made to evaluate a measure:</p>
 <ol>
 <li>The service checks if a <code>MeasureEvaluator</code> instance has already been compiled and cached.</li>
@@ -664,7 +666,7 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
 <li>There are future plans to integrate a FHIR Terminology (TX) Service, which would offload terminology expansion (e.g., <code>$expand</code>) and eliminate the need for local terminology resources in the bundle.</li>
 <li>Note: At this time, value sets and code systems must be pre-expanded, or enumerate all of the codes that should be included in a value set's intensional definition. A terminology service is being explored to address this.</li>
 </ul>
-<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a id="known-deficiencies" href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>No version tracking</strong>: Only a single bundle per <code>:id</code> is retained.</li>
 <li><strong>Overwrites are destructive</strong>: Uploading a new bundle overwrites the existing one.</li>
@@ -768,9 +770,19 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
     <thead>
       <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
     </thead>
-    <tbody><tr><td>debug</td><td>boolean</td><td>No</td><td>Whether to log CQL debugging information during evaluation</td></tr><tr><td>parameters</td><td></td><td>Yes</td><td>The parameters to use in the evaluation</td></tr></tbody>
+    <tbody><tr><td>debug</td><td>array</td><td>No</td><td>Which debug sections to populate on the response. Accepts `true`/`all` (every section), `false`/empty (no sections), or a comma-separated list of: groups, expressions, librarydebug, messages, traces, debuglog.</td></tr><tr><td>parameters</td><td></td><td>Yes</td><td>The parameters to use in the evaluation</td></tr></tbody>
   </table>
 </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-measureevalservice-post-api-measureeval-fhir-path-validate" aria-expanded="false"><strong>POST</strong> <code>/api/measureeval/fhir-path/$validate</code></a></div>
+  <div id="openapi-card-measureevalservice-post-api-measureeval-fhir-path-validate" class="card-body export-collapsible">
+    <p class="text-muted">Validate a FHIRPath expression against a FHIR resource type</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
   </div>
 </div>
 <div class="card mb-3">
@@ -868,19 +880,19 @@ nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nMeasureEvalService_67DBAC12["Service: Measure Evaluation Service"]
-  nMeasureEvalService_67DBAC12 -->|produces| nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"]
-  nresources_normalized_28215193["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_67DBAC12
-  nMeasureEvalService_67DBAC12 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nMeasureReportGenerated_38AFFB54
-    nresources_normalized_28215193
+nMeasureEvalService_655B21CF["Service: Measure Evaluation Service"]
+  nMeasureEvalService_655B21CF -->|produces| nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"]
+  nresources_normalized_47A49D1["Event: resources-normalized"] -->|consumed by| nMeasureEvalService_655B21CF
+  nMeasureEvalService_655B21CF -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nMeasureReportGenerated_6D344E8F
+    nresources_normalized_47A49D1
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nMeasureEvalService_67DBAC12
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nMeasureEvalService_655B21CF
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

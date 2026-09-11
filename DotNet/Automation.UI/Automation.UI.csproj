@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Automation.Link\Automation.Link.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
+    <ProjectReference Include="..\Normalization.Engine\Normalization.Engine.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 </Project>

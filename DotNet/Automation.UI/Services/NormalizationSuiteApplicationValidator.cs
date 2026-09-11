@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Automation.UI.Services;
 
@@ -22,49 +21,42 @@ public sealed class NormalizationSuiteApplicationValidator
         var warnings = new List<string>();
 
         var parsedResources = ParseInternalAbsResources(internalAbsResources, errors);
-        var plannedOperations = BuildPlannedOperations(suiteResolution);
+        var plannedOperations = NormalizationRuntimeSequencePlanner.Plan(suiteResolution);
         var executionEvidence = ParseExecutionEvidence(normalizationSummaryLogs ?? [], warnings);
 
         if (plannedOperations.Count == 0)
             AddError(errors, "Resolved normalization suite has no operations to validate.");
 
-        _output.WriteLine($"[Normalization Suite] Validating for suite '{suiteResolution.SuiteName}' with {suiteResolution.Sequences.Count} sequence(s) and {plannedOperations.Count} operation step(s).");
+        _output.WriteLine($"[Normalization Suite] Validating for suite '{suiteResolution.SuiteName}' with {suiteResolution.Sequences.Count} sequence(s) and {plannedOperations.Count} operation step(s). Matching Loki evidence against Normalization-service runtime sequence numbers (one sequence per resource type).");
 
         foreach (var operation in plannedOperations)
         {
-            var opResourceTypes = operation.Operation.ResourceTypes
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (opResourceTypes.Count == 0)
+            if (string.IsNullOrWhiteSpace(operation.ResourceType))
             {
                 AddError(errors, $"Operation '{operation.Operation.Name}' has no resource types.");
                 continue;
             }
 
-            foreach (var resourceType in opResourceTypes)
+            var resourceType = operation.ResourceType;
+            var candidates = parsedResources
+                .Where(r => string.Equals(r.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (candidates.Count == 0)
             {
-                var candidates = parsedResources
-                    .Where(r => string.Equals(r.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                AddWarning(warnings, $"No ABS resources found for operation '{operation.Operation.Name}' targeting resource type '{resourceType}'. Skipping post-condition checks for this target.");
+                continue;
+            }
 
-                if (candidates.Count == 0)
-                {
-                    AddWarning(warnings, $"No ABS resources found for operation '{operation.Operation.Name}' targeting resource type '{resourceType}'. Skipping post-condition checks for this target.");
-                    continue;
-                }
-
-                switch (operation.Operation.OperationType)
-                {
-                    case "RemoveExtensions":
-                        ValidateRemoveExtensions(operation, resourceType, candidates, errors);
-                        ValidateExecutionEvidence(operation, resourceType, candidates, executionEvidence, errors, warnings, evidenceOptional: true);
-                        break;
-                    default:
-                        ValidateExecutionEvidence(operation, resourceType, candidates, executionEvidence, errors, warnings, evidenceOptional: false);
-                        break;
-                }
+            switch (operation.Operation.OperationType)
+            {
+                case "RemoveExtensions":
+                    ValidateRemoveExtensions(operation, candidates, errors);
+                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: true);
+                    break;
+                default:
+                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: false);
+                    break;
             }
         }
 
@@ -83,24 +75,6 @@ public sealed class NormalizationSuiteApplicationValidator
             _output.WriteLine($"  [WARN] {warning}");
 
         throw new InvalidOperationException($"NORMALIZATION SUITE APPLICATION VALIDATION failed with {errors.Count} issue(s).");
-    }
-
-    private static List<PlannedOperationStep> BuildPlannedOperations(NormalizationSuiteResolution suiteResolution)
-    {
-        var planned = new List<PlannedOperationStep>();
-
-        foreach (var sequence in suiteResolution.Sequences)
-        {
-            foreach (var op in sequence.Operations.OrderBy(o => o.Sequence))
-            {
-                planned.Add(new PlannedOperationStep(sequence.SequenceName, op.Sequence, op.Operation));
-            }
-        }
-
-        foreach (var op in suiteResolution.StandaloneOperations)
-            planned.Add(new PlannedOperationStep("(standalone)", 0, op));
-
-        return planned;
     }
 
     private List<AbsResourceRecord> ParseInternalAbsResources(IDictionary<string, object> internalAbsResources, List<string> errors)
@@ -146,11 +120,11 @@ public sealed class NormalizationSuiteApplicationValidator
     }
 
     private void ValidateRemoveExtensions(
-        PlannedOperationStep operation,
-        string resourceType,
+        PlannedRuntimeStep operation,
         IReadOnlyList<AbsResourceRecord> candidates,
         List<string> errors)
     {
+        var resourceType = operation.ResourceType;
         var extensionUrls = operation.Operation.ExtensionUrls
             .Where(u => !string.IsNullOrWhiteSpace(u))
             .Distinct(StringComparer.Ordinal)
@@ -175,7 +149,7 @@ public sealed class NormalizationSuiteApplicationValidator
             {
                 violations += forbidden.Count;
                 AddError(errors,
-                    $"{operation.SequenceName}#{operation.Sequence}: '{operation.Operation.Name}' left forbidden top-level extension(s) on {resourceType}/{DisplayId(record.ResourceId)} in {record.SourceFile}: [{string.Join(", ", forbidden)}].");
+                    $"{operation.DisplayName}: '{operation.Operation.Name}' left forbidden top-level extension(s) on {resourceType}/{DisplayId(record.ResourceId)} in {record.SourceFile}: [{string.Join(", ", forbidden)}].");
             }
         }
 
@@ -186,38 +160,39 @@ public sealed class NormalizationSuiteApplicationValidator
     }
 
     private void ValidateExecutionEvidence(
-        PlannedOperationStep operation,
-        string resourceType,
+        PlannedRuntimeStep operation,
         IReadOnlyList<AbsResourceRecord> candidates,
         IReadOnlyList<ExecutionEvidenceRecord> evidence,
         List<string> errors,
         List<string> warnings,
         bool evidenceOptional)
     {
+        var resourceType = operation.ResourceType;
         var candidateCount = candidates.Count;
         if (candidateCount == 0)
         {
-            AddWarning(warnings, $"No ABS candidates for {operation.SequenceName}#{operation.Sequence} '{operation.Operation.Name}' on '{resourceType}', skipping execution evidence requirement.");
+            AddWarning(warnings, $"No ABS candidates for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}', skipping execution evidence requirement.");
             return;
         }
 
         var matches = evidence.Where(e =>
                 string.Equals(e.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(e.OperationType, operation.Operation.OperationType, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(e.OperationName, operation.Operation.Name, StringComparison.Ordinal)
-                && e.Sequence == operation.Sequence)
+                && NormalizationExecutionSummaryParser.NamesMatch(e.OperationName, operation.Operation.Name)
+                && e.Sequence == operation.RuntimeSequence)
             .ToList();
 
         if (matches.Count == 0)
         {
+            WriteMissingEvidenceContext(operation, evidence);
             if (!evidenceOptional)
             {
-                AddError(errors, $"No normalization execution evidence found for {operation.SequenceName}#{operation.Sequence} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
+                AddError(errors, $"No normalization execution evidence found for {operation.DisplayName} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
             }
             return;
         }
 
-        _output.WriteLine($"[Normalization Suite] Evidence found for {operation.SequenceName}#{operation.Sequence} '{operation.Operation.Name}' on '{resourceType}': {matches.Count} record(s).");
+        _output.WriteLine($"[Normalization Suite] Evidence found for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}': {matches.Count} record(s).");
 
         var candidateIds = candidates
             .Select(c => c.ResourceId)
@@ -251,15 +226,15 @@ public sealed class NormalizationSuiteApplicationValidator
             }
         }
 
-        var hasSuccessOutcome = matches.Any(m => string.Equals(m.Outcome, "Success", StringComparison.OrdinalIgnoreCase));
-        if (!evidenceOptional && !hasSuccessOutcome)
+        var hasAppliedOutcome = matches.Any(m =>
+            string.Equals(m.Outcome, "Success", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(m.Outcome, "NoAction", StringComparison.OrdinalIgnoreCase));
+        if (!evidenceOptional && !hasAppliedOutcome)
         {
-            if (matches.All(m => string.Equals(m.Outcome, "NoAction", StringComparison.OrdinalIgnoreCase)))
-                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows NoAction outcomes.");
-            else if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
+            if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
                 AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows Failure outcomes.");
             else
-                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not show any Success outcomes.");
+                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not show any Success or NoAction outcomes.");
         }
 
         var outcomeSummary = string.Join(", ",
@@ -271,6 +246,54 @@ public sealed class NormalizationSuiteApplicationValidator
         _output.WriteLine($"[Normalization Suite] Evidence outcomes for '{operation.Operation.Name}' on '{resourceType}': {outcomeSummary}.");
     }
 
+    private void WriteMissingEvidenceContext(
+        PlannedRuntimeStep operation,
+        IReadOnlyList<ExecutionEvidenceRecord> evidence)
+    {
+        var resourceType = operation.ResourceType;
+        var sameName = evidence
+            .Where(e =>
+                string.Equals(e.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(e.OperationType, operation.Operation.OperationType, StringComparison.OrdinalIgnoreCase)
+                && NormalizationExecutionSummaryParser.NamesMatch(e.OperationName, operation.Operation.Name))
+            .ToList();
+
+        if (sameName.Count > 0)
+        {
+            var observed = string.Join("; ",
+                sameName
+                    .GroupBy(e => e.Sequence)
+                    .OrderBy(g => g.Key)
+                    .Select(g =>
+                    {
+                        var outcomes = string.Join(", ",
+                            g.GroupBy(x => x.Outcome, StringComparer.OrdinalIgnoreCase)
+                                .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                                .Select(x => $"{x.Key}={x.Count()}"));
+                        return $"sequence={g.Key} ({outcomes})";
+                    }));
+
+            _output.WriteLine(
+                $"[Normalization Suite] No match for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}' at runtime sequence={operation.RuntimeSequence}. Same name/type observed at {observed}.");
+            return;
+        }
+
+        var observedOnType = evidence
+            .Where(e => string.Equals(e.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(e => (e.Sequence, e.OperationType, e.OperationName))
+            .OrderBy(g => g.Key.Sequence)
+            .ThenBy(g => g.Key.OperationType, StringComparer.OrdinalIgnoreCase)
+            .Select(g => $"{resourceType}#{g.Key.Sequence} {g.Key.OperationType} '{g.Key.OperationName}'")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var observedText = observedOnType.Count == 0
+            ? "(none)"
+            : string.Join("; ", observedOnType);
+        _output.WriteLine(
+            $"[Normalization Suite] No match for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}' at runtime sequence={operation.RuntimeSequence}. Observed {resourceType} steps: {observedText}.");
+    }
+
     private IReadOnlyList<ExecutionEvidenceRecord> ParseExecutionEvidence(IReadOnlyList<string> logLines, List<string> warnings)
     {
         if (logLines.Count == 0)
@@ -279,95 +302,18 @@ public sealed class NormalizationSuiteApplicationValidator
             return [];
         }
 
-        var records = new List<ExecutionEvidenceRecord>();
-        foreach (var line in logLines)
-        {
-            var parsed = ParseSummaryLine(line);
-            records.AddRange(parsed);
-        }
+        var records = NormalizationExecutionSummaryParser.ParseAll(logLines)
+            .Select(s => new ExecutionEvidenceRecord(
+                s.ResourceType,
+                s.ResourceId,
+                s.Sequence,
+                s.OperationType,
+                s.OperationName,
+                s.Outcome))
+            .ToList();
 
         if (records.Count == 0)
             AddWarning(warnings, "Normalization summary logs were queried but no parsable [NormalizationExecutionSummary] records were found.");
-
-        return records;
-    }
-
-    private static IReadOnlyList<ExecutionEvidenceRecord> ParseSummaryLine(string rawLine)
-    {
-        if (string.IsNullOrWhiteSpace(rawLine))
-            return [];
-
-        var trimmed = rawLine.Trim();
-        string? resourceType = null;
-        string? resourceId = null;
-        string? steps = null;
-        string? markerText = null;
-
-        if (trimmed.StartsWith("{", StringComparison.Ordinal))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(trimmed);
-                var root = doc.RootElement;
-
-                resourceType = GetString(root, "ResourceType") ?? GetString(root, "resourceType");
-                resourceId = GetString(root, "ResourceId") ?? GetString(root, "resourceId");
-                steps = GetString(root, "Steps") ?? GetString(root, "steps");
-
-                markerText = GetString(root, "MessageTemplate")
-                    ?? GetString(root, "RenderedMessage")
-                    ?? GetString(root, "Message")
-                    ?? GetString(root, "message");
-
-                markerText ??= GetString(root, "Summary") ?? GetString(root, "summary");
-            }
-            catch
-            {
-                // fall through to text parsing
-            }
-        }
-
-        markerText ??= trimmed;
-        if (!markerText.Contains("[NormalizationExecutionSummary]", StringComparison.Ordinal))
-            return [];
-
-        if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId) || string.IsNullOrWhiteSpace(steps))
-        {
-            var resourceTypeMatch = Regex.Match(markerText, @"(?:^|,\s*)ResourceType=(?<value>[^,]+)", RegexOptions.Compiled);
-            var resourceIdMatch = Regex.Match(markerText, @"(?:^|,\s*)ResourceId=(?<value>[^,]+)", RegexOptions.Compiled);
-            var stepsMatch = Regex.Match(markerText, @"(?:^|,\s*)Steps=\[(?<value>.*)\]\s*$", RegexOptions.Compiled);
-
-            if (resourceTypeMatch.Success)
-                resourceType = resourceTypeMatch.Groups["value"].Value.Trim();
-
-            if (resourceIdMatch.Success)
-                resourceId = resourceIdMatch.Groups["value"].Value.Trim();
-
-            if (stepsMatch.Success)
-                steps = stepsMatch.Groups["value"].Value;
-        }
-
-        if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId) || string.IsNullOrWhiteSpace(steps))
-            return [];
-
-        var records = new List<ExecutionEvidenceRecord>();
-        foreach (var step in steps.Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var parts = step.Split(':', 4);
-            if (parts.Length != 4)
-                continue;
-
-            if (!int.TryParse(parts[0], out var sequence))
-                continue;
-
-            records.Add(new ExecutionEvidenceRecord(
-                ResourceType: resourceType,
-                ResourceId: resourceId,
-                Sequence: sequence,
-                OperationType: parts[1],
-                OperationName: parts[2],
-                Outcome: parts[3]));
-        }
 
         return records;
     }
@@ -412,6 +358,5 @@ public sealed class NormalizationSuiteApplicationValidator
     }
 
     private sealed record AbsResourceRecord(string SourceFile, int LineNumber, string ResourceType, string ResourceId, JsonElement Resource);
-    private sealed record PlannedOperationStep(string SequenceName, int Sequence, Automation.UI.Models.NormalizationOperationDefinition Operation);
     private sealed record ExecutionEvidenceRecord(string ResourceType, string ResourceId, int Sequence, string OperationType, string OperationName, string Outcome);
 }

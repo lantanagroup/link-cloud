@@ -26,7 +26,7 @@ builder.AddExternalConfiguration(DmrpApiConstants.ServiceName);
 builder.Services.Configure<DmrpApiSettings>(
     builder.Configuration.GetSection(DmrpApiSettings.ConfigSectionName));
 
-var enabled = DmrpAvailability.IsEnabled(builder.Environment, builder.Configuration);
+var enabled = DmrpAvailability.IsEnabled(builder.Configuration);
 
 // Must be registered before AddSQLServerEF resolves it.
 builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -104,9 +104,11 @@ else
     // A dormant deployment must not create or alter a schema. Health still answers, so the
     // container reports healthy rather than looking like an outage.
     app.Logger.LogWarning(
-        "Mock DMRP API is disabled in the {Environment} environment. Every route except "
-        + "{AllowedPaths} will answer 503, and schema migration has been skipped.",
+        "Mock DMRP API is disabled in the {Environment} environment because {EnabledKey} is "
+        + "false or unset -- it defaults to disabled. Every route except {AllowedPaths} will "
+        + "answer 503, and schema migration has been skipped.",
         app.Environment.EnvironmentName,
+        DmrpAvailability.EnabledConfigurationKey,
         string.Join(", ", DmrpAvailability.AlwaysAvailablePaths));
 }
 

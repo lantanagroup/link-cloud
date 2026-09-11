@@ -1,5 +1,7 @@
-using LantanaGroup.Link.DMRP.Business.Queries;
+﻿using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -45,7 +47,8 @@ namespace UnitTests.DMRP
         }
 
         private static FacilityReportingPlanQueries CreateQueries(TenantDbContext context) =>
-            new(new EntityRepository<FacilityReportingPlan, TenantDbContext>(context));
+            new(new EntityRepository<FacilityReportingPlan, TenantDbContext>(context),
+                new EntityRepository<MeasureMapping, TenantDbContext>(context));
 
         /// <summary>
         /// Reporting plans point at a measure mapping by foreign key, so one has to exist before any
@@ -70,6 +73,7 @@ namespace UnitTests.DMRP
             {
                 FacilityId = facilityId,
                 MeasureMappingId = mapping.Id,
+                Measure = mapping.Measure,
                 ReportingMonth = month,
                 ReportingYear = year,
                 IsReporting = isReporting
@@ -77,6 +81,25 @@ namespace UnitTests.DMRP
 
             context.FacilityReportingPlans.Add(plan);
             return plan;
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_ResolvesMeasureDetailsFromTheMapping()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            mapping.Frequency = Frequency.Monthly;
+            AddPlan(context, mapping);
+            await context.SaveChangesAsync();
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId);
+
+            // The facility view labels rows by measure, not by mapping id, so the per-facility
+            // read resolves each plan through its measure mapping.
+            var plan = Assert.Single(results);
+            Assert.Equal(mapping.Measure, plan.Measure);
+            Assert.Equal(mapping.DQM, plan.DQM);
+            Assert.Equal(Frequency.Monthly, plan.Frequency);
         }
 
         [Fact]
@@ -161,6 +184,109 @@ namespace UnitTests.DMRP
             // Unenrolled measures are kept as IsReporting = 0 rather than deleted, so an unfiltered
             // read has to return them too.
             Assert.Equal(2, everything.Count);
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_NarrowsToAWindowOfPeriods()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            AddPlan(context, mapping, month: 4, year: 2026);
+            AddPlan(context, mapping, month: 5, year: 2026);
+            AddPlan(context, mapping, month: 6, year: 2026);
+            AddPlan(context, mapping, month: 7, year: 2026);
+            await context.SaveChangesAsync();
+
+            var range = ReportingPeriodRange.LookAhead(new ReportingPeriod(2026, 5), monthsAhead: 2);
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId, periodRange: range);
+
+            // Both ends inclusive: May and June, not April and not July.
+            Assert.Equal(2, results.Count);
+            Assert.All(results, r => Assert.Equal(2026, r.ReportingYear));
+            Assert.Contains(results, r => r.ReportingMonth == 5);
+            Assert.Contains(results, r => r.ReportingMonth == 6);
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_WindowCrossingAYearBoundary_KeepsOnlyThePeriodsInIt()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+
+            // A six-month look-ahead anchored in October runs Oct-Mar, so the comparison cannot be
+            // month-against-month: March of the following year is inside the window while March of
+            // the anchor year is behind it.
+            AddPlan(context, mapping, month: 3, year: 2026);
+            AddPlan(context, mapping, month: 9, year: 2026);
+            AddPlan(context, mapping, month: 10, year: 2026);
+            AddPlan(context, mapping, month: 12, year: 2026);
+            AddPlan(context, mapping, month: 1, year: 2027);
+            AddPlan(context, mapping, month: 3, year: 2027);
+            AddPlan(context, mapping, month: 4, year: 2027);
+            await context.SaveChangesAsync();
+
+            var range = ReportingPeriodRange.LookAhead(new ReportingPeriod(2026, 10), monthsAhead: 6);
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId, periodRange: range);
+
+            Assert.Equal(4, results.Count);
+            Assert.DoesNotContain(results, r => r.ReportingYear == 2026 && r.ReportingMonth == 3);
+            Assert.DoesNotContain(results, r => r.ReportingYear == 2026 && r.ReportingMonth == 9);
+            Assert.DoesNotContain(results, r => r.ReportingYear == 2027 && r.ReportingMonth == 4);
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_WindowOfOneMonth_ReturnsTheAnchorPeriodOnly()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            AddPlan(context, mapping, month: 5, year: 2026);
+            AddPlan(context, mapping, month: 6, year: 2026);
+            await context.SaveChangesAsync();
+
+            var range = ReportingPeriodRange.LookAhead(new ReportingPeriod(2026, 5), monthsAhead: 1);
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId, periodRange: range);
+
+            Assert.Single(results);
+            Assert.Equal(5, results[0].ReportingMonth);
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_WindowCombinesWithTheOtherFilters()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            var otherMapping = AddMapping(context);
+            AddPlan(context, mapping, month: 5, year: 2026, isReporting: true);
+            AddPlan(context, otherMapping, month: 6, year: 2026, isReporting: false);
+            AddPlan(context, mapping, facilityId: OtherFacilityId, month: 5, year: 2026);
+            await context.SaveChangesAsync();
+
+            var range = ReportingPeriodRange.LookAhead(new ReportingPeriod(2026, 5), monthsAhead: 6);
+
+            var results = await CreateQueries(context)
+                .GetForFacilityAsync(FacilityId, isReporting: true, periodRange: range);
+
+            Assert.Single(results);
+            Assert.Equal(FacilityId, results[0].FacilityId);
+            Assert.Equal(5, results[0].ReportingMonth);
+        }
+
+        [Fact]
+        public async Task GetForFacilityAsync_WindowWithNothingInIt_ReturnsEmpty()
+        {
+            using var context = CreateContext();
+            var mapping = AddMapping(context);
+            AddPlan(context, mapping, month: 5, year: 2026);
+            await context.SaveChangesAsync();
+
+            var range = ReportingPeriodRange.LookAhead(new ReportingPeriod(2027, 1), monthsAhead: 6);
+
+            var results = await CreateQueries(context).GetForFacilityAsync(FacilityId, periodRange: range);
+
+            Assert.Empty(results);
         }
 
         [Fact]
@@ -273,16 +399,23 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task AMeasureMappingWithReportingPlans_CannotBeDeleted()
+        public async Task RemovingAMeasureMappingLeavesItsReportingPlansUnmapped()
         {
+            // The foreign key is optional now, so EF severs the relationship rather than refusing
+            // the delete: the enrollments survive with no mapping, which is the same state a
+            // measure Link has never mapped is in. What stops an in-use mapping being deleted at
+            // all is the manager's own check, covered by MeasureMappingManagerTests.
             using var context = CreateContext();
             var mapping = AddMapping(context);
             AddPlan(context, mapping);
             await context.SaveChangesAsync();
 
             context.MeasureMappings.Remove(mapping);
+            await context.SaveChangesAsync();
 
-            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+            var plan = await context.FacilityReportingPlans.SingleAsync();
+            Assert.Null(plan.MeasureMappingId);
+            Assert.Equal(mapping.Measure, plan.Measure);
         }
     }
 }

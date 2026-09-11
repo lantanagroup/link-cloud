@@ -204,22 +204,20 @@ public class PipelineSnapshot
 
                 output.WriteLine($"[Snapshot][NormSequenceRow]     {sequences.Count} operation-sequence row(s) in Normalization service");
             }
-            else
+            else if (sequences.Count == 0)
             {
-                if (sequences.Count == 0)
+                output.WriteLine("[Snapshot][NormSequence]        0 rows");
+            }
+
+            if (sequences.Count > 0)
+            {
+                output.WriteLine($"[Snapshot][NormRuntimeSequence] {sequences.Count} operation-sequence row(s) in Normalization service (per resource type)");
+                foreach (var seq in sequences
+                             .OrderBy(s => s.ResourceType, StringComparer.OrdinalIgnoreCase)
+                             .ThenBy(s => s.Sequence))
                 {
-                    output.WriteLine("[Snapshot][NormSequence]        0 rows");
-                }
-                else
-                {
-                    output.WriteLine($"[Snapshot][NormSequence]        {sequences.Count} sequence(s)");
-                    foreach (var seq in sequences)
-                    {
-                        var opType = seq.OperationType ?? "(unknown)";
-                        var resType = seq.ResourceType ?? "(unknown)";
-                        output.WriteLine($"[Snapshot][NormSequence]          Id={seq.Id}, Sequence={seq.Sequence}, " +
-                                         $"OperationType={opType}, ResourceType={resType}");
-                    }
+                    output.WriteLine(
+                        $"[Snapshot][NormRuntimeSequence]   {seq.ResourceType}#{seq.Sequence} {seq.OperationType} '{seq.OperationName}'");
                 }
             }
         }
