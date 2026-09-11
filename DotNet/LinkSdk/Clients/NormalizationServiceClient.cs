@@ -180,4 +180,14 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Reads the HSLOC reference code list: <c>GET /api/normalization/HSLOC</c>.
+    /// </summary>
+    public Task<LinkApiResponse> GetHslocCodesAsync(
+        bool includeInactive = false,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("normalization/HSLOC")
+            .SetQueryParam("includeInactive", includeInactive)
+            .GetAsync(cancellationToken: cancellationToken));
 }
