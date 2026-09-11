@@ -105,6 +105,19 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   appConfig?: AppConfig;
 
+  /**
+   * DMRP feature flag. When DMRP is enabled the facility's schedule comes from its DMRP reporting
+   * plans, so the report pickers are hidden and the Tenant API is sent an empty schedule. It refuses
+   * one that is not.
+   *
+   * The fallback is the safe direction rather than the eventual one: assuming the flag is off means a
+   * config that failed to load leaves the form asking for a schedule, which the API then rejects out
+   * loud. Assuming it is on would quietly create facilities that report nothing.
+   */
+  get dmrpEnabled(): boolean {
+    return this.appConfig?.dmrpEnabled ?? false;
+  }
+
   constructor(
     private snackBar: MatSnackBar,
     private tenantService: TenantService,
@@ -299,10 +312,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
-  get noReportsEntered(): string | null {
-    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
-  }
-
   get reportsNotUniqueError(): string | null {
     return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
   }
@@ -310,9 +319,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
 
-      let monthlyReports : string[] = this.monthlyReportsControl.value ?? [];
-      let weeklyReports : string[] = this.weeklyReportsControl.value ?? [];
-      let dailyReports : string[] = this.dailyReportsControl.value ?? [];
+      // DMRP feature flag. With DMRP enabled the schedule is derived from the facility's reporting
+      // plans, and the Tenant API refuses a request that carries one. The block itself still has to
+      // be sent: its three arrays are not nullable, so leaving it out fails model binding before the
+      // API sees it. Editing an existing facility loads its stored schedule into these controls, so
+      // the arrays are emptied here rather than relying on the controls being untouched.
+      let monthlyReports : string[] = this.dmrpEnabled ? [] : (this.monthlyReportsControl.value ?? []);
+      let weeklyReports : string[] = this.dmrpEnabled ? [] : (this.weeklyReportsControl.value ?? []);
+      let dailyReports : string[] = this.dmrpEnabled ? [] : (this.dailyReportsControl.value ?? []);
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {

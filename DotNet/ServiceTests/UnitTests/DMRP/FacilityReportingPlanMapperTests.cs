@@ -20,6 +20,68 @@ namespace UnitTests.DMRP
             ModifyDate = modifyDate
         };
 
+        private static FacilityReportingPlanRequest Request(string? component = null,
+            string? measureMappingId = "22222222-2222-2222-2222-222222222222",
+            string? measure = "HOB") => new()
+        {
+            FacilityId = "F1",
+            MeasureMappingId = measureMappingId,
+            Measure = measure,
+            Component = component,
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = true
+        };
+
+        [Theory]
+        [InlineData(" HOB")]
+        [InlineData("HOB ")]
+        [InlineData("  HOB  ")]
+        public void ToEntity_PaddedMeasure_IsTrimmed(string supplied)
+        {
+            // The measure is part of the unique key. SQL Server ignores a trailing blank when it
+            // compares but not a leading one, so an untrimmed " HOB" would be stored as an enrollment
+            // separate from "HOB" that the index would not recognise as a duplicate.
+            Assert.Equal("HOB", FacilityReportingPlanMapper.ToEntity(Request(measure: supplied)).Measure);
+        }
+
+        [Fact]
+        public void ToEntity_NoMeasureSupplied_IsEmptyRatherThanNull()
+        {
+            // Null is not a value the column can hold, and the manager takes the measure from the
+            // mapping when one is supplied. Trimming must not turn the absent case into a throw.
+            Assert.Equal(string.Empty, FacilityReportingPlanMapper.ToEntity(Request(measure: null)).Measure);
+        }
+
+        [Fact]
+        public void ToEntity_NoComponentSupplied_DefaultsToMsc()
+        {
+            // Every enrollment recorded before the component existed was a measure-and-surveillance
+            // one, so an omitted component means MSC rather than unknown.
+            Assert.Equal(ReportingComponents.Msc, FacilityReportingPlanMapper.ToEntity(Request()).Component);
+        }
+
+        [Theory]
+        [InlineData("msc", "MSC")]
+        [InlineData("Ps", "PS")]
+        [InlineData("pS", "PS")]
+        public void ToEntity_ComponentIsStoredInItsCanonicalCasing(string supplied, string expected)
+        {
+            // The component is part of the unique key, so two casings of one component have to be one
+            // value in the column or the same enrollment can be stored twice.
+            Assert.Equal(expected, FacilityReportingPlanMapper.ToEntity(Request(supplied)).Component);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void ToEntity_BlankMeasureMappingId_IsStoredAsNull(string supplied)
+        {
+            // The column is a foreign key. An empty string is not a mapping that exists, and storing
+            // it as one would fail the constraint rather than record an unmapped enrollment.
+            Assert.Null(FacilityReportingPlanMapper.ToEntity(Request(measureMappingId: supplied)).MeasureMappingId);
+        }
+
         [Fact]
         public void ToModel_TreatsStoredTimestampsAsUtc()
         {

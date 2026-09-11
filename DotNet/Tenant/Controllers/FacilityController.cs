@@ -1,5 +1,6 @@
-﻿using AutoMapper;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -12,10 +13,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Data.Entities;
-using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Extensions;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -37,10 +36,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IFacilityManager _facilityManager;
         private readonly IFacilityQueries _facilityQueries;
 
-        private readonly IMapper _mapperDtoToModel;
-        private readonly ILogger<FacilityController> _logger;
+        /// <summary>
+        /// The facility operations that change state. Resolved rather than called directly on the
+        /// manager so the DMRP module can decorate them when it is enabled.
+        /// </summary>
+        private readonly IFacilityOperations _facilityOperations;
 
-        private readonly ScheduleService _scheduleService;
+        private readonly ILogger<FacilityController> _logger;
 
         private readonly IKafkaProducerFactory<string, GenerateReportValue> _adHocKafkaProducerFactory;
         private readonly IHttpClientFactory _httpClient;
@@ -52,7 +54,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public FacilityController(ILogger<FacilityController> logger,
             IFacilityManager facilityManager,
             IFacilityQueries facilityQueries,
-            ScheduleService scheduleService,
+            IFacilityOperations facilityOperations,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
             IOptions<ServiceRegistry> serviceRegistry,
             IHttpClientFactory httpClient,
@@ -62,24 +64,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             _facilityManager = facilityManager;
             _facilityQueries = facilityQueries;
-            _scheduleService = scheduleService;
+            _facilityOperations = facilityOperations ?? throw new ArgumentNullException(nameof(facilityOperations));
             _logger = logger;
 
-            var configModelToDto = new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<Facility, FacilityModel>();
-                cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
-                cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
-            });
-
-            var configDtoToModel = new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<FacilityModel, Facility>();
-                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
-                cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
-            });
-
-            _mapperDtoToModel = configDtoToModel.CreateMapper();
             _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _httpClient = httpClient;
@@ -87,6 +74,41 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
+
+        /// <summary>
+        /// A problem response carrying an explicit type, so the same status always answers with the
+        /// same one rather than depending on the framework's client-error mapping.
+        /// </summary>
+        /// <remarks>
+        /// Every client error answers through these rather than through <c>BadRequest</c> or
+        /// <c>NotFound</c>. Those take the message as a bare <c>string</c>, which the client-error
+        /// mapping does not convert, so it leaves as <c>text/plain</c> with no type, title or
+        /// traceId - the shape callers were being given before.
+        /// <para>
+        /// Validation messages are assembled as fragments and are also read from logs, so they
+        /// arrive with a trailing newline or without a terminating period. <c>detail</c> is prose,
+        /// so it is tidied here rather than at every throw site.
+        /// </para>
+        /// </remarks>
+        private ObjectResult TenantProblem(HttpStatusCode statusCode, string title, string type, string detail)
+        {
+            var sentence = detail?.Trim() ?? string.Empty;
+
+            if (sentence.Length > 0 && !sentence.EndsWith('.') && !sentence.EndsWith('?') && !sentence.EndsWith('!'))
+            {
+                sentence += ".";
+            }
+
+            return Problem(detail: sentence, statusCode: (int)statusCode, title: title, type: type);
+        }
+
+        /// <summary>Client input failed validation. RFC 9110 section 15.5.1.</summary>
+        private ObjectResult BadRequestProblem(string detail) => TenantProblem(
+            HttpStatusCode.BadRequest, "Bad Request", TenantProblemTypes.BadRequest, detail);
+
+        /// <summary>The requested facility or report does not exist. RFC 9110 section 15.5.5.</summary>
+        private ObjectResult NotFoundProblem(string detail) => TenantProblem(
+            HttpStatusCode.NotFound, "Not Found", TenantProblemTypes.NotFound, detail);
 
         /// <summary>
         /// Get facilities
@@ -197,45 +219,42 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
         {
-            var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(newFacility);
-
-            if (facilityEntity == null)
+            if (newFacility == null)
             {
-                return BadRequest();
+                return BadRequestProblem("A facility must be supplied.");
             }
 
-            if (facilityEntity.FacilityName == null)
+            if (newFacility.FacilityId == null)
             {
-                return BadRequest();
+                return BadRequestProblem("Facility ID is required.");
             }
 
-            if (facilityEntity.FacilityId == null)
+            if (newFacility.FacilityName == null)
             {
-                return BadRequest();
+                return BadRequestProblem("Facility name is required.");
             }
 
             try
             {
-                await _facilityManager.CreateAsync(facilityEntity, cancellationToken);
+                await _facilityOperations.CreateAsync(newFacility, cancellationToken);
+            }
+            catch (ScheduledReportsNotAcceptedException ex)
+            {
+                return BadRequestProblem(ex.Message);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception Encountered in FacilityController.StoreFacility");
                 return Problem("An error occurred while creating the facility", null, 500);
-            }
-
-            using (ServiceActivitySource.Instance.StartActivity("Schedule Jobs for New Facility"))
-            {
-                await _scheduleService.AddJobsForFacility(facilityEntity, cancellationToken);
             }
 
             var facilityConfigDto = await _facilityQueries.GetAsync(newFacility.FacilityId, null, cancellationToken);
@@ -250,8 +269,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{facilityId}")]
         public async Task<IActionResult> GetFacility(string facilityId, CancellationToken cancellationToken)
@@ -266,7 +285,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -276,7 +295,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (facilityConfigModel == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
 
             return Ok(facilityConfigModel);
@@ -290,8 +309,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
         public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
@@ -306,7 +325,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -316,29 +335,25 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return NotFound();
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
-
-            var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
-            var newFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(facilityConfig);
 
             try
             {
-                await _facilityManager.UpdateAsync(existingModel.Id!.Value, newFacility, cancellationToken);
+                await _facilityOperations.UpdateAsync(existingModel, facilityConfig, cancellationToken);
+            }
+            catch (ScheduledReportsNotAcceptedException ex)
+            {
+                return BadRequestProblem(ex.Message);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception Encountered in FacilityController.PutFacility");
                 return Problem("An error occurred while updating the facility", null, 500);
-            }
-
-            using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
-            {
-                await _scheduleService.UpdateJobsForFacility(newFacility, oldFacility, cancellationToken);
             }
 
             var facilityConfigDto = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
@@ -353,8 +368,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
@@ -365,16 +380,16 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return NotFound($"Facility with Id: {facilityId} Not Found");
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
             }
 
             try
             {
-                await _facilityManager.DeleteAsync(facilityId, cancellationToken);
+                await _facilityOperations.DeleteAsync(facilityId, cancellationToken);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
@@ -382,18 +397,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An error occurred while deleting the facility", null, 500);
             }
 
-            using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
-            {
-                await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
-            }
-
             return NoContent();
         }
 
         [HttpDelete("softDelete/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> SoftDeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
@@ -401,38 +411,20 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return NotFound($"Facility with Id: {facilityId} Not Found");
-
-            if (existingModel.IsDeleted == true)
-            {
-                // Always attempt job cleanup to self-heal partial failures from prior attempts
-                // (DeleteJobsForFacility is a no-op when no jobs exist)
-                using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
-                {
-                    await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
-                }
-                return NoContent();
-            }
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
 
             try
             {
-                await _facilityManager.SoftDeleteAsync(facilityId, cancellationToken);
+                await _facilityOperations.SoftDeleteAsync(facilityId, cancellationToken);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception encountered in FacilityController.SoftDeleteFacility");
                 return Problem("An error occurred while soft deleting the facility", null, 500);
-            }
-
-            // Delete all scheduled jobs (Monthly, Weekly, Daily) for the soft-deleted facility
-            // Jobs will be recreated when the facility is restored via the restore endpoint
-            using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
-            {
-                await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
             }
 
             return NoContent();
@@ -446,8 +438,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <returns></returns>
         [HttpPatch("restore/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> RestoreFacility(string facilityId, CancellationToken cancellationToken)
         {
@@ -455,27 +447,20 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return NotFound($"Facility with Id: {facilityId} Not Found");
+                return NotFoundProblem($"Facility with Id: {facilityId} Not Found");
 
             try
             {
-                await _facilityManager.RestoreAsync(facilityId, cancellationToken);
+                await _facilityOperations.RestoreAsync(existingModel, cancellationToken);
             }
             catch (ApplicationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestProblem(ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception encountered in FacilityController.RestoreFacility");
                 return Problem("An error occurred while restoring the facility", null, 500);
-            }
-
-            // Re-create scheduled jobs for the restored facility
-            using (ServiceActivitySource.Instance.StartActivity("Restore Jobs for Facility"))
-            {
-                var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
-                await _scheduleService.AddJobsForFacility(facilityEntity, cancellationToken);
             }
 
             return NoContent();
@@ -488,39 +473,39 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/AdHocReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("FacilityId must be provided.");
+                return BadRequestProblem("FacilityId must be provided.");
             }
 
             if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return NotFound("Facility does not exist.");
+                return NotFoundProblem("Facility does not exist.");
             }
 
             if (request.ReportTypes == null || request.ReportTypes.Count == 0)
             {
-                return BadRequest("ReportTypes must be provided.");
+                return BadRequestProblem("ReportTypes must be provided.");
             }
 
             if (request.StartDate == null || request.StartDate == DateTime.MinValue)
             {
-                return BadRequest("StartDate must be provided.");
+                return BadRequestProblem("StartDate must be provided.");
             }
 
             if (request.EndDate == null || request.EndDate == DateTime.MinValue)
             {
-                return BadRequest("EndDate must be provided.");
+                return BadRequestProblem("EndDate must be provided.");
             }
 
             if (request.EndDate <= request.StartDate)
             {
-                return BadRequest("EndDate must be after StartDate.");
+                return BadRequestProblem("EndDate must be after StartDate.");
             }
 
             var reportId = Guid.NewGuid();
@@ -585,25 +570,25 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("FacilityId must be provided.");
+                return BadRequestProblem("FacilityId must be provided.");
             }
 
             if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return NotFound("Facility does not exist.");
+                return NotFoundProblem("Facility does not exist.");
             }
 
             if (string.IsNullOrEmpty(request.ReportId))
             {
-                return BadRequest("ReportId must be provided.");
+                return BadRequestProblem("ReportId must be provided.");
             }
 
             var reportId = Guid.NewGuid();
@@ -631,7 +616,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    return NotFound($"Report schedule {request.ReportId} not found.");
+                    return NotFoundProblem($"Report schedule {request.ReportId} not found.");
                 }
 
                 if (!response.IsSuccessStatusCode)

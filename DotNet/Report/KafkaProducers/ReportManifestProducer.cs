@@ -27,6 +27,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly IReportEntryManager _reportEntryManager;
+        private readonly IReportScheduledManager _reportScheduleManager;
 
 
         public ReportManifestProducer(
@@ -37,7 +38,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             BlobStorageService blobStorageService,
             SubmitPayloadProducer payloadSubmittedProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
-            IReportEntryManager reportEntryManager)
+            IReportEntryManager reportEntryManager,
+            IReportScheduledManager reportScheduleManager)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
@@ -47,6 +49,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _payloadSubmittedProducer = payloadSubmittedProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _reportEntryManager = reportEntryManager;
+            _reportScheduleManager = reportScheduleManager;
         }
 
         public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
@@ -151,7 +154,19 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
-            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
+            if (schedule.EnableSubmission)
+            {
+                _logger.LogDebug("Producing report manifest to Kafka (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+                await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
+                    payloadUri: payloadUri?.ToString());
+            }
+            else
+            {
+                schedule.Status = ScheduleStatus.CompletedNotSubmitted;
+                await _reportScheduleManager.UpdateAsync(schedule, cancellationToken);
+                _logger.LogDebug("Report manifest submission is disabled (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+            }
+
 
             return true;
         }

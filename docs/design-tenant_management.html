@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -496,9 +498,9 @@
     <div class="col-md-8">
         
         <p>In Link Cloud, the terms &quot;tenant&quot; and &quot;facility&quot; are used interchangeably to refer to healthcare organizations configured within the system. Each tenant/facility is identified by a unique <code>facilityId</code> that must be consistent across all services to ensure proper functionality.</p>
-<h1 id="tenant-service" class="content-heading">Tenant Service <a id="tenant-service" href="#tenant-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="tenant-service" class="content-heading">Tenant Service <a href="#tenant-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The Tenant service acts as the primary entry point for configuring organizations within Link Cloud. It maintains core facility configurations and generates events for scheduled measure reporting periods.</p>
-<h2 id="core-tenant-configuration-elements" class="content-heading">Core Tenant Configuration Elements <a id="core-tenant-configuration-elements" href="#core-tenant-configuration-elements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Tenant Configuration Elements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="core-tenant-configuration-elements" class="content-heading">Core Tenant Configuration Elements <a href="#core-tenant-configuration-elements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Tenant Configuration Elements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Facility ID (unique identifier used across all services; two modes: NHSN ORG ID (5 digits) or Custom ID (alphanumeric plus hyphens))</li>
 <li>Facility Name</li>
@@ -512,10 +514,10 @@
 </ul>
 </li>
 </ul>
-<h1 id="cross-service-tenant-configuration" class="content-heading">Cross-Service Tenant Configuration <a id="cross-service-tenant-configuration" href="#cross-service-tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cross-Service Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="cross-service-tenant-configuration" class="content-heading">Cross-Service Tenant Configuration <a href="#cross-service-tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cross-Service Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>A fully functional tenant requires configuration across multiple services. Each service maintains its own tenant-specific configurations using the <code>facilityId</code> as the linking identifier.</p>
-<h2 id="service-specific-configurations" class="content-heading">Service-Specific Configurations <a id="service-specific-configurations" href="#service-specific-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service-Specific Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="tenant-service-1" class="content-heading">Tenant Service <a id="tenant-service-1" href="#tenant-service-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="service-specific-configurations" class="content-heading">Service-Specific Configurations <a href="#service-specific-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service-Specific Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="tenant-service-1" class="content-heading">Tenant Service <a href="#tenant-service-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Basic facility information</li>
 <li>Reporting schedules</li>
@@ -524,35 +526,35 @@
 <li>NHSN ORG ID enforcement flag</li>
 <li>Soft delete support (<code>isDeleted</code> flag)</li>
 </ul>
-<h3 id="data-acquisition-service" class="content-heading">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="data-acquisition-service" class="content-heading">Data Acquisition Service <a href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Data source configurations</li>
 <li>Query parameters</li>
 <li>Resource type settings</li>
 <li>Data collection schedules</li>
 </ul>
-<h3 id="measure-evaluation-service" class="content-heading">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="measure-evaluation-service" class="content-heading">Measure Evaluation Service <a href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Measure specifications</li>
 <li>Evaluation schedules</li>
 <li>Performance settings</li>
 <li>Output configurations</li>
 </ul>
-<h3 id="report-generation-service" class="content-heading">Report Generation Service <a id="report-generation-service" href="#report-generation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Generation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="report-generation-service" class="content-heading">Report Generation Service <a href="#report-generation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Generation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Report templates</li>
 <li>Output format preferences</li>
 <li>Delivery settings</li>
 <li>Generation schedules</li>
 </ul>
-<h3 id="notification-service" class="content-heading">Notification Service <a id="notification-service" href="#notification-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Notification Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="notification-service" class="content-heading">Notification Service <a href="#notification-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Notification Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Email notification settings</li>
 <li>Recipient lists</li>
 <li>Alert preferences</li>
 <li>Communication channels</li>
 </ul>
-<h3 id="census-services" class="content-heading">Census Services <a id="census-services" href="#census-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="census-services" class="content-heading">Census Services <a href="#census-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Facility identification</li>
 <li>Facility ID linking</li>
@@ -564,7 +566,7 @@
 <li>Discharge monitoring configurations</li>
 <li>Patient information retention policies</li>
 </ul>
-<h3 id="query-dispatch-service" class="content-heading">Query Dispatch Service <a id="query-dispatch-service" href="#query-dispatch-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Dispatch Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="query-dispatch-service" class="content-heading">Query Dispatch Service <a href="#query-dispatch-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Dispatch Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Facility Configuration</li>
 <li>Facility ID mapping</li>
@@ -581,14 +583,14 @@
 <li>Performance optimization parameters</li>
 <li>Resource filtering rules</li>
 </ul>
-<h1 id="important-notes" class="content-heading">Important Notes <a id="important-notes" href="#important-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Important Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="important-notes" class="content-heading">Important Notes <a href="#important-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Important Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ol>
 <li>Creating a tenant configuration in the Tenant service alone does not create a fully functional tenant. Additional configuration in other services is required.</li>
 <li>The <code>facilityId</code> must be consistent across all services to ensure proper system integration and functionality.</li>
 <li>Each service captures and manages different aspects of a tenant's configuration, working together to provide complete functionality.</li>
 </ol>
-<h1 id="best-practices" class="content-heading">Best Practices <a id="best-practices" href="#best-practices" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Best Practices"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="configuration-management" class="content-heading">Configuration Management <a id="configuration-management" href="#configuration-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="best-practices" class="content-heading">Best Practices <a href="#best-practices" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Best Practices"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="configuration-management" class="content-heading">Configuration Management <a href="#configuration-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Ensure all required services are properly configured for each tenant</li>
 <li>Maintain consistent <code>facilityId</code> usage across services</li>
@@ -600,7 +602,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ntenant_management_461E1E76["Design: Tenant Management"]</pre>
+ntenant_management_64ACC10C["Design: Tenant Management"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

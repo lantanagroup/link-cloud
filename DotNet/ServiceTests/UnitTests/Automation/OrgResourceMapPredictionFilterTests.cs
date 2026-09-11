@@ -50,8 +50,7 @@ public class OrgResourceMapPredictionFilterTests
             sharedResourceEntries: null,
             organizationLocationConditionFhirPaths: [orgCondition]);
 
-        filtered.Should().Contain(["Encounter/E-1", "Location/L-ROOM"]);
-        filtered.Should().NotContain("Location/L-ROOT");
+        filtered.Should().Contain(["Encounter/E-1", "Location/L-ROOM", "Location/L-ROOT"]);
     }
 
     [Fact]
@@ -105,8 +104,8 @@ public class OrgResourceMapPredictionFilterTests
             sharedResourceEntries: null,
             organizationLocationConditionFhirPaths: [orgCondition]);
 
-        filtered.Should().Contain(["Encounter/E-1", "Location/L-ROOM"]);
-        filtered.Should().NotContain(["Location/L-ROOT", "Location/L-UNUSED"]);
+        filtered.Should().Contain(["Encounter/E-1", "Location/L-ROOM", "Location/L-ROOT"]);
+        filtered.Should().NotContain("Location/L-UNUSED");
     }
 
     [Fact]

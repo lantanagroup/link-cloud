@@ -316,7 +316,6 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
-            await AddResourceToCacheAsync(log, resource, cancellationToken);
             cachedResources.Add(resource);
 
             // Extract and accumulate nested references from cached resources
@@ -333,6 +332,8 @@ public class ReferenceResourceService : IReferenceResourceService
                 }
             }
         }
+
+        await AddResourcesToCacheAsync(log, cachedResources, cancellationToken);
 
         if (string.Equals(resourceType, ResourceType.Location.ToString(), StringComparison.Ordinal)
             && cachedResources.Count > 0)
@@ -534,16 +535,38 @@ public class ReferenceResourceService : IReferenceResourceService
         return pendingReferenceIdsAdded;
     }
 
-    private async Task AddResourceToCacheAsync(
+    private async Task AddResourcesToCacheAsync(
         DataAcquisitionLogModel primaryLog,
-        Resource resource,
+        IReadOnlyCollection<Resource> resources,
         CancellationToken cancellationToken)
     {
-        if (resource is DomainResource domainResource
-            && !string.IsNullOrWhiteSpace(resource.TypeName)
-            && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
+        if (string.IsNullOrWhiteSpace(primaryLog.CorrelationId) || resources.Count == 0)
+            return;
+
+        var resourcesByType = new Dictionary<ResourceType, List<DomainResource>>();
+        foreach (var resource in resources)
         {
-            await _resourceCache.UpdateCorrelationCacheAsync($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
+            if (resource is DomainResource domainResource
+                && !string.IsNullOrWhiteSpace(resource.TypeName)
+                && Enum.TryParse<ResourceType>(resource.TypeName, out var parsedResourceType))
+            {
+                if (!resourcesByType.TryGetValue(parsedResourceType, out var typedResources))
+                {
+                    typedResources = [];
+                    resourcesByType[parsedResourceType] = typedResources;
+                }
+
+                typedResources.Add(domainResource);
+            }
+        }
+
+        foreach (var (parsedResourceType, typedResources) in resourcesByType)
+        {
+            await _resourceCache.UpdateCorrelationCacheAsync(
+                $"{primaryLog.CorrelationId}:{parsedResourceType}",
+                typedResources,
+                parsedResourceType,
+                cancellationToken);
         }
     }
 

@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,7 +497,7 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h1 id="swagger" class="content-heading">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+        <h1 id="swagger" class="content-heading">Swagger <a href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -516,7 +518,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="azure-app-config-environment-variables" class="content-heading">Azure App Config Environment Variables <a id="azure-app-config-environment-variables" href="#azure-app-config-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="azure-app-config-environment-variables" class="content-heading">Azure App Config Environment Variables <a href="#azure-app-config-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The following should be specified as environment variables when launching the service:</p>
 <table>
 <thead>
@@ -545,7 +547,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="blob-storage" class="content-heading">Blob Storage <a id="blob-storage" href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="blob-storage" class="content-heading">Blob Storage <a href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -601,7 +603,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="kafka" class="content-heading">Kafka <a id="kafka" href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="kafka" class="content-heading">Kafka <a href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -675,7 +677,7 @@
 <li>Ssl</li>
 <li>SaslSsl</li>
 </ul>
-<h2 id="sasl-plain-text-authentication" class="content-heading">SASL Plain Text Authentication <a id="sasl-plain-text-authentication" href="#sasl-plain-text-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SASL Plain Text Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="sasl-plain-text-authentication" class="content-heading">SASL Plain Text Authentication <a href="#sasl-plain-text-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SASL Plain Text Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Include the following configuration properties to connecto to Kafka that requires SASL_PLAINTEXT authentication:</p>
 <table>
 <thead>
@@ -703,7 +705,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="kafka-consumer-settings" class="content-heading">Kafka Consumer Settings <a id="kafka-consumer-settings" href="#kafka-consumer-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="kafka-consumer-settings" class="content-heading">Kafka Consumer Settings <a href="#kafka-consumer-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -730,7 +732,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="cors" class="content-heading">CORS <a id="cors" href="#cors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="cors" class="content-heading">CORS <a href="#cors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -786,7 +788,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="token-service-settings" class="content-heading">Token Service Settings <a id="token-service-settings" href="#token-service-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Service Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="token-service-settings" class="content-heading">Token Service Settings <a href="#token-service-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Service Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>TODO: Describe what the purpose of the token endpoint is</p>
 <table>
 <thead>
@@ -843,7 +845,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-authentication" class="content-heading">Service Authentication <a id="service-authentication" href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-authentication" class="content-heading">Service Authentication <a href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -885,7 +887,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="redis" class="content-heading">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="redis" class="content-heading">Redis <a href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -916,7 +918,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="telemetry" class="content-heading">Telemetry <a id="telemetry" href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="telemetry" class="content-heading">Telemetry <a href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -953,10 +955,10 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-registry" class="content-heading">Service Registry <a id="service-registry" href="#service-registry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-registry" class="content-heading">Service Registry <a href="#service-registry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The Service Registry section contains URLs and configurations for all microservices in the Link Cloud ecosystem. Configuration key: <code>ServiceRegistry</code></p>
 <p>Not all services use every URL. The configuration is provided for completeness and future-proofing. If using Azure App Configuration, all service URLs should be specified, and each service will use only the URLs it needs.</p>
-<h2 id="service-urls" class="content-heading">Service URLs <a id="service-urls" href="#service-urls" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service URLs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="service-urls" class="content-heading">Service URLs <a href="#service-urls" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service URLs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -1108,7 +1110,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="example-configuration-in-json" class="content-heading">Example Configuration in JSON <a id="example-configuration-in-json" href="#example-configuration-in-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Configuration in JSON"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="example-configuration-in-json" class="content-heading">Example Configuration in JSON <a href="#example-configuration-in-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Configuration in JSON"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;ServiceRegistry&quot;: {
     &quot;AccountServiceUrl&quot;: &quot;http://localhost:8060&quot;,
@@ -1131,7 +1133,7 @@
   }
 }
 </code></pre>
-<h2 id="tenant-service-configuration" class="content-heading">Tenant Service Configuration <a id="tenant-service-configuration" href="#tenant-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="tenant-service-configuration" class="content-heading">Tenant Service Configuration <a href="#tenant-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -1168,7 +1170,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="data-acquisition-service-configuration" class="content-heading">Data Acquisition Service Configuration <a id="data-acquisition-service-configuration" href="#data-acquisition-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="data-acquisition-service-configuration" class="content-heading">Data Acquisition Service Configuration <a href="#data-acquisition-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The following settings are specific to the Data Acquisition service.</p>
 <table>
 <thead>
@@ -1190,8 +1192,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="databases" class="content-heading">Databases <a id="databases" href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="sql-server-database" class="content-heading">SQL Server Database <a id="sql-server-database" href="#sql-server-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="databases" class="content-heading">Databases <a href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="sql-server-database" class="content-heading">SQL Server Database <a href="#sql-server-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -1226,7 +1228,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="mongo-database" class="content-heading">Mongo Database <a id="mongo-database" href="#mongo-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="mongo-database" class="content-heading">Mongo Database <a href="#mongo-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -1257,7 +1259,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-information" class="content-heading">Service Information <a id="service-information" href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-information" class="content-heading">Service Information <a href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The ServiceInformation configuration allows exposing build, version and deployment information through the <code>/api/XXX/info</code> (i.e. <code>/api/audit/info</code>) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.</p>
 <table>
 <thead>
@@ -1308,9 +1310,9 @@
 </tbody>
 </table>
 <p>The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file</p>
-<h1 id="ef-core-query-logging" class="content-heading">EF Core Query Logging <a id="ef-core-query-logging" href="#ef-core-query-logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EF Core Query Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="ef-core-query-logging" class="content-heading">EF Core Query Logging <a href="#ef-core-query-logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EF Core Query Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Configure EF Core to log queries, including sensitive data, by setting up the <code>appsettings.json</code> file and adjusting the <code>Program.cs</code> file. This allows dynamic adjustment of logging levels in Serilog based on the <code>EnableEnhancedQueryLogging</code> setting.</p>
-<h2 id="configuration-in-appsettings.json" class="content-heading">Configuration in appsettings.json <a id="configuration-in-appsettings-json" href="#configuration-in-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration-in-appsettings-json" class="content-heading">Configuration in appsettings.json <a href="#configuration-in-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Add the following section to enable enhanced query logging:</p>
 <pre><code class="language-json">&quot;EnhancedQueryLoggingSettings&quot;: {
   &quot;EnableEnhancedQueryLogging&quot;: false
@@ -1336,7 +1338,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="configuration-in-program.cs" class="content-heading">Configuration in Program.cs <a id="configuration-in-program-cs" href="#configuration-in-program-cs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in Program.cs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration-in-program-cs" class="content-heading">Configuration in Program.cs <a href="#configuration-in-program-cs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in Program.cs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>In <code>Program.cs</code>, configure Serilog to dynamically set log levels for EF Core namespaces and enable EF Core logging in the DbContext setup.</p>
 <p>For Serilog configuration (e.g., in a <code>ConfigureLogging</code> method):</p>
 <pre><code class="language-csharp">// Bind the enhanced logging settings
@@ -1386,7 +1388,7 @@ builder.Logging.AddSerilog();
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ndotnet_704D25B0["Design: Configuring .NET Services"]</pre>
+ndotnet_47629E7D["Design: Configuring .NET Services"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

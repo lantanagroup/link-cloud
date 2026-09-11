@@ -12,9 +12,8 @@ namespace LantanaGroup.Link.MockDmrpApi.Application.Models;
 /// borrowing types from the third party's contract -- if it did, replacing that contract
 /// would break endpoints that have nothing to do with it.
 /// <para>
-/// <see cref="MockEntryRequest.ReportingMonth"/> is nullable because the rule is conditional:
-/// monthly components require it, annual ones must omit it. A <c>[Range]</c> attribute cannot
-/// express that, so the service enforces it and returns a message naming the component.
+/// <see cref="MockEntryRequest.ReportingMonth"/> is nullable so that omitting it is rejected
+/// as a missing value rather than binding to zero and failing as an out-of-range one.
 /// </para>
 /// </remarks>
 public class MockEntryRequest
@@ -32,7 +31,8 @@ public class MockEntryRequest
     [StringLength(50, MinimumLength = 1)]
     public string Measure { get; set; } = string.Empty;
 
-    /// <summary>Required for monthly components, omitted for annual ones.</summary>
+    /// <summary>The reporting month, 1-12. Required for every component.</summary>
+    [Required]
     [Range(1, 12)]
     public int? ReportingMonth { get; set; }
 
@@ -51,7 +51,7 @@ public class MockEntryModel
     public string FacilityId { get; set; } = string.Empty;
     public string Component { get; set; } = string.Empty;
     public string Measure { get; set; } = string.Empty;
-    public int? ReportingMonth { get; set; }
+    public int ReportingMonth { get; set; }
     public int ReportingYear { get; set; }
     public string IsReporting { get; set; } = string.Empty;
     public DateTimeOffset CreateDate { get; set; }
@@ -111,7 +111,8 @@ public static class MockEntryMapper
             FacilityId = request.FacilityId,
             Component = request.Component,
             Measure = request.Measure,
-            ReportingMonth = request.ReportingMonth,
+            // [Required] and [Range] have both run by the time a request is mapped.
+            ReportingMonth = request.ReportingMonth!.Value,
             ReportingYear = request.ReportingYear,
             IsReporting = string.IsNullOrWhiteSpace(request.IsReporting) ? "Y" : request.IsReporting
         };

@@ -10,6 +10,20 @@
     <h2 class="fw-bold mb-1"><i class="bi bi-funnel me-2"></i>Normalizations</h2>
     <p class="text-muted mb-3">Manage normalization operations, sequences, and suites. Suites are selectable on scenarios to control which normalizations run during a test.</p>
 
+    <div class="au-card">
+        <div class="card-header">Suggest from a patient bundle</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Upload one or more FHIR bundles. We'll propose one operation of each type the data can support, reuse existing operations when they already match, and recommend a suite if one already covers the work. Upload additional patients to refine the same suite.</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @Html.AntiForgeryToken()
+                <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
+                <button type="button" class="btn btn-sm btn-au-action" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNormGenerateReset">Start over</button>
+                <span id="normGenSessionHint" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs mb-3" id="normTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
@@ -423,6 +437,7 @@
 <div id="suiteModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @section Scripts {
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
     // -- Data from server --
     const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
@@ -839,7 +854,11 @@
 
         const container = document.getElementById('seqEntriesContainer');
         container.innerHTML = '';
-        (data?.entries || []).sort((a,b) => a.sequence - b.sequence).forEach(e => addSeqEntryRow(e));
+        (data?.entries || [])
+            .sort((a, b) => a.sequence - b.sequence)
+            .forEach(e => addSeqEntryRow(e));
+
+        updateSeqOperationOptions();
 
         document.getElementById('btnSeqSave').style.display = mode === 'edit' ? '' : 'none';
         document.getElementById('seqSystemOverlay').style.display = mode === 'view' ? '' : 'none';
@@ -850,14 +869,78 @@
     function addSeqEntryRow(entry) {
         const container = document.getElementById('seqEntriesContainer');
         const seq = container.children.length + 1;
-        const options = allOperations.map(o => `<option value="${o.id}" ${o.id === entry?.operationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`).join('');
+
+        const selectedOperationIds = new Set(
+            Array.from(container.querySelectorAll('.seq-op-select'))
+                .map(select => select.value).filter(Boolean)
+        );
+
+        const selectedOperationId = entry?.operationId
+            || allOperations.find(o => !selectedOperationIds.has(o.id))?.id
+            || '';
+
+        const formErrors = document.getElementById('seqFormErrors');
+
+        if (!selectedOperationId) {
+            formErrors.textContent = 'All available operations are already included in this sequence.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
-            <select class="form-select form-select-sm seq-op-select">${options}</select>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove(); renumberSeqEntries();"><i class="bi bi-x-lg"></i></button>`;
+            <select class="form-select form-select-sm seq-op-select"></select>
+            <button type="button" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-x-lg"></i>
+            </button>`;
+
+        const select = row.querySelector('.seq-op-select');
+
+        allOperations.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o.id;
+            option.textContent = `${o.name} (${o.operationType})`;
+            option.selected = o.id === selectedOperationId;
+            select.appendChild(option);
+        });
+
+        select.addEventListener('change', updateSeqOperationOptions);
+
+        row.querySelector('.btn-outline-danger').addEventListener('click', () => {
+            row.remove();
+            renumberSeqEntries();
+            updateSeqOperationOptions();
+        });
+
         container.appendChild(row);
+        updateSeqOperationOptions();
+    }
+
+    function updateSeqOperationOptions() {
+        const selects = Array.from(document.querySelectorAll('#seqEntriesContainer .seq-op-select'));
+
+        selects.forEach(select => {
+            const selectedByOtherRows = new Set(
+                selects
+                    .filter(other => other !== select)
+                    .map(other => other.value)
+                    .filter(Boolean)
+            );
+
+            Array.from(select.options).forEach(option => {
+                option.disabled =
+                    option.value !== select.value &&
+                    selectedByOtherRows.has(option.value);
+            });
+        });
+
+        document.getElementById('btnAddSeqEntry').disabled =
+            selects.length >= allOperations.length;
     }
 
     function renumberSeqEntries() {
@@ -883,12 +966,31 @@
     }
 
     document.getElementById('btnSeqSave').addEventListener('click', async () => {
+        const formErrors = document.getElementById('seqFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
         const data = collectSeqData();
-        const resp = await postJson('@Url.Action("SaveSequence", "Normalizations")', data);
-        if (resp.ok) { location.reload(); } else {
+
+        const operationIds = data.entries.map(e => e.operationId);
+        if (new Set(operationIds).size !== operationIds.length) {
+            formErrors.textContent =
+                'A sequence cannot contain the same operation more than once.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        const resp = await postJson(
+            '@Url.Action("SaveSequence", "Normalizations")',
+            data
+        );
+
+        if (resp.ok) {
+            location.reload();
+        } else {
             const err = await resp.text();
-            document.getElementById('seqFormErrors').textContent = err;
-            document.getElementById('seqFormErrors').style.display = '';
+            formErrors.textContent = err;
+            formErrors.style.display = '';
         }
     });
 
@@ -917,6 +1019,208 @@
     function showSuiteModal() { showCrudModal(suiteModal, suiteBackdrop, hideSuiteModal); }
     function hideSuiteModal() { hideCrudModal(suiteModal, suiteBackdrop); }
 
+    function getSuiteSelectedSequenceIds() {
+        return Array.from(document.querySelectorAll('#suiteSequencesContainer .suite-seq-select'))
+            .map(select => select.value)
+            .filter(Boolean);
+    }
+
+    function getSuiteSequenceOperationSources() {
+        const sourcesByOperation = new Map();
+
+        getSuiteSelectedSequenceIds().forEach(sequenceId => {
+            const sequence = allSequences.find(s => s.id === sequenceId);
+            if (!sequence) return;
+
+            (sequence.entries || []).forEach(entry => {
+                if (!sourcesByOperation.has(entry.operationId)) {
+                    sourcesByOperation.set(entry.operationId, []);
+                }
+
+                sourcesByOperation.get(entry.operationId).push(`sequence '${sequence.name}'`);
+            });
+        });
+
+        return sourcesByOperation;
+    }
+
+    function refreshSuiteSequenceOptions() {
+        const sequenceSelects = Array.from(
+            document.querySelectorAll('#suiteSequencesContainer .suite-seq-select')
+        );
+
+        const standaloneOperationIds = new Set(
+            Array.from(
+                document.querySelectorAll('#suiteOpsContainer .suite-op-select')
+            )
+                .map(select => select.value)
+                .filter(Boolean)
+        );
+
+        sequenceSelects.forEach(select => {
+            const selectedSequenceIdsElsewhere = new Set(
+                sequenceSelects
+                    .filter(otherSelect => otherSelect !== select)
+                    .map(otherSelect => otherSelect.value)
+                    .filter(Boolean)
+            );
+
+            const operationIdsFromOtherSequences = new Set();
+
+            selectedSequenceIdsElsewhere.forEach(sequenceId => {
+                const sequence = allSequences.find(s => s.id === sequenceId);
+                if (!sequence) return;
+
+                (sequence.entries || []).forEach(entry => {
+                    operationIdsFromOtherSequences.add(entry.operationId);
+                });
+            });
+
+            Array.from(select.options).forEach(option => {
+                if (!option.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const sequence = allSequences.find(s => s.id === option.value);
+                if (!sequence) return;
+
+                option.textContent = sequence.name;
+
+                // Keep this row's current value available so an existing invalid
+                // suite can still be displayed and corrected.
+                if (option.value === select.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const sameSequenceSelected =
+                    selectedSequenceIdsElsewhere.has(option.value);
+
+                const sequenceOperationIds = (sequence.entries || [])
+                    .map(entry => entry.operationId);
+
+                const sharedWithAnotherSequence = sequenceOperationIds.some(
+                    operationId => operationIdsFromOtherSequences.has(operationId)
+                );
+
+                const sharedWithStandalone = sequenceOperationIds.some(
+                    operationId => standaloneOperationIds.has(operationId)
+                );
+
+                option.disabled =
+                    sameSequenceSelected ||
+                    sharedWithAnotherSequence ||
+                    sharedWithStandalone;
+
+                if (sameSequenceSelected) {
+                    option.textContent +=
+                        ' — already selected in this suite';
+                } else if (sharedWithAnotherSequence) {
+                    option.textContent +=
+                        ' — contains an operation already included by another sequence';
+                } else if (sharedWithStandalone) {
+                    option.textContent +=
+                        ' — contains an operation already selected as standalone';
+                }
+            });
+        });
+    }
+
+    function refreshSuiteStandaloneOperationOptions() {
+        const sequenceOperationSources = getSuiteSequenceOperationSources();
+
+        const standaloneSelects = Array.from(
+            document.querySelectorAll('#suiteOpsContainer .suite-op-select')
+        );
+
+        standaloneSelects.forEach(select => {
+            Array.from(select.options).forEach(option => {
+                if (!option.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const sources = sequenceOperationSources.get(option.value) || [];
+
+                const selectedElsewhere = standaloneSelects.some(otherSelect =>
+                    otherSelect !== select &&
+                    otherSelect.value === option.value
+                );
+
+                option.disabled =
+                    sources.length > 0 ||
+                    selectedElsewhere;
+
+                const operation = allOperations.find(
+                    o => o.id === option.value
+                );
+
+                if (!operation) return;
+
+                option.textContent =
+                    `${operation.name} (${operation.operationType})`;
+
+                if (sources.length > 0) {
+                    option.textContent +=
+                        ` — already included in ${sources.join(', ')}`;
+                } else if (selectedElsewhere) {
+                    option.textContent +=
+                        ' — already selected as a standalone operation';
+                }
+            });
+        });
+    }
+
+    function refreshSuiteSelectionOptions() {
+        refreshSuiteSequenceOptions();
+        refreshSuiteStandaloneOperationOptions();
+    }
+
+    function getSuiteDuplicateOperationMessages() {
+        const occurrences = new Map();
+
+        function addOccurrence(operationId, source) {
+            if (!operationId) return;
+
+            if (!occurrences.has(operationId)) {
+                occurrences.set(operationId, []);
+            }
+
+            occurrences.get(operationId).push(source);
+        }
+
+        getSuiteSelectedSequenceIds().forEach(sequenceId => {
+            const sequence = allSequences.find(s => s.id === sequenceId);
+            if (!sequence) return;
+
+            (sequence.entries || []).forEach(entry => {
+                addOccurrence(
+                    entry.operationId,
+                    `sequence '${sequence.name}'`
+                );
+            });
+        });
+
+        document.querySelectorAll(
+            '#suiteOpsContainer .suite-op-select'
+        ).forEach(select => {
+            if (select.value) {
+                addOccurrence(select.value, 'Standalone Operations');
+            }
+        });
+
+        return Array.from(occurrences.entries())
+            .filter(([, sources]) => sources.length > 1)
+            .map(([operationId, sources]) => {
+                const operation = allOperations.find(o => o.id === operationId);
+                const operationName = operation?.name || operationId;
+                const uniqueSources = [...new Set(sources)];
+
+                return `'${operationName}' (${uniqueSources.join(' and ')})`;
+        });
+    }
+
     function openSuiteEditor(data, mode) {
         document.getElementById('SuiteId').value = data?.id || '';
         document.getElementById('SuiteIsSystem').value = data?.isSystem ? 'true' : 'false';
@@ -924,16 +1228,23 @@
         document.getElementById('SuiteDescription').value = data?.description || '';
 
         const seqContainer = document.getElementById('suiteSequencesContainer');
-        seqContainer.innerHTML = '';
-        (data?.sequenceIds || []).forEach(sid => addSuiteSeqRow(sid));
-
         const opContainer = document.getElementById('suiteOpsContainer');
+
+        seqContainer.innerHTML = '';
         opContainer.innerHTML = '';
+
+        (data?.sequenceIds || []).forEach(sid => addSuiteSeqRow(sid));
         (data?.operationIds || []).forEach(oid => addSuiteOpRow(oid));
 
         document.getElementById('btnSuiteSave').style.display = mode === 'edit' ? '' : 'none';
         document.getElementById('suiteSystemOverlay').style.display = mode === 'view' ? '' : 'none';
-        document.getElementById('suiteFormErrors').style.display = 'none';
+
+        const formErrors = document.getElementById('suiteFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
+        refreshSuiteSelectionOptions();
+
         showSuiteModal();
     }
 
@@ -944,23 +1255,44 @@
 
         const sequenceSelect = document.createElement('select');
         sequenceSelect.className = 'form-select form-select-sm suite-seq-select';
+
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = 'Select a sequence...';
+        sequenceSelect.appendChild(placeholderOption);
+
         allSequences.forEach(s => {
             const option = document.createElement('option');
             option.value = s.id;
             option.textContent = s.name;
-            if (s.id === selectedId) option.selected = true;
+
+            if (s.id === selectedId) {
+                option.selected = true;
+            }
+
             sequenceSelect.appendChild(option);
         });
+
+        sequenceSelect.addEventListener(
+            'change',
+            refreshSuiteSelectionOptions
+        );
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
         removeButton.className = 'btn btn-sm btn-outline-danger';
         removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
-        removeButton.addEventListener('click', () => row.remove());
+
+        removeButton.addEventListener('click', () => {
+            row.remove();
+            refreshSuiteSelectionOptions();
+        });
 
         row.appendChild(sequenceSelect);
         row.appendChild(removeButton);
         container.appendChild(row);
+
+        refreshSuiteSelectionOptions();
     }
 
     function addSuiteOpRow(selectedId) {
@@ -970,23 +1302,44 @@
 
         const operationSelect = document.createElement('select');
         operationSelect.className = 'form-select form-select-sm suite-op-select';
+
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = 'Select an operation...';
+        operationSelect.appendChild(placeholderOption);
+
         allOperations.forEach(o => {
             const option = document.createElement('option');
             option.value = o.id;
             option.textContent = `${o.name} (${o.operationType})`;
-            if (o.id === selectedId) option.selected = true;
+
+            if (o.id === selectedId) {
+                option.selected = true;
+            }
+
             operationSelect.appendChild(option);
         });
+
+        operationSelect.addEventListener(
+            'change',
+            refreshSuiteSelectionOptions
+        );
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
         removeButton.className = 'btn btn-sm btn-outline-danger';
         removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
-        removeButton.addEventListener('click', () => row.remove());
+
+        removeButton.addEventListener('click', () => {
+            row.remove();
+            refreshSuiteSelectionOptions();
+        });
 
         row.appendChild(operationSelect);
         row.appendChild(removeButton);
         container.appendChild(row);
+
+        refreshSuiteSelectionOptions();
     }
 
     document.getElementById('btnAddSuiteSeq').addEventListener('click', () => addSuiteSeqRow(null));
@@ -1009,12 +1362,33 @@
     }
 
     document.getElementById('btnSuiteSave').addEventListener('click', async () => {
+        const formErrors = document.getElementById('suiteFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
+        const duplicates = getSuiteDuplicateOperationMessages();
+
+        if (duplicates.length > 0) {
+            formErrors.textContent =
+                'Normalization suite cannot contain the same operation more than once. ' +
+                `Duplicate operation(s): ${duplicates.join(', ')}.`;
+            formErrors.style.display = '';
+            return;
+        }
+
         const data = collectSuiteData();
-        const resp = await postJson('@Url.Action("SaveSuite", "Normalizations")', data);
-        if (resp.ok) { location.reload(); } else {
+
+        const resp = await postJson(
+            '@Url.Action("SaveSuite", "Normalizations")',
+            data
+        );
+
+        if (resp.ok) {
+            location.reload();
+        } else {
             const err = await resp.text();
-            document.getElementById('suiteFormErrors').textContent = err;
-            document.getElementById('suiteFormErrors').style.display = '';
+            formErrors.textContent = err;
+            formErrors.style.display = '';
         }
     });
 
@@ -1027,8 +1401,18 @@
         if (resp.ok) openSuiteEditor(await resp.json(), btn.dataset.mode);
     }));
     document.querySelectorAll('.btn-suite-clone').forEach(btn => btn.addEventListener('click', async () => {
-        await postJson('@Url.Action("CloneSuite", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        const resp = await postJson(
+            '@Url.Action("CloneSuite", "Normalizations")',
+            { id: btn.dataset.id }
+        );
+
+        if (resp.ok) {
+            location.reload();
+            return;
+        }
+
+        const err = await resp.text();
+        alert(err || 'Failed to clone normalization suite.');
     }));
     document.querySelectorAll('.btn-suite-default').forEach(btn => btn.addEventListener('click', async () => {
         await postJson('@Url.Action("SetDefaultSuite", "Normalizations")', { id: btn.dataset.id });
@@ -1039,5 +1423,74 @@
         await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
         location.reload();
     }));
+
+    const analyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
+    const applyOrmUrl = '@Url.Action("ApplyOrm", "ConfigurationGeneration")';
+    const applyNormUrl = '@Url.Action("ApplyNormalization", "ConfigurationGeneration")';
+    const normGenKey = 'cfgGen.norm';
+    function loadNormGenState(){
+        try { return JSON.parse(sessionStorage.getItem(normGenKey) || '{}'); } catch { return {}; }
+    }
+    function saveNormGenState(state){ sessionStorage.setItem(normGenKey, JSON.stringify(state || {})); }
+    function refreshNormGenHint(){
+        const hint = document.getElementById('normGenSessionHint');
+        if (!hint) return;
+        const state = loadNormGenState();
+        hint.textContent = state.fingerprint
+            ? 'Session has prior patient data. The next analyze will refine the current proposal. Use Start over to reset.'
+            : '';
+    }
+    refreshNormGenHint();
+    document.getElementById('btnNormGenerateReset').addEventListener('click', () => {
+        sessionStorage.removeItem(normGenKey);
+        document.getElementById('normGenFile').value = '';
+        refreshNormGenHint();
+    });
+    document.getElementById('btnNormGenerate').addEventListener('click', async () => {
+        const files = document.getElementById('normGenFile').files;
+        if (!files.length) { alert('Choose one or more FHIR bundle JSON files first.'); return; }
+        const btn = document.getElementById('btnNormGenerate');
+        btn.disabled = true;
+        try {
+        const sources = await window.BundleConfigGeneration.readFilesAsSources(files);
+        const state = loadNormGenState();
+        const request = { sources, priorFingerprint: state.fingerprint || null, refineOrmId: state.lastOrmId || null, refineSuiteId: state.lastSuiteId || null };
+        function persist(idKey, id, proposal){
+            const next = loadNormGenState();
+            if (proposal) next.fingerprint = proposal.fingerprint || proposal.Fingerprint || next.fingerprint;
+            if (idKey && id) next[idKey] = id;
+            saveNormGenState(next);
+            refreshNormGenHint();
+        }
+        const proposal = await window.BundleConfigGeneration.analyzeAndShow(
+            { analyze: analyzeUrl, applyOrm: applyOrmUrl, applyNorm: applyNormUrl },
+            request,
+            {
+                selectOrmLabel: 'Save new ORM',
+                selectSuiteLabel: 'Save new suite',
+                onSelectOrm: () => location.reload(),
+                onSelectSuite: () => location.reload(),
+                onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
+                onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
+                onExtendOrm: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
+                    persist('lastOrmId', saved.id || saved.Id, refined);
+                    location.reload();
+                },
+                onExtendSuite: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
+                    persist('lastSuiteId', saved.id || saved.Id, refined);
+                    location.reload();
+                }
+            });
+        persist(null, null, proposal);
+        } catch (err) {
+            alert(err.message || 'Suggestion failed.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
 </script>
 }

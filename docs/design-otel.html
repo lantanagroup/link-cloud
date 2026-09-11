@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -496,7 +498,7 @@
     <div class="col-md-8">
         
         <p>In Link we will leverage <a href="https://opentelemetry.io/docs/what-is-opentelemetry/">Open Telemetry</a> to capture important tracing, metrics and other logging to better design and maintain distributed services.</p>
-<h2 id="setting-up-opentelemetry" class="content-heading">Setting up OpenTelemetry <a id="setting-up-opentelemetry" href="#setting-up-opentelemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up OpenTelemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="setting-up-opentelemetry" class="content-heading">Setting up OpenTelemetry <a href="#setting-up-opentelemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up OpenTelemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>There is a great guide <a href="https://opentelemetry.io/docs/instrumentation/net/getting-started/">here</a> , but to get started you will need to add the following core NuGet packages:</p>
 <ul>
 <li><a href="https://www.nuget.org/packages/OpenTelemetry.Exporter.Console">https://www.nuget.org/packages/OpenTelemetry.Exporter.Console</a></li>
@@ -514,7 +516,7 @@
 <li><a href="https://www.nuget.org/packages/OpenTelemetry.Instrumentation.Process/">https://www.nuget.org/packages/OpenTelemetry.Instrumentation.Process/</a></li>
 </ul>
 <p>You can view additional packages <a href="https://www.nuget.org/packages?q=opentelemetry&amp;frameworks=&amp;tfms=&amp;packagetype=&amp;prerel=true&amp;sortby=relevance">here</a> or <a href="https://opentelemetry.io/ecosystem/registry/?s=.net&amp;component=&amp;language=">here</a>.</p>
-<h2 id="service-configuration" class="content-heading">Service Configuration <a id="service-configuration" href="#service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="service-configuration" class="content-heading">Service Configuration <a href="#service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Add the following configuration items to set up service name and version.</p>
 <pre><code class="language-csharp">public class ServiceInformation
 {
@@ -540,7 +542,7 @@ else
     throw new NullReferenceException(&quot;Service Information was null.&quot;);
 }
 </code></pre>
-<h2 id="telemetry-configuration" class="content-heading">Telemetry Configuration <a id="telemetry-configuration" href="#telemetry-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="telemetry-configuration" class="content-heading">Telemetry Configuration <a href="#telemetry-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Add the following configuration items to enable greater portability of your service:</p>
 <pre><code class="language-csharp">public class TelemetryConfig
 {
@@ -618,7 +620,7 @@ else
 <p>You will also need to create the <code>ServiceActivitySource</code>.</p>
 <p>DiagnosticNames</p>
 <p>This static class ensures consistency across services when adding tags to activities, metrics, and tracing.</p>
-<h2 id="creating-a-root-activity" class="content-heading">Creating a root activity <a id="creating-a-root-activity" href="#creating-a-root-activity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Creating a root activity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="creating-a-root-activity" class="content-heading">Creating a root activity <a href="#creating-a-root-activity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Creating a root activity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>It is best practice to create a static root source activity that will be used to build all child activities.</p>
 <pre><code class="language-csharp">public static class ServiceActivitySource
 {
@@ -635,7 +637,7 @@ else
 }
 </code></pre>
 <p>For more information about .NET activates see <a href="https://learn.microsoft.com/en-us/dotnet/core/diagnostics/distributed-tracing-instrumentation-walkthroughs#add-basic-instrumentation">Add distributed tracing instrumentation</a>.</p>
-<h2 id="creating-activities" class="content-heading">Creating Activities <a id="creating-activities" href="#creating-activities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Creating Activities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="creating-activities" class="content-heading">Creating Activities <a href="#creating-activities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Creating Activities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To create an activity anywhere in your service add the following using statement:</p>
 <pre><code class="language-csharp">using Activity? activity = ServiceActivitySource.Instance.StartActivity(&quot;Get All Audit Events Query&quot;);
 </code></pre>
@@ -683,14 +685,14 @@ catch (NullReferenceException ex)
     throw queryEx;
 }
 </code></pre>
-<h2 id="accessing-a-current-activity" class="content-heading">Accessing a current activity <a id="accessing-a-current-activity" href="#accessing-a-current-activity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Accessing a current activity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="accessing-a-current-activity" class="content-heading">Accessing a current activity <a href="#accessing-a-current-activity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Accessing a current activity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>You can access the activity in the current scope at any time as follows:</p>
 <pre><code class="language-csharp">//add id to current activity
 var currentActivity = Activity.Current;
 currentActivity?.AddTag(&quot;audit id&quot;, id);
 </code></pre>
 <p>In this example we are adding a tag to the current activity. For more information about tags see <a href="https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.activity.tags?view=net-7.0">https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.activity.tags?view=net-7.0</a>.</p>
-<h2 id="adding-instrumentation-to-kafka-producers-and-consumers" class="content-heading">Adding Instrumentation to Kafka Producers and Consumers <a id="adding-instrumentation-to-kafka-producers-and-consumers" href="#adding-instrumentation-to-kafka-producers-and-consumers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding Instrumentation to Kafka Producers and Consumers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="adding-instrumentation-to-kafka-producers-and-consumers" class="content-heading">Adding Instrumentation to Kafka Producers and Consumers <a href="#adding-instrumentation-to-kafka-producers-and-consumers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding Instrumentation to Kafka Producers and Consumers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>If you have added the NuGet package for Kafka telemetry then you will need to make the following changes to include that instrumentation in the producer:</p>
 <pre><code class="language-csharp">new ProducerBuilder&lt;string, AuditEventMessage&gt;(_kafkaConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer&lt;AuditEventMessage&gt;()).BuildWithInstrumentation();
 </code></pre>
@@ -700,7 +702,7 @@ currentActivity?.AddTag(&quot;audit id&quot;, id);
   //your code here                               
 }, cancellationToken); 
 </code></pre>
-<h2 id="metrics" class="content-heading">Metrics <a id="metrics" href="#metrics" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Metrics"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="metrics" class="content-heading">Metrics <a href="#metrics" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Metrics"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>You can add custom metrics like counters. To do so you will want to create a service metrics class that contains all custom counters or other meters you want to keep track of in your service.</p>
 <pre><code class="language-csharp">namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
 {
@@ -768,7 +770,7 @@ _metrics.AuditableEventCounter.Add(1,
     new KeyValuePair&lt;string, object?&gt;(&quot;resource&quot;, auditLog.Resource)                
 );
 </code></pre>
-<h2 id="setting-up-jaeger-in-your-local-environment" class="content-heading">Setting up Jaeger in your local environment <a id="setting-up-jaeger-in-your-local-environment" href="#setting-up-jaeger-in-your-local-environment" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up Jaeger in your local environment"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="setting-up-jaeger-in-your-local-environment" class="content-heading">Setting up Jaeger in your local environment <a href="#setting-up-jaeger-in-your-local-environment" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up Jaeger in your local environment"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To test consuming tracing you can can set up Jaeger in docker desktop as follows:</p>
 <pre><code class="language-bash">docker run -d --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
 </code></pre>
@@ -782,7 +784,7 @@ _metrics.AuditableEventCounter.Add(1,
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-notel_65CACAD5["Design: Open Telemetry"]</pre>
+notel_3B844BEA["Design: Open Telemetry"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

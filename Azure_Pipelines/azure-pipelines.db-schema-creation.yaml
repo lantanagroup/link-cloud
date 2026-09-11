@@ -9,11 +9,16 @@ pool:
 
 variables:
 - group: 'MSSQL_DBCreation'
+- group: link-cloud-variables
 
 parameters:
-- name: previous_release
-  displayName: "What is the Tag or Commit SHA of the Previous Release? (i.e. : v0.2.0-beta.1)"
+- name: environment
+  displayName: Which environment is this for? (TEST | QA | QA2)
   type: string
+  values:
+    - scale-test
+    - scale-qa
+    - scale-qa2
 
 - name: current_release
   displayName: "What is the Tag or Commit SHA of the Current Release? (i.e. : v0.2.0-beta.2)"
@@ -26,6 +31,10 @@ parameters:
       alias: account
       artifact: account-db
       file: accountDb.sql
+    # - name: app-bff
+    #   alias: app_bff
+    #   artifact: app-bff-db
+    #   file: app-bffDb.sql
     - name: audit
       alias: audit
       artifact: audit-db
@@ -73,19 +82,26 @@ stages:
   jobs:
   - job: getChangedFiles
     displayName: Get Changes
-    steps: 
+    steps:
       - checkout: self
         fetchDepth: 0
+        fetchTags: true
         persistCredentials: true
+
+      - template: templates/verify-release-against-deployed.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          currentRelease: ${{ parameters.current_release }}
+
       - task: PowerShell@2
         name: setVariables
+        displayName: Report which services have migration changes
+        env:
+          DEPLOYED_COMMIT: $(FromCommit)
         inputs:
           targetType: 'inline'
           script: |
-            Write-Host ${env:BYPASSCHANGEEVALUATION}
-            
-            # Get any changed files
-            $prev = '${{ parameters.previous_release }}'
+            $prev = $env:DEPLOYED_COMMIT
             $curr = '${{ parameters.current_release }}'
 
             # Define path to changedServices.txt
@@ -96,31 +112,37 @@ stages:
             New-Item -ItemType File -Path $changedFilesFile -Force | Out-Null
             New-Item -ItemType File -Path $changedServicesFile -Force | Out-Null
 
-            Write-Host "Previous Release: $prev"
+            Write-Host "Deployed commit (baseline): $prev"
             Write-Host "Current Release: $curr"
 
-            git fetch --tags
+            $changedFiles = git diff $prev $curr --name-only
 
-            If ($prev && $curr) {
-              $changedFiles = git diff $prev $curr --name-only
-            } else {
-              $changedFiles = git diff --name-status HEAD HEAD^
-            }
-            
             Write-Host "Changed files:"
             Write-Host $changedFiles
 
             # Save output to changedfiles.txt
             $changedFiles | Out-File -FilePath $changedFilesFile -Encoding utf8
 
-            # List of DotNet services to check
-            $dotnetServices = @("Account", "Audit", "Census", "MockDmrpApi", "Normalization", "QueryDispatch", "Report", "Submission", "Tenant" ) 
-            $javaServices = @("validation" )
-            $dataAcquisition = @("DataAcquisition" )
+            # Migration folder per service. These are not all "DotNet/<service>/Migrations":
+            # DataAcquisition keeps its DbContext in a .Domain project and Submission in a
+            # .Data project, and the previous plain pattern silently skipped Submission.
+            $migrationPaths = [ordered]@{
+              "Account"         = "DotNet/Account/Migrations"
+              # "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
+              "Audit"           = "DotNet/Audit/Migrations"
+              "Census"          = "DotNet/Census/Migrations"
+              "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
+              "MockDmrpApi"     = "DotNet/MockDmrpApi/Migrations"
+              "Normalization"   = "DotNet/Normalization/Migrations"
+              "QueryDispatch"   = "DotNet/QueryDispatch/Migrations"
+              "Report"          = "DotNet/Report/Migrations"
+              "Submission"      = "DotNet/Submission.Data/Migrations"
+              "Tenant"          = "DotNet/Tenant/Migrations"
+              "validation"      = "Java/validation/src/main/resources/database/migrations"
+            }
 
-            # DotNet Services
-            foreach ($service in $dotnetServices) {
-              $path = "Dotnet/$service/migrations"
+            foreach ($service in $migrationPaths.Keys) {
+              $path = $migrationPaths[$service]
               $match = $changedFiles | Where-Object { $_ -like "$path*" }
 
               if ($match) {
@@ -129,36 +151,8 @@ stages:
                 Add-Content -Path $changedServicesFile -Value $message
               } else {
                 Write-Host "No changes in $service files."
-                }
               }
-
-            # dataAcquisition Services
-            foreach ($service in $dataAcquisition) {
-              $path = "Dotnet/$service.Domain/Migrations"
-              $match = $changedFiles | Where-Object { $_ -like "$path*" }
-
-              if ($match) {
-                $message = "$service migration files have changed."
-                Write-Host $message
-                Add-Content -Path $changedServicesFile -Value $message
-              } else {
-                Write-Host "No changes in $service files."
-                }
-              }
-
-            # Java Services
-            foreach ($service in $javaServices) {
-              $path = "Java/$service/src/main/resources/database/migrations"
-              $match = $changedFiles | Where-Object { $_ -like "$path*" }
-
-              if ($match) {
-                $message = "$service migration files have changed."
-                Write-Host $message
-                Add-Content -Path $changedServicesFile -Value $message
-              } else {
-                Write-Host "No changes in $service files."
-                }
-              }
+            }
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
 
@@ -181,6 +175,18 @@ stages:
   - job: Account
     displayName: "Generate Account Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Account
           dotnet new tool-manifest --force
@@ -198,12 +204,58 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/accountDb.sql'
          ArtifactName: 'account-db'
          publishLocation: 'container'
-        displayName: Publish Account SQL Script  
+        displayName: Publish Account SQL Script
+  # App-BFF
+  # - job: App_BFF
+  #   displayName: "Generate App-BFF Schema Script"
+  #   steps:
+  #     - checkout: self
+  #       fetchDepth: 0
+  #       fetchTags: true
+  #     - script: |
+  #         # The generated script is produced from the working tree, so the tree must be
+  #         # moved to current_release or the parameter is a label with no effect on output.
+  #         if [ -n "${{ parameters.current_release }}" ]; then
+  #           git checkout --detach "${{ parameters.current_release }}"
+  #         fi
+  #         echo "Generating schema from commit:"
+  #         git rev-parse HEAD
+  #       displayName: Check out current_release
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         dotnet new tool-manifest --force
+  #         dotnet tool install dotnet-ef --version 8.0.22
+  #         dotnet tool restore
+  #         dotnet tool run dotnet-ef --version
+  #       displayName: Install dotnet-ef (local pinned)
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+  #         dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+  #       displayName: Generate App-BFF SQL Script
+  #     - task: PublishBuildArtifacts@1
+  #       inputs:
+  #        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
+  #        ArtifactName: 'app-bff-db'
+  #        publishLocation: 'container'
+  #       displayName: Publish App-BFF SQL Script  
   ###
   # Audit
   - job: Audit
     displayName: "Generate Audit Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Audit
           dotnet new tool-manifest --force
@@ -227,6 +279,18 @@ stages:
   - job: Census
     displayName: "Generate Census Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Census
           dotnet new tool-manifest --force
@@ -250,6 +314,18 @@ stages:
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/DataAcquisition
           dotnet new tool-manifest --force
@@ -273,6 +349,18 @@ stages:
   - job: Mock_DMRP
     displayName: "Generate Mock_DMRP Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/MockDmrpApi
           dotnet new tool-manifest --force
@@ -296,6 +384,18 @@ stages:
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Normalization
           dotnet new tool-manifest --force
@@ -319,6 +419,18 @@ stages:
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/QueryDispatch
           dotnet new tool-manifest --force
@@ -342,6 +454,18 @@ stages:
   - job: Report
     displayName: "Generate Report Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Report
           dotnet new tool-manifest --force
@@ -365,6 +489,18 @@ stages:
   - job: Submission
     displayName: "Generate Submission Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Submission
           dotnet new tool-manifest --force
@@ -388,6 +524,18 @@ stages:
   - job: Tenant
     displayName: "Generate Tenant Schema Script"
     steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
       - script: |
           cd DotNet/Tenant
           dotnet new tool-manifest --force
@@ -411,6 +559,18 @@ stages:
   - job: Validation
     displayName: "Generate Validation Schema Script"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+    - script: |
+        # The generated script is produced from the working tree, so the tree must be
+        # moved to current_release or the parameter is a label with no effect on output.
+        if [ -n "${{ parameters.current_release }}" ]; then
+          git checkout --detach "${{ parameters.current_release }}"
+        fi
+        echo "Generating schema from commit:"
+        git rev-parse HEAD
+      displayName: Check out current_release
     - task: CopyFiles@2
       displayName: Copy Validation SQL Scripts to Artifact Staging Directory
       inputs:
@@ -431,19 +591,41 @@ stages:
 ############################################################################################
 - stage: Apply_TEST_Update_SQL_DBs
   displayName: Apply TEST SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_TEST below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  condition: always()
+  condition: eq('${{ parameters.environment }}', 'scale-test')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_TEST
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_TEST
         displayName: Update ${{ db.alias }}
+        dependsOn: Verify_TEST
 
         steps:
         - download: current
@@ -462,6 +644,7 @@ stages:
 
   - job: Update_validation_TEST
     displayName: Update validation
+    dependsOn: Verify_TEST
 
     steps:
     - download: current
@@ -545,19 +728,41 @@ stages:
 ############################################################################################
 - stage: Apply_QA_Update_SQL_DBs
   displayName: Apply QA SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  condition: always()
+  condition: eq('${{ parameters.environment }}', 'scale-qa')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_QA
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_QA
         displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA
 
         steps:
         - download: current
@@ -576,6 +781,7 @@ stages:
 
   - job: Update_validation_QA
     displayName: Update validation
+    dependsOn: Verify_QA
 
     steps:
     - download: current
@@ -659,19 +865,41 @@ stages:
 ############################################################################################
 - stage: Apply_QA2_Update_SQL_DBs
   displayName: Apply QA2 SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA2 below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
   trigger: manual
-  condition: always()
+  condition: eq('${{ parameters.environment }}', 'scale-qa2')
 
   pool:
     vmImage: windows-latest
 
   jobs:
+  - job: Verify_QA2
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
   - ${{ each db in parameters.databases }}:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
       - job: Update_${{ db.alias }}_QA2
-        displayName: Update ${{ db.aliase }}
+        displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA2
 
         steps:
         - download: current
@@ -690,6 +918,7 @@ stages:
 
   - job: Update_validation_QA2
     displayName: Update validation
+    dependsOn: Verify_QA2
 
     steps:
     - download: current

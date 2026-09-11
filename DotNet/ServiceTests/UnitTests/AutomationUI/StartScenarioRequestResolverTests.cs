@@ -409,7 +409,7 @@ public class StartScenarioRequestResolverTests
         });
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Report period start and end are required when imported patients are included in a run.*");
+            .WithMessage("*Report period start and end are required when imported patients are included in an adhoc run.*");
     }
 
     [Fact]
@@ -505,5 +505,49 @@ public class StartScenarioRequestResolverTests
         options.PatientCohorts.Should().NotBeEmpty();
         options.ImportedPatientIds.Should().BeEmpty();
         options.ImportedPatientBundles.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Live_simulation_forces_scheduled_report_and_extends_polling()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.Adhoc,
+            IsLiveSimulation = true,
+            ReportingWindowMinutes = 15
+        });
+
+        options.IsLiveSimulation.Should().BeTrue();
+        options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
+        options.ReportingWindowMinutes.Should().Be(15);
+        options.MaxPollingDurationMinutes.Should().Be(45);
+    }
+
+    [Fact]
+    public void Live_simulation_reads_flags_from_run_configuration_json()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = """{ "isLiveSimulation": true, "reportingWindowMinutes": 7 }"""
+        });
+
+        options.IsLiveSimulation.Should().BeTrue();
+        options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
+        options.ReportingWindowMinutes.Should().Be(10);
+        options.MaxPollingDurationMinutes.Should().Be(40);
+    }
+
+    [Theory]
+    [InlineData(null, 10)]
+    [InlineData(0, 10)]
+    [InlineData(4, 5)]
+    [InlineData(5, 5)]
+    [InlineData(9, 10)]
+    [InlineData(12, 15)]
+    public void Reporting_window_minutes_are_normalized(int? input, int expected)
+    {
+        StartScenarioRequestResolver.NormalizeReportingWindowMinutes(input).Should().Be(expected);
     }
 }

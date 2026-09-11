@@ -44,7 +44,7 @@ public class MockDelayModel
             Milliseconds = delay.Milliseconds,
             IsActive = delay.IsActive,
             ConfiguredOn = delay.ConfiguredOn,
-            AppliesTo = "The contract endpoints only (GET /msc, GET /ps/annual). "
+            AppliesTo = "The contract endpoints only (GET /msc, GET /ps/annual/mrp). "
                         + "/api, /health and /swagger are never delayed."
         };
     }

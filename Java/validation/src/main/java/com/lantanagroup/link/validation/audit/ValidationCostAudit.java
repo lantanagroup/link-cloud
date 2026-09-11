@@ -17,8 +17,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
-import com.lantanagroup.link.validation.services.ValidationMetrics;
-import io.opentelemetry.api.OpenTelemetry;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
@@ -200,22 +198,20 @@ public class ValidationCostAudit {
 
     /**
      * Builds a production-shaped {@link RemoteTermServiceValidation} for the audit chain. Wires up
-     * a minimal in-process {@link ValidationCacheService} (Caffeine {@link CacheManager} + no-op
-     * OpenTelemetry {@link ValidationMetrics}) so the class works standalone — the cost audit does
-     * not have a Spring context to inject the production beans from. Cache hit / miss counters are
-     * recorded but not exported anywhere; the goal here is to measure realistic per-call latency
-     * with caching engaged, matching what production sees on warm cache.
+     * a minimal in-process {@link ValidationCacheService} (Caffeine {@link CacheManager}, no
+     * {@code CacheErrorHandler}, default TTL) so the class works standalone — the cost audit does
+     * not have a Spring context to inject the production beans from. The goal is to measure
+     * realistic per-call latency with caching engaged, matching what production sees on warm cache.
      *
      * <p>Whitelists are empty — the audit measures the raw remote-TS cost for every code system and
      * value set the IG references. If your production configuration whitelists certain systems away
      * from the remote, expect the audit's numbers to be higher than production's.
      */
     private RemoteTermServiceValidation buildRemoteTermSupport(FhirContext ctx, String baseUrl) {
-        // In-process cache manager with the same region names ValidationCacheService's @Cacheable
-        // methods target on the production side.
-        // Cache region names must match what ValidationCacheService's @Cacheable methods declare.
-        // Kept as inline literals here because the constant on ValidationCacheService is package-
-        // private to `providers`; hoisting it public just for the audit tool wasn't warranted.
+        // Cache region names must match ValidationCacheService's public cache-name constants
+        // (VALIDATE_CODE_CACHE, IS_CODE_SYSTEM_SUPPORTED_CACHE, IS_VALUE_SET_SUPPORTED_CACHE,
+        // LOOKUP_CODE_CACHE). Inlined here to avoid pulling the constants into the audit tool's
+        // classpath — they're stable region names in production too.
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
                 "validateCodeCache",
                 "isCodeSystemSupportedCache",
@@ -225,8 +221,7 @@ public class ValidationCostAudit {
                 .expireAfterWrite(Duration.ofHours(1))
                 .maximumSize(10_000));
 
-        ValidationMetrics metrics = new ValidationMetrics(OpenTelemetry.noop());
-        ValidationCacheService cacheService = new ValidationCacheService(cacheManager, metrics);
+        ValidationCacheService cacheService = new ValidationCacheService(cacheManager, null, null);
 
         return new RemoteTermServiceValidation(
                 cacheService, ctx, baseUrl, List.of(), List.of());
