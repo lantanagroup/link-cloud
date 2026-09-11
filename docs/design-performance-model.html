@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,9 +497,9 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h1 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+        <h1 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>As Link scales from initial deployment to supporting tens of thousands of facilities, it is critical to have a clear performance model. This document outlines the throughput requirements at various milestones and identifies the key points in the reporting pipeline that must be monitored to ensure the system meets its performance goals.</p>
-<h1 id="scale-milestones" class="content-heading">Scale Milestones <a id="scale-milestones" href="#scale-milestones" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scale Milestones"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="scale-milestones" class="content-heading">Scale Milestones <a href="#scale-milestones" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scale Milestones"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The primary driver for performance is the number of facilities and the volume of patient data they produce. Based on an average of <strong>12,000 patients per facility per month</strong>, we can derive the required system throughput (patients per minute) for each milestone.</p>
 <p>Assuming a month has approximately 44,000 minutes:</p>
 <table>
@@ -541,7 +543,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="data-volume-scaling" class="content-heading">Data Volume Scaling <a id="data-volume-scaling" href="#data-volume-scaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Volume Scaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="data-volume-scaling" class="content-heading">Data Volume Scaling <a href="#data-volume-scaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Volume Scaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Beyond patient counts, the total volume of FHIR resources processed by the <a href="service-normalizationservice.html">Normalization Service</a> and stored by <a href="service-dataaccess.html">service:DataAccess</a> scales linearly with patient count.</p>
 <p>Based on initial data analysis (averaging <strong>708 resources per patient</strong>):</p>
 <ul>
@@ -549,7 +551,7 @@
 <li><strong>30,000 Facilities</strong>: ~255 Billion resources / month (~5.8 Million resources / minute)</li>
 </ul>
 <p>This highlights the necessity of a highly performant, distributed data lake (e.g., Iceberg) for the <a href="domain-dataaccess.html">Data Access</a> domain.</p>
-<h2 id="patient-payload-metrics-first-half" class="content-heading">Patient Payload Metrics (First Half) <a id="patient-payload-metrics-first-half" href="#patient-payload-metrics-first-half" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Payload Metrics (First Half)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="patient-payload-metrics-first-half" class="content-heading">Patient Payload Metrics (First Half) <a href="#patient-payload-metrics-first-half" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Patient Payload Metrics (First Half)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>In the First Half of the pipeline (Acquisition through Evaluation), the system processes individual patient data sets. The following metrics represent the volume of data (in serialized JSON format) associated with a single patient.</p>
 <p>These metrics are based on an initial analysis of <strong>10,765 patients</strong> and approximately <strong>7,622,175 resources</strong>.</p>
 <table>
@@ -574,13 +576,13 @@
 </tr>
 </tbody>
 </table>
-<h3 id="serialization-context" class="content-heading">Serialization Context <a id="serialization-context" href="#serialization-context" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Serialization Context"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="serialization-context" class="content-heading">Serialization Context <a href="#serialization-context" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Serialization Context"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>These metrics are derived using <code>BSON.encode</code>, which represents the <strong>actual serialized bytes</strong> of the data, rather than pretty-printed or indented JSON text. While Kafka events often include pretty-printing for human readability, this model focuses on the raw serialized size as it directly impacts storage requirements for <a href="service-reportservice.html">Report Service</a>'s database and intermediate Redis caching layers.</p>
-<h3 id="encryption-impact" class="content-heading">Encryption Impact <a id="encryption-impact" href="#encryption-impact" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Encryption Impact"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="encryption-impact" class="content-heading">Encryption Impact <a href="#encryption-impact" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Encryption Impact"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>While encryption-at-rest is handled natively by the database (e.g., Cosmos DB/Mongo), the system must consider the impact of encrypting data in transient storage. Specifically, using <strong>AES-128</strong> to encrypt each resource before storing it in cache (e.g., Redis) adds a fixed overhead of approximately <strong>32 bytes</strong> per encryption operation.</p>
 <p><strong>Per-Resource</strong> in-transit encryption to support individual resource caching with an average of <strong>708 resources per patient</strong> adds <strong>~22.7 KB</strong> of metadata bloats every patient's footprint; increasing the average patient size from <strong>2.44 KB</strong> to <strong>~25.14 KB</strong> (a ~930% increase); not including processing timme for encrypting each resource.</p>
 <p>In this model, where individual resources are small, per-resource encryption leads to significant &quot;metadata bloat,&quot; where the encryption overhead (32 bytes) frequently exceeds the size of the resource itself.</p>
-<h3 id="throughput-implications-first-half" class="content-heading">Throughput Implications (First Half) <a id="throughput-implications-first-half" href="#throughput-implications-first-half" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Throughput Implications (First Half)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="throughput-implications-first-half" class="content-heading">Throughput Implications (First Half) <a href="#throughput-implications-first-half" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Throughput Implications (First Half)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Based on the <strong>Average (2.44 KB)</strong> and <strong>Maximum (40.08 KB)</strong> payload sizes, we can project the data throughput requirements for the ingestion pipeline across different scales:</p>
 <table>
 <thead>
@@ -619,21 +621,21 @@
 </tbody>
 </table>
 <p>These metrics inform the infrastructure requirements for transient data storage (e.g., Kafka message sizes, cache subscriptions) between the <a href="service-dataacquisitionservice.html">Data Acquisition Service</a>, <a href="service-normalizationservice.html">Normalization Service</a>, and <a href="service-measureevalservice.html">Measure Evaluation Service</a>.</p>
-<h1 id="reporting-pipeline-segmentation" class="content-heading">Reporting Pipeline Segmentation <a id="reporting-pipeline-segmentation" href="#reporting-pipeline-segmentation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Pipeline Segmentation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="reporting-pipeline-segmentation" class="content-heading">Reporting Pipeline Segmentation <a href="#reporting-pipeline-segmentation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Pipeline Segmentation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>To better analyze and scale the system, the reporting pipeline is divided into two primary segments:</p>
-<h2 id="first-half-data-ingestion-transformation" class="content-heading">First Half: Data Ingestion &amp; Transformation <a id="first-half-data-ingestion-amp-transformation" href="#first-half-data-ingestion-amp-transformation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: First Half: Data Ingestion &amp;amp; Transformation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="first-half-data-ingestion-amp-transformation" class="content-heading">First Half: Data Ingestion &amp; Transformation <a href="#first-half-data-ingestion-amp-transformation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: First Half: Data Ingestion &amp;amp; Transformation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>This segment covers the movement of data from the source EHR through the evaluation of measure logic. It is characterized by high-frequency, low-latency processing of <a href="#patient-payload-metrics-first-half">individual patient payloads</a>.</p>
 <ul>
 <li><strong>Services</strong>: <a href="service-dataacquisitionservice.html">Data Acquisition Service</a>, <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a>, <a href="service-normalizationservice.html">Normalization Service</a>, <a href="service-measureevalservice.html">Measure Evaluation Service</a></li>
 <li><strong>Workflow</strong>: Acquisition -&gt; Normalization -&gt; Initial Evaluation -&gt; (Optional) Supplemental Acquisition -&gt; (Optional) Supplemental Normalization -&gt; Supplemental Evaluation.</li>
 </ul>
-<h2 id="second-half-validation-submission" class="content-heading">Second Half: Validation &amp; Submission <a id="second-half-validation-amp-submission" href="#second-half-validation-amp-submission" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half: Validation &amp;amp; Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="second-half-validation-amp-submission" class="content-heading">Second Half: Validation &amp; Submission <a href="#second-half-validation-amp-submission" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half: Validation &amp;amp; Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>This segment covers final quality checks and the actual submission to the reporting authority. While processing the same aggregate patient data volume as the first half, this phase typically handles larger bundles and performs high-latency operations like FHIR profile validation.</p>
 <ul>
 <li><strong>Services</strong>: <a href="service-validationservice.html">Validation Service</a>, <a href="service-submissionservice.html">Submission Service</a></li>
 <li><strong>Workflow</strong>: Validation -&gt; Submission.</li>
 </ul>
-<h1 id="current-scaling-capacity" class="content-heading">Current Scaling &amp; Capacity <a id="current-scaling-amp-capacity" href="#current-scaling-amp-capacity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Current Scaling &amp;amp; Capacity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="current-scaling-amp-capacity" class="content-heading">Current Scaling &amp; Capacity <a href="#current-scaling-amp-capacity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Current Scaling &amp;amp; Capacity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>As of version 0.5.0, the system is configured with the following resource allocations. These settings provide a baseline for the 25-100 facility milestones.</p>
 <table>
 <thead>
@@ -676,73 +678,73 @@
 </tr>
 </tbody>
 </table>
-<h2 id="second-half-throughput-validation" class="content-heading">Second Half Throughput (Validation) <a id="second-half-throughput-validation" href="#second-half-throughput-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half Throughput (Validation)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="second-half-throughput-validation" class="content-heading">Second Half Throughput (Validation) <a href="#second-half-throughput-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half Throughput (Validation)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Based on current performance monitoring (observing <code>ReadyForValidation</code> consumer lag), the <a href="service-validationservice.html">Validation Service</a> has the following capacity:</p>
 <ul>
 <li><strong>Avg Throughput</strong>: ~1 patient every 2-3 seconds per replica.</li>
 <li><strong>Total Capacity (5 replicas)</strong>: ~100-150 patients per minute.</li>
 </ul>
 <p>This capacity is sufficient for the <strong>100 Facilities</strong> milestone (~27.3 patients/minute). However, to meet the <strong>1,000 Facilities</strong> milestone (~272.7 patients/minute), the <a href="service-validationservice.html">Validation Service</a> will need to scale to approximately 10-15 replicas, assuming linear scaling of the underlying FHIR validation engine.</p>
-<h1 id="key-monitoring-points" class="content-heading">Key Monitoring Points <a id="key-monitoring-points" href="#key-monitoring-points" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Monitoring Points"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="key-monitoring-points" class="content-heading">Key Monitoring Points <a href="#key-monitoring-points" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Monitoring Points"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Monitoring is divided between the two primary segments of the pipeline to better isolate performance bottlenecks.</p>
-<h2 id="first-half-ingestion-evaluation" class="content-heading">First Half: Ingestion &amp; Evaluation <a id="first-half-ingestion-amp-evaluation" href="#first-half-ingestion-amp-evaluation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: First Half: Ingestion &amp;amp; Evaluation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="data-acquisition-ehr-interop" class="content-heading">1. Data Acquisition (EHR Interop) <a id="1-data-acquisition-ehr-interop" href="#1-data-acquisition-ehr-interop" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. Data Acquisition (EHR Interop)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="first-half-ingestion-amp-evaluation" class="content-heading">First Half: Ingestion &amp; Evaluation <a href="#first-half-ingestion-amp-evaluation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: First Half: Ingestion &amp;amp; Evaluation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="1-data-acquisition-ehr-interop" class="content-heading">1. Data Acquisition (EHR Interop) <a href="#1-data-acquisition-ehr-interop" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. Data Acquisition (EHR Interop)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-dataacquisitionservice.html">Data Acquisition Service</a> and <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a>.</li>
 <li><strong>Metric</strong>: Time to retrieve patient data from external EHRs.</li>
 <li><strong>Constraints</strong>: Limited to <strong>8 threads per facility</strong> to prevent EHR overload.</li>
 <li><strong>Milestone Impact</strong>: At 30k facilities, even a small increase in EHR latency can lead to massive backlogs in the acquisition workers, as we are capped on concurrent requests per facility.</li>
 </ul>
-<h3 id="normalization-throughput" class="content-heading">2. Normalization Throughput <a id="2-normalization-throughput" href="#2-normalization-throughput" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 2. Normalization Throughput"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="2-normalization-throughput" class="content-heading">2. Normalization Throughput <a href="#2-normalization-throughput" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 2. Normalization Throughput"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-normalizationservice.html">Normalization Service</a>.</li>
 <li><strong>Metric</strong>: Resources normalized per second.</li>
 <li><strong>Observation</strong>: Tracked via <a href="event-resourcenormalized.html">Resource Normalized</a> processing times.</li>
 <li><strong>Milestone Impact</strong>: Normalization is an atomic, high-frequency task. As patient volume grows, this service must scale horizontally to prevent being a bottleneck.</li>
 </ul>
-<h3 id="measure-evaluation-latency" class="content-heading">3. Measure Evaluation Latency <a id="3-measure-evaluation-latency" href="#3-measure-evaluation-latency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 3. Measure Evaluation Latency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="3-measure-evaluation-latency" class="content-heading">3. Measure Evaluation Latency <a href="#3-measure-evaluation-latency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 3. Measure Evaluation Latency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-measureevalservice.html">Measure Evaluation Service</a>.</li>
 <li><strong>Metric</strong>: Time to evaluate CQL for a single patient (Initial and Supplemental).</li>
 <li><strong>Milestone Impact</strong>: Evaluation is computationally intensive. Monitoring the <code>InitialEvaluation</code> and <code>SupplementalEvaluation</code> statuses in <a href="event-reportstatusupdated.html">event:ReportStatusUpdated</a> is critical.</li>
 </ul>
-<h2 id="second-half-validation-submission-1" class="content-heading">Second Half: Validation &amp; Submission <a id="second-half-validation-amp-submission-1" href="#second-half-validation-amp-submission-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half: Validation &amp;amp; Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="validation-throughput" class="content-heading">4. Validation Throughput <a id="4-validation-throughput" href="#4-validation-throughput" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 4. Validation Throughput"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="second-half-validation-amp-submission-1" class="content-heading">Second Half: Validation &amp; Submission <a href="#second-half-validation-amp-submission-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Second Half: Validation &amp;amp; Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="4-validation-throughput" class="content-heading">4. Validation Throughput <a href="#4-validation-throughput" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 4. Validation Throughput"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-validationservice.html">Validation Service</a>.</li>
 <li><strong>Metric</strong>: Validation time per patient (targeting ~2-3 seconds per patient).</li>
 <li><strong>Observation</strong>: Consumer lag on the <code>ReadyForValidation</code> topic.</li>
 <li><strong>Milestone Impact</strong>: As reported in <a href="Proposals/Details?id=09-validation-unacceptable-rules-runtime">Targeted Runtime Validation</a>, full validation at the 30k scale is prohibitive. Monitoring the impact of &quot;Unacceptable-only&quot; validation rules on throughput is essential to maintain the 2-3 second/patient target.</li>
 </ul>
-<h3 id="submission-success-rate" class="content-heading">5. Submission Success Rate <a id="5-submission-success-rate" href="#5-submission-success-rate" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 5. Submission Success Rate"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="5-submission-success-rate" class="content-heading">5. Submission Success Rate <a href="#5-submission-success-rate" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 5. Submission Success Rate"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-submissionservice.html">Submission Service</a>.</li>
 <li><strong>Metric</strong>: Submission success rate and latency.</li>
 <li><strong>Milestone Impact</strong>: Final submission is the last mile. Monitoring for transient network errors or submission endpoint saturation is critical as the frequency of submissions increases.</li>
 </ul>
-<h2 id="cross-pipeline-health" class="content-heading">Cross-Pipeline Health <a id="cross-pipeline-health" href="#cross-pipeline-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cross-Pipeline Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="kafka-pipeline-health" class="content-heading">6. Kafka Pipeline Health <a id="6-kafka-pipeline-health" href="#6-kafka-pipeline-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 6. Kafka Pipeline Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="cross-pipeline-health" class="content-heading">Cross-Pipeline Health <a href="#cross-pipeline-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cross-Pipeline Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="6-kafka-pipeline-health" class="content-heading">6. Kafka Pipeline Health <a href="#6-kafka-pipeline-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 6. Kafka Pipeline Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: Kafka Broker and Consumer Groups.</li>
 <li><strong>Metric</strong>: Consumer Lag (especially for <code>ReportStatusUpdated</code> and <code>ResourceNormalized</code> topics).</li>
 <li><strong>Milestone Impact</strong>: As throughput increases to thousands of patients per minute, Kafka lag becomes the leading indicator of system saturation.</li>
 </ul>
-<h3 id="report-state-persistence" class="content-heading">7. Report State Persistence <a id="7-report-state-persistence" href="#7-report-state-persistence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 7. Report State Persistence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="7-report-state-persistence" class="content-heading">7. Report State Persistence <a href="#7-report-state-persistence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 7. Report State Persistence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Monitoring Point</strong>: <a href="service-reportservice.html">Report Service</a> and its underlying database.</li>
 <li><strong>Metric</strong>: Database write latency for status updates.</li>
 <li><strong>Milestone Impact</strong>: The <code>ReportService</code> must handle thousands of status updates per minute. Database indexing and write-ahead logging (WAL) performance will be key at the 10k+ facility scale.</li>
 </ul>
-<h1 id="ehr-acquisition-performance-constraints" class="content-heading">EHR Acquisition Performance &amp; Constraints <a id="ehr-acquisition-performance-amp-constraints" href="#ehr-acquisition-performance-amp-constraints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EHR Acquisition Performance &amp;amp; Constraints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="ehr-acquisition-performance-amp-constraints" class="content-heading">EHR Acquisition Performance &amp; Constraints <a href="#ehr-acquisition-performance-amp-constraints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EHR Acquisition Performance &amp;amp; Constraints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Real-world observations from our first facility deployments indicate that data acquisition from external EHRs is the most variable and constrained part of the pipeline. These metrics may vary from hospital to hospital depending on the underlying EHR infrastructure.</p>
-<h2 id="resource-query-performance" class="content-heading">Resource Query Performance <a id="resource-query-performance" href="#resource-query-performance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Query Performance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="resource-query-performance" class="content-heading">Resource Query Performance <a href="#resource-query-performance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Query Performance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Based on one week of data (25,125 data acquisition logs across 2,991 patients):</p>
 <ul>
 <li><strong>Avg Logs per Patient</strong>: ~8.4</li>
 <li><strong>Avg Query Duration</strong>: 5.32 seconds</li>
 <li><strong>Estimated Total Acquisition Time per Patient</strong>: ~44.7 seconds</li>
 </ul>
-<h3 id="query-performance-by-resource-type" class="content-heading">Query Performance by Resource Type <a id="query-performance-by-resource-type" href="#query-performance-by-resource-type" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Performance by Resource Type"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="query-performance-by-resource-type" class="content-heading">Query Performance by Resource Type <a href="#query-performance-by-resource-type" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Performance by Resource Type"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following table summarizes the average latency and data volume for common FHIR resource queries. Some resources, like <code>Observation</code>, are significantly more expensive to retrieve and represent much larger payloads.</p>
 <table>
 <thead>
@@ -810,21 +812,21 @@
 </tr>
 </tbody>
 </table>
-<h2 id="concurrency-constraints" class="content-heading">Concurrency Constraints <a id="concurrency-constraints" href="#concurrency-constraints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Concurrency Constraints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="concurrency-constraints" class="content-heading">Concurrency Constraints <a href="#concurrency-constraints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Concurrency Constraints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To prevent overloading external EHR infrastructure and impacting hospital operations, concurrency is strictly limited:</p>
 <ul>
 <li><strong>Max Threads per Facility</strong>: 8</li>
 </ul>
-<h3 id="throughput-capacity-facility-level" class="content-heading">Throughput Capacity (Facility Level) <a id="throughput-capacity-facility-level" href="#throughput-capacity-facility-level" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Throughput Capacity (Facility Level)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="throughput-capacity-facility-level" class="content-heading">Throughput Capacity (Facility Level) <a href="#throughput-capacity-facility-level" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Throughput Capacity (Facility Level)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Given an average patient acquisition time of ~44.7 seconds and a concurrency limit of 8 threads:</p>
 <ul>
 <li><strong>Max Patients / Minute / Facility</strong>: ~10.7 patients</li>
 </ul>
 <p>While this capacity is well above the average monthly requirement (~0.27 patients/minute), it limits the system's ability to &quot;catch up&quot; if backlogs occur or if reporting windows are short (e.g., daily submission cycles requiring all data to be pulled in a 2-hour window).</p>
-<h1 id="reporting-cadence-burst-load-model" class="content-heading">Reporting Cadence &amp; Burst Load Model <a id="reporting-cadence-amp-burst-load-model" href="#reporting-cadence-amp-burst-load-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Cadence &amp;amp; Burst Load Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="reporting-cadence-amp-burst-load-model" class="content-heading">Reporting Cadence &amp; Burst Load Model <a href="#reporting-cadence-amp-burst-load-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Cadence &amp;amp; Burst Load Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The current state of this Performance Model design represents the &quot;typical&quot; daily workflow. However, at the end of each reporting period, the system must burst to a peak load to process all configured facilities' currently admitted patients.</p>
 <p>An important variable in this model is the average number of patients in the hospital on any given day, since that determines how many patients the system will attempt to process at the end of each reporting period. This average should be refined over time as more data flows through the system.</p>
-<h2 id="reporting-cadence-assumptions" class="content-heading">Reporting Cadence Assumptions <a id="reporting-cadence-assumptions" href="#reporting-cadence-assumptions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Cadence Assumptions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="reporting-cadence-assumptions" class="content-heading">Reporting Cadence Assumptions <a href="#reporting-cadence-assumptions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Cadence Assumptions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><strong>100% of facilities</strong> report <strong>monthly</strong>.</li>
 <li>Roughly <strong>40% of facilities</strong> also report <strong>daily</strong>.</li>
@@ -832,10 +834,10 @@
 <li>For <strong>daily reporting</strong>, at the start of every day, each facility's currently admitted patients are queried, normalized, and evaluated.</li>
 <li>There is overlap between these cadences: some facilities will burst daily, while the remainder will burst only at the monthly boundary.</li>
 </ul>
-<h2 id="burst-load-expectations" class="content-heading">Burst Load Expectations <a id="burst-load-expectations" href="#burst-load-expectations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Burst Load Expectations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="burst-load-expectations" class="content-heading">Burst Load Expectations <a href="#burst-load-expectations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Burst Load Expectations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Typical steady-state processing is expected to be around <strong>10-20 patients per hour</strong> per facility during normal workflow. At reporting boundaries, however, the system may burst up to approximately <strong>250 currently admitted patients</strong> per facility.</p>
 <p>These burst values are intentionally approximate and should be refined as more production data becomes available so the performance model can better reflect real-world demand.</p>
-<h2 id="peakburst-throughput-requirements" class="content-heading">Peak/Burst Throughput Requirements <a id="peak-burst-throughput-requirements" href="#peak-burst-throughput-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Peak/Burst Throughput Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="peak-burst-throughput-requirements" class="content-heading">Peak/Burst Throughput Requirements <a href="#peak-burst-throughput-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Peak/Burst Throughput Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The table below shows the same throughput model as above, but sized for peak/burst reporting windows rather than normal operations. It assumes the system must process the currently admitted patient population for each facility within the burst window.</p>
 <table>
 <thead>
@@ -878,7 +880,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="observation-tooling" class="content-heading">Observation &amp; Tooling <a id="observation-amp-tooling" href="#observation-amp-tooling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observation &amp;amp; Tooling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="observation-amp-tooling" class="content-heading">Observation &amp; Tooling <a href="#observation-amp-tooling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observation &amp;amp; Tooling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>We observe these metrics using the platform's standard telemetry stack as described in <a href="Entities/Details?type=design&amp;id=telemetry">Telemetry</a>.</p>
 <ul>
 <li><strong>Prometheus</strong>: Collects custom metrics emitted by services (e.g., patient processing counts, phase durations).</li>
@@ -886,7 +888,7 @@
 <li><strong>OTEL Tracing</strong>: Provides end-to-end visibility using <code>correlationId</code> to identify where a specific patient's processing is stalled.</li>
 <li><strong>Report Performance Analysis</strong>: Detailed granular tracking of pipeline phases is visualized in the <a href="service-adminui.html">Admin UI (front-end)</a> as proposed in <a href="Proposals/Details?id=05-report-performance-analysis">Report Performance Analysis</a>.</li>
 </ul>
-<h1 id="related-entities" class="content-heading">Related Entities <a id="related-entities" href="#related-entities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Related Entities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="related-entities" class="content-heading">Related Entities <a href="#related-entities" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Related Entities"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ul>
 <li><strong>Events</strong>: <a href="event-reportstatusupdated.html">event:ReportStatusUpdated</a>, <a href="event-resourcenormalized.html">Resource Normalized</a></li>
 <li><strong>Services</strong>: <a href="service-reportservice.html">Report Service</a>, <a href="service-dataacquisitionservice.html">Data Acquisition Service</a>, <a href="service-measureevalservice.html">Measure Evaluation Service</a>, <a href="service-normalizationservice.html">Normalization Service</a></li>
@@ -899,7 +901,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nperformance_model_6F4F9EFC["Design: Performance Model"]</pre>
+nperformance_model_28337108["Design: Performance Model"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

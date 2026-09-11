@@ -45,7 +45,6 @@ public static class ObservationFactory
         string? organizationId = null)
     {
         var isLab = category == "laboratory";
-        var periodEnd = effective.AddHours(1 + seed % 4);
 
         var categoryDisplay = category switch
         {
@@ -77,20 +76,15 @@ public static class ObservationFactory
             Performer = [Ref($"Organization/{organizationId ?? FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
         };
 
-        if (isLab)
-        {
-            obs.Effective = new Period
-            {
-                StartElement = new FhirDateTime(effective),
-                EndElement = new FhirDateTime(periodEnd)
-            };
-            if (specimenIds?.Count > 0)
-                obs.Specimen = Ref($"Specimen/{specimenIds[seed % specimenIds.Count]}");
-        }
-        else
-        {
-            obs.Effective = new FhirDateTime(effective);
-        }
+        // Use a point-in-time effectiveDateTime for every Observation, including labs.
+        // A lab effectivePeriod that starts just before the Daily measurement-period
+        // boundary and extends 1-4 hours into the window is included by HAPI date
+        // search but can disagree with acquisition-simulator overlap, producing a
+        // systematic Observation expected=N actual=N+1 on Daily ACH. Thetis generation
+        // already uses FhirDateTime; keep this factory on the same shape.
+        obs.Effective = new FhirDateTime(effective);
+        if (isLab && specimenIds?.Count > 0)
+            obs.Specimen = Ref($"Specimen/{specimenIds[seed % specimenIds.Count]}");
 
         // ---------------------------------------------------------------
         // Culture / bacteriology — valueString

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # It's probably best to use the same the Java version in the build and run stages
 # I.e., when upgrading the HAPI image, consider whether the Maven image needs to be upgraded as well
 # Later versions of HAPI:
@@ -15,10 +16,12 @@ COPY hapi/pom.xml hapi/
 COPY measureeval/pom.xml measureeval/
 COPY shared/pom.xml shared/
 COPY validation/pom.xml validation/
-RUN mvn -pl hapi -am -B -e -ntp dependency:go-offline
-COPY hapi/ hapi/
-RUN mvn -pl hapi -am -B -DskipTests -e -ntp package
-RUN mvn -pl hapi dependency:copy-dependencies -DoutputDirectory=target/dependencies
+RUN --mount=type=cache,id=m2,sharing=locked,target=/root/.m2 \
+    mvn -pl hapi -am -B -e -ntp dependency:go-offline
+COPY hapi/src/main hapi/src/main
+RUN --mount=type=cache,id=m2,sharing=locked,target=/root/.m2 \
+    mvn -pl hapi -am -B -DskipTests -e -ntp package \
+ && mvn -pl hapi -B -e -ntp dependency:copy-dependencies -DoutputDirectory=target/dependencies
 
 FROM hapiproject/hapi:v5.6.0-distroless AS run
 WORKDIR /app

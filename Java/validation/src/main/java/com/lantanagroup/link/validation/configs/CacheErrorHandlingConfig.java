@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -19,7 +20,9 @@ public class CacheErrorHandlingConfig implements CachingConfigurer {
     private static final Logger logger = LoggerFactory.getLogger(CacheErrorHandlingConfig.class);
 
     // Replaces Spring's default SimpleCacheErrorHandler, which rethrows cache errors, with one that
-    // logs and swallows them.
+    // logs and swallows them. Exposed as a bean so ValidationCacheService can use the same policy
+    // for programmatic cache get/put (those calls do not go through CacheInterceptor).
+    @Bean
     @Override
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {

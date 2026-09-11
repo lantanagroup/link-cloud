@@ -83,7 +83,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             Mock.Of<IOrganizationResourceMapTemplateStore>(),
             new ImportedBundleExecutionResolver(Database, Mock.Of<IImportedBundleContentStore>()),
             Mock.Of<IGeneratedPatientTemplateCache>(),
-            new GeneratedTemplateCacheVersionStore(Database));
+            new GeneratedTemplateCacheVersionStore(Database),
+            Mock.Of<ILivePatientEventInjector>());
     }
 
     public async Task InitializeAsync()

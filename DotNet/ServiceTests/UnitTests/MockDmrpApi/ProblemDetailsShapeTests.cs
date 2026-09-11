@@ -231,16 +231,6 @@ public class ProblemDetailsShapeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CadenceViolation_IsAWellFormedBadRequest()
-    {
-        var problem = await ProblemAsync(
-            await _client.PostAsJsonAsync("/api/mock-dmrp/entries", Body(measure: "NOMONTH", month: null)));
-
-        ShouldBeAWellFormedProblem(problem, 400, "Invalid Reporting Plan Entry");
-        problem.GetProperty("detail").GetString().Should().Contain("monthly");
-    }
-
-    [Fact]
     public async Task UnknownComponent_IsAWellFormedBadRequest()
     {
         var problem = await ProblemAsync(

@@ -1,4 +1,5 @@
 import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
+import { ScheduleStatus } from '../../../interfaces/report/schedule-status';
 
 export interface IReportListSummary {
   id: string;
@@ -16,12 +17,9 @@ export interface IReportListSummary {
   createDate: Date;
 }
 
-export enum ScheduleStatus {
-  New = 'New',
-  Scheduled = 'Scheduled',
-  EndOfPeriod = 'EndOfPeriod',
-  Submitted = 'Submitted'
-}
+// Defined alongside its display metadata so the enum and the labels cannot drift.
+// Re-exported because this file's existing consumers already import it from this path.
+export { ScheduleStatus };
 
 export interface ICensusCount {
   admittedPatients: number;

@@ -45,7 +45,7 @@ public sealed class DashboardStatsAggregator
             Succeeded = merged.Count(r => r.Status == AutomationRunStatus.Succeeded),
             Failed = merged.Count(r => r.Status == AutomationRunStatus.Failed),
             Cancelled = merged.Count(r => r.Status == AutomationRunStatus.Cancelled),
-            Running = merged.Count(r => r.Status == AutomationRunStatus.Running),
+            Running = merged.Count(r => r.Status.IsInProgress()),
             Queued = merged.Count(r => r.Status == AutomationRunStatus.Queued),
         };
 

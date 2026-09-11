@@ -24,13 +24,18 @@ public class DmrpDisabledMiddlewareTests
     /// <summary>
     /// Builds a host whose only endpoint records whether the pipeline got past the gate.
     /// </summary>
-    private static async Task<IHost> StartHostAsync(string environmentName, string? enabled)
+    /// <remarks>
+    /// The environment is pinned to Production because that is what every deployed Link
+    /// namespace runs as -- dev, qa and test included. It must make no difference to the
+    /// gate; that it once did is LEGLINK-1048.
+    /// </remarks>
+    private static async Task<IHost> StartHostAsync(string? enabled)
     {
         var host = await new HostBuilder()
             .ConfigureWebHost(web =>
             {
                 web.UseTestServer();
-                web.UseEnvironment(environmentName);
+                web.UseEnvironment("Production");
                 web.ConfigureAppConfiguration(config =>
                 {
                     if (enabled is not null)
@@ -63,7 +68,7 @@ public class DmrpDisabledMiddlewareTests
     [Fact]
     public async Task WhenEnabled_RequestsReachTheRestOfThePipeline()
     {
-        using var host = await StartHostAsync("Development", "true");
+        using var host = await StartHostAsync("true");
 
         var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
@@ -74,7 +79,7 @@ public class DmrpDisabledMiddlewareTests
     [Fact]
     public async Task WhenDisabled_RequestsAreRefusedBeforeReachingThePipeline()
     {
-        using var host = await StartHostAsync("Development", "false");
+        using var host = await StartHostAsync("false");
 
         var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
@@ -88,7 +93,7 @@ public class DmrpDisabledMiddlewareTests
     [Fact]
     public async Task WhenDisabled_TheResponseIsProblemDetailsCarryingATraceId()
     {
-        using var host = await StartHostAsync("Development", "false");
+        using var host = await StartHostAsync("false");
 
         var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
@@ -111,7 +116,7 @@ public class DmrpDisabledMiddlewareTests
     {
         // Health has to stay up or the container reports unhealthy and restarts, which
         // reads as an outage rather than a service that is deliberately dormant.
-        using var host = await StartHostAsync("Development", "false");
+        using var host = await StartHostAsync("false");
 
         var response = await host.GetTestClient().GetAsync(path);
 
@@ -120,11 +125,12 @@ public class DmrpDisabledMiddlewareTests
     }
 
     [Fact]
-    public async Task InProduction_EvenAnExplicitEnabledTrueIsRefused()
+    public async Task WithNoConfiguration_RequestsAreRefused()
     {
-        // The one that guards production. A configuration source that outranks appsettings
-        // -- App Configuration does -- cannot turn the mock on.
-        using var host = await StartHostAsync("Production", "true");
+        // The one that guards production. An environment that provisions no row gets a
+        // dormant service, and that is the whole of the protection -- nothing here consults
+        // the environment name, because every deployed namespace carries the same one.
+        using var host = await StartHostAsync(enabled: null);
 
         var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
@@ -133,21 +139,11 @@ public class DmrpDisabledMiddlewareTests
     }
 
     [Fact]
-    public async Task InProduction_HealthStillAnswers()
+    public async Task WithNoConfiguration_HealthStillAnswers()
     {
-        using var host = await StartHostAsync("Production", "true");
+        using var host = await StartHostAsync(enabled: null);
 
         var response = await host.GetTestClient().GetAsync("/health");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task WithNoConfiguration_OutsideProductionTheServiceServes()
-    {
-        using var host = await StartHostAsync("Development", enabled: null);
-
-        var response = await host.GetTestClient().GetAsync("/api/mock-dmrp/entries/search");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }

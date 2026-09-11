@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -10,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
@@ -143,6 +145,11 @@ namespace IntegrationTests.Tenant
 
             builder.Services.AddSingleton<ScheduleService>();
             //builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
+
+            // The facility endpoints resolve their state-changing operations through this rather than
+            // calling the manager, which is what lets the DMRP module decorate them. The module is not
+            // registered here, so this is the whole implementation, as it is with DMRP disabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
 
             // Add Kafka producer factories (mirrors Program.cs):
             //   <string, GenerateReportValue> -> FacilityController (ad-hoc report path)

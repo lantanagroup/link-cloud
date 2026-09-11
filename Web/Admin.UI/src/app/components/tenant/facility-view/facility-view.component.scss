@@ -1,3 +1,5 @@
+@use '../../../../styles/schedule-status.scss';
+
 .new-row {
   background-color: rgba(30, 136, 229, 0.15) !important;
   transition: background-color 4s ease;
@@ -61,37 +63,10 @@
     color: #000;
 }
 
-.status-new {
-  background-color: #eef2ff;
-  color: #4338ca;
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
-  padding: 6px 6px;
-  border-radius: 0.375rem;
-}
 
-.status-scheduled {
-  background-color: #eef2ff;
-  color: #007D74;
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
-  padding: 6px 6px;
-  border-radius: 0.375rem;
-}
 
-.status-endOfPeriod {
-  background-color: #eef2ff;
-  color: #5f6672;
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
-  padding: 6px 6px;
-  border-radius: 0.375rem;
-}
 
-.status-submitted {
-  background-color: #ecfdf5;
-  color: #047857;
-  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
-  padding: 6px 6px;
-  border-radius: 0.375rem;
-}
+
 
 .status-date {
   font-size: 11px;

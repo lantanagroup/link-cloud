@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,7 +497,7 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h1 id="deployment-validation" class="content-heading">Deployment Validation <a id="deployment-validation" href="#deployment-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+        <h1 id="deployment-validation" class="content-heading">Deployment Validation <a href="#deployment-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <ol>
 <li>Confirm that the following Link Cloud service containers are running:
 <ul>
@@ -566,7 +568,7 @@
 <Admonition type="info">
   If the databases listed above don't exist, you may attempt to rerun the following command: `docker compose up mssql_init -d`
 </Admonition>
-<h1 id="basic-testing" class="content-heading">Basic Testing <a id="basic-testing" href="#basic-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Basic Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="basic-testing" class="content-heading">Basic Testing <a href="#basic-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Basic Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Configuration database scripts are provided to generate a tenant named <code>Test-Hospital</code>. These scripts will load most of the service configurations needed to run Link Cloud. To be capable of performing resource acquisition, a FHIR endpoint will need to be manually added (detailed below). Here are the steps to run the scripts:</p>
 <ol>
 <li><p>Open SQL Server Management Studio and connect to your SQL Server Docker container (Defaulted to port 1433).</p>
@@ -585,7 +587,7 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
 <ol start="4">
 <li>Open Mongosh in a separate terminal and run the following: <code>load(&quot;\\link-cloud\\Scripts\\load-mongo-data.js&quot;)</code>.</li>
 </ol>
-<h1 id="manual-reporting" class="content-heading">Manual Reporting <a id="manual-reporting" href="#manual-reporting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Manual Reporting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="manual-reporting" class="content-heading">Manual Reporting <a href="#manual-reporting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Manual Reporting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Automated report scheduling can be configured through the Tenant API. However, a manual approach can be done to immediately generate a report. Open Kafka UI and produce the following into the <code>ReportScheduled</code> topic:</p>
 <p><strong>Key:</strong></p>
 <pre><code>{
@@ -709,12 +711,12 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
 </code></pre>
 <p>At the end of the reporting period, the Report service will make additional requests to query and evaluate patients that are currently admitted in the facility prior to submitting. After each of those admitted patients are evaluated, the Report service will then produce a <code>SubmitReport</code> event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the <code>link-submission</code> container. Select the <code>files</code> tab and navigate to the <code>app\submissions</code> folder. There, you'll be able to download the submission results for the reporting period:</p>
 <img src="/images/docker_submission.png" width="75%" height="75%" alt="Docker Desktop UI showing submissions folder" />
-<h1 id="reporting-event-workflow" class="content-heading">Reporting Event Workflow <a id="reporting-event-workflow" href="#reporting-event-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Event Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="reporting-event-workflow" class="content-heading">Reporting Event Workflow <a href="#reporting-event-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Event Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <blockquote>
 <p>Note: As Link Cloud continues to develop, the workflow detailed below to generate reports may be subject to large changes.</p>
 </blockquote>
 <p>Detailed below are the steps Link Cloud takes to generate a report for a tenant reporting period. They are broken into phases. Each phase has a sequence diagram to visualize the workflow.</p>
-<h2 id="report-scheduling" class="content-heading">Report Scheduling <a id="report-scheduling" href="#report-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="report-scheduling" class="content-heading">Report Scheduling <a href="#report-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre class="mermaid">sequenceDiagram
     participant Tenant as Tenant Service
     participant Kafka
@@ -729,7 +731,7 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
     Query->>Query: Persist reporting updates()
 </pre>
 <p>At the beginning of a new reporting period, the Tenant service produces a <code>ReportScheduled</code> event. The Query Dispatch and Report services consume and persist the reporting information in the event into their databases. The Report service sets an internal cron job (based on the EndDate of the consumed event) to execute the work needed to complete the report.</p>
-<h2 id="census-acquisition-and-discharge" class="content-heading">Census Acquisition and Discharge <a id="census-acquisition-and-discharge" href="#census-acquisition-and-discharge" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Acquisition and Discharge"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="census-acquisition-and-discharge" class="content-heading">Census Acquisition and Discharge <a href="#census-acquisition-and-discharge" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Acquisition and Discharge"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre class="mermaid">sequenceDiagram
     participant Census as Census Service
     participant Kafka
@@ -757,7 +759,7 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
 </blockquote>
 <p>A <code>PatientEvent</code> Kafka message is produced for each patient that has been discharged.</p>
 <p>The QueryDispatch service consumes the patient events and appends the tenants' reporting information (the info consumed in the <code>ReportScheduled</code> event). The service then sets a cron job based on the configured lag time that the facility wants to apply for each discharge. When that lag time is met, the Query Dispatch service produces a <code>DataAcquisitionRequested</code> event to trigger the acquisition and evaluation steps.</p>
-<h2 id="resource-acquisition-and-evaluation" class="content-heading">Resource Acquisition and Evaluation <a id="resource-acquisition-and-evaluation" href="#resource-acquisition-and-evaluation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Acquisition and Evaluation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="resource-acquisition-and-evaluation" class="content-heading">Resource Acquisition and Evaluation <a href="#resource-acquisition-and-evaluation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Acquisition and Evaluation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre class="mermaid">sequenceDiagram
     participant Kafka
     participant Acquisition as Data Acquisition
@@ -790,7 +792,7 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
   The MeasureEval service is capable of producing DataAcquisitionRequested events if the reporting measure also includes the need for additional supplemental data for a patient that meets the initial population criteria of a measure. If this is the case, the MeasureEval service will only produce ResourceEvaluated events after it has evaluated a patient that had had their supplemental resources acquired and normalized.
 </Admonition>
 <p>When the end of the reporting period is met, the Report service will confirm that it has MeasureReport's for all discharged patients that were within the reporting period. Additionally, it will request that currently admitted patients be evaluated for that reporting period. The service does this by producing <code>DataAcquisitionRequested</code> events for each admitted patient which triggers the acquisition/evaluation workflow mentioned above. After those patient MeasureReports are accounted for, the Report service will produce a <code>SubmitReport</code> for the Submission service.</p>
-<h1 id="automated-smoke-testing" class="content-heading">Automated Smoke Testing <a id="automated-smoke-testing" href="#automated-smoke-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Automated Smoke Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="automated-smoke-testing" class="content-heading">Automated Smoke Testing <a href="#automated-smoke-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Automated Smoke Testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>An automated smoke test can be found in the <code>/Tests/E2ETests</code> folder/project which performs the following actions:</p>
 <ol>
 <li>Loads a FHIR server with pre-defined synthetic test data</li>
@@ -809,7 +811,7 @@ set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ntesting_7D11EE2F["Design: Testing"]</pre>
+ntesting_4505CA2C["Design: Testing"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

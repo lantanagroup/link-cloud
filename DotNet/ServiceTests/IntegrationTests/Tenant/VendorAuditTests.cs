@@ -77,7 +77,7 @@ public class VendorAuditTests : IDisposable
         Assert.Equal(AuditEventType.Update, audit.Value.Action);
         var change = Assert.Single(audit.Value.PropertyChanges!,
             c => c.PropertyName == nameof(VendorAuthenticationSettings.SigningKeySecretId));
-        Assert.Null(change.InitialPropertyValue);
+        Assert.Empty(change.InitialPropertyValue);
         Assert.Equal("epic-signing-key", change.NewPropertyValue);
     }
 
@@ -102,7 +102,7 @@ public class VendorAuditTests : IDisposable
         var change = Assert.Single(Assert.Single(events).Value.PropertyChanges!,
             c => c.PropertyName == nameof(VendorAuthenticationSettings.SigningKeySecretId));
         Assert.Equal("epic-signing-key", change.InitialPropertyValue);
-        Assert.Null(change.NewPropertyValue);
+        Assert.Empty(change.NewPropertyValue);
     }
 
     [Fact]

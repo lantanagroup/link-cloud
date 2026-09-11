@@ -1,9 +1,11 @@
 ﻿using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
+using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.AspNetCore.Http;
@@ -50,6 +52,120 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     public void Dispose() => _scope.Dispose();
+
+    /// <summary>
+    /// A mapping that reporting plans still point at cannot be removed: the foreign key restricts it.
+    /// That is a conflict, not a missing row - answering 404 for a mapping the caller can plainly GET
+    /// tells them the opposite of what happened.
+    /// </summary>
+    [Fact]
+    public async Task DeleteMeasureMapping_WhenReportingPlansReferenceIt_ReturnsConflict()
+    {
+        var sp = _scope.ServiceProvider;
+        var mappingId = await CreateMappingAsync();
+
+        var plans = sp.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
+        var plan = new FacilityReportingPlan
+        {
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            MeasureMappingId = mappingId,
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = true
+        };
+        await plans.AddAsync(plan);
+        await plans.SaveChangesAsync();
+
+        try
+        {
+            var result = await _controller.DeleteMeasureMapping(mappingId, CancellationToken.None);
+
+            var problem = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+
+            // The mapping must still be there: a refused delete changes nothing.
+            var stillThere = Assert.IsType<OkObjectResult>(
+                await _controller.GetMeasureMapping(mappingId, CancellationToken.None));
+            Assert.NotNull(stillThere.Value);
+        }
+        finally
+        {
+            plans.Remove(plan);
+            await plans.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Delete-all is refused while any reporting plan exists, since every plan would be orphaned. The
+    /// refusal happens before anything is removed, so the table is left whole rather than half emptied.
+    /// </summary>
+    [Fact]
+    public async Task DeleteAllMeasureMappings_WhenAnyReportingPlanExists_ReturnsConflictAndDeletesNothing()
+    {
+        var sp = _scope.ServiceProvider;
+        var mappingId = await CreateMappingAsync();
+
+        var plans = sp.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
+        var plan = new FacilityReportingPlan
+        {
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            MeasureMappingId = mappingId,
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = true
+        };
+        await plans.AddAsync(plan);
+        await plans.SaveChangesAsync();
+
+        try
+        {
+            var result = await _controller.DeleteAllMeasureMappings(CancellationToken.None);
+
+            var problem = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+
+            // Nothing was removed, not even the mappings no plan points at.
+            var stillThere = Assert.IsType<OkObjectResult>(
+                await _controller.GetMeasureMapping(mappingId, CancellationToken.None));
+            Assert.NotNull(stillThere.Value);
+        }
+        finally
+        {
+            plans.Remove(plan);
+            await plans.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DeleteMeasureMapping_WhenNothingReferencesIt_ReturnsNoContent()
+    {
+        var mappingId = await CreateMappingAsync();
+
+        Assert.IsType<NoContentResult>(await _controller.DeleteMeasureMapping(mappingId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeleteMeasureMapping_WhenMissing_StillReturnsNotFound()
+    {
+        var result = await _controller.DeleteMeasureMapping(Guid.NewGuid().ToString(), CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    private async Task<string> CreateMappingAsync()
+    {
+        // Measure and DQM are unique together, so each mapping needs its own name.
+        var created = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
+
+        var model = Assert.IsType<MeasureMappingModel>(Assert.IsType<CreatedResult>(created).Value);
+
+        return model.Id!;
+    }
 
     [Fact]
     public async Task CreateMeasureMapping_ThenGet_ReturnsCreatedRecord()

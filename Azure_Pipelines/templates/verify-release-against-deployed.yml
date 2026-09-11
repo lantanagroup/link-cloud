@@ -1,0 +1,70 @@
+# Resolves the commit an environment is actually running and compares it to the release the
+# schema is being generated from.
+#
+# Used twice: once in Build, and again as a gate job inside each Apply stage. The apply stages
+# carry `trigger: manual`, which Azure DevOps refuses to combine with `dependsOn` ("Manually
+# triggered stages cannot have dependencies"), so Build failing cannot hold an apply back.
+# Re-running the comparison inside the stage that does the writing is what actually blocks a
+# mismatched apply.
+
+parameters:
+- name: environment
+  type: string
+- name: currentRelease
+  type: string
+
+steps:
+# The baseline is what is actually running in the target environment rather than a
+# hand-typed tag. A typed guess is what let QA2 receive a schema far ahead of its images.
+- task: Bash@3
+  name: getDeployedCommit
+  displayName: Get the commit deployed to ${{ parameters.environment }}
+  inputs:
+    targetType: inline
+    script: |
+      python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
+
+- task: Bash@3
+  displayName: Compare current_release against the deployed commit
+  env:
+    DEPLOYED_COMMIT: $(FromCommit)
+    TARGET_RELEASE: ${{ parameters.currentRelease }}
+  inputs:
+    targetType: inline
+    script: |
+      set -euo pipefail
+      git fetch origin --tags --quiet || true
+
+      if [ -z "${TARGET_RELEASE}" ]; then
+        echo "##vso[task.logissue type=error]current_release is required."
+        exit 1
+      fi
+
+      if ! TARGET_SHA=$(git rev-parse --verify "${TARGET_RELEASE}^{commit}" 2>/dev/null); then
+        echo "##vso[task.logissue type=error]current_release ${TARGET_RELEASE} is not a commit or tag in this repository."
+        exit 1
+      fi
+
+      if ! git cat-file -e "${DEPLOYED_COMMIT}^{commit}" 2>/dev/null; then
+        echo "##vso[task.logissue type=error]Deployed commit ${DEPLOYED_COMMIT} is not present in this clone."
+        exit 1
+      fi
+
+      echo "Deployed to ${{ parameters.environment }}: ${DEPLOYED_COMMIT}"
+      echo "Schema will be generated from: ${TARGET_SHA} (${TARGET_RELEASE})"
+
+      if [ "${TARGET_SHA}" = "${DEPLOYED_COMMIT}" ]; then
+        echo "Schema and deployed code are the same commit."
+      elif git merge-base --is-ancestor "${DEPLOYED_COMMIT}" "${TARGET_SHA}"; then
+        AHEAD=$(git rev-list --count "${DEPLOYED_COMMIT}..${TARGET_SHA}")
+        echo "##vso[task.logissue type=warning]Schema is ${AHEAD} commit(s) AHEAD of the code deployed to ${{ parameters.environment }}. A destructive migration in this range will break the running services until they are redeployed. Review the migrations listed below before letting the apply proceed."
+        echo "Migration files added or changed in that range:"
+        git diff --name-only "${DEPLOYED_COMMIT}" "${TARGET_SHA}" -- "*Migrations/*" "*migrations/*" || true
+      elif git merge-base --is-ancestor "${TARGET_SHA}" "${DEPLOYED_COMMIT}"; then
+        BEHIND=$(git rev-list --count "${TARGET_SHA}..${DEPLOYED_COMMIT}")
+        echo "##vso[task.logissue type=error]Schema is ${BEHIND} commit(s) BEHIND the code deployed to ${{ parameters.environment }}. The running services expect migrations this script does not contain."
+        exit 1
+      else
+        echo "##vso[task.logissue type=error]current_release and the deployed commit share no ancestry. Check that this pipeline was queued on the right branch."
+        exit 1
+      fi

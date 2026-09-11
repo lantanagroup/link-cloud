@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -54,7 +55,22 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings")
+        SearchMeasureMappingsAsync(measure: null, dqm: null, frequency: null, pageSize, pageNumber,
+            cancellationToken);
+
+    public Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(
+        string? measure,
+        string? dqm = null,
+        Frequency? frequency = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        // The searchable listing is /search; the collection route itself only accepts POST. Reading
+        // measure-mappings without the segment answers 404, which reads as "DMRP is switched off".
+        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings/search")
+            .SetQueryParam("measure", measure)
+            .SetQueryParam("dqm", dqm)
+            .SetQueryParam("frequency", frequency)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
@@ -93,11 +109,32 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanPeriodModel>>> GetFacilityReportingPlanPeriodsAsync(
+        string facilityId,
+        int? monthsAhead = null,
+        bool? isReporting = null,
+        bool refresh = false,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityReportingPlanPeriodModel>>(
+            () => Request($"/dmrp/reporting-plans/facilities/{facilityId}/periods")
+                .SetQueryParam("monthsAhead", monthsAhead)
+                .SetQueryParam("isReporting", isReporting)
+                // Sent only when asked for, so a default call cannot be mistaken for one that
+                // deliberately declined a refresh.
+                .SetQueryParam("refresh", refresh ? "true" : null)
+                .SetQueryParam("pageSize", pageSize)
+                .SetQueryParam("pageNumber", pageNumber)
+                .GetAsync(cancellationToken: cancellationToken));
+
     public async Task<LinkApiResponse<List<FacilityReportingPlanModel>>> GetFacilityReportingPlansForFacilityAsync(
         string facilityId,
         int? month = null,
         int? year = null,
         bool? isReporting = null,
+        int? monthsAhead = null,
+        bool refresh = false,
         CancellationToken cancellationToken = default)
     {
         var response = await SendAsync<List<FacilityReportingPlanModel>>(
@@ -105,6 +142,8 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
                 .SetQueryParam("month", month)
                 .SetQueryParam("year", year)
                 .SetQueryParam("isReporting", isReporting)
+                .SetQueryParam("monthsAhead", monthsAhead)
+                .SetQueryParam("refresh", refresh ? "true" : null)
                 .GetAsync(cancellationToken: cancellationToken));
 
         if (response.IsSuccessStatusCode && response.Body is null)

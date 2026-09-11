@@ -13,6 +13,7 @@ trigger:
   paths:
     include:
     - DotNet/Normalization/*
+    - DotNet/Normalization.Engine/*
     - DotNet/Shared/*
     exclude:
     - '*'

@@ -44,4 +44,14 @@ public record ResolvedRunOptions(
 
     /// <summary>NHSN reporting Organization ID for this run.</summary>
     public string NhsnOrganizationId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// When true, the run holds a short live reporting window and accepts
+    /// Admit/Discharge injections before finalizing the scheduled report.
+    /// </summary>
+    public bool IsLiveSimulation { get; init; }
+
+    /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
+    public int ReportingWindowMinutes { get; init; } = 10;
+
 }

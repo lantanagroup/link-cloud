@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,14 +497,14 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h3 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+        <h3 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The National Healthcare Safety Network (NHSN) reporting use case leverages the entire Link stack of services to generate automated reports for NHSN on behalf of healthcare facilities.</p>
 <p>The primary goals of this implementation are:</p>
 <ul>
 <li><strong>Increasing the reliability of near-real-time reporting:</strong> By automating the data flow and analysis, the platform ensures that reports are accurate and delivered promptly.</li>
 <li><strong>Reducing the reporting burden on facilities:</strong> Automating the data collection and processing significantly reduces the manual effort required by healthcare staff, allowing them to focus on patient care.</li>
 </ul>
-<h3 id="primary-reporting-workflow" class="content-heading">Primary Reporting Workflow <a id="primary-reporting-workflow" href="#primary-reporting-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Primary Reporting Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="primary-reporting-workflow" class="content-heading">Primary Reporting Workflow <a href="#primary-reporting-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Primary Reporting Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The reporting workflow involves multiple facilities integrating through several stages, often split into initial and supplemental phases to ensure data completeness and accuracy.</p>
 <pre class="mermaid">graph TD
     subgraph Initial Phase
@@ -522,18 +524,18 @@
     style Initial Phase fill:#f9f,stroke:#333,stroke-width:2px
     style Supplemental Phase fill:#bbf,stroke:#333,stroke-width:2px
 </pre>
-<h3 id="data-submission" class="content-heading">Data Submission <a id="data-submission" href="#data-submission" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="data-submission" class="content-heading">Data Submission <a href="#data-submission" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Submission"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Once the data has been processed, evaluated, and validated, it is submitted to down-stream NHSN systems. A key feature of this process is the inclusion of <strong>raw patient-level (aka: &quot;line-level&quot;) data</strong>.</p>
 <p>This detailed data submission allows NHSN to perform further metrics and calculations at a granular level, providing deeper insights and more flexible analysis capabilities than aggregate reporting alone.</p>
-<h3 id="facilitytenant-configuration-requirements" class="content-heading">Facility/Tenant Configuration Requirements <a id="facility-tenant-configuration-requirements" href="#facility-tenant-configuration-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility/Tenant Configuration Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="facility-tenant-configuration-requirements" class="content-heading">Facility/Tenant Configuration Requirements <a href="#facility-tenant-configuration-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility/Tenant Configuration Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Each facility or tenant in the NHSN reporting workflow must be configured with specific requirements to ensure reliable data flow and processing.</p>
-<h4 id="data-source-configuration" class="content-heading">Data Source Configuration <a id="data-source-configuration" href="#data-source-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Source Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="data-source-configuration" class="content-heading">Data Source Configuration <a href="#data-source-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Source Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The primary data source for NHSN reporting is a FHIR server. This requires:</p>
 <ul>
 <li><strong>Authentication</strong>: Currently, we support <strong>Epic</strong> and <strong>Cerner</strong> authentication models, with plans to support more EHR vendors in the future.</li>
 <li><strong>Throttling</strong>: Throttling configuration is critical to ensure that data acquisition does not negatively impact the facility's clinical systems during peak usage.</li>
 </ul>
-<h4 id="census-acquisition-methods" class="content-heading">Census Acquisition Methods <a id="census-acquisition-methods" href="#census-acquisition-methods" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Acquisition Methods"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="census-acquisition-methods" class="content-heading">Census Acquisition Methods <a href="#census-acquisition-methods" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Acquisition Methods"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The system supports multiple methods for determining the patient census, depending on the facility's technical capabilities:</p>
 <ul>
 <li><strong>FHIR Patient List</strong>: Utilizing the Epic FHIR Patient List resource, if supported by the facility.</li>
@@ -546,18 +548,18 @@
 </ul>
 </li>
 </ul>
-<h4 id="query-plan-and-data-normalization" class="content-heading">Query Plan and Data Normalization <a id="query-plan-and-data-normalization" href="#query-plan-and-data-normalization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan and Data Normalization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="query-plan-and-data-normalization" class="content-heading">Query Plan and Data Normalization <a href="#query-plan-and-data-normalization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan and Data Normalization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li><strong>Query Plan</strong>: A specific query plan must be defined for each facility to identify the exact FHIR resources and search parameters required for measure evaluation.</li>
 <li><strong>Normalization Operations</strong>: Normalization processes are used to convert local codes and formats to standard codes (e.g., SNOMED-CT, LOINC, RXNORM) required for reporting.</li>
 </ul>
-<h4 id="measure-configuration-and-reporting-cadence" class="content-heading">Measure Configuration and Reporting Cadence <a id="measure-configuration-and-reporting-cadence" href="#measure-configuration-and-reporting-cadence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Configuration and Reporting Cadence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="measure-configuration-and-reporting-cadence" class="content-heading">Measure Configuration and Reporting Cadence <a href="#measure-configuration-and-reporting-cadence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Configuration and Reporting Cadence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The reporting cadence and specific measures must be configured based on the facility's reporting requirements. Examples include:</p>
 <ul>
 <li><strong>NHSN Acute Care Monthly Initial Population</strong>: Evaluating and submitting data on a monthly basis.</li>
 <li><strong>Daily Reporting</strong>: Real-time or daily reporting for specific metrics to provide high-frequency insights.</li>
 </ul>
-<h3 id="core-services-involved" class="content-heading">Core Services Involved <a id="core-services-involved" href="#core-services-involved" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services Involved"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="core-services-involved" class="content-heading">Core Services Involved <a href="#core-services-involved" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services Involved"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following core services are instrumental in the NHSN reporting workflow:</p>
 <ul>
 <li><a href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
@@ -574,7 +576,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nnhsn_65C2A22D["Design: NHSN Reporting Use Case"]</pre>
+nnhsn_708C33DD["Design: NHSN Reporting Use Case"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

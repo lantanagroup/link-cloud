@@ -13,16 +13,20 @@ public static class ApiEndPointLibrary
     {
         var services = new[]
         {
+            ServiceNames.Account,
             ServiceNames.AdminBff,
             ServiceNames.AdminBffAuth,
+            ServiceNames.Audit,
             ServiceNames.Census,
             ServiceNames.DataAcquisition,
+            ServiceNames.Dmrp,
             ServiceNames.MeasureEval,
             ServiceNames.Normalization,
             ServiceNames.QueryDispatch,
             ServiceNames.Report,
             ServiceNames.Submission,
             ServiceNames.Tenant,
+            ServiceNames.Terminology,
             ServiceNames.Validation
         };
 
@@ -68,16 +72,20 @@ public static class ApiEndPointLibrary
     private static IReadOnlyList<ApiEndpointDefinition> BuildServiceEndpoints(string serviceName) =>
         serviceName switch
         {
-            ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps),BuildAdminBffMetadata()),
+            ServiceNames.Account => BuildFromStepConstants(ServiceNames.Account, typeof(AccountSteps), BuildAccountMetadata()),
+            ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps), BuildAdminBffMetadata()),
             ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
+            ServiceNames.Audit => BuildFromStepConstants(ServiceNames.Audit, typeof(AuditSteps), BuildAuditMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
             ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps), BuildDataAcquisitionMetadata()),
+            ServiceNames.Dmrp => BuildFromStepConstants(ServiceNames.Dmrp, typeof(DmrpSteps), BuildDmrpMetadata()),
             ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps), BuildMeasureEvalMetadata()),
             ServiceNames.Normalization => BuildFromStepConstants(ServiceNames.Normalization, typeof(NormalizationSteps), BuildNormalizationMetadata()),
             ServiceNames.QueryDispatch => BuildFromStepConstants(ServiceNames.QueryDispatch, typeof(QueryDispatchSteps), BuildQueryDispatchMetadata()),
             ServiceNames.Report => BuildFromStepConstants(ServiceNames.Report, typeof(ReportSteps), BuildReportMetadata()),
             ServiceNames.Submission => BuildFromStepConstants(ServiceNames.Submission, typeof(SubmissionSteps), BuildSubmissionMetadata()),
             ServiceNames.Tenant => BuildFromStepConstants(ServiceNames.Tenant, typeof(TenantSteps), BuildTenantMetadata()),
+            ServiceNames.Terminology => BuildFromStepConstants(ServiceNames.Terminology, typeof(TerminologySteps), BuildTerminologyMetadata()),
             ServiceNames.Validation => BuildFromStepConstants(ServiceNames.Validation, typeof(ValidationSteps), BuildValidationMetadata()),
             _ => []
         };
@@ -118,6 +126,14 @@ public static class ApiEndPointLibrary
         return endpoints;
     }
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAccountMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AccountSteps.InfoGet200] = new EndpointMeta("Returns Account service information.", "GET /api/Account/info"),
+        [AccountSteps.RootHealthGet200] = new EndpointMeta("Returns Account service health status.", "GET /health")
+
+    };
+
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffAuthMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [AdminBffAuthSteps.ValidBearerGet200] = new EndpointMeta("Valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
@@ -130,6 +146,15 @@ public static class ApiEndPointLibrary
         [AdminBffAuthSteps.InvalidAuthSchemeGet401] = new EndpointMeta("Invalid auth scheme (Basic) GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
         [AdminBffAuthSteps.CrossApiTokenReuseGet401] = new EndpointMeta("Cross-API token reuse GET \u2192 401", "GET /aggregate/reports/summaries (auth)")
     };
+
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAuditMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AuditSteps.InfoGet200] = new EndpointMeta("Returns Audit service information.", "GET /api/Audit/info"),
+        [AuditSteps.RootHealthGet200] = new EndpointMeta("Returns Audit service health status.", "GET /health")
+
+    };
+
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
@@ -152,6 +177,46 @@ public static class ApiEndPointLibrary
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildDmrpMetadata()
+    {
+        const string mappings = "/api/dmrp/measure-mappings";
+        const string plans = "/api/dmrp/reporting-plans";
+
+        return new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+        {
+            [DmrpSteps.MappingPost201] = new EndpointMeta("Creates a measure mapping.", $"POST {mappings}"),
+            [DmrpSteps.MappingPost400UnknownDqm] = new EndpointMeta("Refuses a dQM MeasureEval does not know.", $"POST {mappings}"),
+            [DmrpSteps.MappingPost400Duplicate] = new EndpointMeta("Refuses a second mapping for the same measure and dQM.", $"POST {mappings}"),
+            [DmrpSteps.MappingGet200] = new EndpointMeta("Reads a measure mapping by id.", $"GET {mappings}/{{id}}"),
+            [DmrpSteps.MappingGet404] = new EndpointMeta("Answers not-found for an unknown id.", $"GET {mappings}/{{id}}"),
+            [DmrpSteps.MappingSearch200] = new EndpointMeta("Finds a mapping by measure and dQM.", $"GET {mappings}/search"),
+            [DmrpSteps.MappingSearch204] = new EndpointMeta("Answers no-content, not an empty page, when nothing matches.", $"GET {mappings}/search"),
+            [DmrpSteps.MappingPut202] = new EndpointMeta("Updates a measure mapping.", $"PUT {mappings}/{{id}}"),
+            [DmrpSteps.MappingPut404] = new EndpointMeta("Refuses to update a mapping that does not exist.", $"PUT {mappings}/{{id}}"),
+            [DmrpSteps.PlanPost201] = new EndpointMeta("Enrolls a facility in a measure for a reporting period.", $"POST {plans}"),
+            [DmrpSteps.PlanPost409Duplicate] = new EndpointMeta("Refuses a second plan for the same facility, mapping and period.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownFacility] = new EndpointMeta("Refuses a plan for a facility that does not exist.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownMapping] = new EndpointMeta("Refuses a plan for a measure mapping that does not exist.", $"POST {plans}"),
+            [DmrpSteps.PlanPost400UnknownComponent] = new EndpointMeta("Refuses a plan whose NHSN component is neither MSC nor PS. The component is part of the natural key, so a value that describes nothing would take a slot in it.", $"POST {plans}"),
+            [DmrpSteps.PlanGet200] = new EndpointMeta("Reads a reporting plan by id.", $"GET {plans}/{{id}}"),
+            [DmrpSteps.PlanGet404] = new EndpointMeta("Answers not-found for an unknown id.", $"GET {plans}/{{id}}"),
+            [DmrpSteps.PlansForFacilityGet200] = new EndpointMeta("Lists a facility's reporting plans.", $"GET {plans}/facilities/{{facilityId}}"),
+            [DmrpSteps.PlansForFacilityGet200LookAhead] = new EndpointMeta("Lists a facility's plans within a six-month window. The flat read takes the same window as the periods read, and answers against the same current period.", $"GET {plans}/facilities/{{facilityId}}?monthsAhead=6"),
+            [DmrpSteps.PlansForFacilityGet400MonthsAhead] = new EndpointMeta("Refuses a look-ahead window outside 1 to 24 on the flat read as well.", $"GET {plans}/facilities/{{facilityId}}?monthsAhead=0"),
+            [DmrpSteps.PlanPeriodsGet200] = new EndpointMeta("Reads a facility's plan as periods, each with its measures and schedule.", $"GET {plans}/facilities/{{facilityId}}/periods"),
+            [DmrpSteps.PlanPeriodsGet200LookAhead] = new EndpointMeta("Answers a six-month look-ahead, projecting months with no plan on record.", $"GET {plans}/facilities/{{facilityId}}/periods?monthsAhead=6"),
+            [DmrpSteps.PlanPeriodsGet400MonthsAhead] = new EndpointMeta("Refuses a look-ahead window outside 1 to 24.", $"GET {plans}/facilities/{{facilityId}}/periods?monthsAhead=0"),
+            [DmrpSteps.MappingDelete409InUse] = new EndpointMeta("Refuses to delete a mapping a reporting plan still references.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.PlanDelete204] = new EndpointMeta("Deletes a reporting plan.", $"DELETE {plans}/{{id}}"),
+            [DmrpSteps.PlanDelete404] = new EndpointMeta("Answers not-found when deleting a plan twice.", "DELETE /api/dmrp/reporting-plans/{id}"),
+            [DmrpSteps.MappingDelete204] = new EndpointMeta("Deletes a mapping once nothing references it.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.MappingDelete404] = new EndpointMeta("Answers not-found when deleting a mapping twice.", $"DELETE {mappings}/{{id}}"),
+            [DmrpSteps.FacilityPost400WithSchedule] = new EndpointMeta(
+                "Refuses a facility that carries its own schedule while DMRP is enabled; the schedule is derived from reporting plans.",
+                "POST /api/Facility")
+        };
+    }
+
     private static IReadOnlyDictionary<string, EndpointMeta> BuildMeasureEvalMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [MeasureEvalSteps.InfoGet200] = new EndpointMeta("Returns MeasureEval service information.", "GET /api/measureeval/info"),
@@ -161,7 +226,30 @@ public static class ApiEndPointLibrary
     private static IReadOnlyDictionary<string, EndpointMeta> BuildNormalizationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
         [NormalizationSteps.InfoGet200] = new EndpointMeta("Returns Normalization service information.", "GET /api/Normalization/info"),
-        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health")
+        [NormalizationSteps.RootHealthGet200] = new EndpointMeta("Returns Normalization service health status.", "GET /health"),
+        [NormalizationSteps.LocationPost201] = new EndpointMeta("Creates a facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationPost400EmptyLocationId] = new EndpointMeta("Rejects a facility location with an empty location id.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationGet200] = new EndpointMeta("Returns a facility location including LocationName and LocationAlias.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.LocationGet400EmptyLocationId] = new EndpointMeta("Rejects a facility-location get with an empty location id.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.LocationGet404] = new EndpointMeta("Returns 404 for a facility location that does not exist.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
+        [NormalizationSteps.MappingPost201] = new EndpointMeta("Creates an HSLOC mapping including LocalCodeSystem.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost400EmptyLocalCode] = new EndpointMeta("Rejects an HSLOC mapping with an empty local code.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost404UnknownLocation] = new EndpointMeta("Returns 404 when the facility location does not exist.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingPost409Duplicate] = new EndpointMeta("Rejects a duplicate HSLOC mapping.", "POST /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingGet200] = new EndpointMeta("Returns an HSLOC mapping including LocalCodeSystem.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingGet400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping get with an empty id.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingGet404] = new EndpointMeta("Returns 404 for an HSLOC mapping that does not exist.", "GET /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingSearch200HasResults] = new EndpointMeta("Searches HSLOC mappings and returns the created row.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.MappingSearch200Empty] = new EndpointMeta("Searches HSLOC mappings and returns an empty page.", "GET /api/normalization/hsloc-mappings/search"),
+        [NormalizationSteps.MappingPut202] = new EndpointMeta("Updates an HSLOC mapping.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut400EmptyLocalCode] = new EndpointMeta("Rejects an HSLOC mapping update with an empty local code.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut404] = new EndpointMeta("Returns 404 when updating an HSLOC mapping that does not exist.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingPut409Duplicate] = new EndpointMeta("Rejects an HSLOC mapping update that collides with an existing local code.", "PUT /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDelete204] = new EndpointMeta("Deletes an HSLOC mapping by id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDelete400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping delete with an empty id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
+        [NormalizationSteps.MappingDeleteFacility204] = new EndpointMeta("Deletes HSLOC mappings for a facility.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -174,6 +262,10 @@ public static class ApiEndPointLibrary
     {
         [ReportSteps.InfoGet200] = new EndpointMeta("Returns Report service information.", "GET /api/Report/info"),
         [ReportSteps.RootHealthGet200] = new EndpointMeta("Returns Report service health status.", "GET /health"),
+        [ReportSteps.ReportSummaries200] = new EndpointMeta("Returns an empty page of report summaries for an unknown facility.", "GET /api/schedules/summaries"),
+        [ReportSteps.ReportSummaries200HasData] = new EndpointMeta("Returns report summaries for the seeded facility.", "GET /api/schedules/summaries"),
+        [ReportSteps.ReportSummaryGet200HasData] = new EndpointMeta("Returns the summary for the seeded report schedule.", "GET /api/schedules/{reportScheduleId}/summary"),
+        [ReportSteps.ReportSummaryGet404] = new EndpointMeta("Returns not-found for an unknown report-schedule summary.", "GET /api/schedules/{reportScheduleId}/summary"),
         [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
@@ -188,6 +280,13 @@ public static class ApiEndPointLibrary
     {
         [TenantSteps.InfoGet200] = new EndpointMeta("Returns Tenant service information.", "GET /api/facility/info"),
         [TenantSteps.RootHealthGet200] = new EndpointMeta("Returns Tenant service health status.", "GET /health")
+    };
+
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildTerminologyMetadata() =>
+    new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [TerminologySteps.InfoGet200] = new EndpointMeta("Returns Terminology service information.", "GET /api/Terminology/info"),
+        [TerminologySteps.RootHealthGet200] = new EndpointMeta("Returns Terminology service health status.", "GET /health")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildValidationMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -219,16 +318,20 @@ public static class ApiEndPointLibrary
 
     public static class ServiceNames
     {
+        public const string Account = "Account";
         public const string AdminBff = "AdminBff";
         public const string AdminBffAuth = "AdminBffAuth";
+        public const string Audit = "Audit";
         public const string Census = "Census";
         public const string DataAcquisition = "DataAcquisition";
+        public const string Dmrp = "DMRP";
         public const string MeasureEval = "MeasureEval";
         public const string Normalization = "Normalization";
         public const string QueryDispatch = "QueryDispatch";
         public const string Report = "Report";
         public const string Submission = "Submission";
         public const string Tenant = "Tenant";
+        public const string Terminology = "Terminology";
         public const string Validation = "Validation";
     }
 
@@ -249,6 +352,12 @@ public static class ApiEndPointLibrary
         public const string ReportRestorePatch404 = "Report Restore PATCH → 404";
     }
 
+    public static class AccountSteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
+    }
+
     public static class AdminBffAuthSteps
     {
         public const string ValidBearerGet200 = "Valid credentials/token → access granted";
@@ -260,6 +369,12 @@ public static class ApiEndPointLibrary
         public const string MissingAuthHeaderGet401 = "Missing auth header → 401";
         public const string InvalidAuthSchemeGet401 = "Invalid auth scheme (Basic) → 401";
         public const string CrossApiTokenReuseGet401 = "Cross-API token reuse → 401";
+    }
+
+    public static class AuditSteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
     public static class CensusSteps
@@ -385,6 +500,29 @@ public static class ApiEndPointLibrary
         public const string SequencesDelete204 = "SEQUENCES DELETE → 204";
         public const string SequencesDelete404 = "SEQUENCES DELETE → 404";
         public const string SequencesDelete400EmptyFacility = "SEQUENCES DELETE → 400 (empty facility)";
+        public const string LocationPost201 = "LOCATION POST → 201";
+        public const string LocationPost400EmptyLocationId = "LOCATION POST → 400 (empty locationId)";
+        public const string LocationPost409Duplicate = "LOCATION POST → 409 (duplicate)";
+        public const string LocationGet200 = "LOCATION GET → 200";
+        public const string LocationGet400EmptyLocationId = "LOCATION GET → 400 (empty locationId)";
+        public const string LocationGet404 = "LOCATION GET → 404";
+        public const string MappingPost201 = "MAPPING POST → 201";
+        public const string MappingPost400EmptyLocalCode = "MAPPING POST → 400 (empty localCode)";
+        public const string MappingPost404UnknownLocation = "MAPPING POST → 404 (unknown location)";
+        public const string MappingPost409Duplicate = "MAPPING POST → 409 (duplicate)";
+        public const string MappingGet200 = "MAPPING GET → 200";
+        public const string MappingGet400EmptyId = "MAPPING GET → 400 (empty id)";
+        public const string MappingGet404 = "MAPPING GET → 404";
+        public const string MappingSearch200HasResults = "MAPPING SEARCH → 200 (has results)";
+        public const string MappingSearch200Empty = "MAPPING SEARCH → 200 (empty)";
+        public const string MappingPut202 = "MAPPING PUT → 202";
+        public const string MappingPut400EmptyLocalCode = "MAPPING PUT → 400 (empty localCode)";
+        public const string MappingPut404 = "MAPPING PUT → 404";
+        public const string MappingPut409Duplicate = "MAPPING PUT → 409 (duplicate)";
+        public const string MappingDelete204 = "MAPPING DELETE → 204";
+        public const string MappingDelete400EmptyId = "MAPPING DELETE → 400 (empty id)";
+        public const string MappingDeleteFacility204 = "MAPPING DELETE FACILITY → 204";
+        public const string MappingDeleteFacility400EmptyFacility = "MAPPING DELETE FACILITY → 400 (empty facility)";
     }
 
     public static class QueryDispatchSteps
@@ -418,6 +556,10 @@ public static class ApiEndPointLibrary
         public const string GetByFacility200Empty = "Get By Facility → 200 (empty)";
         public const string GetByFacility200HasData = "Get By Facility → 200 (has data)";
         public const string Search200 = "Search → 200";
+        public const string ReportSummaries200 = "Report Summaries GET → 200";
+        public const string ReportSummaries200HasData = "Report Summaries GET → 200 (has data)";
+        public const string ReportSummaryGet200HasData = "Report Summary GET → 200 (has data)";
+        public const string ReportSummaryGet404 = "Report Summary GET → 404";
         public const string SoftDelete400BadGuid = "SoftDelete → 400 (bad guid)";
         public const string SoftDelete404 = "SoftDelete → 404";
         public const string SoftDelete204 = "SoftDelete → 204";
@@ -506,6 +648,48 @@ public static class ApiEndPointLibrary
         public const string Regenerate400NoReportId = "RegenerateReport → 400 (no report id)";
         public const string Regenerate404NonExistentFacility = "RegenerateReport → 404 (non-existent facility)";
         public const string Regenerate404NonExistentReport = "RegenerateReport → 404 (non-existent report)";
+    }
+
+    public static class TerminologySteps
+    {
+        public const string InfoGet200 = "Service Info GET → 200";
+        public const string RootHealthGet200 = "Root Health GET → 200";
+    }
+
+    /// <summary>
+    /// DMRP is a module hosted by the Tenant service, so these run against the Tenant base address.
+    /// Order matters: the delete steps depend on what the create steps left behind.
+    /// </summary>
+    public static class DmrpSteps
+    {
+        public const string MappingPost201 = "MeasureMapping POST → 201";
+        public const string MappingPost400UnknownDqm = "MeasureMapping POST → 400 (dQM not in MeasureEval)";
+        public const string MappingPost400Duplicate = "MeasureMapping POST → 400 (duplicate measure + dQM)";
+        public const string MappingGet200 = "MeasureMapping GET → 200";
+        public const string MappingGet404 = "MeasureMapping GET → 404";
+        public const string MappingSearch200 = "MeasureMappings SEARCH → 200 (filtered)";
+        public const string MappingSearch204 = "MeasureMappings SEARCH → 204 (no match)";
+        public const string MappingPut202 = "MeasureMapping PUT → 202";
+        public const string MappingPut404 = "MeasureMapping PUT → 404 (non-existent)";
+        public const string PlanPost201 = "ReportingPlan POST → 201";
+        public const string PlanPost409Duplicate = "ReportingPlan POST → 409 (duplicate period)";
+        public const string PlanPost400UnknownFacility = "ReportingPlan POST → 400 (non-existent facility)";
+        public const string PlanPost400UnknownMapping = "ReportingPlan POST → 400 (non-existent measure mapping)";
+        public const string PlanPost400UnknownComponent = "ReportingPlan POST → 400 (unknown NHSN component)";
+        public const string PlanGet200 = "ReportingPlan GET → 200";
+        public const string PlanGet404 = "ReportingPlan GET → 404";
+        public const string PlansForFacilityGet200 = "ReportingPlans for facility GET → 200";
+        public const string PlansForFacilityGet200LookAhead = "ReportingPlans for facility GET → 200 (monthsAhead=6)";
+        public const string PlansForFacilityGet400MonthsAhead = "ReportingPlans for facility GET → 400 (monthsAhead out of range)";
+        public const string PlanPeriodsGet200 = "ReportingPlan periods GET → 200";
+        public const string PlanPeriodsGet200LookAhead = "ReportingPlan periods GET → 200 (monthsAhead=6)";
+        public const string PlanPeriodsGet400MonthsAhead = "ReportingPlan periods GET → 400 (monthsAhead out of range)";
+        public const string MappingDelete409InUse = "MeasureMapping DELETE → 409 (referenced by a reporting plan)";
+        public const string PlanDelete204 = "ReportingPlan DELETE → 204";
+        public const string PlanDelete404 = "ReportingPlan DELETE → 404";
+        public const string MappingDelete204 = "MeasureMapping DELETE → 204";
+        public const string MappingDelete404 = "MeasureMapping DELETE → 404";
+        public const string FacilityPost400WithSchedule = "Facility POST → 400 (schedule supplied while DMRP is enabled)";
     }
 
     public static class MeasureEvalSteps

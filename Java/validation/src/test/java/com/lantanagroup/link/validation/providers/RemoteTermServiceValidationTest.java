@@ -452,6 +452,30 @@ class RemoteTermServiceValidationTest {
         verifyNoInteractions(cacheService);
     }
 
+    @Test
+    void fetchValueSet_matchesWhitelist_returnsNullWithoutTouchingCacheOrClient() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = spy(new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir",
+                List.of(), List.of("^http://example\\.org/ValueSet/.*")));
+
+        assertNull(subject.fetchValueSet("http://example.org/ValueSet/vs"));
+        verifyNoInteractions(cacheService);
+        verify(subject, never()).provideClient();
+    }
+
+    @Test
+    void fetchCodeSystem_matchesWhitelist_returnsNullWithoutTouchingCacheOrClient() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = spy(new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir",
+                List.of("^http://open\\.epic\\.com/.*"), List.of()));
+
+        assertNull(subject.fetchCodeSystem("http://open.epic.com/FHIR/foo"));
+        verifyNoInteractions(cacheService);
+        verify(subject, never()).provideClient();
+    }
+
     // ---------- log-sanitization tests ----------
 
     @Test

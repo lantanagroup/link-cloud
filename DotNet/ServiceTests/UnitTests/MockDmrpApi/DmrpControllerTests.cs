@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using LantanaGroup.Link.MockDmrpApi.Application.Services;
 using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
@@ -20,8 +21,9 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.MockDmrpApi;
 
 /// <summary>
-/// Drives the two contract endpoints over real HTTP, so the assertions cover routing, model
-/// binding, status codes and serialization -- not just the method bodies.
+/// Drives the two contract endpoints through the full MVC pipeline via <c>TestServer</c> --
+/// in-process, no sockets and no listening port -- so the assertions cover routing, model
+/// binding, status codes and serialization rather than just the method bodies.
 /// </summary>
 /// <remarks>
 /// Both endpoints are placeholders whose shape is expected to change when the published
@@ -94,7 +96,7 @@ public class DmrpControllerTests : IAsyncLifetime
     private ReportingPlanEntryEntity Seed(
         string facilityId = "F1",
         string measure = "HOB",
-        int? month = 5,
+        int month = 5,
         int year = 2026,
         string isReporting = "Y",
         string component = ReportingComponents.Msc)
@@ -115,10 +117,11 @@ public class DmrpControllerTests : IAsyncLifetime
         return entry;
     }
 
-    /// <summary>Seeds an annual (PS) entry, which carries no month.</summary>
-    private ReportingPlanEntryEntity SeedAnnual(
-        string facilityId = "F1", string measure = "HAI", int year = 2026, string isReporting = "Y") =>
-        Seed(facilityId, measure, month: null, year, isReporting, ReportingComponents.Ps);
+    /// <summary>Seeds a patient-safety (PS) entry, which carries a month like any other.</summary>
+    private ReportingPlanEntryEntity SeedPatientSafety(
+        string facilityId = "F1", string measure = "HAI", int month = 5, int year = 2026,
+        string isReporting = "Y") =>
+        Seed(facilityId, measure, month, year, isReporting, ReportingComponents.Ps);
 
     /// <summary>
     /// Mints a third-party token directly rather than through the support surface, so these
@@ -222,7 +225,7 @@ public class DmrpControllerTests : IAsyncLifetime
         // keeps them from becoming one another. A patient-safety measure surfacing in the
         // medicine plan is silent -- the response still looks well formed.
         Seed(measure: "HOB");
-        SeedAnnual(measure: "HAI");
+        SeedPatientSafety(measure: "HAI");
 
         var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5");
 
@@ -262,7 +265,7 @@ public class DmrpControllerTests : IAsyncLifetime
         Seed(measure: "HOB", month: 5, year: 2026);
         Seed(measure: "HTCDI", month: 6, year: 2026);
         Seed(measure: "OLD", month: 1, year: 2025);
-        SeedAnnual(measure: "HAI");
+        SeedPatientSafety(measure: "HAI");
 
         var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1");
 
@@ -318,43 +321,73 @@ public class DmrpControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    // ------------------------------------------------------------ /ps/annual
+    // ------------------------------------------------------------ /ps/annual/mrp
 
     [Fact]
     public async Task GetAnnualPlan_WithoutAToken_Returns401()
     {
-        var response = await _client.GetAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await _client.GetAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetAnnualPlan_ListsTheYearsMeasuresAndOmitsTheMonth()
+    public async Task GetPatientSafetyPlan_ListsTheMeasuresForThePeriod()
     {
-        SeedAnnual(measure: "HAI");
-        SeedAnnual(measure: "SSI");
-        SeedAnnual(measure: "OLD", year: 2025);
+        SeedPatientSafety(measure: "HAI");
+        SeedPatientSafety(measure: "SSI");
+        SeedPatientSafety(measure: "OLD", year: 2025);
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
         plan!.Orgid.Should().BeNull("F1 is not numeric, so it cannot be represented by the root orgid");
         plan.Year.Should().Be(2026);
-        plan.Month.Should().BeNull("an annual plan covers no particular month");
+        plan.Month.Should().BeNull("no month was asked for, so none is echoed back");
         plan.Plans.Select(m => m.Name).Should().BeEquivalentTo("HAI", "SSI");
+    }
+
+    [Fact]
+    public async Task ThePlanSerialisesThePeriodAsNumbersAndTheFacilityAsAStringInsidePlans()
+    {
+        // The JSON types are part of the contract, and a typed read would hide them - the
+        // generated DTO would happily parse either shape. So this asserts the wire format.
+        //
+        // month and year are numbers in both places. The facility is not: numeric at the
+        // root, a string inside plans. That asymmetry is the real API's and is reproduced
+        // rather than tidied up, because a consumer that codes against a cleaned-up shape
+        // breaks on first contact with the real endpoint.
+        Seed(facilityId: "100", measure: "HOB", month: 5, year: 2026);
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=100&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+
+        root.GetProperty("orgid").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
+
+        var item = root.GetProperty("plans")[0];
+
+        item.GetProperty("nhsnorgid").ValueKind.Should().Be(JsonValueKind.String);
+        item.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        item.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
     }
 
     [Fact]
     public async Task GetAnnualPlan_DoesNotServeMedicineEntries()
     {
-        // The annual query deliberately does not filter on month. Without the component
-        // in the predicate that omission would pull in every monthly entry for the year.
-        SeedAnnual(measure: "HAI");
+        // This call supplies a year but no month, so nothing narrows the period. Without
+        // the component in the predicate that would pull in every medicine entry for the year.
+        SeedPatientSafety(measure: "HAI");
         Seed(measure: "HOB");
         Seed(measure: "HTCDI", month: 6);
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
         plan!.Plans.Should().ContainSingle();
@@ -364,10 +397,10 @@ public class DmrpControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetAnnualPlan_ExcludesEntriesNotBeingReported()
     {
-        SeedAnnual(measure: "HAI");
-        SeedAnnual(measure: "SSI", isReporting: "N");
+        SeedPatientSafety(measure: "HAI");
+        SeedPatientSafety(measure: "SSI", isReporting: "N");
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
 
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
         plan!.Plans.Should().ContainSingle();
@@ -377,7 +410,7 @@ public class DmrpControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetAnnualPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
     {
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=Nobody&year=2026");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=Nobody&year=2026");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
@@ -385,18 +418,20 @@ public class DmrpControllerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetAnnualPlan_DoesNotAcceptAReportingMonth()
+    public async Task GetPatientSafetyPlan_NarrowsByTheReportingMonth()
     {
-        // A month on an annual request would be quietly ignored by the handler. Proving it
-        // is not bound at all keeps a caller from believing the plan was month-scoped.
-        SeedAnnual(measure: "HAI");
-        Seed(measure: "HOB");
+        // The month is a real filter here, not a parameter accepted and dropped. Seeding a
+        // second month proves it narrows, and the medicine entry proves the component still
+        // separates the two plans.
+        SeedPatientSafety(measure: "HAI", month: 5);
+        SeedPatientSafety(measure: "SSI", month: 6);
+        Seed(measure: "HOB", month: 5);
 
-        var response = await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026&month=5");
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026&month=5");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        plan!.Month.Should().BeNull();
+        plan!.Month.Should().Be(5);
         plan.Plans.Should().ContainSingle();
         plan.Plans.Single().Name.Should().Be("HAI");
     }
@@ -408,14 +443,14 @@ public class DmrpControllerTests : IAsyncLifetime
     {
         // One authorization server stands behind both, so a caller acquires a token once.
         Seed(measure: "HOB");
-        SeedAnnual(measure: "HAI");
+        SeedPatientSafety(measure: "HAI");
 
         var token = ThirdPartyToken();
 
         foreach (var url in new[]
                  {
                      "/msc?nhsnorgid=F1&year=2026&month=5",
-                     "/ps/annual?nhsnorgid=F1&year=2026"
+                     "/ps/annual/mrp?nhsnorgid=F1&year=2026"
                  })
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -430,11 +465,11 @@ public class DmrpControllerTests : IAsyncLifetime
     public async Task BothEndpointsScopeToTheRequestedFacility()
     {
         Seed(facilityId: "F2", measure: "HOB");
-        SeedAnnual(facilityId: "F2", measure: "HAI");
+        SeedPatientSafety(facilityId: "F2", measure: "HAI");
 
         var monthly = await (await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5"))
             .Content.ReadFromJsonAsync<ReportingPlanResponse>();
-        var annual = await (await GetAuthorizedAsync("/ps/annual?nhsnorgid=F1&year=2026"))
+        var annual = await (await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026"))
             .Content.ReadFromJsonAsync<ReportingPlanResponse>();
 
         monthly!.Plans.Should().BeEmpty();

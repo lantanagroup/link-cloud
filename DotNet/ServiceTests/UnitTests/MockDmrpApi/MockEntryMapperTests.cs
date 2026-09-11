@@ -16,7 +16,7 @@ public class MockEntryMapperTests
     private static ReportingPlanEntryEntity Entry(
         string measure = "HOB",
         string isReporting = "Y",
-        int? month = 5,
+        int month = 5,
         string component = ReportingComponents.Msc) => new()
         {
             Id = "11111111-1111-1111-1111-111111111111",
@@ -47,14 +47,11 @@ public class MockEntryMapperTests
     }
 
     [Fact]
-    public void ToModel_ForAnAnnualEntry_KeepsTheMonthNull()
+    public void ToModel_ForAPatientSafetyEntry_CarriesItsMonth()
     {
-        // Defaulting a missing month to zero would make a patient-safety entry look like a
-        // monthly one, and round-tripping it back through the create endpoint would then be
-        // rejected for carrying a month it never had.
-        var model = MockEntryMapper.ToModel(Entry(month: null, component: ReportingComponents.Ps));
+        var model = MockEntryMapper.ToModel(Entry(month: 5, component: ReportingComponents.Ps));
 
-        model.ReportingMonth.Should().BeNull();
+        model.ReportingMonth.Should().Be(5);
     }
 
     [Fact]
@@ -104,17 +101,18 @@ public class MockEntryMapperTests
     }
 
     [Fact]
-    public void ToEntity_ForAnAnnualRequest_CarriesTheAbsentMonthThrough()
+    public void ToEntity_ForAPatientSafetyRequest_CarriesTheMonthThrough()
     {
         var request = new MockEntryRequest
         {
             FacilityId = "F1",
             Component = "PS",
             Measure = "HAI",
+            ReportingMonth = 5,
             ReportingYear = 2026
         };
 
-        MockEntryMapper.ToEntity(request).ReportingMonth.Should().BeNull();
+        MockEntryMapper.ToEntity(request).ReportingMonth.Should().Be(5);
     }
 
     [Theory]

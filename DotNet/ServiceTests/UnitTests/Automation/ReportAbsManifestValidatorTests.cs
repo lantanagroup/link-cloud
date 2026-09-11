@@ -61,7 +61,7 @@ public class ReportAbsManifestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAllAsync_WithManifest_UsesConfiguredOperationOutcomeWriters()
+    public async Task ValidateAllAsync_WithManifest_ExpectsOperationOutcomeWhenValidationWriterIsOn()
     {
         var output = new BufferingAutomationOutput();
         var patientId = "patient-oo-1";
@@ -146,8 +146,107 @@ public class ReportAbsManifestValidatorTests
             expectDataAcquisitionData: true,
             manifest: manifest,
             operationOutcomeExpectations: new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
-                ReportWritesLegacyOperationOutcomeWhenInvalid: true,
                 ValidationWritesPreQualOperationOutcomeWhenInvalid: true));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenPatientPassedValidation_DoesNotRequireOperationOutcomeEvenIfPresent()
+    {
+        var output = new BufferingAutomationOutput();
+        var patientId = "patient-oo-passed-1";
+        var measureId = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
+        var scheduleId = Guid.NewGuid();
+
+        var internalAbsResources = BuildAbsResourcesWithExtraOperationOutcomes(
+            patientId,
+            measureId,
+            ExpectedStart,
+            ExpectedEnd);
+
+        var manifest = new GenerationManifest
+        {
+            PatientIds = [patientId],
+            Profiles =
+            [
+                new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+                })
+            ],
+            SelectedMeasures =
+            [
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
+            ],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                [patientId] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    $"Patient/{patientId}"
+                }
+            },
+            ExpectedAbsPatientIdsOverride = new HashSet<string>(StringComparer.Ordinal) { patientId },
+            // Stale generation-time prediction: validator must override this because the
+            // patient PassedValidation.
+            ExpectedOperationOutcomeCountByPatient = new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                [patientId] = 1
+            }
+        };
+
+        var reportClient = new Mock<IReportServiceClient>();
+        reportClient
+            .Setup(c => c.GetEntriesByScheduleAsync(scheduleId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<List<ReportEntryApiModel>>
+            {
+                StatusCode = 200,
+                Body =
+                [
+                    new ReportEntryApiModel
+                    {
+                        Id = Guid.NewGuid(),
+                        FacilityId = "Facility-UT",
+                        PatientId = patientId,
+                        ReportingStatus = ReportingStatus.PassedValidation,
+                        SubmissionStatus = SubmissionStatus.Submitted,
+                        MeasureReports =
+                        [
+                            new EntryMeasureReportApiModel
+                            {
+                                MeasureReportId = $"MR-{patientId}-1",
+                                ReportType = measureId,
+                                Status = EntryMeasureReportStatus.ReadyForValidation,
+                                ResourceCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["Patient"] = 1,
+                                    ["MeasureReport"] = 1,
+                                }
+                            }
+                        ]
+                    }
+                ]
+            });
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader(reportClient.Object));
+
+        await validator.ValidateAllAsync(
+            internalAbsResources,
+            new[] { patientId },
+            new[] { measureId },
+            ExpectedStart,
+            ExpectedEnd,
+            facilityId: "Facility-UT",
+            reportId: scheduleId.ToString(),
+            generatedBundles: null,
+            expectedManifestPatientListIds: new[] { patientId },
+            expectDataAcquisitionData: true,
+            manifest: manifest,
+            operationOutcomeExpectations: new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
+                ValidationWritesPreQualOperationOutcomeWhenInvalid: true));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Ignoring OperationOutcome", StringComparison.OrdinalIgnoreCase)
+            && line.Contains(patientId, StringComparison.Ordinal));
+        Assert.Empty(manifest.ExpectedOperationOutcomeCountByPatient);
     }
 
     [Fact]
@@ -484,7 +583,6 @@ public class ReportAbsManifestValidatorTests
                 type = "individual",
                 subject = new { reference = $"Patient/{patientId}" }
             }),
-            JsonSerializer.Serialize(new { resourceType = "OperationOutcome", id = $"oo-{patientId}-legacy" }),
             JsonSerializer.Serialize(new { resourceType = "OperationOutcome", id = $"oo-{patientId}-prequal" })
         });
 
