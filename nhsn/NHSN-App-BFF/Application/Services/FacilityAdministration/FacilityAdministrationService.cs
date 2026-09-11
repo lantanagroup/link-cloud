@@ -7,7 +7,9 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 
@@ -19,6 +21,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
     private readonly IFacilityGateway _facilityGateway;
     private readonly IFhirConfigurationGateway _fhirConfigurationGateway;
     private readonly IQueryDispatchGateway _queryDispatchGateway;
+    private readonly LinkCapabilitiesSettings _linkCapabilities;
 
     public FacilityAdministrationService(
         NhsnAppDbContext dbContext,
@@ -26,7 +29,8 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         IFacilityWriteLock writeLock,
         IFacilityGateway facilityGateway,
         IFhirConfigurationGateway fhirConfigurationGateway,
-        IQueryDispatchGateway queryDispatchGateway)
+        IQueryDispatchGateway queryDispatchGateway,
+        IOptions<LinkCapabilitiesSettings> linkCapabilities)
     {
         _dbContext = dbContext;
         _userContext = userContext;
@@ -34,6 +38,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         _facilityGateway = facilityGateway;
         _fhirConfigurationGateway = fhirConfigurationGateway;
         _queryDispatchGateway = queryDispatchGateway;
+        _linkCapabilities = linkCapabilities.Value;
     }
 
     public async Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default)
@@ -179,14 +184,21 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         };
     }
 
-    public Task<ConnectionResult> TestFhirConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
+    public async Task<ConnectionResult> TestFhirConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
     {
         if (!IsValidFhirServerUrl(fhirServerBaseUrl))
         {
-            return Task.FromResult(new ConnectionResult { Success = false, MessageKey = "fhirServerInfo.messages.invalidBaseUrl" });
+            return new ConnectionResult { Success = false, MessageKey = "fhirServerInfo.messages.invalidBaseUrl" };
         }
 
-        return Task.FromResult(new ConnectionResult { Success = true, MessageKey = "fhirServerInfo.messages.testSuccess" });
+        var reachable = await _fhirConfigurationGateway.TestConnectionAsync(fhirServerBaseUrl, cancellationToken);
+
+        return new ConnectionResult
+        {
+            Success = reachable,
+            MessageKey = reachable ? "fhirServerInfo.messages.testSuccess" : "fhirServerInfo.messages.testFailure",
+            Simulated = !_linkCapabilities.FhirConnectionProbe
+        };
     }
 
     internal static (int Days, int Hours, int Minutes) ParseLagDuration(string? duration)

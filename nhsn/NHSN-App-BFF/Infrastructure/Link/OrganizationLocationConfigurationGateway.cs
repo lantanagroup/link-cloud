@@ -12,12 +12,10 @@ internal sealed class OrganizationLocationConfigurationGateway : IOrganizationLo
     private const string ServiceName = "DataAcquisition";
 
     private readonly IDataAcquisitionServiceClient _dataAcquisitionClient;
-    private readonly IDataAcquisitionRawClient _rawClient;
 
-    public OrganizationLocationConfigurationGateway(IDataAcquisitionServiceClient dataAcquisitionClient, IDataAcquisitionRawClient rawClient)
+    public OrganizationLocationConfigurationGateway(IDataAcquisitionServiceClient dataAcquisitionClient)
     {
         _dataAcquisitionClient = dataAcquisitionClient;
-        _rawClient = rawClient;
     }
 
     public async Task<LocationOrgSection?> GetAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -76,7 +74,7 @@ internal sealed class OrganizationLocationConfigurationGateway : IOrganizationLo
         }
 
         // Facility-wide replace.
-        await _rawClient.UpdateOrganizationLocationConfigurationAsync(
+        var updateResponse = await _dataAcquisitionClient.UpdateOrganizationLocationConfigurationAsync(
             request.FacilityId,
             new UpdateOrganizationLocationConfigurationPayload
             {
@@ -91,5 +89,12 @@ internal sealed class OrganizationLocationConfigurationGateway : IOrganizationLo
                     .ToList()
             },
             cancellationToken);
+
+        // DataAcquisition answers 304 when the PUT payload matches what's already stored - not a
+        // failure, so it's excluded from the success check rather than treated as an error.
+        if (updateResponse.StatusCode != StatusCodes.Status304NotModified)
+        {
+            LinkResponseHandler.EnsureSuccess(updateResponse, ServiceName, nameof(SaveAsync));
+        }
     }
 }
