@@ -69,6 +69,7 @@ export class TestAuthApiClient implements ApiClient {
   regenerateReport: ApiClient['regenerateReport'] = id => this.inner.regenerateReport(id);
 
   getReportingPlan = () => this.inner.getReportingPlan();
+  getAvailableMeasures = () => this.inner.getAvailableMeasures();
 
   getJwksInstructionsUrl: ApiClient['getJwksInstructionsUrl'] = vendor =>
     this.inner.getJwksInstructionsUrl(vendor);

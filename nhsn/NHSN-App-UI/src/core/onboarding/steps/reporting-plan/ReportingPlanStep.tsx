@@ -1,6 +1,8 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
+import {useApiClient} from '../../../api/ApiClientContext';
 import {Button, MessageContainer, PageHeader, StepActions} from '../../../fields';
+import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 
@@ -66,7 +68,9 @@ function buildReportingPlanRows(referenceDate: Date): ReportingPlanRow[] {
 
 export function ReportingPlanStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving} = useOnboarding();
+  const api = useApiClient();
+  const {notifyError} = useNotifications();
+  const {patch, saving} = useOnboarding();
 
   // Built locally on every visit — deterministic in the current month, so
   // nothing needs to be persisted for it to survive a reload.
@@ -78,6 +82,46 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
     }
   }, []);
   const hasSchedule = rows.length > 0;
+
+  // The schedule above is display-only mockup data. Whether the facility can actually proceed is
+  // decided separately, against its real reporting plan: at least one enrolled measure must both
+  // have a resolved dQM and a MeasureEval definition loaded for it.
+  const [checkingMeasures, setCheckingMeasures] = useState(true);
+  const [hasAvailableMeasure, setHasAvailableMeasure] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setCheckingMeasures(true);
+
+    api
+      .getAvailableMeasures()
+      .then(available => {
+        if (!mounted) {
+          return;
+        }
+        setHasAvailableMeasure(available.length > 0);
+        patch('reportingPlan', {hasAvailableMeasure: available.length > 0});
+      })
+      .catch(cause => {
+        if (!mounted) {
+          return;
+        }
+        notifyError(cause instanceof Error ? cause.message : t('onboarding:reportingPlan.measuresLoadError'));
+        setHasAvailableMeasure(false);
+        patch('reportingPlan', {hasAvailableMeasure: false});
+      })
+      .finally(() => {
+        if (mounted) {
+          setCheckingMeasures(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [api]);
+
+  const canContinue = hasSchedule && !checkingMeasures && hasAvailableMeasure;
 
   return (
     <div className="nhsn-link__content nhsn-link__reporting-plan">
@@ -120,11 +164,17 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
         </MessageContainer>
       )}
 
+      {!checkingMeasures && !hasAvailableMeasure && (
+        <MessageContainer type="error" showIcon>
+          <span role="alert">{t('onboarding:reportingPlan.noAvailableMeasures')}</span>
+        </MessageContainer>
+      )}
+
       <StepActions saving={saving}>
         <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={onNext} disabled={saving || !hasSchedule} loading={saving}>
+        <Button onClick={onNext} disabled={saving || !canContinue} loading={saving || checkingMeasures}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

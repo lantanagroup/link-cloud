@@ -19,7 +19,6 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
-import {PLACEHOLDER_MEASURES} from '../report/placeholderMeasures';
 import {parseQueryPlan, type ParsedQueryPlan, type ParsedQueryPlanQuery} from './queryPlan';
 import {buildXlsxBlob, downloadBlob, type XlsxSheet} from './reportExport';
 
@@ -63,12 +62,12 @@ const STATUS_PILL_CLASS_BY_KEY: Record<string, string> = {
 };
 
 /**
- * The NHSN measure names Report Results/Details show for a report, resolved back from the dQMs
- * Report actually stores. Prefers the exact selection made when the report was requested (kept in
- * the draft, since Report only knows the resolved dQM); falls back to every placeholder measure
- * that resolves to one of the report's dQMs when that record isn't available -- e.g. a report
- * generated in another session -- which is ambiguous when several placeholders share a dQM but
- * still more useful than the raw dQM id.
+ * The NHSN measure names Report Results/Details show for a report. Prefers the exact selection
+ * made when the report was requested (kept in the draft as real measure names, since Report only
+ * knows the resolved dQM); falls back to reversing DIGITAL_QUALITY_MEASURE_BY_MEASURE /
+ * DQM_INFO_BY_REAL_ID below from the report's real dQM ids when that record isn't available --
+ * e.g. a report generated in another session -- which only resolves the fixed demo measure names
+ * those tables know about, but is still more useful than the raw dQM id.
  */
 function friendlyMeasuresFor(
   dqmMeasures: string[],
@@ -77,17 +76,16 @@ function friendlyMeasuresFor(
 ): string[] {
   const requested = requestedMeasuresByReportId?.[reportId];
   if (requested && requested.length > 0) {
-    const names = requested
-      .map(id => PLACEHOLDER_MEASURES.find(measure => measure.id === id)?.name)
-      .filter((name): name is string => Boolean(name));
-    if (names.length > 0) {
-      return names;
-    }
+    return requested;
   }
 
-  const dqmSet = new Set(dqmMeasures);
-  const byDqm = PLACEHOLDER_MEASURES.filter(measure => dqmSet.has(measure.digitalQualityMeasure)).map(measure => measure.name);
-  return byDqm.length > 0 ? byDqm : dqmMeasures;
+  const dqmTabNames = new Set(
+    dqmMeasures.map(dqmId => DQM_INFO_BY_REAL_ID[dqmId]?.name).filter((name): name is string => Boolean(name))
+  );
+  const byDqmTab = Object.entries(DIGITAL_QUALITY_MEASURE_BY_MEASURE)
+    .filter(([, tabName]) => dqmTabNames.has(tabName))
+    .map(([measureName]) => measureName);
+  return byDqmTab.length > 0 ? byDqmTab : dqmMeasures;
 }
 
 // Report generation has no completion signal wired up downstream in this environment -- every ad
@@ -152,11 +150,15 @@ const DQM_INFO_BY_REAL_ID: Record<string, {name: string; url: string}> = {
 };
 
 // A DQM tab ("ACH Monthly") to the real report type Report stores measure reports under
-// ("NHSNAcuteCareHospitalMonthlyInitialPopulation"). Derived from the placeholder table rather
-// than hand-duplicated, since every placeholder already carries both.
-const REAL_REPORT_TYPE_BY_DQM_NAME: Record<string, string> = Object.fromEntries(
-  PLACEHOLDER_MEASURES.map(measure => [DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure.name], measure.digitalQualityMeasure])
-);
+// ("NHSNAcuteCareHospitalMonthlyInitialPopulation"). Fixed here directly, matching
+// DQM_INFO_BY_REAL_ID above -- previously derived from the placeholder measure table, which is
+// gone now that the picker reads the facility's real reporting plan instead of a fixed 5-measure
+// list.
+const REAL_REPORT_TYPE_BY_DQM_NAME: Record<string, string> = {
+  'ACH Monthly': 'NHSNAcuteCareHospitalMonthlyInitialPopulation',
+  'ACH Daily': 'NHSNAcuteCareHospitalDailyInitialPopulation',
+  'LTC Monthly': 'NHSNLongTermCareMonthlyInitialPopulation'
+};
 
 // The reverse of the map above, for turning a patient's real per-dQM report type back into the
 // DQM tab name it belongs under -- used by the Export Report Summary sheet, which isn't scoped to
@@ -880,7 +882,8 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 </thead>
                 <tbody>
                   {friendlyDetailMeasures.map(measure => {
-                    const realDqmId = PLACEHOLDER_MEASURES.find(placeholder => placeholder.name === measure)?.digitalQualityMeasure;
+                    const tabName = DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure];
+                    const realDqmId = tabName ? REAL_REPORT_TYPE_BY_DQM_NAME[tabName] : undefined;
                     const dqmInfo = realDqmId ? DQM_INFO_BY_REAL_ID[realDqmId] : undefined;
                     return (
                       <tr key={measure}>

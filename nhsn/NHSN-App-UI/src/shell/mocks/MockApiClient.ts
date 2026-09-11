@@ -516,6 +516,20 @@ export class MockApiClient implements ApiClient {
     };
   }
 
+  async getAvailableMeasures(): Promise<C.AvailableMeasure[]> {
+    await tick();
+    return [
+      {
+        name: 'Glycemic Control (simulated)',
+        digitalQualityMeasure: 'NHSNGlycemicControlHypoglycemicInitialPopulation'
+      },
+      {
+        name: 'Acute Care Hospital Monthly (simulated)',
+        digitalQualityMeasure: 'NHSNAcuteCareHospitalMonthlyInitialPopulation'
+      }
+    ];
+  }
+
   getJwksInstructionsUrl(vendor: string): string {
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
     return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));

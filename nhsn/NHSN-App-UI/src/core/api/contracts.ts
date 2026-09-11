@@ -110,6 +110,16 @@ export interface Measure {
 }
 
 /**
+ * One NHSN measure the current facility is enrolled in AND MeasureEval can actually evaluate.
+ * The single source both the Reporting Plan step's completion gate and the Generate Test Report
+ * step's picker read from — unlike `Measure` above, this is facility-specific and not cached.
+ */
+export interface AvailableMeasure {
+  name: string;
+  digitalQualityMeasure: string;
+}
+
+/**
  * Facility types NHSN groups HSLOC codes by, shown as badges in the reference
  * table ("Facilities" column). Matches the flags the POC's HSLOC_CODES fixture
  * carries per row.

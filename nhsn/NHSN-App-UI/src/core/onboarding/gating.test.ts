@@ -21,7 +21,15 @@ const user: UserInfoResponse = {
 };
 
 function draftAt(unlocked: StepId[], overrides: Partial<FacilityDraft> = {}): FacilityDraft {
-  return {...createEmptyDraft(), unlockedStepIds: unlocked, ...overrides};
+  return {
+    ...createEmptyDraft(),
+    unlockedStepIds: unlocked,
+    // Satisfied by default so tests unrelated to the reporting-plan step's own gating logic
+    // (covered separately in steps/reporting-plan/validate.test.ts) can use it as a pass-through
+    // prerequisite, matching every other step's default-satisfied shape here.
+    reportingPlan: {hasAvailableMeasure: true},
+    ...overrides
+  };
 }
 
 describe('resolveStep', () => {

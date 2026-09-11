@@ -192,6 +192,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, OrganizationIdentificationEndpoints>();
     builder.Services.AddTransient<IApi, HslocMappingsEndpoints>();
     builder.Services.AddTransient<IApi, ReportsEndpoints>();
+    builder.Services.AddTransient<IApi, ReportingPlanEndpoints>();
     builder.Services.AddTransient<IApi, DocumentsEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();

@@ -2,6 +2,7 @@ import type {FacilityDraft} from '../onboarding/types';
 import type {Operation} from './http';
 import type {
   Acknowledgement,
+  AvailableMeasure,
   CensusListKey,
   CensusListResult,
   CommitResult,
@@ -115,6 +116,12 @@ export interface ApiClient {
 
   // reporting plan
   getReportingPlan(): Promise<ReportingPlan>;
+  /**
+   * The current facility's reporting-plan measures MeasureEval can actually evaluate. Read fresh
+   * by both the Reporting Plan step (its completion gate) and the Generate Test Report step (its
+   * measure picker) — neither caches it, so neither goes stale relative to the other.
+   */
+  getAvailableMeasures(): Promise<AvailableMeasure[]>;
 
   getJwksInstructionsUrl(vendor: string): string;
   getLocationOrgResolutionUrl(): string;
