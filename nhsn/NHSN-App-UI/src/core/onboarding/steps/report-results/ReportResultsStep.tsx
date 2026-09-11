@@ -36,7 +36,6 @@ import {useOnboarding} from '../../OnboardingProvider';
 import type {LocationOrgDraft} from '../../types';
 import {buildGroups} from '../encounter/EncounterStep';
 import {METHOD_LABEL_KEYS} from '../location-org/LocationOrgStep';
-import {PLACEHOLDER_MEASURES} from '../report/placeholderMeasures';
 import {parseQueryPlan, type ParsedQueryPlan, type ParsedQueryPlanQuery} from './queryPlan';
 import {buildXlsxBlob, downloadBlob, type XlsxSheet} from './reportExport';
 
