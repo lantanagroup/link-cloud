@@ -48,14 +48,14 @@ class ValidationCacheServiceTest {
         verify(delegate, times(1)).invokeRemoteValidateCode(anyString(), anyString(), anyString(), anyString(), any());
 
         Cache cache = cacheManager.getCache(ValidationCacheService.CACHE_NAME);
-        assertSame(expected, cache.get(java.util.Objects.hash("sys", "code", "display", "vs")).get());
+        assertSame(expected, cache.get(service.validateCodeCacheKey("sys", "code", "display", "vs")).get());
     }
 
     @Test
     void hitReturnsCachedResultWithoutCallingDelegate() {
         IValidationSupport.CodeValidationResult expected = new IValidationSupport.CodeValidationResult();
         cacheManager.getCache(ValidationCacheService.CACHE_NAME)
-                .put(java.util.Objects.hash("sys", "code", "display", "vs"), expected);
+                .put(service.validateCodeCacheKey("sys", "code", "display", "vs"), expected);
 
         IValidationSupport.CodeValidationResult actual =
                 service.cachedValidateCode(delegate, "sys", "code", "display", "vs");
