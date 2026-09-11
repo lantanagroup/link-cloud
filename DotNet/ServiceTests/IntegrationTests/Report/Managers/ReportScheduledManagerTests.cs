@@ -1,7 +1,10 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -254,6 +257,184 @@ public class ReportScheduledManagerTests
     #endregion
 
     #region Helper Methods
+
+    #region Bypassed submission (LEGLINK-1083)
+
+    /// <summary>
+    /// Pins the EF behaviour the whole feature rests on. EnableSubmission is configured with
+    /// HasDefaultValue(true), which makes EF infer ValueGeneratedOnAdd on top of the column's
+    /// DEFAULT 1 constraint -- the classic shape of a bool that silently reverts to its store
+    /// default on insert.
+    ///
+    /// It does not revert, because since EF Core 7 HasDefaultValue(v) also sets the property's
+    /// sentinel to v: the value omitted from the INSERT is true, so an explicit false is sent.
+    /// Nothing else covers this, and it is subtle enough that an EF upgrade or an edit to that
+    /// one line could flip it without any other test noticing -- at which point bypassSubmission
+    /// would be accepted, appear to work, and submit anyway.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AddAsync_PersistsEnableSubmissionExactlyAsGiven(bool enableSubmission)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var model = new ReportScheduleModel
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            Frequency = Frequency.Adhoc,
+            ReportTypes = { "DE-111" },
+            Status = ScheduleStatus.New,
+            EnableSubmission = enableSubmission,
+            CreateDate = DateTime.UtcNow
+        };
+
+        await sut.AddAsync(model, CancellationToken.None);
+
+        // Read through the raw entity rather than the manager, so a projection that happened to
+        // default the value could not mask a bad write.
+        context.ChangeTracker.Clear();
+        var stored = await context.ReportSchedule.FindAsync(model.Id);
+
+        Assert.NotNull(stored);
+        Assert.Equal(enableSubmission, stored.EnableSubmission);
+    }
+
+
+    /// <summary>
+    /// A bypassed report completed its work, so the facility-facing status is Completed --
+    /// the same value a submitted report reads. LEGLINK-1009 defines that vocabulary as
+    /// exactly Pending, Completed and Canceled, projected over the internal state machine
+    /// rather than mirroring it, so no fourth value is added for the bypass.
+    /// </summary>
+    [Fact]
+    public async Task GetReportSummaries_WithCompletedNotSubmittedReport_ProjectsToCompleted()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted));
+
+        var result = await sut.GetReportSummaries(facilityId, null, null, null, 10, 1);
+
+        var summary = Assert.Single(result.Records);
+        Assert.Equal(ReportStatus.Completed, summary.Status);
+    }
+
+    /// <summary>
+    /// The projection's else branch falls through to Unknown, and every status declared
+    /// before this ticket was named explicitly, so CompletedNotSubmitted is the first value
+    /// that could ever reach it. Landing there would read as a bug rather than a decision.
+    /// </summary>
+    [Fact]
+    public async Task GetReportSummaries_WithCompletedNotSubmittedReport_DoesNotProjectToUnknown()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted));
+
+        var result = await sut.GetReportSummaries(facilityId, null, null, null, 10, 1);
+
+        Assert.NotEqual(ReportStatus.Unknown, Assert.Single(result.Records).Status);
+    }
+
+    /// <summary>
+    /// Filtering by Completed has to return bypassed reports alongside submitted ones,
+    /// otherwise a bypassed report is reachable by no status filter at all.
+    /// </summary>
+    [Fact]
+    public async Task GetReportSummaries_FilteredByCompleted_ReturnsBothSubmittedAndBypassed()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.Submitted));
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted));
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.EndOfPeriod));
+
+        var result = await sut.GetReportSummaries(facilityId, ReportStatus.Completed, null, null, 10, 1);
+
+        Assert.Equal(2, result.Records.Count);
+    }
+
+    /// <summary>
+    /// Canceled is derived from IsDeleted and is evaluated first, so it still wins over a
+    /// terminal status.
+    /// </summary>
+    [Fact]
+    public async Task GetReportSummaries_WithDeletedCompletedNotSubmittedReport_ProjectsToCanceled()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedAsync(context, CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted, isDeleted: true));
+
+        var result = await sut.GetReportSummaries(facilityId, null, null, null, 10, 1);
+
+        Assert.Equal(ReportStatus.Canceled, Assert.Single(result.Records).Status);
+    }
+
+    /// <summary>
+    /// Bulk soft-delete by facility only ever batched Submitted rows. Without the terminal
+    /// set a bypassed report would be undeletable through this path.
+    /// </summary>
+    [Fact]
+    public async Task UpdateReportsDeletedStatusForFacility_WithCompletedNotSubmittedReport_SetsIsDeletedTrue()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var report = CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted);
+
+        await SeedAsync(context, report);
+
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+
+        var updated = await context.ReportSchedule.FindAsync(report.Id);
+        Assert.True(updated!.IsDeleted);
+    }
+
+    /// <summary>
+    /// Soft-delete by id refuses only reports still in progress. A bypassed report has
+    /// finished, so it must be deletable.
+    /// </summary>
+    [Fact]
+    public async Task SoftDeleteByReportTrackingIdAsync_WithCompletedNotSubmittedReport_Succeeds()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var report = CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted);
+
+        await SeedAsync(context, report);
+
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        var updated = await context.ReportSchedule.FindAsync(report.Id);
+        Assert.True(updated!.IsDeleted);
+    }
+
+    #endregion
 
     private static ReportSchedule CreateReport(string facilityId, ScheduleStatus status, bool isDeleted = false)
     {

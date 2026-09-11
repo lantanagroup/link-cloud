@@ -183,11 +183,35 @@ namespace LantanaGroup.Link.Report.Listeners
             // (pre-qualification.write-pre-qual-operation-outcome). Report only records
             // the validation result and forwards the patient payload for submission.
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
-            reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
 
-            await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+            if (schedule.EnableSubmission)
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+            }
+            else
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+                // The per-patient SubmitPayload we just skipped is normally what drives report
+                // completion: it comes back as PayloadSubmitted, and PayloadSubmittedListener
+                // calls ReportManifestProducer.Produce after each patient. With submission
+                // bypassed that event never exists, and the other callers cannot stand in for
+                // it -- MeasureReportGeneratedListener runs before validation, and an ad-hoc
+                // report never schedules EndOfReportPeriodJob. Without this call the manifest
+                // is never written to internal/ and the schedule sits at its pre-report status
+                // forever.
+                //
+                // Produce is gated on EndOfReportPeriodJobHasRun and AreAllEntriesCompleteAsync,
+                // so it is a no-op on every patient but the last, exactly as on the submitting
+                // path.
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
+                await reportManifestProducer.Produce(schedule, correlationIdStr, cancellationToken);
+            }
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
