@@ -36,6 +36,7 @@ CLI flags:
 | `--report <path>` | no | `validation-cost-report.json` | Output path for JSON report. |
 | `--top-messages N` | no | `20` | Number of top-N validation messages to include in the rollup. |
 | `--verbose`, `-v` | no | off | Keep HAPI's INFO-level chatter (`Fetching CodeSystem...`, `Loading structure definitions...`). Default silences these; WARN/ERROR still get through. |
+| `--terminology-service-url <url>` | no | — | If set, inserts a production-shaped `RemoteTermServiceValidation` into the chain ahead of the in-memory fallbacks (matching `ValidationService.loadTerminologyValidationSupport` ordering). Numbers will include remote round-trips, cached identically to production. Leave unset to measure IG-intrinsic cost without network latency. |
 
 ## Inputs
 

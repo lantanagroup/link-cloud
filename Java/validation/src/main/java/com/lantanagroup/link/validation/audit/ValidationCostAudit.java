@@ -14,6 +14,11 @@ import ch.qos.logback.classic.Logger;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
+import com.lantanagroup.link.validation.providers.ValidationCacheService;
+import com.lantanagroup.link.validation.services.ValidationMetrics;
+import io.opentelemetry.api.OpenTelemetry;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
@@ -27,12 +32,14 @@ import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,7 +68,14 @@ import org.slf4j.LoggerFactory;
  *                  --deps /path/to/deps-dir \
  *                  --bundles /path/to/bundles-dir \
  *                  --iterations 3 \
- *                  --report cost-report.json"
+ *                  --report cost-report.json \
+ *                  [--terminology-service-url https://tx.example.org/fhir]"
+ *
+ * <p>By default the audit uses in-memory terminology only, deliberately excluding remote-TS
+ * latency so results reflect IG-intrinsic cost. Pass {@code --terminology-service-url} to insert
+ * a production-shaped {@link RemoteTermServiceValidation} into the chain (ahead of the in-memory
+ * fallbacks, matching {@code ValidationService.loadTerminologyValidationSupport}'s ordering) —
+ * numbers will then include remote round-trips, cached identically to production.
  * </pre>
  *
  * <p>Not measured: per-invariant / per-constraint timing (HAPI doesn't natively expose it).
@@ -98,12 +112,14 @@ public class ValidationCostAudit {
         System.out.printf("Deps dir:      %s%n", a.deps);
         System.out.printf("Bundles dir:   %s%n", a.bundles);
         System.out.printf("Iterations:    %d (1 warmup + %d recorded)%n", a.iterations, a.iterations - 1);
+        System.out.printf("Terminology:   %s%n",
+                a.terminologyServiceUrl != null ? "remote — " + a.terminologyServiceUrl : "in-memory only");
         System.out.println();
 
         FhirContext ctx = FhirContext.forR4();
         System.out.println("Building validator chain...");
         long tBuildStart = System.nanoTime();
-        FhirValidator validator = buildValidator(ctx, a.ig, a.deps);
+        FhirValidator validator = buildValidator(ctx, a.ig, a.deps, a.terminologyServiceUrl);
         double buildMs = (System.nanoTime() - tBuildStart) / 1_000_000.0;
         System.out.printf("  ...validator ready in %.1f ms%n%n", buildMs);
 
@@ -144,7 +160,7 @@ public class ValidationCostAudit {
 
     // ---------- Validator setup ----------
 
-    private FhirValidator buildValidator(FhirContext ctx, Path primaryIg, Path depsDir) throws IOException {
+    private FhirValidator buildValidator(FhirContext ctx, Path primaryIg, Path depsDir, String terminologyServiceUrl) throws IOException {
         PrePopulatedValidationSupport packageSupport = new PrePopulatedValidationSupport(ctx);
         loadPackage(ctx, packageSupport, primaryIg);
         if (depsDir != null && Files.isDirectory(depsDir)) {
@@ -163,15 +179,57 @@ public class ValidationCostAudit {
         ValidationSupportChain chain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(ctx),
                 packageSupport,
-                new CommonCodeSystemsTerminologyService(ctx),
-                new InMemoryTerminologyServerValidationSupport(ctx),
                 new SnapshotGeneratingValidationSupport(ctx));
+
+        // Mirror production ordering (ValidationService.loadTerminologyValidationSupport):
+        // remote first (if configured) so it wins for whatever it can answer, then the
+        // in-memory fallbacks catch base-FHIR / package-owned VSes the remote doesn't own.
+        if (terminologyServiceUrl != null && !terminologyServiceUrl.isBlank()) {
+            chain.addValidationSupport(buildRemoteTermSupport(ctx, terminologyServiceUrl));
+            System.out.printf("  wired remote terminology support: %s%n", terminologyServiceUrl);
+        }
+        chain.addValidationSupport(new CommonCodeSystemsTerminologyService(ctx));
+        chain.addValidationSupport(new InMemoryTerminologyServerValidationSupport(ctx));
 
         CachingValidationSupport caching = new CachingValidationSupport(chain);
         FhirInstanceValidator module = new FhirInstanceValidator(caching);
         FhirValidator validator = new FhirValidator(ctx);
         validator.registerValidatorModule(module);
         return validator;
+    }
+
+    /**
+     * Builds a production-shaped {@link RemoteTermServiceValidation} for the audit chain. Wires up
+     * a minimal in-process {@link ValidationCacheService} (Caffeine {@link CacheManager} + no-op
+     * OpenTelemetry {@link ValidationMetrics}) so the class works standalone — the cost audit does
+     * not have a Spring context to inject the production beans from. Cache hit / miss counters are
+     * recorded but not exported anywhere; the goal here is to measure realistic per-call latency
+     * with caching engaged, matching what production sees on warm cache.
+     *
+     * <p>Whitelists are empty — the audit measures the raw remote-TS cost for every code system and
+     * value set the IG references. If your production configuration whitelists certain systems away
+     * from the remote, expect the audit's numbers to be higher than production's.
+     */
+    private RemoteTermServiceValidation buildRemoteTermSupport(FhirContext ctx, String baseUrl) {
+        // In-process cache manager with the same region names ValidationCacheService's @Cacheable
+        // methods target on the production side.
+        // Cache region names must match what ValidationCacheService's @Cacheable methods declare.
+        // Kept as inline literals here because the constant on ValidationCacheService is package-
+        // private to `providers`; hoisting it public just for the audit tool wasn't warranted.
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+                "validateCodeCache",
+                "isCodeSystemSupportedCache",
+                "isValueSetSupportedCache",
+                "lookupCodeCache");
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofHours(1))
+                .maximumSize(10_000));
+
+        ValidationMetrics metrics = new ValidationMetrics(OpenTelemetry.noop());
+        ValidationCacheService cacheService = new ValidationCacheService(cacheManager, metrics);
+
+        return new RemoteTermServiceValidation(
+                cacheService, ctx, baseUrl, List.of(), List.of());
     }
 
     private static final Collection<String> LOADABLE_TYPES = List.of(
@@ -232,7 +290,19 @@ public class ValidationCostAudit {
                 List<MessageRecord> capturedMessages = null;
                 for (int i = 0; i < iterations; i++) {
                     long start = System.nanoTime();
-                    ValidationResult result = validator.validateWithResult(forValidation, options);
+                    ValidationResult result;
+                    try {
+                        result = validator.validateWithResult(forValidation, options);
+                    } catch (Exception ex) {
+                        // Defensive: with a remote TS configured, unexpected HTTP responses
+                        // (e.g. 422 from a server that doesn't like a specific code) currently
+                        // propagate out of RemoteTermServiceValidation. Log-and-continue so one
+                        // bad code doesn't torpedo the whole audit; the sample is skipped.
+                        System.err.printf("    ! %s/%s against %s: %s%n",
+                                res.fhirType(), res.getIdPart(), profile,
+                                ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                        break;   // Skip remaining iterations for this pair; move to next profile.
+                    }
                     long elapsed = System.nanoTime() - start;
 
                     if (i == 0) {
@@ -532,6 +602,7 @@ public class ValidationCostAudit {
         int iterations = 3;
         boolean verbose = false;
         int topMessages = 20;
+        String terminologyServiceUrl;
 
         static Args parse(String[] argv) {
             Args a = new Args();
@@ -548,6 +619,7 @@ public class ValidationCostAudit {
                             case "--iterations" -> a.iterations = Integer.parseInt(value);
                             case "--report" -> a.report = Paths.get(value);
                             case "--top-messages" -> a.topMessages = Integer.parseInt(value);
+                            case "--terminology-service-url" -> a.terminologyServiceUrl = value;
                             default -> throw new IllegalArgumentException("Unknown flag: " + flag);
                         }
                     }
