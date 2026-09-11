@@ -23,3 +23,9 @@ mvn clean install
 ```bash
 docker build -t link-validation .
 ```
+
+## Utilities
+
+- **Validation cost audit** — internal tool for auditing IG validation cost,
+  ranking profiles / resource types / validation messages by contribution.
+  See [COST-AUDIT.md](COST-AUDIT.md).
