@@ -1,10 +1,12 @@
 import React, {useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
+import type {AvailableMeasure} from '../../../api/contracts';
 import {
   Button,
   ChipMultiSelect,
   DateField,
+  NHSNLoadingIndicator,
   PageHeader,
   StepActions
 } from '../../../fields';
@@ -12,7 +14,6 @@ import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {PatientSelection} from './PatientSelection';
-import {PLACEHOLDER_MEASURES, toDigitalQualityMeasures} from './placeholderMeasures';
 import {enteredPatientIds, validateReport, type FieldErrors} from './validate';
 import './ReportStep.css';
 
@@ -24,9 +25,40 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const {draft, patch, saving} = useOnboarding();
   const report = draft.report;
 
+  const [loading, setLoading] = useState(true);
+  const [availableMeasures, setAvailableMeasures] = useState<AvailableMeasure[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [requesting, setRequesting] = useState(false);
   const [advanceAfterRequest, setAdvanceAfterRequest] = useState(false);
+
+  // Fetched fresh here rather than shared with the Reporting Plan step's copy -- simplest, and
+  // avoids either step going stale relative to the other.
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+
+    api
+      .getAvailableMeasures()
+      .then(measures => {
+        if (mounted) {
+          setAvailableMeasures(measures);
+        }
+      })
+      .catch(cause => {
+        if (mounted) {
+          notifyError(cause instanceof Error ? cause.message : t('onboarding:report.messages.measuresLoadError'));
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [api]);
 
   // Advancing is deferred a render so the reducer's patch is in the draft the
   // provider persists — `onNext` saves the draft it was rendered with.
@@ -58,11 +90,10 @@ export function ReportStep({onNext, onBack}: StepProps) {
     setRequesting(true);
     try {
       const operation = await api.requestReport({
-        // The picker's values are placeholder ids, not measures Tenant knows
-        // about -- resolve to the dQMs they stand in for before this goes out.
-        // Filtered to ids the picker still offers, so a stale id left over from
-        // an earlier draft can't silently resolve to nothing.
-        measures: toDigitalQualityMeasures(selectedMeasures),
+        // Resolve the selected NHSN measure names to the dQMs Tenant/MeasureEval know about.
+        // Deduplicated -- two NHSN measures can map to the same dQM, and Tenant refuses a
+        // request naming one twice.
+        measures: resolveDigitalQualityMeasures(selectedMeasures, availableMeasures),
         startDate: report.startDate!,
         endDate: report.endDate!,
         // Blank rows are an editing state, not patients.
@@ -94,19 +125,24 @@ export function ReportStep({onNext, onBack}: StepProps) {
   }
 
 
-  // Measures are hardcoded for now rather than read from a facility's reporting plan.
-  // The name is stand-in data, not UI copy, so it's used as-is rather than interpolated
-  // through t() -- i18next HTML-escapes interpolated values, which mangled "&"/"/" here.
-  const measureOptions = PLACEHOLDER_MEASURES.map(measure => ({
-    value: measure.id,
+  // The measure name is real facility data, not UI copy, so it's used as-is rather than
+  // interpolated through t() -- i18next HTML-escapes interpolated values, which would mangle
+  // "&"/"/" in a name like "Antimicrobial Use and Resistance (AU/AR)".
+  const measureOptions = availableMeasures.map(measure => ({
+    value: measure.name,
     label: measure.name
   }));
 
-  // A draft saved before this placeholder scheme existed can carry a raw dQM id (or any other
-  // id no longer offered) in report.measures. ChipMultiSelect renders an unrecognized value's raw
-  // id as its own chip label rather than dropping it, so it must be filtered out here instead.
-  const validPlaceholderIds = new Set(PLACEHOLDER_MEASURES.map(measure => measure.id));
-  const selectedMeasures = (report.measures ?? []).filter(id => validPlaceholderIds.has(id));
+  // A draft saved against an earlier available-measures fetch can carry a name no longer
+  // offered (the facility's plan or MeasureEval's definitions changed since). ChipMultiSelect
+  // renders an unrecognized value as its own chip rather than dropping it, so it must be
+  // filtered out here instead.
+  const validMeasureNames = new Set(availableMeasures.map(measure => measure.name));
+  const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
+
+  if (loading) {
+    return <NHSNLoadingIndicator />;
+  }
 
   return (
     <div className="report-generate">
@@ -178,6 +214,18 @@ export function ReportStep({onNext, onBack}: StepProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Selected NHSN measure names to the dQMs a report request carries. Deduplicated because two
+ * NHSN measures can share one dQM -- Tenant refuses a request that names one twice.
+ */
+function resolveDigitalQualityMeasures(
+  selectedNames: readonly string[],
+  availableMeasures: readonly AvailableMeasure[]
+): string[] {
+  const dqmByName = new Map(availableMeasures.map(measure => [measure.name, measure.digitalQualityMeasure]));
+  return [...new Set(selectedNames.map(name => dqmByName.get(name)).filter((dqm): dqm is string => Boolean(dqm)))];
 }
 
 export default ReportStep;

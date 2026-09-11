@@ -147,6 +147,12 @@ export interface ManualUploadDraft {
 
 export interface ReportingPlanDraft {
   reviewed?: boolean;
+  /**
+   * Set once the step has checked the facility's real reporting plan against MeasureEval, so
+   * flow.ts's completion predicate can read it straight from the draft rather than re-fetching on
+   * every gating check. Independent of the static schedule shown on the step itself.
+   */
+  hasAvailableMeasure?: boolean;
 }
 
 // ---------------------------------------------------------------- the draft

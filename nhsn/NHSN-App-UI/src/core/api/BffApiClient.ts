@@ -5,6 +5,7 @@ import {cachedReference} from './referenceCache';
 import type {
   Acknowledgement,
   AcquisitionLogEntry,
+  AvailableMeasure,
   CensusListKey,
   CensusListResult,
   CommitResult,
@@ -303,6 +304,11 @@ export class BffApiClient implements ApiClient {
 
   async getReportingPlan(): Promise<ReportingPlan> {
     const {data} = await this.http.get<ReportingPlan>('/reporting-plan');
+    return data;
+  }
+
+  async getAvailableMeasures(): Promise<AvailableMeasure[]> {
+    const {data} = await this.http.get<AvailableMeasure[]>('/reporting-plan/measures');
     return data;
   }
 
