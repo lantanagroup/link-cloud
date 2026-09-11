@@ -21,11 +21,10 @@ internal static class FacilityInfoMapper
 
     // Builds the payload for a facility Tenant does not have yet.
     //
-    // ScheduledReports is built with three empty arrays — the only place in the BFF permitted to
-    // construct it, and the only place empty is safe. Tenant throws on a null-array default, and
-    // empty arrays are the correct create-time value: they leave the facility inert, with no Quartz
-    // rows created. On an existing facility the same value would silently delete the Quartz job and
-    // trigger, which is why Overlay exists instead.
+    // ScheduledReports is built with three empty arrays: Tenant throws on a null-array default, and
+    // empty arrays are what both a plain create and a DMRP-enabled create expect - the latter
+    // derives the real schedule from the facility's DMRP reporting plans right after. See Overlay
+    // for the equivalent on update.
     public static FacilityModel ForCreate(FacilityInfo desired, VendorModel? vendor) => new()
     {
         FacilityId = desired.FacilityId,
@@ -43,9 +42,8 @@ internal static class FacilityInfoMapper
     // Overlays the values this step owns onto the record Tenant currently holds.
     //
     // current must be the object from the immediately preceding GET — this method mutates it
-    // rather than building a new one, so fields the BFF doesn't own (including ScheduledReports)
-    // survive untouched even as Tenant's schema evolves. Null on desired means "not captured by
-    // this step", not "clear it".
+    // rather than building a new one, so fields the BFF doesn't own survive untouched even as
+    // Tenant's schema evolves. Null on desired means "not captured by this step", not "clear it".
     public static FacilityModel Overlay(FacilityModel current, FacilityInfo desired, VendorModel? vendor)
     {
         ArgumentNullException.ThrowIfNull(current);
@@ -65,7 +63,18 @@ internal static class FacilityInfoMapper
             current.Vendor = vendor;
         }
 
-        // ScheduledReports is deliberately untouched. See the remarks above before changing this.
+        // Tenant's DMRP module owns scheduling once enabled: it rejects a write whose
+        // scheduledReports isn't empty, then derives the real schedule itself from the facility's
+        // DMRP reporting plans. Round-tripping whatever GET returned - which is already populated
+        // by that same derivation - trips that rejection on every update, so this always resubmits
+        // empty arrays instead and lets Tenant recompute the schedule.
+        current.ScheduledReports = new TenantScheduledReportConfig
+        {
+            Daily = [],
+            Weekly = [],
+            Monthly = []
+        };
+
         return current;
     }
 

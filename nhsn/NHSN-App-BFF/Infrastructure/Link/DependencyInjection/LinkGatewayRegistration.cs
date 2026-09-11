@@ -34,7 +34,6 @@ public static class LinkGatewayRegistration
         services.AddScoped<IReportingPlanGateway, ReportingPlanGateway>();
         services.AddScoped<IFhirConfigurationGateway, FhirConfigurationGateway>();
         services.AddScoped<IOrganizationLocationConfigurationGateway, OrganizationLocationConfigurationGateway>();
-        services.AddSingleton<IDataAcquisitionRawClient, DataAcquisitionRawClient>();
         services.AddSingleton<INormalizationRawClient, NormalizationRawClient>();
         services.AddScoped<ICensusConfigurationGateway, CensusConfigurationGateway>();
         services.AddScoped<IQueryDispatchGateway, QueryDispatchGateway>();

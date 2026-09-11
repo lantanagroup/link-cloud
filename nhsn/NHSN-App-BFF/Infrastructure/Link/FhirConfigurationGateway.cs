@@ -12,12 +12,10 @@ internal sealed class FhirConfigurationGateway : IFhirConfigurationGateway
     private const string ServiceName = "DataAcquisition";
 
     private readonly IDataAcquisitionServiceClient _dataAcquisitionClient;
-    private readonly IDataAcquisitionRawClient _rawClient;
 
-    public FhirConfigurationGateway(IDataAcquisitionServiceClient dataAcquisitionClient, IDataAcquisitionRawClient rawClient)
+    public FhirConfigurationGateway(IDataAcquisitionServiceClient dataAcquisitionClient)
     {
         _dataAcquisitionClient = dataAcquisitionClient;
-        _rawClient = rawClient;
     }
 
     public async Task<FhirSection?> GetAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -53,8 +51,7 @@ internal sealed class FhirConfigurationGateway : IFhirConfigurationGateway
             return;
         }
 
-        // Routed through the raw client rather than IDataAcquisitionServiceClient directly so the clean-replace payload shape stays owned by IDataAcquisitionRawClient
-        await _rawClient.UpdateFhirQueryConfigurationAsync(new UpdateFhirQueryConfigurationPayload
+        var updateResponse = await _dataAcquisitionClient.UpdateFhirQueryConfigurationAsync(new UpdateFhirQueryConfigurationPayload
         {
             Id = existing.Id,
             FacilityId = request.FacilityId,
@@ -65,5 +62,18 @@ internal sealed class FhirConfigurationGateway : IFhirConfigurationGateway
             MaxAcquisitionPullTime = request.MaxAcquisitionPullTime,
             TimeZone = request.TimeZone
         }, cancellationToken);
+
+        // DataAcquisition answers 304 when the PUT payload matches what's already stored — not a
+        // failure, so it's excluded from the success check rather than treated as an error.
+        if (updateResponse.StatusCode != StatusCodes.Status304NotModified)
+        {
+            LinkResponseHandler.EnsureSuccess(updateResponse, ServiceName, nameof(SaveAsync));
+        }
+    }
+
+    public async Task<bool> TestConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
+    {
+        var response = await _dataAcquisitionClient.ValidateConnectionAsync(fhirServerBaseUrl, cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 }
