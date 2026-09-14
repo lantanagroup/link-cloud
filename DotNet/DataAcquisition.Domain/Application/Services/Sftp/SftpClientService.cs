@@ -27,6 +27,18 @@ public interface ISftpClientService
     Task<ISftpSession> OpenSessionAsync(
         SftpConfigurationModel sftpConfig,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens an SFTP session using the provided host, port, and credentials.
+    /// The session maintains a single connection for all subsequent file operations.
+    /// </summary>
+    /// <param name="host">Host name for the SFTP server.</param>
+    /// <param name="port">Port number for the SFTP server.</param>
+    /// <param name="credentials">Credentials for authenticating with the SFTP server.</param>
+    /// <param name="timeout">Timeout for the SFTP session.</param>
+    /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
+    /// <returns>An open <see cref="ISftpSession"/> ready for file operations.</returns>
+    Task<ISftpSession> OpenSessionAsync(string host, int port, SftpCredentialsModel credentials, TimeSpan timeout, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -46,18 +58,39 @@ public class SftpClientService(ILogger<SftpClientService> logger, ISftpCredentia
             throw new InvalidOperationException($"No SFTP credentials found for facility {sftpConfig.OrganizationId}");
         }
 
-        var client = new SftpClient(
+        var session = await OpenSessionAsync(
             sftpConfig.Host,
             sftpConfig.Port,
-            credentials.Username,
-            credentials.Password);
-
-        client.ConnectionInfo.Timeout = sftpConfig.Timeout;
-        await client.ConnectAsync(cancellationToken);
+            credentials,
+            sftpConfig.Timeout,
+            cancellationToken);
 
         logger.LogDebug(
             "Opened SFTP session to {Host}:{Port} for facility {FacilityId}",
             sftpConfig.Host.SanitizeForLog(), sftpConfig.Port.SanitizeForLog(), sftpConfig.OrganizationId.SanitizeForLog());
+
+        return session;
+    }
+
+    /// <inheritdoc/>
+    public async Task<ISftpSession> OpenSessionAsync(string host, int port, SftpCredentialsModel credentials, TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(credentials);
+
+        var client = new SftpClient(host, port, credentials.Username, credentials.Password);
+        client.ConnectionInfo.Timeout = timeout;
+
+        try
+        {
+            await client.ConnectAsync(cancellationToken);
+        }
+        catch
+        {
+            // Nothing else owns the client until the session wraps it
+            client.Dispose();
+            throw;
+        }
 
         return new SftpSession(client, logger);
     }
