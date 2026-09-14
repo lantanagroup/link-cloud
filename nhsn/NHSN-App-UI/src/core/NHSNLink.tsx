@@ -1,28 +1,31 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {useTranslation} from 'react-i18next';
-import {useApiClient} from './api/ApiClientContext';
-import type {UserInfoResponse} from './api/contracts';
-import {NavigationItem, NavigationRail, NavigationSection} from './NavigationRail';
-import {ConfigurationScreen} from './ConfigurationScreen';
-import {OnboardingProvider} from './onboarding/OnboardingProvider';
-import {OnboardingStepsNav, StepHost} from './onboarding/StepHost';
-import {normalizeBaseUrl} from './onboarding/navigation';
-import './NHSNLink.css';
-import {setAppLocale} from './localization/i18n';
+import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApiClient } from "./api/ApiClientContext";
+import type { UserInfoResponse } from "./api/contracts";
+import {
+  NavigationItem,
+  NavigationRail,
+  NavigationSection,
+} from "./NavigationRail";
+import { ConfigurationScreen } from "./ConfigurationScreen";
+import { Home } from "./Home";
+import { OnboardingProvider } from "./onboarding/OnboardingProvider";
+import { OnboardingStepsNav, StepHost } from "./onboarding/StepHost";
+import { normalizeBaseUrl } from "./onboarding/navigation";
+import "./NHSNLink.css";
+import { setAppLocale } from "./localization/i18n";
 
 export interface NHSNLinkProps {
   baseUrl?: string;
-  /** Where "Return to Home" on the completed-enrollment screen sends the browser. Host page, not a route inside this app. */
-  homeUrl?: string;
   locale?: string;
 }
 
-type RouteName = 'home' | 'onboarding' | 'configuration';
+type RouteName = "home" | "onboarding" | "configuration";
 
 const routePathMap: Record<RouteName, string> = {
-  home: '/',
-  onboarding: '/onboarding',
-  configuration: '/configuration'
+  home: "/",
+  onboarding: "/onboarding",
+  configuration: "/configuration",
 };
 
 /**
@@ -32,22 +35,26 @@ const routePathMap: Record<RouteName, string> = {
  * point's composition root, and the user context is server-observed. There is
  * deliberately no prop by which a caller can assert a facility or a role.
  */
-export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) {
-  const {t} = useTranslation('common');
+export function NHSNLink({
+  baseUrl = "/",
+  locale,
+}: NHSNLinkProps) {
+  const { t } = useTranslation("common");
   const api = useApiClient();
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [route, setRoute] = useState<RouteName>('home');
+  const [route, setRoute] = useState<RouteName>("home");
   const normalizedBaseUrl = useMemo(() => normalizeBaseUrl(baseUrl), [baseUrl]);
 
   useHintTooltips();
 
   useEffect(() => {
-    const syncRoute = () => setRoute(resolveRoute(window.location.pathname, normalizedBaseUrl));
+    const syncRoute = () =>
+      setRoute(resolveRoute(window.location.pathname, normalizedBaseUrl));
     syncRoute();
-    window.addEventListener('popstate', syncRoute);
-    return () => window.removeEventListener('popstate', syncRoute);
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
   }, [normalizedBaseUrl]);
 
   useEffect(() => {
@@ -61,14 +68,16 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
 
     api
       .getUserInfo()
-      .then(result => {
+      .then((result) => {
         if (mounted) {
           setUserInfo(result);
         }
       })
       .catch((cause: unknown) => {
         if (mounted) {
-          setError(cause instanceof Error ? cause.message : t('errors.unexpected'));
+          setError(
+            cause instanceof Error ? cause.message : t("errors.unexpected"),
+          );
         }
       })
       .finally(() => {
@@ -83,22 +92,24 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
   }, [api, t]);
 
   const navigationSections = useMemo<NavigationSection[]>(() => {
-    if (!userInfo || userInfo.accessState !== 'Allowed') {
+    if (!userInfo || userInfo.accessState !== "Allowed") {
       return [];
     }
 
-    // Home stays out of the rail until the facility is onboarded — until
-    // then, onboarding is the only place to go, and it renders as the step
-    // rail below rather than as a plain button here.
     const facilityItems: NavigationItem[] = userInfo.isOnboarded
-      ? [{key: 'home', label: t('navigation.home')}, {key: 'configuration', label: t('navigation.configuration')}]
-      : [{key: 'onboarding', label: t('navigation.onboarding')}];
+      ? [
+          { key: "home", label: t("navigation.home") },
+          { key: "configuration", label: t("navigation.configuration") },
+        ]
+      : [{ key: "onboarding", label: t("navigation.onboarding") }];
 
-    return [{heading: t('navigation.facility'), items: facilityItems}];
+    return [{ heading: t("navigation.facility"), items: facilityItems }];
   }, [t, userInfo]);
 
   if (loading) {
-    return <div className="nhsn-link__state">{t('state.loadingUserContext')}</div>;
+    return (
+      <div className="nhsn-link__state">{t("state.loadingUserContext")}</div>
+    );
   }
 
   if (error) {
@@ -106,19 +117,22 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
   }
 
   if (!userInfo) {
-    return <div className="nhsn-link__state">{t('state.noUserContext')}</div>;
+    return <div className="nhsn-link__state">{t("state.noUserContext")}</div>;
   }
 
-  if (userInfo.accessState === 'MissingRequiredRole') {
+  if (userInfo.accessState === "MissingRequiredRole") {
     return (
       <div className="nhsn-link__state">
         <div className="nhsn-link__state-card">
-          <h2>{t('auth.missingAccessTitle')}</h2>
-          <p>{t('auth.missingAccessDescription')}</p>
+          <h2>{t("auth.missingAccessTitle")}</h2>
+          <p>{t("auth.missingAccessDescription")}</p>
           {userInfo.accessRequestUrl && (
             <p>
-              <a href={userInfo.accessRequestUrl} target="_blank" rel="noreferrer">
-                {t('actions.submitRequest')}
+              <a
+                href={userInfo.accessRequestUrl}
+                target="_blank"
+                rel="noreferrer">
+                {t("actions.submitRequest")}
               </a>
             </p>
           )}
@@ -127,12 +141,12 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
     );
   }
 
-  if (userInfo.accessState === 'MissingFacility' || !userInfo.hasFacility) {
+  if (userInfo.accessState === "MissingFacility" || !userInfo.hasFacility) {
     return (
       <div className="nhsn-link__state">
         <div className="nhsn-link__state-card">
-          <h2>{t('auth.missingFacilityTitle')}</h2>
-          <p>{t('auth.missingFacilityDescription')}</p>
+          <h2>{t("auth.missingFacilityTitle")}</h2>
+          <p>{t("auth.missingFacilityDescription")}</p>
         </div>
       </div>
     );
@@ -141,23 +155,23 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
   function navigateTo(nextRoute: RouteName) {
     const targetPath = buildPath(nextRoute, normalizedBaseUrl);
     if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
+      window.history.pushState({}, "", targetPath);
     }
     setRoute(nextRoute);
   }
 
-  const showOnboarding = route === 'onboarding' && !userInfo.isOnboarded;
-
-  // Onboarding needs its provider in scope for the sidebar's step rail as
-  // well as the step panel, so both live under one OnboardingProvider here
-  // rather than the provider wrapping only the panel.
+  const showOnboarding = route === "onboarding" && !userInfo.isOnboarded;
+  
   return (
     <div className="nhsn-link">
       {showOnboarding ? (
-        <OnboardingProvider user={userInfo} baseUrl={normalizedBaseUrl} homeUrl={homeUrl}>
+        <OnboardingProvider
+          user={userInfo}
+          baseUrl={normalizedBaseUrl}
+          onGoHome={() => navigateTo("home")}>
           <div className="nhsn-link__layout">
             <NavigationRail
-              title={t('app.linkTitle')}
+              title={t("app.linkTitle")}
               sections={[]}
               activeRoute={route}
               onNavigate={navigateTo}
@@ -165,7 +179,8 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
               userEmail={userInfo.email}
               facilityName={userInfo.facilityName}
               facilityId={userInfo.facilityId}
-              stepsSection={<OnboardingStepsNav />} />
+              stepsSection={<OnboardingStepsNav />}
+            />
 
             <section className="nhsn-link__grid">
               <StepHost />
@@ -175,18 +190,21 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
       ) : (
         <div className="nhsn-link__layout">
           <NavigationRail
-            title={t('app.linkTitle')}
+            title={t("app.linkTitle")}
             sections={navigationSections}
             activeRoute={route}
             onNavigate={navigateTo}
             userName={userInfo.name}
             userEmail={userInfo.email}
             facilityName={userInfo.facilityName}
-            facilityId={userInfo.facilityId} />
+            facilityId={userInfo.facilityId}
+          />
 
           <section className="nhsn-link__grid">
-            {route === 'home' && <HomePanels userInfo={userInfo} />}
-            {route === 'configuration' && userInfo.isOnboarded && <ConfigurationScreen />}
+            {route === "home" && <Home userInfo={userInfo} />}
+            {route === "configuration" && userInfo.isOnboarded && (
+              <ConfigurationScreen />
+            )}
           </section>
         </div>
       )}
@@ -194,73 +212,32 @@ export function NHSNLink({baseUrl = '/', homeUrl = '/', locale}: NHSNLinkProps) 
   );
 }
 
-function HomePanels({userInfo}: {userInfo: UserInfoResponse}) {
-  const {t} = useTranslation('common');
-  return (
-    <>
-      <div className="nhsn-link__panel">
-        <h2>{t('home.userContextTitle')}</h2>
-        <p>
-          <strong>{t('home.facilityLabel')}</strong>{' '}
-          {userInfo.facilityId ?? t('home.notAssigned')}
-        </p>
-        <p>
-          <strong>{t('home.groupsLabel')}</strong>{' '}
-          {userInfo.groups.length > 0 ? userInfo.groups.join(', ') : t('home.noGroupsProvided')}
-        </p>
-        <p>
-          <strong>{t('home.accessStateLabel')}</strong> {userInfo.accessState}
-        </p>
-        <p>
-          <strong>{t('home.facilityAdminLabel')}</strong>{' '}
-          {userInfo.isFacilityAdmin ? t('commonBoolean.yes') : t('commonBoolean.no')}
-        </p>
-        <p>
-          <strong>{t('home.onboardingLabel')}</strong>{' '}
-          {userInfo.isOnboarded ? t('home.onboardingComplete') : t('home.onboardingInProgress')}
-        </p>
-      </div>
-
-      <div className="nhsn-link__panel">
-        <h2>{t('home.frameworkStatusTitle')}</h2>
-        <p>
-          {userInfo.isOnboarded
-            ? t('home.maintenanceModeDescription')
-            : t('home.onboardingModeDescription')}
-        </p>
-
-        <h3>{t('home.availableNavigationTitle')}</h3>
-        <ul>
-          {userInfo.availableNavigation.map(item => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-    </>
-  );
-}
-
 export default NHSNLink;
 
 function resolveRoute(pathname: string, baseUrl: string): RouteName {
   const withoutBase =
-    baseUrl !== '/' && pathname.startsWith(baseUrl) ? pathname.slice(baseUrl.length) || '/' : pathname;
+    baseUrl !== "/" && pathname.startsWith(baseUrl)
+      ? pathname.slice(baseUrl.length) || "/"
+      : pathname;
 
-  if (withoutBase === routePathMap.onboarding || withoutBase.startsWith(`${routePathMap.onboarding}/`)) {
-    return 'onboarding';
+  if (
+    withoutBase === routePathMap.onboarding ||
+    withoutBase.startsWith(`${routePathMap.onboarding}/`)
+  ) {
+    return "onboarding";
   }
   if (withoutBase === routePathMap.configuration) {
-    return 'configuration';
+    return "configuration";
   }
-  return 'home';
+  return "home";
 }
 
-const FIELD_HINT_OPEN_CLASS = 'k-form-field--hint-open';
-const INFO_ICON_OPEN_CLASS = 'info-icon--open';
+const FIELD_HINT_OPEN_CLASS = "k-form-field--hint-open";
+const INFO_ICON_OPEN_CLASS = "info-icon--open";
 const OPEN_SELECTOR = `.${FIELD_HINT_OPEN_CLASS}, .${INFO_ICON_OPEN_CLASS}`;
 
 function closeAllHintsExcept(keep: Element | null) {
-  document.querySelectorAll(OPEN_SELECTOR).forEach(el => {
+  document.querySelectorAll(OPEN_SELECTOR).forEach((el) => {
     if (el !== keep) {
       el.classList.remove(FIELD_HINT_OPEN_CLASS, INFO_ICON_OPEN_CLASS);
     }
@@ -275,53 +252,51 @@ function useHintTooltips() {
         return;
       }
 
-      const label = target.closest('.k-label');
-      const field = label?.closest('.k-form-field') ?? null;
-      const fieldTrigger = field?.querySelector('.k-form-hint') ? field : null;
-      const infoIconTrigger = target.closest('.info-icon');
+      const label = target.closest(".k-label");
+      const field = label?.closest(".k-form-field") ?? null;
+      const fieldTrigger = field?.querySelector(".k-form-hint") ? field : null;
+      const infoIconTrigger = target.closest(".info-icon");
 
       const trigger = fieldTrigger ?? infoIconTrigger;
       if (!trigger) {
-        if (!target.closest('.k-form-hint, .tooltip-bubble')) {
+        if (!target.closest(".k-form-hint, .tooltip-bubble")) {
           closeAllHintsExcept(null);
         }
         return;
       }
 
       if (trigger) {
-        // Clicking the badge/icon itself must only toggle the tooltip - not
-        // also fall through to the label's native "focus the associated
-        // control" behavior (fieldTrigger) or bubble into anything else
-        // listening for clicks on the icon (infoIconTrigger).
         event.preventDefault();
         event.stopPropagation();
       }
 
-      const openClass = fieldTrigger ? FIELD_HINT_OPEN_CLASS : INFO_ICON_OPEN_CLASS;
+      const openClass = fieldTrigger
+        ? FIELD_HINT_OPEN_CLASS
+        : INFO_ICON_OPEN_CLASS;
       const isOpen = trigger.classList.contains(openClass);
       closeAllHintsExcept(isOpen ? null : trigger);
       trigger.classList.toggle(openClass, !isOpen);
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         closeAllHintsExcept(null);
       }
     }
 
-    document.addEventListener('click', handleClick, true);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("click", handleClick, true);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('click', handleClick, true);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("click", handleClick, true);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 }
 
 function buildPath(route: RouteName, baseUrl: string): string {
   const routePath = routePathMap[route];
-  if (baseUrl === '/') {
+  if (baseUrl === "/") {
     return routePath;
   }
-  return routePath === '/' ? baseUrl : `${baseUrl}${routePath}`;
+  return routePath === "/" ? baseUrl : `${baseUrl}${routePath}`;
 }
