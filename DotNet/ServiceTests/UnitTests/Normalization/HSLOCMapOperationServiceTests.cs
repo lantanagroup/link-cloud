@@ -188,38 +188,58 @@ public class HSLOCMapOperationServiceTests
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
     }
 
-    [Fact]
-    public async Task CircularParentReferenceStopsAtIterationLimit()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CircularParentReferenceStopsAfterVisitingEachLocation(bool selfReference, bool hasValues)
     {
-        var child = new Location { Id = "child", Alias = ["Child"], PartOf = new ResourceReference("parent") };
-        var parent = new Location { Id = "parent", Alias = ["Parent"], PartOf = new ResourceReference("child") };
+        var child = new Location { Id = "child", Alias = hasValues ? ["Child"] : [], PartOf = new ResourceReference(selfReference ? "child" : "parent") };
+        var parent = new Location { Id = "parent", Alias = hasValues ? ["Parent"] : [], PartOf = new ResourceReference("child") };
 
-        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), child, [child, parent]);
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), child, [child, parent]);
 
-        Assert.Equal(2, child.Type.Count);
-        AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
-        AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Parent");
+        Assert.Equal(hasValues ? OperationStatus.Success : OperationStatus.NoAction, result.SuccessCode);
+        Assert.Equal(hasValues ? (selfReference ? 1 : 2) : 0, child.Type.Count);
+        if (hasValues)
+        {
+            AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
+            if (!selfReference)
+                AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Parent");
+        }
         Assert.Empty(parent.Type);
-        VerifyWarning($"Maximum iteration count of {HSLOCMapOperationService.MAX_ITERATIONS} reached");
+        VerifyWarning("Circular location hierarchy detected");
     }
 
     [Fact]
-    public async Task TraversalDoesNotCopyBeyondFixedIterationLimit()
+    public async Task TraversalCopiesAndMapsEntireLongAcyclicChain()
     {
-        var locations = Enumerable.Range(0, HSLOCMapOperationService.MAX_ITERATIONS + 1)
+        const int chainLength = 64;
+        var locations = Enumerable.Range(0, chainLength)
             .Select(index => new Location
             {
                 Id = $"location-{index}",
                 Alias = [$"Alias-{index}"],
-                PartOf = new ResourceReference($"location-{index + 1}")
+                PartOf = index < chainLength - 1 ? new ResourceReference($"location-{index + 1}") : null
             }).ToList();
+        var operation = new HSLOCMapOperation(
+        [
+            new CodeSystemMap(HSLOCMapOperationService.LocationAliasCodeSystem, "urn:hsloc",
+                new Dictionary<string, CodeMap> { [$"Alias-{chainLength - 1}"] = new("1027-4", "Medical critical care") })
+        ]);
 
-        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), locations[0], locations.Cast<DomainResource>().ToList());
+        var result = await _service.ProcessOperationAsync(operation, locations[0], locations.Cast<DomainResource>().ToList());
 
-        Assert.Equal(HSLOCMapOperationService.MAX_ITERATIONS, locations[0].Type.Count);
-        AssertCode(locations[0], HSLOCMapOperationService.LocationAliasCodeSystem, $"Alias-{HSLOCMapOperationService.MAX_ITERATIONS - 1}");
-        Assert.DoesNotContain(locations[0].Type.SelectMany(concept => concept.Coding), coding => coding.Code == $"Alias-{HSLOCMapOperationService.MAX_ITERATIONS}");
-        VerifyWarning($"Maximum iteration count of {HSLOCMapOperationService.MAX_ITERATIONS} reached");
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Equal(chainLength, locations[0].Type.Count);
+        foreach (var index in Enumerable.Range(0, chainLength - 1))
+            AssertCode(locations[0], HSLOCMapOperationService.LocationAliasCodeSystem, $"Alias-{index}");
+        AssertCode(locations[0], "urn:hsloc", "1027-4");
+        Assert.All(locations.Skip(1), location => Assert.Empty(location.Type));
+        _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(), It.IsAny<Exception>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
     }
 
     [Fact]

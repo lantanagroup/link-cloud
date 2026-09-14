@@ -50,7 +50,6 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
     private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
-    private readonly IFacilityLocationLocalCodeMappingManager _facilityLocationLocalCodeMappingManager;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -71,7 +70,6 @@ public class ResourcesAcquiredListener : BackgroundService
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache,
         IResourceCachePurger resourceCachePurger,
-        IFacilityLocationLocalCodeMappingManager facilityLocationLocalCodeMappingManager,
         IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -102,7 +100,6 @@ public class ResourcesAcquiredListener : BackgroundService
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
         _mappingOutcomeProducer = mappingOutcomeProducer ?? throw new ArgumentNullException(nameof(mappingOutcomeProducer));
-        _facilityLocationLocalCodeMappingManager = facilityLocationLocalCodeMappingManager ?? throw new ArgumentNullException(nameof(facilityLocationLocalCodeMappingManager));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -357,15 +354,22 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
 
                     try{
-                        await _facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(result.Message.Key.FacilityId, hslocMappingResults, cancellationToken);
+                        var facilityLocationLocalCodeMappingManager = scope.ServiceProvider.GetRequiredService<IFacilityLocationLocalCodeMappingManager>();
+                        await facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(result.Message.Key.FacilityId, hslocMappingResults, cancellationToken);
                     }
-                    catch(Exception exception)
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
                     {
                         _logger.LogError(
                             exception,
                             "Failed to save HSLOC map results for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
                             result.Message.Key.FacilityId.SanitizeForLog(),
                             correlationId.SanitizeForLog());
+
+                        throw new TransientException("Failed to save HSLOC map results.", exception);
                     }
                 }
 

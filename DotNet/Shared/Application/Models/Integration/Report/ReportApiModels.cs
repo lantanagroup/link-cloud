@@ -144,8 +144,7 @@ public class CodeMapOutcomeApiModel
     public int FailureCount { get; set; }
 
     /// <summary>
-    /// The distinct source codes that had no entry in the map -- what an operator would go and configure.
-    /// Capped; <see cref="UnmappedCount"/> is the true total.
+    /// The distinct source codes that had no entry in the map -- what an operator would go and configure.code
     /// </summary>
     public List<string> UnmappedCodes { get; set; } = [];
     public List<CodeMappingApiModel> MappedCodes { get; set; } = [];

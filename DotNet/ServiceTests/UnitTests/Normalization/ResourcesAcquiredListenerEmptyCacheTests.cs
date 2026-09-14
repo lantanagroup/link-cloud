@@ -261,7 +261,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             Mock.Of<IResourceCachePurger>(),
-            Mock.Of<IFacilityLocationLocalCodeMappingManager>(),
             mappingOutcomeProducer.Object);
     }
 

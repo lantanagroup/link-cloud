@@ -137,7 +137,6 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             purger.Object,
-            Mock.Of<IFacilityLocationLocalCodeMappingManager>(),
             Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
     }
 

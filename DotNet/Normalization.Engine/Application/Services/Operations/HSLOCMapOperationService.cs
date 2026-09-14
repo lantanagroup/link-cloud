@@ -14,7 +14,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         private readonly ILogger<HSLOCMapOperationService> _logger;
 
         public static string LocationAliasCodeSystem = "https://nhsnlink.org/location-alias";
-        public const int MAX_ITERATIONS = 20; //prevent infinite loops in case of circular references in the partOf hierarchy
 
         public HSLOCMapOperationService(ILogger<HSLOCMapOperationService> logger,
                                         CodeMapOperationService codeMapOperationService,
@@ -96,11 +95,17 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 location.Type = new List<CodeableConcept>();
             }
 
-            int iterationCount = 0;
+            var visitedLocations = new HashSet<Location>(ReferenceEqualityComparer.Instance);
             int changes = 0;
             do
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (!visitedLocations.Add(location))
+                {
+                    _logger.LogWarning("Circular location hierarchy detected while processing HSLOCMapOperation for Location {ResourceId}.", resource.Id.SanitizeForLog());
+                    break;
+                }
 
                 //1. copy alias to type
                 foreach(var alias in location.Alias)
@@ -152,12 +157,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     }
                     location = null;
                 }
-                iterationCount++;
-                if(iterationCount >= MAX_ITERATIONS && location != null)
-                {
-                    _logger.LogWarning("Maximum iteration count of {MaxIterations} reached while processing HSLOCMapOperation for Location {ResourceId}.", MAX_ITERATIONS, resource.Id.SanitizeForLog());
-                }
-            } while(location != null && iterationCount < MAX_ITERATIONS);
+            } while(location != null);
 
             if(changes > 0)
             {
