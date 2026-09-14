@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterMapping} from '../../../api/contracts';
@@ -38,11 +39,18 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const {notifyError} = useNotifications();
   const {draft, patch, saving} = useOnboarding();
 
-  const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<CodeSystemGroupState[]>(() =>
     buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? [])
   );
-  const [referenceCodes, setReferenceCodes] = useState<EncounterCode[]>([]);
+  const {
+    data: referenceCodes = [],
+    isLoading: loading,
+    error: referenceCodesError
+  } = useQuery({
+    queryKey: ['encounterCodes'],
+    queryFn: () => api.getEncounterCodes(),
+    staleTime: Infinity
+  });
   const [activeTab, setActiveTab] = useState<'mapping' | 'reference'>('mapping');
   const [search, setSearch] = useState('');
   const [systemFilter, setSystemFilter] = useState('');
@@ -58,30 +66,12 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   }, [readyToAdvance, onNext]);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-
-    api
-      .getEncounterCodes()
-      .then(codes => {
-        if (!mounted) {
-          return;
-        }
-        setReferenceCodes(codes);
-      })
-      .catch(cause => {
-        notifyError(cause instanceof Error ? cause.message : t('onboarding:encounter.messages.loadError'));
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [api]);
+    if (referenceCodesError) {
+      notifyError(
+        referenceCodesError instanceof Error ? referenceCodesError.message : t('onboarding:encounter.messages.loadError')
+      );
+    }
+  }, [referenceCodesError]);
 
   const systemOptions = useMemo(() => {
     const systems = Array.from(new Set(referenceCodes.map(code => code.system))).sort();

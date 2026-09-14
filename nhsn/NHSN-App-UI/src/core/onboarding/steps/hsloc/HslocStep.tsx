@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/contracts';
@@ -70,12 +71,21 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const {notifyError} = useNotifications();
   const {patch, saving, vendorProfile} = useOnboarding();
 
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<HslocTab>('mapping');
-  const [codes, setCodes] = useState<HslocCode[]>([]);
+  const [mappingsLoading, setMappingsLoading] = useState(true);
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+
+  const {
+    data: codes = [],
+    isLoading: codesLoading,
+    error: codesError
+  } = useQuery({
+    queryKey: ['hslocCodes'],
+    queryFn: () => api.getHslocCodes(),
+    staleTime: Infinity
+  });
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -93,14 +103,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
+    setMappingsLoading(true);
 
-    Promise.all([api.getHslocCodes(), api.getHslocMappings()])
-      .then(([codeList, mappings]) => {
+    api
+      .getHslocMappings()
+      .then(mappings => {
         if (!mounted) {
           return;
         }
-        setCodes(codeList);
         setRows(mappings.map(toMappingRow));
       })
       .catch(cause => {
@@ -108,7 +118,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
       })
       .finally(() => {
         if (mounted) {
-          setLoading(false);
+          setMappingsLoading(false);
         }
       });
 
@@ -116,6 +126,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
       mounted = false;
     };
   }, [api]);
+
+  useEffect(() => {
+    if (codesError) {
+      notifyError(codesError instanceof Error ? codesError.message : t('onboarding:hsloc.messages.loadError'));
+    }
+  }, [codesError]);
+
+  const loading = mappingsLoading || codesLoading;
 
   const locationValueLabel = vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback');
   const yourCodeLabel = t('onboarding:hsloc.mapping.fields.yourCodePlaceholder');

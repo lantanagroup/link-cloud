@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {AvailableMeasure} from '../../../api/contracts';
@@ -25,40 +26,27 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const {draft, patch, saving} = useOnboarding();
   const report = draft.report;
 
-  const [loading, setLoading] = useState(true);
-  const [availableMeasures, setAvailableMeasures] = useState<AvailableMeasure[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [requesting, setRequesting] = useState(false);
   const [advanceAfterRequest, setAdvanceAfterRequest] = useState(false);
 
-  // Fetched fresh here rather than shared with the Reporting Plan step's copy -- simplest, and
-  // avoids either step going stale relative to the other.
+  // Shares its cache with the Reporting Plan step via the query key -- both read the same
+  // value, so neither can go stale relative to the other.
+  const {
+    data: availableMeasures = [],
+    isLoading: loading,
+    error: measuresError
+  } = useQuery({
+    queryKey: ['availableMeasures'],
+    queryFn: () => api.getAvailableMeasures(),
+    staleTime: Infinity
+  });
+
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-
-    api
-      .getAvailableMeasures()
-      .then(measures => {
-        if (mounted) {
-          setAvailableMeasures(measures);
-        }
-      })
-      .catch(cause => {
-        if (mounted) {
-          notifyError(cause instanceof Error ? cause.message : t('onboarding:report.messages.measuresLoadError'));
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [api]);
+    if (measuresError) {
+      notifyError(measuresError instanceof Error ? measuresError.message : t('onboarding:report.messages.measuresLoadError'));
+    }
+  }, [measuresError]);
 
   // Advancing is deferred a render so the reducer's patch is in the draft the
   // provider persists — `onNext` saves the draft it was rendered with.
