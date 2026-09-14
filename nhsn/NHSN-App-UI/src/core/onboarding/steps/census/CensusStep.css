@@ -190,51 +190,10 @@
   margin-top: 5px;
 }
 
-.census-poi .k-form-field:has(.k-form-hint) .k-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.census-poi .k-form-field:has(.k-form-hint) .k-label::after {
-  content: '?';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  border-radius: 50%;
-  background: var(--census-gray-200);
-  color: var(--census-gray-600);
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  anchor-name: --census-hint-badge;
-  pointer-events: auto;
-}
-
-.census-poi .k-form-field--hint-open .k-label::after {
-  background: var(--census-blue);
-  color: var(--kendo-color-on-inverse, #ffffff);
-}
-
-@supports (position-anchor: --census-hint-badge) {
-  .census-poi .k-form-hint {
-    position-anchor: --census-hint-badge;
-    left: anchor(center);
-    bottom: calc(anchor(top) + 9px);
-    transform: translateX(-50%);
-  }
-
-  .census-poi .k-form-hint::after {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
-.census-poi .k-form-field--hint-open .k-form-hint {
-  display: block;
+.census-poi {
+  --hint-badge-bg: var(--census-gray-200);
+  --hint-badge-color: var(--census-gray-600);
+  --hint-badge-open-bg: var(--census-blue);
 }
 
 .census-poi .census-list-field {

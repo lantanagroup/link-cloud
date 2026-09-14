@@ -852,13 +852,13 @@
   display: none;
 }
 
-.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label {
+.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.nhsn-facility-info .k-form-field:has(.k-form-hint) .k-label::after {
+.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label::after {
   content: "?";
   display: inline-flex;
   align-items: center;
@@ -867,35 +867,36 @@
   height: 15px;
   flex: 0 0 15px;
   border-radius: 50%;
-  background: var(--kendo-color-border, #d0d7de);
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  background: var(--hint-badge-bg, var(--kendo-color-border, #d0d7de));
+  color: var(--hint-badge-color, var(--kendo-color-app-text-subtle, #5a5f69));
   font-size: 10.5px;
   font-weight: 700;
   cursor: pointer;
-  anchor-name: --facility-hint-badge;
+  anchor-name: --field-hint-badge;
   pointer-events: auto;
 }
 
-.nhsn-facility-info .k-form-field--hint-open .k-label::after {
-  background: var(--kendo-color-primary, #0057b7);
-  color: var(--kendo-color-on-primary, #ffffff);
+.nhsn-link__content .k-form-field--hint-open .k-label::after {
+  background: var(--hint-badge-open-bg, var(--kendo-color-primary, #0057b7));
+  color: var(--kendo-color-on-inverse, #ffffff);
 }
 
-@supports (position-anchor: --facility-hint-badge) {
-  .nhsn-facility-info .k-form-hint {
-    position-anchor: --facility-hint-badge;
+@supports (position-anchor: --field-hint-badge) {
+  .nhsn-link__content .k-form-hint {
+    position-anchor: --field-hint-badge;
     left: anchor(center);
     bottom: calc(anchor(top) + 9px);
     transform: translateX(-50%);
   }
 
-  .nhsn-facility-info .k-form-hint::after {
+  .nhsn-link__content .k-form-hint::after {
     left: 50%;
     transform: translateX(-50%);
   }
 }
 
-.nhsn-facility-info .k-form-field--hint-open .k-form-hint {
+.nhsn-link__content .k-form-field--hint-open .k-form-hint,
+.nhsn-link__content .k-form-field:has(.k-form-hint):has(.k-label:hover) .k-form-hint {
   display: block;
 }
 
@@ -1663,6 +1664,7 @@
   border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
+.info-icon:hover .tooltip-bubble,
 .info-icon:focus-visible .tooltip-bubble,
 .info-icon.info-icon--open .tooltip-bubble {
   display: block;
