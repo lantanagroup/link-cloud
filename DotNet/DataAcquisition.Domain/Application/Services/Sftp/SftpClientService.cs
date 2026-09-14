@@ -80,6 +80,9 @@ public class SftpClientService(ILogger<SftpClientService> logger, ISftpCredentia
 
         var client = new SftpClient(host, port, credentials.Username, credentials.Password);
         client.ConnectionInfo.Timeout = timeout;
+        // ConnectionInfo.Timeout only bounds connecting; each SFTP request (list, read) waits
+        // indefinitely by default, so a server that stalls after login would hold the caller forever
+        client.OperationTimeout = timeout;
 
         try
         {

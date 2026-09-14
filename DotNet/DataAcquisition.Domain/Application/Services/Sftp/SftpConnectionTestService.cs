@@ -67,6 +67,16 @@ public class SftpConnectionTestService(
     /// </summary>
     public const long MaxPreviewFileSizeBytes = 10 * 1024 * 1024;
 
+    /// <summary>
+    /// Most patients previewed from a single file. A file with more is previewed in part.
+    /// </summary>
+    public const int MaxPatientsPerFile = 2_000;
+
+    /// <summary>
+    /// Most patients previewed across all files. Once reached, the remaining extracts are listed but not previewed.
+    /// </summary>
+    public const int MaxPatientsTotal = 10_000;
+
     private const string AuthenticationFailedMessage = "Authentication failed. Verify the username and password.";
     private const string TimedOutMessage = "The connection to the SFTP server timed out. Verify the host name and port, and that the server accepts connections from Link.";
     private const string HostNotFoundMessage = "The SFTP host name could not be resolved. Verify the host name.";
@@ -144,6 +154,9 @@ public class SftpConnectionTestService(
         var notExtractCount = 0;
         var tooLargeCount = 0;
         var unreadableCount = 0;
+        var partlyPreviewedCount = 0;
+        var overPatientLimitCount = 0;
+        var patientsPreviewed = 0;
 
         foreach (var file in newestFiles)
         {
@@ -164,9 +177,23 @@ public class SftpConnectionTestService(
                 continue;
             }
 
+            var patientLimit = Math.Min(MaxPatientsPerFile, MaxPatientsTotal - patientsPreviewed);
+            if (patientLimit == 0)
+            {
+                overPatientLimitCount++;
+                continue;
+            }
+
             try
             {
-                fileModel.Patients = await PreviewPatientsAsync(session, file, cancellationToken);
+                var (patients, truncated) = await PreviewPatientsAsync(session, file, patientLimit, cancellationToken);
+                fileModel.Patients = patients;
+                patientsPreviewed += patients.Length;
+
+                if (truncated)
+                {
+                    partlyPreviewedCount++;
+                }
             }
             catch (Exception ex) when (ex is SftpPermissionDeniedException or SftpPathNotFoundException)
             {
@@ -198,6 +225,16 @@ public class SftpConnectionTestService(
             message += $" {unreadableCount} file(s) could not be read.";
         }
 
+        if (partlyPreviewedCount > 0)
+        {
+            message += $" {partlyPreviewedCount} file(s) were only partly previewed; a preview shows at most {MaxPatientsPerFile} patients per file and {MaxPatientsTotal} in total.";
+        }
+
+        if (overPatientLimitCount > 0)
+        {
+            message += $" {overPatientLimitCount} file(s) were not previewed because the {MaxPatientsTotal}-patient preview limit was reached.";
+        }
+
         return new SftpTestConnectionResult
         {
             Success = true,
@@ -206,9 +243,14 @@ public class SftpConnectionTestService(
         };
     }
 
-    private async Task<SftpTestFilePatientModel[]> PreviewPatientsAsync(
+    /// <summary>
+    /// Reads at most <paramref name="limit"/> patients from an extract. Stops parsing as soon as one more
+    /// patient is found, and reports that the preview was truncated.
+    /// </summary>
+    private async Task<(SftpTestFilePatientModel[] Patients, bool Truncated)> PreviewPatientsAsync(
         ISftpSession session,
         SftpFileInfo file,
+        int limit,
         CancellationToken cancellationToken)
     {
         await using var stream = await session.DownloadFileAsync(file.FullName, cancellationToken);
@@ -217,10 +259,15 @@ public class SftpConnectionTestService(
 
         await foreach (var patient in cernerParser.Preview(stream, null, cancellationToken))
         {
+            if (patients.Count == limit)
+            {
+                return (patients.ToArray(), true);
+            }
+
             patients.Add(patient);
         }
 
-        return patients.ToArray();
+        return (patients.ToArray(), false);
     }
 
     private bool IsCernerExtract(string fileName)

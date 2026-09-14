@@ -308,6 +308,61 @@ public class SftpConnectionTestServiceTests
 
     #endregion
 
+    #region Preview limits
+
+    [Fact]
+    public async Task TestSftpConnectionAsync_FileAtThePerFileLimit_IsPreviewedInFull()
+    {
+        var max = SftpConnectionTestService.MaxPatientsPerFile;
+        SetupListFiles(RemoteFile("census_1.dat"));
+        SetupDownload("census_1.dat", ExtractWithPatients(max));
+
+        var result = await TestAsync(includeFileContent: true);
+
+        Assert.Equal(max, Assert.Single(result.Files!).Patients.Length);
+        Assert.DoesNotContain("partly previewed", result.Message);
+    }
+
+    [Fact]
+    public async Task TestSftpConnectionAsync_FileOverThePerFileLimit_IsPreviewedInPart()
+    {
+        var max = SftpConnectionTestService.MaxPatientsPerFile;
+        SetupListFiles(RemoteFile("census_1.dat"));
+        SetupDownload("census_1.dat", ExtractWithPatients(max + 1));
+
+        var result = await TestAsync(includeFileContent: true);
+
+        Assert.True(result.Success);
+        Assert.Equal(max, Assert.Single(result.Files!).Patients.Length);
+        Assert.Contains("1 file(s) were only partly previewed", result.Message);
+    }
+
+    [Fact]
+    public async Task TestSftpConnectionAsync_TotalLimitReached_RemainingExtractsAreListedButNotRead()
+    {
+        var perFile = SftpConnectionTestService.MaxPatientsPerFile;
+        var total = SftpConnectionTestService.MaxPatientsTotal;
+        var newest = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var names = Enumerable.Range(1, total / perFile + 1).Select(i => $"census_{i}.dat").ToArray();
+        SetupListFiles(names.Select((name, i) => RemoteFile(name, lastWriteTime: newest.AddMinutes(-i))).ToArray());
+        foreach (var name in names)
+        {
+            SetupDownload(name, ExtractWithPatients(perFile));
+        }
+
+        var result = await TestAsync(includeFileContent: true);
+
+        Assert.True(result.Success);
+        Assert.Equal(names.Length, result.Files!.Length);
+        Assert.Equal(total, result.Files.Sum(f => f.Patients.Length));
+        Assert.Empty(result.Files[^1].Patients);
+        Assert.Contains($"1 file(s) were not previewed because the {total}-patient preview limit was reached.", result.Message);
+        var lastFile = $"{ReportDirectory}/{names[^1]}";
+        _sessionMock.Verify(s => s.DownloadFileAsync(lastFile, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    #endregion
+
     #region Nothing stored
 
     [Fact]
@@ -386,6 +441,17 @@ public class SftpConnectionTestServiceTests
         Length = length,
         LastWriteTime = lastWriteTime ?? new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc)
     };
+
+    private static string ExtractWithPatients(int count)
+    {
+        var builder = new StringBuilder();
+        for (var i = 1; i <= count; i++)
+        {
+            builder.Append($"{i}.00|{i}.00|Fac|Unit|101|A|FIN|MRN|Patient, Number {i}|Active|IP|20230101120000|\n");
+        }
+
+        return builder.ToString();
+    }
 
     private sealed class CapturingLogger<T> : ILogger<T>
     {
