@@ -1,9 +1,9 @@
-import React from 'react';
-import {createRoot, Root} from 'react-dom/client';
-import {AppRoot} from '../core/AppRoot';
-import {BffApiClient} from '../core/api/BffApiClient';
-import {ensureI18nInitialized} from '../core/localization/i18n';
-import '../styles.scss';
+import React from "react";
+import { createRoot, Root } from "react-dom/client";
+import { AppRoot } from "../core/AppRoot";
+import { BffApiClient } from "../core/api/BffApiClient";
+import { ensureI18nInitialized } from "../core/localization/i18n";
+import "../styles.scss";
 
 /**
  * The embed entry point.
@@ -17,7 +17,7 @@ class NhsnLinkElement extends HTMLElement {
   private root?: Root;
 
   static get observedAttributes() {
-    return ['baseurl', 'apibaseurl', 'homeurl', 'locale'];
+    return ["baseurl", "apibaseurl", "locale"];
   }
 
   attributeChangedCallback() {
@@ -41,22 +41,23 @@ class NhsnLinkElement extends HTMLElement {
       return;
     }
 
-    const baseUrl = this.getAttribute('baseurl') || '/nhsnlink';
-    const apiBaseUrl = this.getAttribute('apibaseurl') || '/api';
-    const homeUrl = this.getAttribute('homeurl') || '/';
-    const locale = this.getAttribute('locale') || undefined;
+    const baseUrl = this.getAttribute("baseurl") || "/nhsnlink";
+    const apiBaseUrl = this.getAttribute("apibaseurl") || "/api";
+    const locale = this.getAttribute("locale") || undefined;
 
     // The composition root: core never constructs a client.
     const client = new BffApiClient(apiBaseUrl);
 
-    void ensureI18nInitialized({apiBaseUrl, locale}).then(() => {
-      this.root?.render(<AppRoot client={client} baseUrl={baseUrl} homeUrl={homeUrl} locale={locale} />);
+    void ensureI18nInitialized({ apiBaseUrl, locale }).then(() => {
+      this.root?.render(
+        <AppRoot client={client} baseUrl={baseUrl} locale={locale} />,
+      );
     });
   }
 }
 
-if (!customElements.get('nhsn-link')) {
-  customElements.define('nhsn-link', NhsnLinkElement);
+if (!customElements.get("nhsn-link")) {
+  customElements.define("nhsn-link", NhsnLinkElement);
 }
 
-export {NHSNLink} from '../core/NHSNLink';
+export { NHSNLink } from "../core/NHSNLink";

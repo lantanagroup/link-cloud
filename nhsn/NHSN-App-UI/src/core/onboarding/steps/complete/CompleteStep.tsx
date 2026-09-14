@@ -19,7 +19,7 @@ import {migrateDraft} from '../../types';
  */
 export function CompleteStep(_props: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {user, vendorProfile, homeUrl} = useOnboarding();
+  const {user, vendorProfile, goHome} = useOnboarding();
   const api = useApiClient();
   const [envelope, setEnvelope] = useState<DraftEnvelope | null>(null);
   const [error, setError] = useState<string>();
@@ -97,7 +97,7 @@ export function CompleteStep(_props: StepProps) {
       </ul>
 
       <StepActions>
-        <Button onClick={() => window.location.assign(homeUrl)}>{t('common:actions.returnToHome')}</Button>
+        <Button onClick={goHome}>{t('common:actions.returnToHome')}</Button>
       </StepActions>
     </div>
   );
