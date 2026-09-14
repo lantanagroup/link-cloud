@@ -255,49 +255,8 @@
   margin-top: 5px;
 }
 
-.fhir-server-info .k-form-field:has(.k-form-hint) .k-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.fhir-server-info .k-form-field:has(.k-form-hint) .k-label::after {
-  content: '?';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  border-radius: 50%;
-  background: var(--fhir-gray-200);
-  color: var(--fhir-gray-600);
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  anchor-name: --fhir-hint-badge;
-  pointer-events: auto;
-}
-
-.fhir-server-info .k-form-field--hint-open .k-label::after {
-  background: var(--fhir-blue);
-  color: var(--kendo-color-on-inverse, #ffffff);
-}
-
-@supports (position-anchor: --fhir-hint-badge) {
-  .fhir-server-info .k-form-hint {
-    position-anchor: --fhir-hint-badge;
-    left: anchor(center);
-    bottom: calc(anchor(top) + 9px);
-    transform: translateX(-50%);
-  }
-
-  .fhir-server-info .k-form-hint::after {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
-.fhir-server-info .k-form-field--hint-open .k-form-hint {
-  display: block;
+.fhir-server-info {
+  --hint-badge-bg: var(--fhir-gray-200);
+  --hint-badge-color: var(--fhir-gray-600);
+  --hint-badge-open-bg: var(--fhir-blue);
 }
