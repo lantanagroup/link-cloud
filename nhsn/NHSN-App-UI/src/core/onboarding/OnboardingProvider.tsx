@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState
 } from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
@@ -78,7 +79,16 @@ export function OnboardingProvider({
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
   const [commitState, setCommitState] = useState<CommitResult | null>(null);
-  const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
+  const [draftReady, setDraftReady] = useState(false);
+  const {
+    data: vendorProfiles = [],
+    isLoading: vendorProfilesLoading,
+    error: vendorProfilesError
+  } = useQuery({
+    queryKey: ['vendorProfiles'],
+    queryFn: () => api.getVendorProfiles(),
+    staleTime: Infinity
+  });
   const [saving, setSaving] = useState(false);
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const pendingSaves = useRef(0);
@@ -99,19 +109,16 @@ export function OnboardingProvider({
     applyEnvelope(envelope);
   }, [api, applyEnvelope]);
 
-  // Initial load. Vendor profiles come with it because every step that
-  // branches reads them, and a step must never see a half-loaded context.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [envelope, profiles] = await Promise.all([api.getDraft(), api.getVendorProfiles()]);
+        const envelope = await api.getDraft();
         if (!active) {
           return;
         }
         applyEnvelope(envelope);
-        setVendorProfiles(profiles);
-        setLoadState('ready');
+        setDraftReady(true);
       } catch (cause) {
         if (!active) {
           return;
@@ -124,6 +131,20 @@ export function OnboardingProvider({
       active = false;
     };
   }, [api, applyEnvelope]);
+
+  // A step must never see a half-loaded context, so 'ready' waits on both the
+  // draft and vendor profiles - whichever settles last decides the moment.
+  useEffect(() => {
+    if (!draftReady || vendorProfilesLoading) {
+      return;
+    }
+    if (vendorProfilesError) {
+      setError(vendorProfilesError instanceof Error ? vendorProfilesError.message : String(vendorProfilesError));
+      setLoadState('error');
+      return;
+    }
+    setLoadState('ready');
+  }, [draftReady, vendorProfilesLoading, vendorProfilesError]);
 
   // Where the URL says we are, when it parses to one of ours. On first mount
   // this is the deep link; afterwards it is whatever popstate last produced.

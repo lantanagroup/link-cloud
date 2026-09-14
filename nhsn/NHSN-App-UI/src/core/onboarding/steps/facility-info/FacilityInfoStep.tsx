@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
-import type {
-  EhrVendor,
-  Timezone,
-  VendorProfile,
-} from '../../../api/contracts';
+import type { EhrVendor } from '../../../api/contracts';
 import {
   Button,
   NHSNLoadingIndicator,
@@ -25,45 +22,45 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
   const { notifyError } = useNotifications();
   const { draft, patch, saving } = useOnboarding();
 
-  const [loading, setLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [timezones, setTimezones] = useState<Timezone[]>([]);
-  const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
 
   const timeZone = draft.facilityInfo.timeZone ?? '';
   const ehrVendor = draft.facilityInfo.vendor ?? '';
 
+  const {
+    data: timezones = [],
+    isLoading: timezonesLoading,
+    error: timezonesError
+  } = useQuery({
+    queryKey: ['timezones'],
+    queryFn: () => api.getTimezones(),
+    staleTime: Infinity
+  });
+
+  const {
+    data: vendorProfiles = [],
+    isLoading: vendorProfilesLoading,
+    error: vendorProfilesError
+  } = useQuery({
+    queryKey: ['vendorProfiles'],
+    queryFn: () => api.getVendorProfiles(),
+    staleTime: Infinity
+  });
+
+  const loading = timezonesLoading || vendorProfilesLoading;
+  const loadError = timezonesError ?? vendorProfilesError;
+
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-
-    Promise.all([api.getTimezones(), api.getVendorProfiles()])
-      .then(([zones, profiles]) => {
-        if (!mounted) {
-          return;
-        }
-        setTimezones(zones);
-        setVendorProfiles(profiles);
-      })
-      .catch((cause) => {
-        notifyError(
-          cause instanceof Error
-            ? cause.message
-            : t('onboarding:facilityInfo.messages.loadError'),
-        );
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [api]);
+    if (loadError) {
+      notifyError(
+        loadError instanceof Error
+          ? loadError.message
+          : t('onboarding:facilityInfo.messages.loadError'),
+      );
+    }
+  }, [loadError]);
 
   function markTouched(field: string) {
     setTouched((prev) => ({ ...prev, [field]: true }));

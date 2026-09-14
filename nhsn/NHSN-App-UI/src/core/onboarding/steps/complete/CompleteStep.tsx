@@ -1,7 +1,7 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {DraftEnvelope} from '../../../api/ApiClient';
 import {Button, MessageContainer, NHSNLoadingIndicator, PageHeader, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
@@ -21,27 +21,14 @@ export function CompleteStep(_props: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const {user, vendorProfile, goHome} = useOnboarding();
   const api = useApiClient();
-  const [envelope, setEnvelope] = useState<DraftEnvelope | null>(null);
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    let active = true;
-    api
-      .getDraft()
-      .then(result => {
-        if (active) {
-          setEnvelope(result);
-        }
-      })
-      .catch(cause => {
-        if (active) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [api]);
+  const {
+    data: envelope,
+    error: loadError
+  } = useQuery({
+    queryKey: ['completeStepDraft'],
+    queryFn: () => api.getDraft()
+  });
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : undefined;
 
   const draft = useMemo(() => migrateDraft(envelope?.draft ?? null), [envelope]);
   const commitState = envelope?.commitState ?? null;

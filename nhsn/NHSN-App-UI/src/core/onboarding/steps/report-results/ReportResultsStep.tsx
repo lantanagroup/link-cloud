@@ -1,4 +1,5 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {
@@ -536,19 +537,50 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const {draft, patch, mirror, saving, goTo, openView, closeView, vendorProfile} = useOnboarding();
   const reportResults = draft.reportResults;
 
-  const [reports, setReports] = useState<ReportSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+
+  const {
+    data: reportsPage,
+    isLoading: loading,
+    isFetching: reportsFetching,
+    error: reportsQueryError,
+    refetch: refetchReports
+  } = useQuery({
+    queryKey: ['reports'],
+    queryFn: () => api.listReports({page: 1, pageSize: 50})
+  });
+  const reports = reportsPage?.items ?? [];
+  const refreshing = reportsFetching && !loading;
+  const loadError = reportsQueryError
+    ? reportsQueryError instanceof Error
+      ? reportsQueryError.message
+      : t('onboarding:reportResults.messages.loadError')
+    : null;
 
   const viewingDetail = draft.currentView?.view === 'detail';
   const viewingReportId = draft.currentView?.params?.reportId;
 
-  const [detail, setDetail] = useState<ReportDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [patients, setPatients] = useState<ReportPatientEntry[]>([]);
+  const {
+    data: detailData,
+    isLoading: detailQueryLoading,
+    error: detailQueryError,
+    refetch: refetchDetail
+  } = useQuery({
+    queryKey: ['reportDetail', viewingReportId],
+    queryFn: async () => {
+      const [found, foundPatients] = await Promise.all([api.getReport(viewingReportId!), api.getReportPatients(viewingReportId!)]);
+      return {found, foundPatients};
+    },
+    enabled: viewingDetail && Boolean(viewingReportId)
+  });
+  const detail = detailData?.found ?? null;
+  const patients = detailData?.foundPatients ?? [];
+  const detailLoading = viewingDetail && detailQueryLoading;
+  const detailError = detailQueryError
+    ? detailQueryError instanceof Error
+      ? detailQueryError.message
+      : t('onboarding:reportResults.messages.detailLoadError')
+    : null;
   const [activeDqm, setActiveDqm] = useState<string | undefined>();
   const [selectedPatientRow, setSelectedPatientRow] = useState<PatientStatusRow | null>(null);
   const [timelinePatientRow, setTimelinePatientRow] = useState<PatientStatusRow | null>(null);
@@ -776,53 +808,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     }
   }
 
-  const loadReports = useCallback(async () => {
-    try {
-      const page = await api.listReports({page: 1, pageSize: 50});
-      setReports(page.items);
-      setLoadError(null);
-      return true;
-    } catch (cause) {
-      setReports([]);
-      setLoadError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
-      return false;
-    }
-  }, [api, t]);
-
-  useEffect(() => {
-    setLoading(true);
-    loadReports().finally(() => setLoading(false));
-  }, [loadReports]);
-
-  const loadDetail = useCallback(
-    async (reportId: string) => {
-      try {
-        const [found, foundPatients] = await Promise.all([api.getReport(reportId), api.getReportPatients(reportId)]);
-        setDetail(found);
-        setPatients(foundPatients);
-        setDetailError(null);
-        return true;
-      } catch (cause) {
-        setDetailError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.detailLoadError'));
-        return false;
-      }
-    },
-    [api, t]
-  );
-
-  useEffect(() => {
-    if (!viewingDetail || !viewingReportId) {
-      return;
-    }
-    setDetailLoading(true);
-    loadDetail(viewingReportId).finally(() => setDetailLoading(false));
-  }, [viewingDetail, viewingReportId, loadDetail]);
-
   async function handleRefresh() {
-    setRefreshing(true);
-    const ok = await loadReports();
-    setRefreshing(false);
-    if (ok) {
+    const result = await refetchReports();
+    if (result.isSuccess) {
       notifySuccess(t('onboarding:reportResults.messages.refreshed'));
     } else {
       notifyError(t('onboarding:reportResults.messages.loadError'));
@@ -833,10 +821,8 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     if (!viewingReportId) {
       return;
     }
-    setDetailLoading(true);
-    const ok = await loadDetail(viewingReportId);
-    setDetailLoading(false);
-    if (ok) {
+    const result = await refetchDetail();
+    if (result.isSuccess) {
       notifySuccess(t('onboarding:reportResults.messages.refreshed'));
     } else {
       notifyError(t('onboarding:reportResults.messages.detailLoadError'));
