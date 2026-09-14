@@ -533,7 +533,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifySuccess, notifyError} = useNotifications();
-  const {draft, patch, saving, goTo, openView, closeView, vendorProfile} = useOnboarding();
+  const {draft, patch, mirror, saving, goTo, openView, closeView, vendorProfile} = useOnboarding();
   const reportResults = draft.reportResults;
 
   const [reports, setReports] = useState<ReportSummary[]>([]);
@@ -762,7 +762,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
       const nextMappings = [...hslocMappings, {sourceCode: unmappedCode, hslocCode}];
       await api.saveHslocMappings(nextMappings);
       setHslocMappings(nextMappings);
-      patch('hsloc', {mappings: nextMappings});
+      mirror('hsloc', {mappings: nextMappings});
       notifySuccess(t('onboarding:reportResults.detail.mappingEvidence.hslocMappingAdded'));
       setHslocSelections(prev => {
         const next = {...prev};
