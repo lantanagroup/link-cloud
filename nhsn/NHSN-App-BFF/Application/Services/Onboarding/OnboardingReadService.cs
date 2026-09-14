@@ -37,6 +37,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly IEncounterMappingService _encounterMappingService;
+    private readonly IPatientListGateway _patientListGateway;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
 
@@ -53,6 +54,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IAcknowledgementService acknowledgementService,
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IEncounterMappingService encounterMappingService,
+        IPatientListGateway patientListGateway,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
     {
@@ -68,6 +70,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _acknowledgementService = acknowledgementService;
         _organizationLocationGateway = organizationLocationGateway;
         _encounterMappingService = encounterMappingService;
+        _patientListGateway = patientListGateway;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -117,6 +120,9 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var hasCredentialsTask = ReadSectionAsync<bool?>("census", "DataAcquisition",
             async ct => await _sftpConfigurationGateway.GetHasCredentialsAsync(facilityId, ct), overall.Token, cancellationToken);
 
+        var patientListIdsTask = ReadSectionAsync("census", "DataAcquisition",
+            ct => _patientListGateway.GetConfigurationAsync(facilityId, ct), overall.Token, cancellationToken);
+
         var reportTask = ReadSectionAsync("report", "Report",
             ct => _reportGateway.GetLatestScheduleAsync(facilityId, ct), overall.Token, cancellationToken);
 
@@ -126,7 +132,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var encounterMappingsTask = ReadSectionAsync<IReadOnlyList<EncounterMapping>?>("encounter", "Normalization",
             async ct => await _encounterMappingService.GetAsync(ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, reportTask, locationOrgTask, encounterMappingsTask);
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, patientListIdsTask, reportTask, locationOrgTask, encounterMappingsTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
@@ -134,6 +140,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var lagDuration = await lagDurationTask;
         var sftpConfig = await sftpConfigTask;
         var hasCredentials = await hasCredentialsTask;
+        var patientListIds = await patientListIdsTask;
         var report = await reportTask;
         var locationOrg = await locationOrgTask;
         var encounterMappings = await encounterMappingsTask;
@@ -148,8 +155,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         return new DraftEnvelopeResponse
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
-                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, report.Value, locationOrg.Value,
-                encounterMappings.Value),
+                censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, patientListIds.Value, report.Value,
+                locationOrg.Value, encounterMappings.Value),
             CommitState = null, // Populated once the completion fan-out exists.
             Sources = sources
         };
@@ -165,6 +172,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         bool? censusAccuracyAcknowledged,
         SftpConfig? sftpConfig,
         bool? hasCredentials,
+        IReadOnlyDictionary<string, string>? patientListIds,
         ReportScheduleSummary? report,
         LocationOrgSection? locationOrg,
         IReadOnlyList<EncounterMapping>? encounterMappings) => new()
@@ -199,6 +207,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
 
             Census = new CensusSection
             {
+                PatientListIds = patientListIds ?? new Dictionary<string, string>(),
                 SftpHost = sftpConfig?.Host,
                 SftpPort = sftpConfig?.Port,
                 SftpRemoteDirectory = sftpConfig?.RemoteDirectory,

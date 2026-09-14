@@ -42,7 +42,7 @@ public static class LinkGatewayRegistration
         services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
         services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
         services.AddSingleton<ISftpConfigurationGateway, SftpConfigurationFixtureGateway>();
-        services.AddSingleton<IPatientListGateway, PatientListFixtureGateway>();
+        services.AddScoped<IPatientListGateway, PatientListGateway>();
 
         return services;
     }
