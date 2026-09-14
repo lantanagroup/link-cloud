@@ -181,7 +181,8 @@
       "downloadInstructions": "Download PDF Instructions",
       "instructionsHint": "If an SFTP endpoint or file extraction has not been disclosed for NHSNLink usage, the following instructions can be downloaded for your technical team to use to set up Cerner census extracts.",
       "fields": {
-        "hostLabel": "SFTP Host URL",
+        "hostLabel": "SFTP Host",
+        "hostPlaceholder": "sftp.example.com or 192.0.2.1",
         "portLabel": "SFTP Host URL Port",
         "usernameLabel": "Username",
         "passwordLabel": "Password",
@@ -219,12 +220,14 @@
       "incomplete": "Please complete all required fields before continuing.",
       "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
       "validateBeforeAck": "Click Validate before acknowledging that the results are accurate.",
+      "testConnectionBeforeAck": "Click Test Connection before acknowledging that the results are accurate.",
       "vendorRequired": "Complete Facility Information before configuring patients of interest.",
       "ackError": "Unable to record the acknowledgement."
     },
     "errors": {
       "listIdRequired": "This field is required.",
       "hostRequired": "SFTP Host URL is required.",
+      "hostInvalid": "Enter a hostname or IP address, not a URL (e.g. sftp.example.com, not http://sftp.example.com).",
       "portRequired": "SFTP Host URL Port is required.",
       "portInvalid": "Enter a valid port between 1 and 65535.",
       "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes."

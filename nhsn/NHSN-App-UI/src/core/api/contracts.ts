@@ -206,6 +206,9 @@ export interface SftpConfig {
   port: number;
   remoteDirectory: string;
   removeAfterProcessing: boolean;
+  /** Write-only. Only sent when the user typed new credentials; never returned by a read. */
+  username?: string;
+  password?: string;
 }
 
 /** Write-only. Never returned by a read, never stored in the draft. */

@@ -193,6 +193,16 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     setSelectedListKey((prev) => (prev === key ? null : prev));
   }
 
+  function updateSftpField(fields: Partial<typeof census>) {
+    patch("census", fields);
+    if (census.accuracyAcknowledged) {
+      revokeAcknowledgement();
+      setValidationMessage(
+        t("onboarding:census.messages.testConnectionBeforeAck"),
+      );
+    }
+  }
+
   async function handleValidateEpicLists() {
     const fieldErrors = validateCensus(draft, "PatientList");
     if (Object.keys(fieldErrors).length > 0) {
@@ -249,29 +259,39 @@ export function CensusStep({ onNext, onBack }: StepProps) {
       return;
     }
 
+    setValidationMessage(null);
     setTestingConnection(true);
     setConnectionResult(null);
     setSftpFiles(null);
     setSelectedFileName(null);
+    if (census.accuracyAcknowledged) {
+      revokeAcknowledgement();
+    }
+
+    // Credentials go in the same call as the rest of the configuration, not a separate one before
+    // it: the backend must create the sFTP configuration before it can attach credentials to it,
+    // and saving them first would 404 against a configuration that doesn't exist yet.
+    const enteringCredentials = Boolean(
+      sftpUsername.trim() && sftpPassword.trim(),
+    );
 
     try {
-      if (sftpUsername.trim() && sftpPassword.trim()) {
-        await api.saveSftpCredentials({
-          username: sftpUsername.trim(),
-          password: sftpPassword.trim(),
-        });
-        patch("census", { hasCredentials: true });
-        setSftpUsername("");
-        setSftpPassword("");
-      }
-
       const result = await api.testSftpConnection({
         host: census.sftpHost!.trim(),
         port: census.sftpPort!,
         remoteDirectory: census.sftpRemoteDirectory?.trim() || "/",
         removeAfterProcessing: Boolean(census.sftpRemoveAfterProcessing),
+        ...(enteringCredentials
+          ? { username: sftpUsername.trim(), password: sftpPassword.trim() }
+          : {}),
       });
       setConnectionResult(result);
+
+      if (enteringCredentials) {
+        patch("census", { hasCredentials: true });
+        setSftpUsername("");
+        setSftpPassword("");
+      }
 
       if (result.success) {
         setSftpFiles(await api.listSftpFiles());
@@ -289,27 +309,36 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
   function handleAckChange(checked: boolean) {
     if (checked && !resultsReady && !census.accuracyAcknowledged) {
-      setValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
+      setValidationMessage(
+        t(
+          acquisition === "Sftp"
+            ? "onboarding:census.messages.testConnectionBeforeAck"
+            : "onboarding:census.messages.validateBeforeAck",
+        ),
+      );
       return;
     }
 
-    patch("census", { accuracyAcknowledged: checked });
-    if (checked) {
-      api
-        .acknowledgeCensus({
-          kind: "CensusAccuracy",
-          accepted: true,
-          statementKey: "census-accuracy",
-        })
-        .catch((cause) => {
-          notifyError(
-            cause instanceof Error
-              ? cause.message
-              : t("onboarding:census.messages.ackError"),
-          );
-          patch("census", { accuracyAcknowledged: false });
-        });
+    if (!checked) {
+      revokeAcknowledgement();
+      return;
     }
+
+    patch("census", { accuracyAcknowledged: true });
+    api
+      .acknowledgeCensus({
+        kind: "CensusAccuracy",
+        accepted: true,
+        statementKey: "census-accuracy",
+      })
+      .catch((cause) => {
+        notifyError(
+          cause instanceof Error
+            ? cause.message
+            : t("onboarding:census.messages.ackError"),
+        );
+        patch("census", { accuracyAcknowledged: false });
+      });
   }
 
   function handleNext() {
@@ -629,9 +658,10 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   id="census-sftp-host"
                   label={t("onboarding:census.cerner.fields.hostLabel")}
                   required
+                  placeholder={t("onboarding:census.cerner.fields.hostPlaceholder")}
                   value={census.sftpHost ?? ""}
                   error={errors.sftpHost ? t(errors.sftpHost) : undefined}
-                  onChange={(value) => patch("census", { sftpHost: value })}
+                  onChange={(value) => updateSftpField({ sftpHost: value })}
                   onBlur={() => refreshFieldError("sftpHost")}
                 />
 
@@ -644,7 +674,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   step={1}
                   value={census.sftpPort}
                   error={errors.sftpPort ? t(errors.sftpPort) : undefined}
-                  onChange={(value) => patch("census", { sftpPort: value })}
+                  onChange={(value) => updateSftpField({ sftpPort: value })}
                   onBlur={() => refreshFieldError("sftpPort")}
                 />
 
@@ -680,7 +710,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   placeholder="/"
                   value={census.sftpRemoteDirectory ?? ""}
                   onChange={(value) =>
-                    patch("census", { sftpRemoteDirectory: value })
+                    updateSftpField({ sftpRemoteDirectory: value })
                   }
                 />
 
@@ -691,7 +721,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   )}
                   value={Boolean(census.sftpRemoveAfterProcessing)}
                   onChange={(value) =>
-                    patch("census", { sftpRemoveAfterProcessing: value })
+                    updateSftpField({ sftpRemoveAfterProcessing: value })
                   }
                 />
 
@@ -724,6 +754,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                     {connectionResult.success
                       ? t("onboarding:census.cerner.testSuccess")
                       : t("onboarding:census.cerner.testFailure")}
+                    {connectionResult.detail
+                      ? ` ${connectionResult.detail}`
+                      : null}
                   </p>
                 )}
 
