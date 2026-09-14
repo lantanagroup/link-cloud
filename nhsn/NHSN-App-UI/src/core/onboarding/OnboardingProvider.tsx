@@ -12,6 +12,7 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
+import {Button, Modal} from '../fields';
 import {useNotifications} from '../notifications/NotificationProvider';
 import {furthestLegalStep, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
@@ -34,6 +35,7 @@ interface OnboardingContextValue {
   saving: boolean;
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
+  mirror: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
   goTo: (stepId: StepId) => void;
   goNext: () => void;
   goBack: () => void;
@@ -80,10 +82,16 @@ export function OnboardingProvider({
   const [saving, setSaving] = useState(false);
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const pendingSaves = useRef(0);
+  const dirtyRef = useRef(false);
+  const lastSavedDraftRef = useRef<FacilityDraft>();
+  const [pendingStepId, setPendingStepId] = useState<StepId | null>(null);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
     setCommitState(envelope.commitState);
-    dispatch({type: 'draft/loaded', draft: migrateDraft(envelope.draft ?? createEmptyDraft())});
+    const loaded = migrateDraft(envelope.draft ?? createEmptyDraft());
+    lastSavedDraftRef.current = loaded;
+    dirtyRef.current = false;
+    dispatch({type: 'draft/loaded', draft: loaded});
   }, []);
 
   const reloadDraft = useCallback(async () => {
@@ -180,6 +188,8 @@ export function OnboardingProvider({
         .then(async () => {
           try {
             await api.saveDraft(toSave);
+            lastSavedDraftRef.current = toSave;
+            dirtyRef.current = false;
             return true;
           } catch (cause) {
             notifyError(cause instanceof Error ? cause.message : t('errors.saveFailed'));
@@ -211,30 +221,76 @@ export function OnboardingProvider({
       return;
     }
     persistedStep.current = key;
-    persistDraft(draft);
+    if (dirtyRef.current) {
+      persistDraft(draft);
+    }
   }, [draft, loadState, persistDraft]);
+
+  const completeGoTo = useCallback((stepId: StepId) => {
+    persistedStep.current = `${stepId}:`;
+    setUrlTarget(undefined);
+    dispatch({type: 'step/unlock', stepId});
+    dispatch({type: 'step/goto', stepId});
+  }, []);
 
   const goTo = useCallback(
     (stepId: StepId) => {
+      if (dirtyRef.current) {
+        setPendingStepId(stepId);
+        return;
+      }
+      completeGoTo(stepId);
+    },
+    [completeGoTo]
+  );
+
+  const confirmSaveAndContinue = useCallback(() => {
+    if (pendingStepId === null) {
+      return;
+    }
+    const stepId = pendingStepId;
+    setPendingStepId(null);
+    persistDraft(draft).then(saved => {
+      if (saved) {
+        completeGoTo(stepId);
+      }
+    });
+  }, [pendingStepId, draft, persistDraft, completeGoTo]);
+
+  const confirmDiscardChanges = useCallback(() => {
+    if (pendingStepId === null) {
+      return;
+    }
+    const stepId = pendingStepId;
+    setPendingStepId(null);
+    if (lastSavedDraftRef.current) {
+      dispatch({type: 'draft/loaded', draft: lastSavedDraftRef.current});
+    }
+    dirtyRef.current = false;
+    completeGoTo(stepId);
+  }, [pendingStepId, completeGoTo]);
+
+  const advanceTo = useCallback(
+    (stepId: StepId) => {
+      if (!dirtyRef.current) {
+        completeGoTo(stepId);
+        return;
+      }
       persistDraft(draft).then(saved => {
-        if (!saved) {
-          return;
+        if (saved) {
+          completeGoTo(stepId);
         }
-        persistedStep.current = `${stepId}:`;
-        setUrlTarget(undefined);
-        dispatch({type: 'step/unlock', stepId});
-        dispatch({type: 'step/goto', stepId});
       });
     },
-    [draft, persistDraft]
+    [draft, persistDraft, completeGoTo]
   );
 
   const goNext = useCallback(() => {
     const next = nextStepId(target.stepId, draft, user);
     if (next) {
-      goTo(next);
+      advanceTo(next);
     }
-  }, [target.stepId, draft, user, goTo]);
+  }, [target.stepId, draft, user, advanceTo]);
 
   const goBack = useCallback(() => {
     if (target.view) {
@@ -244,9 +300,9 @@ export function OnboardingProvider({
     }
     const previous = previousStepId(target.stepId, draft, user);
     if (previous) {
-      goTo(previous);
+      advanceTo(previous);
     }
-  }, [target, draft, user, goTo]);
+  }, [target, draft, user, advanceTo]);
 
   const openView = useCallback((view: StepView) => {
     setUrlTarget(undefined);
@@ -259,6 +315,11 @@ export function OnboardingProvider({
   }, []);
 
   const patch = useCallback<OnboardingContextValue['patch']>((section, sectionPatch) => {
+    dirtyRef.current = true;
+    dispatch({type: 'section/patch', section, patch: sectionPatch});
+  }, []);
+
+  const mirror = useCallback<OnboardingContextValue['mirror']>((section, sectionPatch) => {
     dispatch({type: 'section/patch', section, patch: sectionPatch});
   }, []);
 
@@ -279,6 +340,7 @@ export function OnboardingProvider({
       goHome: onGoHome,
       saving,
       patch,
+      mirror,
       goTo,
       goNext,
       goBack,
@@ -298,6 +360,7 @@ export function OnboardingProvider({
       onGoHome,
       saving,
       patch,
+      mirror,
       goTo,
       goNext,
       goBack,
@@ -307,7 +370,25 @@ export function OnboardingProvider({
     ]
   );
 
-  return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
+  return (
+    <OnboardingContext.Provider value={value}>
+      {children}
+      <Modal
+        open={pendingStepId !== null}
+        title={t('unsavedChanges.title')}
+        onClose={() => setPendingStepId(null)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={confirmDiscardChanges}>
+              {t('actions.discardChanges')}
+            </Button>
+            <Button onClick={confirmSaveAndContinue}>{t('actions.saveAndContinue')}</Button>
+          </>
+        }>
+        <p>{t('unsavedChanges.message')}</p>
+      </Modal>
+    </OnboardingContext.Provider>
+  );
 }
 
 export {furthestLegalStep};

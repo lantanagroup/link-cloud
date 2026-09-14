@@ -26,6 +26,8 @@
     "continue": "Continue",
     "back": "Back",
     "returnToHome": "Return to Home",
+    "saveAndContinue": "Save and Continue",
+    "discardChanges": "Discard Changes",
     "reload": "Reload",
     "refresh": "Refresh",
     "close": "Close",
@@ -76,5 +78,9 @@
   "errors": {
     "unexpected": "Something went wrong. Please try again.",
     "saveFailed": "Unable to save your changes. Please try again."
+  },
+  "unsavedChanges": {
+    "title": "Unsaved changes",
+    "message": "You have unsaved changes on this step. Save them before continuing, or discard them?"
   }
 }
