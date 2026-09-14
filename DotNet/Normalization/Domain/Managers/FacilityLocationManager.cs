@@ -112,14 +112,16 @@ public class FacilityLocationManager : IFacilityLocationManager
         ModifyDate = facilityLocation.ModifyDate
     };
 
-    public Task Update(string facilityId, string locationId, string locationName, string locationAlias, string? partOfId, CancellationToken cancellationToken = default)
+    public async Task Update(string facilityId, string locationId, string locationName, string locationAlias, string? partOfId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.FacilityLocations
+        var parentFacilityLocationId = await ResolveParentFacilityLocationId(facilityId, partOfId, cancellationToken);
+        await _dbContext.FacilityLocations
             .Where(location => location.FacilityId == facilityId && location.LocationId == locationId)
             .ExecuteUpdateAsync(updates => updates
                 .SetProperty(location => location.LocationName, locationName)
                 .SetProperty(location => location.LocationAlias, locationAlias)
                 .SetProperty(location => location.PartOfId, partOfId)
+                .SetProperty(location => location.ParentFacilityLocationId, parentFacilityLocationId)
                 .SetProperty(location => location.ModifyDate, DateTime.UtcNow), cancellationToken);
     }
 }

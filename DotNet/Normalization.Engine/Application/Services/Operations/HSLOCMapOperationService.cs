@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 //2. copy identifier to type
                 foreach (var identifier in location.Identifier)
                 {
-                    if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value))
+                    if (string.IsNullOrWhiteSpace(identifier.System) || string.IsNullOrWhiteSpace(identifier.Value))
                     {
                         continue;
                     }

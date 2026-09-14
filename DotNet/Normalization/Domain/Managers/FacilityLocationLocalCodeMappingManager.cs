@@ -154,7 +154,12 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
 
     public async Task UpdateFacilityLocationLocalCodeMappings(string facilityId, IReadOnlyList<HSLOCMappingResult> hslocMappingResults, CancellationToken cancellationToken = default)
     {
-        var hslocCodes = await _hslocQueries.GetAll(true, cancellationToken);
+        if(hslocMappingResults == null || hslocMappingResults.Count == 0)
+        {
+            return;
+        }
+
+        List<HSLOC>? hslocCodes = null;
         var existingLocationsAndMappings = await _dbContext.FacilityLocations.AsNoTracking().Include(i => i.FacilityLocationLocalCodeMappings).Where(q => q.FacilityId == facilityId).ToListAsync(cancellationToken);
         foreach(var hslocMappingResult in hslocMappingResults)
         {
@@ -191,10 +196,14 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                         }
                     }
 
+                    //reload the existing locations and mappings since another thread may have added the location while we were trying to add it
+                    existingLocationsAndMappings =await _dbContext.FacilityLocations.AsNoTracking().Include(i => i.FacilityLocationLocalCodeMappings).Where(q => q.FacilityId == facilityId).ToListAsync(cancellationToken);
+                    existingLocation = existingLocationsAndMappings.FirstOrDefault(f => f.LocationId == hslocMappingResult.Location.Id);
+                    facilityLocationId = existingLocation?.Id;
+
                     _logger.LogDebug(exception,
                         "Ignoring duplicate facility location insert for FacilityId={FacilityId}, LocationId={LocationId}.",
                         facilityId.SanitizeForLog(), hslocMappingResult.Location.Id.SanitizeForLog());
-                    continue;
                 }
             }
             else if(HasLocationChanged(existingLocation, hslocMappingResult.Location))
@@ -211,6 +220,7 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
             //add or update the FacilityLocationLocalCodeMapping
             foreach(var locationTypeCode in hslocMappingResult.LocationTypeCodes)
             {
+                hslocCodes ??= await _hslocQueries.GetAll(false, cancellationToken);
                 var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m => m.LocalCodeSystem == locationTypeCode.SourceSystem && m.LocalCode == locationTypeCode.SourceCode);
                 if(existingMapping == null)
                 {
@@ -263,16 +273,6 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                             HSLOCId = hslocId
                         }, cancellationToken);
                     }
-                }
-            }
-
-            //delete any mappings that are no longer present
-            var mappingsToDelete = existingLocation?.FacilityLocationLocalCodeMappings?.Where(m => !hslocMappingResult.LocationTypeCodes.Any(l => l.SourceSystem == m.LocalCodeSystem && l.SourceCode == m.LocalCode)).ToList();
-            if(mappingsToDelete != null)
-            {
-                foreach(var mappingToDelete in mappingsToDelete)
-                {
-                    await Delete(mappingToDelete.Id, cancellationToken);
                 }
             }
         }

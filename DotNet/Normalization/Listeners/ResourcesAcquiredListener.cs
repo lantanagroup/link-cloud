@@ -319,9 +319,9 @@ public class ResourcesAcquiredListener : BackgroundService
                                                         operationResult.SuccessCode == OperationStatus.Success);
                                 }
                                 
-                                if(operation.OperationType == OperationType.HSLOCMap && operationResult.CodeMapping != null)
+                                if(operation.OperationType == OperationType.HSLOCMap)
                                 {
-                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping.Count, result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping?.Count ?? 0, result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
                                     hslocMappingResults.AddRange(BuildHSLOCMappingResults(result.Message.Key.FacilityId, resource, operationResult));
                                 }
                             }
@@ -408,12 +408,12 @@ public class ResourcesAcquiredListener : BackgroundService
     private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
     {
         var hslocMappingResults = new List<HSLOCMappingResult>();
-        if(operationResult == null || operationResult.CodeMapping == null || operationResult.CodeMapping.Count == 0)
+        if(operationResult == null || operationResult.SuccessCode == OperationStatus.Failure || resource is not Location location)
         {
             return hslocMappingResults;
         }
         var hslocMappingResult = new HSLOCMappingResult(facilityId, (Location)resource);
-        foreach (var mapping in operationResult.CodeMapping)
+        foreach (var mapping in operationResult.CodeMapping ?? [])
         {
             var sourceSystem = mapping.SourceSystem ?? string.Empty;
             if (mapping.MappedCodes != null)
