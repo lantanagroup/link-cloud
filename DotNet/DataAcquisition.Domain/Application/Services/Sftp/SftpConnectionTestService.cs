@@ -235,7 +235,7 @@ public class SftpConnectionTestService(
         logger.LogWarning(
             ex,
             "SFTP connection test to {Host}:{Port} failed: {Reason}",
-            hostName.SanitizeForLog(), hostUrlPort.SanitizeForLog(), reason);
+            hostName.SanitizeForLog(), hostUrlPort.SanitizeForLog(), reason.SanitizeForLog());
 
         return new SftpTestConnectionResult { Success = false, Message = reason };
     }
