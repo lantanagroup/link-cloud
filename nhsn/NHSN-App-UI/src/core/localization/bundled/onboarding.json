@@ -218,6 +218,7 @@
     "messages": {
       "incomplete": "Please complete all required fields before continuing.",
       "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
+      "validateBeforeAck": "Click Validate before acknowledging that the results are accurate.",
       "vendorRequired": "Complete Facility Information before configuring patients of interest.",
       "ackError": "Unable to record the acknowledgement."
     },

@@ -37,6 +37,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IFacilityGateway _facilityGateway;
     private readonly ICensusConfigurationGateway _censusGateway;
     private readonly ISftpConfigurationGateway _sftpConfigurationGateway;
+    private readonly IPatientListGateway _patientListGateway;
     private readonly IFacilityAdministrationService _facilityAdministrationService;
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly IEncounterMappingService _encounterMappingService;
@@ -51,6 +52,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IFacilityGateway facilityGateway,
         ICensusConfigurationGateway censusGateway,
         ISftpConfigurationGateway sftpConfigurationGateway,
+        IPatientListGateway patientListGateway,
         IFacilityAdministrationService facilityAdministrationService,
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IEncounterMappingService encounterMappingService,
@@ -64,6 +66,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _facilityGateway = facilityGateway;
         _censusGateway = censusGateway;
         _sftpConfigurationGateway = sftpConfigurationGateway;
+        _patientListGateway = patientListGateway;
         _facilityAdministrationService = facilityAdministrationService;
         _organizationLocationGateway = organizationLocationGateway;
         _encounterMappingService = encounterMappingService;
@@ -224,8 +227,18 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     await _censusGateway.SaveAcquisitionFrequencyAsync(facility.FacilityId, draft.Census.AcquisitionFrequency, cancellationToken);
                 }
 
+                if (draft.Census.PatientListIds.Count > 0)
+                {
+                    await _patientListGateway.SaveConfigurationAsync(facility.FacilityId, draft.Census.PatientListIds, cancellationToken);
+                }
+
                 if (!string.IsNullOrWhiteSpace(draft.Census.SftpHost) && draft.Census.SftpPort is not null)
                 {
+                    // A facility can only have one census acquisition method in Data Acquisition — a
+                    // facility switching from Epic to Cerner would otherwise fail to save with a
+                    // stale FHIR List configuration still on record.
+                    await _patientListGateway.DeleteConfigurationIfExistsAsync(facility.FacilityId, cancellationToken);
+
                     await _sftpConfigurationGateway.SaveConfigurationAsync(facility.FacilityId, new SftpConfig
                     {
                         Host = draft.Census.SftpHost,

@@ -157,10 +157,31 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     });
   }
 
+  function revokeAcknowledgement() {
+    patch("census", { accuracyAcknowledged: false });
+    api
+      .acknowledgeCensus({
+        kind: "CensusAccuracy",
+        accepted: false,
+        statementKey: "census-accuracy",
+      })
+      .catch((cause) => {
+        notifyError(
+          cause instanceof Error
+            ? cause.message
+            : t("onboarding:census.messages.ackError"),
+        );
+      });
+  }
+
   function updateListId(key: CensusListKey, value: string) {
     patch("census", {
       patientListIds: { ...census.patientListIds, [key]: value },
     });
+    if (census.accuracyAcknowledged) {
+      revokeAcknowledgement();
+      setValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
+    }
     setListState((prev) => {
       if (!prev[key]) {
         return prev;
@@ -183,6 +204,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     setValidationMessage(null);
     setSelectedListKey(null);
     setValidatingLists(true);
+    if (census.accuracyAcknowledged) {
+      revokeAcknowledgement();
+    }
     setListState(
       Object.fromEntries(
         CENSUS_LIST_KEYS.map((key) => [key, { querying: true }]),
@@ -264,6 +288,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   }
 
   function handleAckChange(checked: boolean) {
+    if (checked && !resultsReady && !census.accuracyAcknowledged) {
+      setValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
+      return;
+    }
+
     patch("census", { accuracyAcknowledged: checked });
     if (checked) {
       api
@@ -740,14 +769,12 @@ export function CensusStep({ onNext, onBack }: StepProps) {
               </>
             )}
 
-            {resultsReady && (
-              <CheckboxField
-                id="census-accuracy-ack"
-                label={t("onboarding:census.fields.accuracyAck")}
-                value={Boolean(census.accuracyAcknowledged)}
-                onChange={handleAckChange}
-              />
-            )}
+            <CheckboxField
+              id="census-accuracy-ack"
+              label={t("onboarding:census.fields.accuracyAck")}
+              value={Boolean(census.accuracyAcknowledged)}
+              onChange={handleAckChange}
+            />
 
             {validationMessage && (
               <p className="nhsn-link__form-error" role="alert">
