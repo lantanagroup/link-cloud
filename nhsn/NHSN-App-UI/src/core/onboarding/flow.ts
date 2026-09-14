@@ -5,7 +5,6 @@ import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
 import {CENSUS_LIST_KEYS} from './steps/census/validate';
 import {isReportComplete} from './steps/report/validate';
-import {isReportingPlanComplete} from './steps/reporting-plan/validate';
 import {WelcomeStep} from './steps/welcome/WelcomeStep';
 
 export interface StepProps {
@@ -62,7 +61,7 @@ export const STEPS: Step[] = [
     id: 'reporting-plan',
     labelKey: 'onboarding:steps.reportingPlan',
     Component: lazyStep(() => import('./steps/reporting-plan/ReportingPlanStep')),
-    isComplete: isReportingPlanComplete
+    isComplete: () => true
   },
   {
     id: 'facility-info',
