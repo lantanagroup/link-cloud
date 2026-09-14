@@ -1,4 +1,5 @@
 using Hl7.Fhir.Model;
+using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -34,6 +35,21 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return copyResult;
             }
 
+            var configuredSourceSystems = operation.CodeSystemMaps.Select(map => map.SourceSystem).ToHashSet();
+            var unconfiguredOutcomes = resource.Select(operation.FhirPath)
+                .SelectMany(source => source switch
+                {
+                    Coding coding => new[] { coding },
+                    CodeableConcept concept => concept.Coding.AsEnumerable(),
+                    _ => Enumerable.Empty<Coding>()
+                })
+                .Where(coding => !string.IsNullOrWhiteSpace(coding.Code) && !configuredSourceSystems.Contains(coding.System))
+                .GroupBy(coding => coding.System ?? string.Empty)
+                .Select(group => new CodeMappingOutcome(
+                    group.Key, string.Empty, 0, group.Count(),
+                    group.Select(coding => coding.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList()))
+                .ToList();
+
             //Now that location.type is normalized, execute the code map.
             var codeMapOperation = new CodeMapOperation(
             operation.Name,
@@ -47,12 +63,18 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 supportingResources,
                 cancellationToken);
 
-            if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
+            if (codeMapOperationResult.SuccessCode == OperationStatus.Failure)
             {
-                return OperationResult.Success(resource, codeMapOperationResult.CodeMapping);
+                return codeMapOperationResult;
             }
 
-            return codeMapOperationResult;
+            var codeMapping = (codeMapOperationResult.CodeMapping ?? []).Concat(unconfiguredOutcomes).ToList();
+            if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
+            {
+                return OperationResult.Success(resource, codeMapping);
+            }
+
+            return new OperationResult(codeMapOperationResult.SuccessCode, codeMapOperationResult.ErrorMessage, resource, codeMapping);
         }
 
         /// <summary>

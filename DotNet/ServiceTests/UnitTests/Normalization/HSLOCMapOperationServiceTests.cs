@@ -21,6 +21,66 @@ public class HSLOCMapOperationServiceTests
     }
 
     [Fact]
+    public async Task ReportsEveryTypeCodeWhenNoMapsAreConfigured()
+    {
+        var location = new Location
+        {
+            Type = [new CodeableConcept("urn:local", "existing"), new CodeableConcept(null, "no-system")],
+            Identifier = [new Identifier("urn:identifier", "123")],
+            Alias = ["ICU"]
+        };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.NotNull(result.CodeMapping);
+        Assert.Equal(4, result.CodeMapping.Count);
+        Assert.All(result.CodeMapping, outcome =>
+        {
+            Assert.Equal(0, outcome.MappedCount);
+            Assert.Equal(1, outcome.UnmappedCount);
+            Assert.Single(outcome.UnmappedCodes);
+            Assert.Empty(outcome.TargetSystem);
+        });
+        Assert.Equal(new[] { "123", "ICU", "existing", "no-system" },
+            result.CodeMapping.SelectMany(outcome => outcome.UnmappedCodes).OrderBy(code => code, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReportsConfiguredAndUnconfiguredCodesTogether()
+    {
+        var location = new Location
+        {
+            Type =
+            [
+                new CodeableConcept("urn:local", "mapped"),
+                new CodeableConcept("urn:local", "missing"),
+                new CodeableConcept("urn:other", "other"),
+                new CodeableConcept("urn:other", "other")
+            ]
+        };
+        var operation = new HSLOCMapOperation(
+        [
+            new CodeSystemMap("urn:local", "urn:hsloc",
+                new Dictionary<string, CodeMap> { ["mapped"] = new("1027-4", "Medical critical care") })
+        ]);
+
+        var result = await _service.ProcessOperationAsync(operation, location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.NotNull(result.CodeMapping);
+        Assert.Equal(2, result.CodeMapping.Count);
+        var configured = Assert.Single(result.CodeMapping, outcome => outcome.SourceSystem == "urn:local");
+        Assert.Equal(1, configured.MappedCount);
+        Assert.Equal("mapped", Assert.Single(configured.MappedCodes!).SourceCode);
+        Assert.Equal("missing", Assert.Single(configured.UnmappedCodes));
+        var unconfigured = Assert.Single(result.CodeMapping, outcome => outcome.SourceSystem == "urn:other");
+        Assert.Equal(2, unconfigured.UnmappedCount);
+        Assert.Equal("other", Assert.Single(unconfigured.UnmappedCodes));
+        AssertCode(location, "urn:hsloc", "1027-4");
+    }
+
+    [Fact]
     public async Task CopiesIdentifiersAndAliasesToType()
     {
         var location = new Location

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Report.Domain;
+namespace LantanaGroup.Link.Shared.Application.Utilities;
 
 public static class MappingTargetSystems
 {
