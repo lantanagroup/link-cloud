@@ -1,6 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Concurrency;
-using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Capabilities;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -40,8 +39,8 @@ public static class LinkGatewayRegistration
         services.AddScoped<IReportGateway, ReportGateway>();
         services.AddScoped<IDataAcquisitionGateway, DataAcquisitionGateway>();
         services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
-        services.AddSingleton<ISftpFileGateway, SftpFileFixtureGateway>();
-        services.AddSingleton<ISftpConfigurationGateway, SftpConfigurationFixtureGateway>();
+        services.AddScoped<ISftpFileGateway, SftpFileGateway>();
+        services.AddScoped<ISftpConfigurationGateway, SftpConfigurationGateway>();
         services.AddScoped<IPatientListGateway, PatientListGateway>();
 
         return services;

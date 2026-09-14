@@ -33,14 +33,60 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
         _cache = cache;
     }
 
+    // Data Acquisition's connection test runs against the facility's saved configuration and
+    // credentials, not whatever is currently typed into the form — so both are saved here first.
+    // Order matters: Data Acquisition's credentials endpoint 404s unless the configuration already
+    // exists, so the configuration must be saved before any credentials in it are.
     public async Task<ConnectionResult> TestSftpConnectionAsync(SftpConfig config, CancellationToken cancellationToken = default)
     {
         var facilityId = _userContext.RequireFacilityId();
-        var files = await _sftpFileGateway.TestConnectionAsync(facilityId, config, cancellationToken);
+        await _sftpConfigurationGateway.SaveConfigurationAsync(facilityId, config, cancellationToken);
 
-        _cache.Set(SftpFilesCacheKey(facilityId), files, SftpFilesCacheDuration);
+        if (!string.IsNullOrWhiteSpace(config.Username) && !string.IsNullOrWhiteSpace(config.Password))
+        {
+            await _sftpConfigurationGateway.SaveCredentialsAsync(facilityId, config.Username, config.Password, cancellationToken);
+        }
 
-        return new ConnectionResult { Success = true, MessageKey = "census.sftp.simulated", Simulated = true };
+        var result = await _sftpFileGateway.TestConnectionAsync(facilityId, cancellationToken);
+
+        // The connection test itself is real; the file/patient preview is not — Data Acquisition
+        // has no live directory-listing endpoint, only its internal scheduled acquisition job. Only
+        // populate the (simulated) preview once a real connection has actually succeeded.
+        if (result.Success)
+        {
+            _cache.Set(SftpFilesCacheKey(facilityId), GenerateSimulatedFiles(), SftpFilesCacheDuration);
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyList<SftpFile> GenerateSimulatedFiles()
+    {
+        var queriedAt = DateTimeOffset.UtcNow;
+        var random = Random.Shared;
+        var patientSeq = 0;
+        var files = new List<SftpFile>();
+
+        foreach (var fileIndex in Enumerable.Range(1, random.Next(2, 6)))
+        {
+            var patientCount = random.Next(3, 16);
+            var patientIds = new List<string>(patientCount);
+            for (var i = 0; i < patientCount; i++)
+            {
+                patientSeq++;
+                patientIds.Add($"SIMULATED-PATIENT-{patientSeq:D4}");
+            }
+
+            files.Add(new SftpFile
+            {
+                FileName = $"census_extract_{fileIndex}_{queriedAt:yyyy-MM-dd}.csv",
+                QueriedAt = queriedAt,
+                Simulated = true,
+                PatientIds = patientIds
+            });
+        }
+
+        return files;
     }
 
     public Task<IReadOnlyList<SftpFile>> GetSftpFilesAsync(CancellationToken cancellationToken = default)

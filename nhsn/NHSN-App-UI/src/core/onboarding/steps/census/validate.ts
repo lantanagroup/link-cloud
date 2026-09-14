@@ -38,6 +38,8 @@ export function validateCensus(
   } else if (censusAcquisition === 'Sftp') {
     if (!c.sftpHost?.trim()) {
       errors.sftpHost = 'onboarding:census.errors.hostRequired';
+    } else if (!isValidSftpHost(c.sftpHost.trim())) {
+      errors.sftpHost = 'onboarding:census.errors.hostInvalid';
     }
     if (c.sftpPort === undefined) {
       errors.sftpPort = 'onboarding:census.errors.portRequired';
@@ -55,4 +57,21 @@ export function validateCensus(
   }
 
   return errors;
+}
+
+/**
+ * Mirrors Data Acquisition's own SftpConfigurationValidationRules.BeValidHostName — sFTP connects
+ * by bare hostname or IP, never a URL, so this catches a pasted `http://...` value client-side
+ * instead of round-tripping to a 400.
+ */
+function isValidSftpHost(host: string): boolean {
+  if (/\s|\/|\\/.test(host)) {
+    return false;
+  }
+  return !(
+    host.startsWith('.') ||
+    host.startsWith('-') ||
+    host.endsWith('.') ||
+    host.endsWith('-')
+  );
 }

@@ -2,14 +2,10 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 
-// Cerner's sFTP connection test, one call: Data Acquisition's ad-hoc test-connection endpoint
-// tests the given connection details and returns every matching file with its patients already
-// attached when includeFileContent=true. There is no separate file-listing call.
-//
-// Fixture-only for now: LinkSdk has no sFTP coverage at all, so there is nothing to call through.
-// NHSN-App-BFF does not touch DotNet/LinkSdk, so this is the platform team's work, not ours.
-// Every implementation must set Simulated = true until a real adapter exists to replace it.
+// Cerner's real sFTP connection test — Data Acquisition tests the facility's already-saved
+// configuration and credentials; it does not accept ad-hoc connection details and returns no file
+// listing. The caller is responsible for saving the configuration first.
 public interface ISftpFileGateway
 {
-    Task<IReadOnlyList<SftpFile>> TestConnectionAsync(string facilityId, SftpConfig config, CancellationToken cancellationToken = default);
+    Task<ConnectionResult> TestConnectionAsync(string facilityId, CancellationToken cancellationToken = default);
 }
