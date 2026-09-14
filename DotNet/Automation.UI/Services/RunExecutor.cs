@@ -1964,12 +1964,6 @@ internal sealed class RunExecutor
                 "DMRP is enabled for this Automation scenario, but DMRP is disabled in Tenant.");
         }
 
-        if (!enableDmrp && tenantDmrpEnabled)
-        {
-            throw new InvalidOperationException(
-                "DMRP is disabled for this Automation scenario, but DMRP is enabled in Tenant.");
-        }
-
         output.WriteLine(
             $"DMRP configuration validated: scenario={(enableDmrp ? "enabled" : "disabled")}, " +
             $"Tenant={(tenantDmrpEnabled ? "enabled" : "disabled")}.");
