@@ -51,9 +51,7 @@
       "glycemicControl": "Glycemic Control",
       "respiratoryPathogens": "Respiratory Pathogens Surveillance (RPS)"
     },
-    "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available.",
-    "noAvailableMeasures": "None of your facility's enrolled NHSN measures are supported by NHSNLink yet. Enrollment cannot continue until at least one is available.",
-    "measuresLoadError": "Your facility's reporting plan measures could not be retrieved."
+    "scheduleUnavailable": "The reporting plan schedule could not be retrieved. Enrollment cannot be completed until it is available."
   },
   "facilityInfo": {
     "title": "Facility Information",
