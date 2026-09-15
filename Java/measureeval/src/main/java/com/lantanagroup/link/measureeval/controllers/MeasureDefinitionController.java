@@ -3,6 +3,8 @@ package com.lantanagroup.link.measureeval.controllers;
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
+import com.lantanagroup.link.measureeval.models.DebugSections;
+import com.lantanagroup.link.measureeval.models.MeasureEvaluationResult;
 import com.lantanagroup.link.measureeval.models.RelatedArtifactInfo;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
@@ -15,10 +17,8 @@ import com.lantanagroup.link.shared.serdes.Views;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import javassist.NotFoundException;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/measureeval/measure-definition")
@@ -136,7 +137,7 @@ public class MeasureDefinitionController {
 
         try {
             return CqlUtils.getCql(measureDefinition.getBundle(), libraryId, range);
-        } catch (NotFoundException e) {
+        } catch (CqlUtils.ResourceNotFoundException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
         }
     }
@@ -146,24 +147,53 @@ public class MeasureDefinitionController {
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     @Parameter(name = "id", description = "The ID of the measure definition", required = true)
     @Parameter(name = "parameters", description = "The parameters to use in the evaluation", required = true)
-    @Parameter(name = "debug", description = "Whether to log CQL debugging information during evaluation", required = false)
-    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters, @RequestParam(required = false, defaultValue = "false") boolean debug) {
+    @Parameter(name = "debug",
+            description = "Which debug sections to populate on the response. " +
+                    "Accepts `true`/`all` (every section), `false`/empty (no sections), " +
+                    "or a comma-separated list of: groups, expressions, librarydebug, messages, traces, debuglog.",
+            required = false)
+    public Object evaluate(
+            @AuthenticationPrincipal PrincipalUser user,
+            @PathVariable String id,
+            @RequestBody Parameters parameters,
+            @RequestParam(required = false, defaultValue = "false") Set<DebugSections> debug) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
 
-        // Ensure that a measure evaluator is cached (so that CQL logging can use it)
+        // Resolve the cached evaluator. Two things this gives us:
+        //   1. A cheap existence check for the measure (returns null -> 404).
+        //   2. Side effect: ensures the measure's libraries are registered with
+        //      MeasureEvaluatorCache's LibraryResolver, which CqlLogAppender uses
+        //      to translate CQL log locators back to source ranges.
+        // We intentionally do NOT call evaluator.evaluate(...) here. The cached
+        // evaluator was compiled once at first-use time with `linkConfig.cqlDebug`
+        // baked in as its only debug flag; reusing it would either log too much or
+        // too little relative to the per-request `debug` parameter. So we always
+        // recompile via compileAndEvaluate(...) with the explicit per-request
+        // section set, which sets the engine's debug/tracing flags correctly for
+        // this specific call.
         MeasureEvaluator evaluator = evaluatorCache.get(id);
 
         if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Measure definition not found");
         }
 
+        if (!debug.isEmpty()) {
+            _logger.info("Measure evaluation requested with debug sections {} for measure {}",
+                    StringEscapeUtils.escapeJava(String.valueOf(debug)),
+                    StringEscapeUtils.escapeJava(id));
+        }
+
         try {
-            // But recompile the bundle every time because the debug flag may not match what's in the cache
-            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+            MeasureEvaluationResult result = MeasureEvaluator.compileAndEvaluate(
+                    FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+            // Preserve the original wire contract: when no debug sections are
+            // requested, return a bare MeasureReport. Only emit the wrapper for
+            // callers who opted in via the `debug` query parameter.
+            return debug.isEmpty() ? result.getMeasureReport() : result;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Console-only logging for tests.
+
+  The main logback-spring.xml conditionally attaches a Loki4j appender. When Loki is unreachable
+  (any machine without the local docker-compose stack running, and CI), the appender's send failure
+  is escalated to a Logback configuration error, which aborts Spring context initialization and
+  fails every context-booting test with a misleading ApplicationContext error. Logback prefers
+  logback-test.xml on the test classpath, so this keeps tests off Loki entirely.
+-->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date [%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

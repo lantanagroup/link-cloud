@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
@@ -88,13 +89,14 @@ public class LocationMappingServiceTests
         // Stateful cache: Get returns the last Set value (seeded above with a non-matching
         // condition so the facility is "configured" but generic locations are not org locations).
         _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>?>(It.IsAny<string>()))
-            .Returns(() => _cachedConditions);
+            .Setup(c => c.GetAsync<List<OrganizationLocationConditionModel>?>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _cachedConditions);
         _mockCache
-            .Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
-                It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()))
-            .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType>(
-                (_, value, _, _) => _cachedConditions = value);
+            .Setup(c => c.SetAsync(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
+                It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>(), It.IsAny<CancellationToken>()))
+            .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType, CancellationToken>(
+                (_, value, _, _, _) => _cachedConditions = value)
+            .Returns(Task.CompletedTask);
 
         _mockConfigQueries
             .Setup(q => q.GetByFacilityIdAsync(It.IsAny<string>()))
@@ -485,11 +487,12 @@ public class LocationMappingServiceTests
 
         // Assert
         _mockConfigQueries.Verify(q => q.GetByFacilityIdAsync(FacilityId), Times.Once);
-        _mockCache.Verify(c => c.Set(
+        _mockCache.Verify(c => c.SetAsync(
             It.IsAny<string>(),
             It.Is<List<OrganizationLocationConditionModel>>(l => l.Count == 1 && l[0].ConditionId == 1),
             It.IsAny<TimeSpan>(),
-            ExpirationType.Absolute), Times.Once);
+            ExpirationType.Absolute,
+            It.IsAny<CancellationToken>()), Times.Once);
         _mockManager.Verify(m => m.CreateAsync(It.Is<CreateOrganizationLocationMappingModel>(c =>
             c.IsOrgLocation)), Times.Once);
     }
@@ -913,14 +916,16 @@ public class LocationMappingServiceTests
         const string correlationId = "corr-1";
         const string patientId = "patient-1";
         var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
 
         _mockConfigQueries
             .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         _mockResourceCache
-            .Setup(c => c.Get(cacheKey))
-            .Returns(new List<DomainResource>
+            .Setup(c => c.GetAsync(cacheKey, cancellationToken))
+            .ReturnsAsync(new List<DomainResource>
             {
                 new Encounter { Id = "enc-org" },
                 new Encounter { Id = "enc-nonorg" }
@@ -930,25 +935,76 @@ public class LocationMappingServiceTests
             .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EncounterMappingModel>
             {
-                new() { EncounterId = "enc-org", MappedToOrg = true },
-                new() { EncounterId = "enc-nonorg", MappedToOrg = false }
+                new()
+                {
+                    EncounterId = "enc-org",
+                    MappedToOrg = true,
+                    EncounterLocations =
+                    [
+                        new EncounterLocationModel
+                        {
+                            OrganizationLocationMappingId = 1,
+                            LocationId = "loc-org",
+                            LocationName = "5 West Medical ICU",
+                            LocationAlias = "1027-4",
+                            PartOfValue = "loc-root",
+                            IsOrgLocation = true
+                        }
+                    ]
+                },
+                new()
+                {
+                    EncounterId = "enc-nonorg",
+                    MappedToOrg = false,
+                    EncounterLocations =
+                    [
+                        new EncounterLocationModel
+                        {
+                            OrganizationLocationMappingId = 2,
+                            LocationId = "loc-other",
+                            LocationName = "Radiology Suite B",
+                            LocationAlias = "Radiology Suite B",
+                            PartOfValue = "loc-root",
+                            IsOrgLocation = false
+                        }
+                    ]
+                }
             });
 
         List<DomainResource>? rewritten = null;
         _mockResourceCache
-            .Setup(c => c.UpdateCorrelationCache(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter))
-            .Callback<string, List<DomainResource>, ResourceType>((_, resources, _) => rewritten = resources);
+            .Setup(c => c.UpdateCorrelationCacheAsync(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter, cancellationToken))
+            .Callback<string, List<DomainResource>, ResourceType, CancellationToken>((_, resources, _, _) => rewritten = resources)
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
 
         // Act
-        var stripped = await _service.StripNonOrgEncountersFromCacheAsync(
-            FacilityId, correlationId, patientId, CancellationToken.None);
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
+            FacilityId, correlationId, patientId, cancellationToken);
 
         // Assert — only the non-org encounter is removed; the org encounter is rewritten.
-        Assert.Equal(1, stripped);
-        _mockResourceCache.Verify(c => c.Delete(It.Is<List<string>>(keys => keys.Contains(cacheKey))), Times.Once);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.Is<List<string>>(keys => keys.Contains(cacheKey)), cancellationToken), Times.Once);
         Assert.NotNull(rewritten);
         Assert.Single(rewritten!);
         Assert.Equal("enc-org", rewritten![0].Id);
+
+        // The counts describe the encounters as acquired, before the strip removed anything -- a patient
+        // who had one of two encounters excluded must not report as one of one.
+        Assert.Equal(LocationOrgStatus.Found, outcome.Status);
+        Assert.Equal(2, outcome.EncounterCount);
+        Assert.Equal(1, outcome.OrgEncounterCount);
+        Assert.Equal(0, outcome.AssumedOrgEncounterCount);
+
+        // Both locations are reported, including the one that did not resolve -- that is the location a
+        // user would go and fix, so losing it would defeat the indicator.
+        Assert.Equal(2, outcome.Matches.Count);
+        var orgMatch = Assert.Single(outcome.Matches, match => match.LocationId == "loc-org");
+        Assert.True(orgMatch.IsOrgLocation);
+        Assert.Equal("5 West Medical ICU", orgMatch.LocationName);
+        Assert.Equal("1027-4", orgMatch.LocationAlias);
+        Assert.Equal("loc-root", orgMatch.PartOfValue);
+
+        var nonOrgMatch = Assert.Single(outcome.Matches, match => match.LocationId == "loc-other");
+        Assert.False(nonOrgMatch.IsOrgLocation);
     }
 
     [Fact]
@@ -963,22 +1019,188 @@ public class LocationMappingServiceTests
             .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         _mockResourceCache
-            .Setup(c => c.Get(cacheKey))
-            .Returns(new List<DomainResource> { new Encounter { Id = "enc-nonorg" } });
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource> { new Encounter { Id = "enc-nonorg" } });
         _mockEncounterMappingQueries
             .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<EncounterMappingModel> { new() { EncounterId = "enc-nonorg", MappedToOrg = false } });
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new()
+                {
+                    EncounterId = "enc-nonorg",
+                    MappedToOrg = false,
+                    EncounterLocations =
+                    [
+                        new EncounterLocationModel
+                        {
+                            OrganizationLocationMappingId = 2,
+                            LocationId = "loc-other",
+                            LocationName = "Radiology Suite B",
+                            LocationAlias = "Radiology Suite B",
+                            PartOfValue = "loc-root",
+                            IsOrgLocation = false
+                        }
+                    ]
+                }
+            });
 
         // Act
-        var stripped = await _service.StripNonOrgEncountersFromCacheAsync(
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
             FacilityId, correlationId, patientId, CancellationToken.None);
 
         // Assert — the key is deleted and never rewritten, so MeasureEval rehydrates no qualifying encounter.
-        Assert.Equal(1, stripped);
-        _mockResourceCache.Verify(c => c.Delete(It.Is<List<string>>(keys => keys.Contains(cacheKey))), Times.Once);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.Is<List<string>>(keys => keys.Contains(cacheKey)), It.IsAny<CancellationToken>()), Times.Once);
         _mockResourceCache.Verify(
-            c => c.UpdateCorrelationCache(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>()),
+            c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
             Times.Never);
+
+        // A patient with encounters, none of which resolved, is NotFound -- not NotApplicable, which would
+        // claim there was nothing to resolve, and not Found, which is the inversion this asserts against.
+        Assert.Equal(LocationOrgStatus.NotFound, outcome.Status);
+        Assert.Equal(1, outcome.EncounterCount);
+        Assert.Equal(0, outcome.OrgEncounterCount);
+        Assert.Equal(0, outcome.AssumedOrgEncounterCount);
+
+        var match = Assert.Single(outcome.Matches);
+        Assert.Equal("loc-other", match.LocationId);
+        Assert.False(match.IsOrgLocation);
+    }
+
+    [Fact]
+    public async Task StripNonOrgEncountersFromCacheAsync_NothingCached_ReportsNotApplicableWithoutQueryingMappings()
+    {
+        // Arrange — the facility is configured, but this correlation acquired no encounters.
+        const string correlationId = "corr-4";
+        const string patientId = "patient-4";
+        var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+
+        _mockConfigQueries
+            .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockResourceCache
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>());
+
+        // Act
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
+            FacilityId, correlationId, patientId, CancellationToken.None);
+
+        // Assert — no encounters in this correlation is NotApplicable rather than NotFound: there was
+        // nothing to resolve, which is not the same as failing to resolve.
+        Assert.Equal(LocationOrgStatus.NotApplicable, outcome.Status);
+        Assert.Equal(0, outcome.EncounterCount);
+        Assert.Empty(outcome.Matches);
+
+        // The mappings describe the patient's whole history at the facility, so with nothing cached to
+        // scope them to there is no question they could answer.
+        _mockEncounterMappingQueries.Verify(
+            q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task StripNonOrgEncountersFromCacheAsync_ScopesCountsToTheCorrelationAndDeduplicatesLocations()
+    {
+        // Arrange — the patient has three mapped encounters at the facility, but this correlation acquired
+        // only two of them, and both were in the same ward.
+        const string correlationId = "corr-5";
+        const string patientId = "patient-5";
+        var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+
+        _mockConfigQueries
+            .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockResourceCache
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>
+            {
+                new Encounter { Id = "enc-1" },
+                new Encounter { Id = "enc-2" }
+            });
+
+        EncounterLocationModel SharedWard() => new()
+        {
+            OrganizationLocationMappingId = 1,
+            LocationId = "loc-ward",
+            LocationName = "5 West Medical ICU",
+            LocationAlias = "1027-4",
+            IsOrgLocation = true
+        };
+
+        _mockEncounterMappingQueries
+            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { EncounterId = "enc-1", MappedToOrg = true, EncounterLocations = [SharedWard()] },
+                new() { EncounterId = "enc-2", MappedToOrg = true, EncounterLocations = [SharedWard()] },
+
+                // From an earlier report. Not in this correlation's cache, so it must not be counted.
+                new() { EncounterId = "enc-old", MappedToOrg = false, EncounterLocations = [] }
+            });
+
+        // Act
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
+            FacilityId, correlationId, patientId, CancellationToken.None);
+
+        // Assert — counts cover this correlation only; the prior report's encounter is excluded, so it can
+        // neither inflate the total nor drag the status to NotFound.
+        Assert.Equal(LocationOrgStatus.Found, outcome.Status);
+        Assert.Equal(2, outcome.EncounterCount);
+        Assert.Equal(2, outcome.OrgEncounterCount);
+
+        // Two encounters, one ward: the outcome describes locations, not visits.
+        var match = Assert.Single(outcome.Matches);
+        Assert.Equal("loc-ward", match.LocationId);
+    }
+
+    [Fact]
+    public async Task StripNonOrgEncountersFromCacheAsync_EncountersWithoutLocationReferences_CountAsAssumedOrg()
+    {
+        // Arrange — acquisition treats an encounter carrying no resolvable location references as belonging
+        // to the organization by default. That membership was never verified against the configuration.
+        const string correlationId = "corr-6";
+        const string patientId = "patient-6";
+        var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+
+        _mockConfigQueries
+            .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockResourceCache
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>
+            {
+                new Encounter { Id = "enc-assumed" },
+                new Encounter { Id = "enc-verified" }
+            });
+
+        _mockEncounterMappingQueries
+            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { EncounterId = "enc-assumed", MappedToOrg = true, EncounterLocations = [] },
+                new()
+                {
+                    EncounterId = "enc-verified",
+                    MappedToOrg = true,
+                    EncounterLocations =
+                    [
+                        new EncounterLocationModel { OrganizationLocationMappingId = 1, LocationId = "loc-ward", IsOrgLocation = true }
+                    ]
+                }
+            });
+
+        // Act
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
+            FacilityId, correlationId, patientId, CancellationToken.None);
+
+        // Assert — assumed membership is a strict subset of org membership, never a separate total.
+        Assert.Equal(LocationOrgStatus.Found, outcome.Status);
+        Assert.Equal(2, outcome.EncounterCount);
+        Assert.Equal(2, outcome.OrgEncounterCount);
+        Assert.Equal(1, outcome.AssumedOrgEncounterCount);
+
+        // The assumed encounter contributes no location, so it cannot appear in the match list.
+        Assert.Single(outcome.Matches);
     }
 
     [Fact]
@@ -990,13 +1212,17 @@ public class LocationMappingServiceTests
             .ReturnsAsync(false);
 
         // Act
-        var stripped = await _service.StripNonOrgEncountersFromCacheAsync(
+        var outcome = await _service.StripNonOrgEncountersFromCacheAsync(
             FacilityId, "corr-3", "patient-3", CancellationToken.None);
 
         // Assert — never touches the resource cache or encounter mappings when mapping is inactive.
-        Assert.Equal(0, stripped);
-        _mockResourceCache.Verify(c => c.Get(It.IsAny<string>()), Times.Never);
-        _mockResourceCache.Verify(c => c.Delete(It.IsAny<List<string>>()), Times.Never);
+        Assert.Equal(LocationOrgStatus.NotApplicable, outcome.Status);
+        Assert.Equal(0, outcome.EncounterCount);
+        Assert.Equal(0, outcome.OrgEncounterCount);
+        Assert.Equal(0, outcome.AssumedOrgEncounterCount);
+        Assert.Empty(outcome.Matches);
+        _mockResourceCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
         _mockEncounterMappingQueries.Verify(
             q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);

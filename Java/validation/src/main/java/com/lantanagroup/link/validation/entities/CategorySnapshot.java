@@ -13,6 +13,8 @@ public class CategorySnapshot {
     private String title;
     private CategorySeverity severity;
     private boolean acceptable;
+    private boolean submit = true;
+    private boolean review = true;
     private String guidance;
     /**
      * Optional in the source JSON. Absent or null → {@link CategoryStrategy#LABEL}.
@@ -44,6 +46,8 @@ public class CategorySnapshot {
         title = category.getTitle();
         severity = category.getSeverity();
         acceptable = category.isAcceptable();
+        submit = category.isSubmit();
+        review = category.isReview();
         guidance = category.getGuidance();
         strategy = category.getStrategy() != null ? category.getStrategy() : CategoryStrategy.LABEL;
         scope = category.getScope();
@@ -61,9 +65,21 @@ public class CategorySnapshot {
 
     public Category toCategory(Category category) {
         category.setId(id);
+        return applyTo(category);
+    }
+
+    /**
+     * Copies the snapshot's mutable fields onto an existing category, leaving its identifier alone.
+     * Assigning the ID of an already-persisted category is not safe: under a case-insensitive collation
+     * the stored ID may differ from this snapshot's ID only by case, and writing it would alter the
+     * identifier of a managed entity.
+     */
+    public Category applyTo(Category category) {
         category.setTitle(title);
         category.setSeverity(severity);
         category.setAcceptable(acceptable);
+        category.setSubmit(submit);
+        category.setReview(review);
         category.setGuidance(guidance);
         category.setStrategy(strategy != null ? strategy : CategoryStrategy.LABEL);
         category.setScope(scope);

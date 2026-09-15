@@ -17,7 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
-import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
+import {IVendorVersion} from 'src/app/interfaces/tenant/vendor-interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -94,7 +94,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
   timezones: string[] = moment.tz.names();
-  vendors = Object.values(Vendor);
+  vendors: IVendorVersion[] = [];
 
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
@@ -105,6 +105,19 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   appConfig?: AppConfig;
 
+  /**
+   * DMRP feature flag. When DMRP is enabled the facility's schedule comes from its DMRP reporting
+   * plans, so the report pickers are hidden and the Tenant API is sent an empty schedule. It refuses
+   * one that is not.
+   *
+   * The fallback is the safe direction rather than the eventual one: assuming the flag is off means a
+   * config that failed to load leaves the form asking for a schedule, which the API then rejects out
+   * loud. Assuming it is on would quietly create facilities that report nothing.
+   */
+  get dmrpEnabled(): boolean {
+    return this.appConfig?.dmrpEnabled ?? false;
+  }
+
   constructor(
     private snackBar: MatSnackBar,
     private tenantService: TenantService,
@@ -113,6 +126,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
+  }
+
+  compareVendors(vendor1: IVendorVersion | null, vendor2: IVendorVersion | null): boolean {
+    return vendor1?.id === vendor2?.id;
   }
 
   async ngOnInit(): Promise<void> {
@@ -125,13 +142,23 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
         timeZone: new FormControl('', Validators.required),
-        vendor: new FormControl<Vendor | null>(null, Validators.required),
+        vendor: new FormControl<IVendorVersion | null>(null),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
       { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
+
+    this.tenantService.getVendorVersions().subscribe({
+      next: (vendors) => {
+        this.vendors = vendors;
+        this.setVendorFromItem();
+      },
+      error: (err) => {
+        this.submittedConfiguration.emit({id: '', message: err.message});
+      }
+    });
 
     this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
       {
@@ -156,8 +183,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
@@ -197,8 +223,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
       this.monthlyReportsControl.updateValueAndValidity();
@@ -269,6 +294,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('dailyReports') as FormControl;
   }
 
+  private setVendorFromItem(): void {
+    const vendorVersionId = this.item?.vendorVersionId;
+    const vendor = this.vendors.find(candidate => candidate.id === vendorVersionId) ?? null;
+
+    this.vendorControl.setValue(vendor);
+    this.vendorControl.updateValueAndValidity();
+  }
+
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
     this.facilityIdControl.updateValueAndValidity();
@@ -279,10 +312,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
-  get noReportsEntered(): string | null {
-    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
-  }
-
   get reportsNotUniqueError(): string | null {
     return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
   }
@@ -290,9 +319,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
 
-      let monthlyReports : string[] = this.monthlyReportsControl.value ?? [];
-      let weeklyReports : string[] = this.weeklyReportsControl.value ?? [];
-      let dailyReports : string[] = this.dailyReportsControl.value ?? [];
+      // DMRP feature flag. With DMRP enabled the schedule is derived from the facility's reporting
+      // plans, and the Tenant API refuses a request that carries one. The block itself still has to
+      // be sent: its three arrays are not nullable, so leaving it out fails model binding before the
+      // API sees it. Editing an existing facility loads its stored schedule into these controls, so
+      // the arrays are emptied here rather than relying on the controls being untouched.
+      let monthlyReports : string[] = this.dmrpEnabled ? [] : (this.monthlyReportsControl.value ?? []);
+      let weeklyReports : string[] = this.dmrpEnabled ? [] : (this.weeklyReportsControl.value ?? []);
+      let dailyReports : string[] = this.dmrpEnabled ? [] : (this.dailyReportsControl.value ?? []);
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {

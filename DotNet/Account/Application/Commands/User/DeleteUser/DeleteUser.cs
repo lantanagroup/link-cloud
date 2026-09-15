@@ -92,7 +92,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 try
                 {
-                    _cache.Remove(userKey);
+                    await _cache.RemoveAsync(userKey, cancellationToken);
                 }
                 catch (Exception ex)
                 {

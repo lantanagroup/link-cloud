@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Shared.Application.Health
             _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         }
 
-        public Task<HealthCheckResult> CheckHealthAsync(
+        public async Task<HealthCheckResult> CheckHealthAsync(
             HealthCheckContext context,
             CancellationToken cancellationToken = default)
         {
@@ -23,12 +23,12 @@ namespace LantanaGroup.Link.Shared.Application.Health
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeoutCts.CancelAfter(HealthCheckTimeout);
 
-                _ = _cacheService.Get<string>("healthcheck");
-                return Task.FromResult(HealthCheckResult.Healthy());
+                _ = await _cacheService.GetAsync<string>("healthcheck", timeoutCts.Token);
+                return HealthCheckResult.Healthy();
             }
             catch (Exception ex)
             {
-                return Task.FromResult(HealthCheckResult.Unhealthy("Failed to connect to cache", ex));
+                return HealthCheckResult.Unhealthy("Failed to connect to cache", ex);
             }
         }
     }

@@ -10,6 +10,6 @@ namespace LantanaGroup.Link.Submission.Application.Interfaces
         Task<byte[]?> DownloadFromInternalAsync(SubmitPayloadValue value, CancellationToken cancellationToken = default);
         Task UploadToExternalAsync(SubmitPayloadKey key, SubmitPayloadValue value, byte[] content, CancellationToken cancellationToken = default);
         Task<IDictionary<string, byte[]>> DownloadFromInternalAsync(string payloadRootUri, CancellationToken cancellationToken = default);
-        Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(string payloadRootUri, CancellationToken cancellationToken = default);
+        Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(ICollection<string> reportTypes, string payloadRootUri, CancellationToken cancellationToken = default);
     }
 }

@@ -2,6 +2,7 @@ import {RouterModule, Routes} from '@angular/router';
 
 import {NgModule} from '@angular/core';
 import {AuthGuard} from './services/security/auth.guard'; // adjust the path
+import {DmrpGuard} from './services/security/dmrp.guard';
 
 
 const routes: Routes = [
@@ -22,6 +23,7 @@ const routes: Routes = [
   { path: 'audit', loadComponent: () => import('./components/audit/audit-dashboard/audit-dashboard.component').then(mod => mod.AuditDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'account', loadComponent: () => import('./components/account/account-dashboard/account-dashboard.component').then(mod => mod.AccountDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'vendor', loadComponent: () => import('./components/vendor/vendor-dashboard/vendor-dashboard.component').then(mod => mod.VendorDashboardComponent), canActivate: [AuthGuard] },
+  { path: 'measure-mappings', loadComponent: () => import('./components/measure-mappings/measure-mappings-dashboard/measure-mappings-dashboard.component').then(mod => mod.MeasureMappingsDashboardComponent), canActivate: [AuthGuard, DmrpGuard] },
   { path: 'integration-test', loadComponent: () => import('./components/testing/integration-test/integration-test.component').then(mod => mod.IntegrationTestComponent), canActivate: [AuthGuard] },
   { path: 'validation-config', loadComponent: () => import('./components/validation-config/validation-config.component').then(mod => mod.ValidationConfigComponent), canActivate: [AuthGuard]  },
   { path: 'monitor/health', loadComponent: () => import('./components/monitor/link-health-check/link-health-check.component').then(mod => mod.LinkHealthCheckComponent), canActivate: [AuthGuard]  },
@@ -31,6 +33,7 @@ const routes: Routes = [
   { path: 'sub-pre-qual-report/facility/:facilityId/report/:submissionId', loadComponent: () => import('./components/sub-pre-qual-report/sub-pre-qual-report.component').then(mod => mod.SubPreQualReportComponent), canActivate: [AuthGuard]  },
   { path: 'sub-pre-qual-report/facility/:facilityId/report/:submissionId/:categoryId', loadComponent: () => import('./components/sub-pre-qual-report/sub-pre-qual-report-issues/sub-pre-qual-report-issues.component').then(mod => mod.SubPreQualReportIssuesComponent), canActivate: [AuthGuard]  },
   { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesComponent) , canActivate: [AuthGuard] },
+  { path: 'validation-config/validation-categories-management', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-management/validation-categories-management.component').then(mod => mod.ValidationCategoriesManagementComponent), canActivate: [AuthGuard] },
   { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent), canActivate: [AuthGuard]  },
   { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'terminology-config', loadComponent: () => import('./components/terminology/terminology-config.component').then(mod => mod.TerminologyConfigComponent), canActivate: [AuthGuard]  },

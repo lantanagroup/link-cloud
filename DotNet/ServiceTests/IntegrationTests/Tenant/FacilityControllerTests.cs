@@ -1,6 +1,8 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -10,13 +12,17 @@ using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Controllers;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Quartz;
 using System.Net;
 using System.Text.Json;
 using Xunit.Abstractions;
@@ -33,6 +39,22 @@ public class FacilityControllerTests : IDisposable
     private readonly TenantIntegrationTestFixture _fixture;
     private readonly IServiceScope _scope;
     private readonly FacilityController _controller;
+    private readonly TenantDbContext _dbContext;
+
+    /// <summary>
+    /// Real MVC services, so the controller's problem responses are built by the actual
+    /// <see cref="ProblemDetailsFactory"/>. The fixture registers no MVC services of its own, and
+    /// <c>ControllerBase.Problem</c> resolves the factory rather than constructing one.
+    /// </summary>
+    private static readonly IServiceProvider MvcServices = BuildMvcServices();
+
+    private static IServiceProvider BuildMvcServices()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddControllers();
+        return services.BuildServiceProvider();
+    }
 
     public FacilityControllerTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
     {
@@ -43,6 +65,7 @@ public class FacilityControllerTests : IDisposable
         // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
         _scope = fixture.ServiceProvider.CreateScope();
         var sp = _scope.ServiceProvider;
+        _dbContext = sp.GetRequiredService<TenantDbContext>();
 
         var logger = sp.GetRequiredService<ILogger<FacilityController>>();
         var scheduleService = sp.GetRequiredService<ScheduleService>();
@@ -59,8 +82,9 @@ public class FacilityControllerTests : IDisposable
         var linkBearerServiceOptions = sp.GetRequiredService<IOptions<LinkBearerServiceOptions>>();
         var queries = sp.GetRequiredService<IFacilityQueries>();
         var manager = sp.GetRequiredService<IFacilityManager>();
+        var facilityOperations = sp.GetRequiredService<IFacilityOperations>();
 
-        _controller = new FacilityController(logger, manager, queries, scheduleService, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
+        _controller = new FacilityController(logger, manager, queries, facilityOperations, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
 
         // Set HttpContext
         var httpContext = new DefaultHttpContext();
@@ -69,12 +93,34 @@ public class FacilityControllerTests : IDisposable
         {
             HttpContext = httpContext
         };
+        _controller.ProblemDetailsFactory = MvcServices.GetRequiredService<ProblemDetailsFactory>();
 
         Quartz.Logging.LogProvider.SetCurrentLogProvider(new NoOpQuartzLogProvider());
 
     }
 
     public void Dispose() => _scope.Dispose();
+
+    private async Task<VendorVersion> CreateVendorVersionAsync()
+    {
+        var vendor = new Vendor
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Vendor-{Guid.NewGuid():N}"
+        };
+        var vendorVersion = new VendorVersion
+        {
+            Id = Guid.NewGuid(),
+            VendorId = vendor.Id,
+            Version = "test"
+        };
+
+        await _dbContext.Vendors.AddAsync(vendor);
+        await _dbContext.VendorVersions.AddAsync(vendorVersion);
+        await _dbContext.SaveChangesAsync();
+
+        return vendorVersion;
+    }
 
     [Fact]
     public async Task GetFacilities_Success()
@@ -121,17 +167,28 @@ public class FacilityControllerTests : IDisposable
     {
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Store Test {facilityId}";
+        var vendorVersion = await CreateVendorVersionAsync();
         var facilityConfig = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityName,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Id = vendorVersion.VendorId,
+                Name = vendorVersion.Vendor!.Name
+            },
+            VendorVersionId = vendorVersion.Id,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
         var result = await _controller.StoreFacility(facilityConfig, CancellationToken.None);
-        Assert.IsType<CreatedResult>(result);
+        var createdResult = Assert.IsType<CreatedResult>(result);
+        var createdFacility = Assert.IsType<FacilityModel>(createdResult.Value);
+        var storedFacility = await _dbContext.Facilities.AsNoTracking().SingleAsync(facility => facility.FacilityId == facilityId);
+
+        Assert.Equal(vendorVersion.Id, storedFacility.VendorVersionId);
+        Assert.Equal(vendorVersion.Id, createdFacility.VendorVersionId);
     }
 
     [Fact]
@@ -139,6 +196,7 @@ public class FacilityControllerTests : IDisposable
     {
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Put Test {facilityId}";
+        var vendorVersion = await CreateVendorVersionAsync();
         var facility = new Facility
         {
             FacilityId = facilityId,
@@ -153,7 +211,12 @@ public class FacilityControllerTests : IDisposable
             FacilityId = facilityId,
             FacilityName = "Updated Name",
             TimeZone = "America/New_York",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Id = vendorVersion.VendorId,
+                Name = vendorVersion.Vendor!.Name
+            },
+            VendorVersionId = vendorVersion.Id,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -161,7 +224,11 @@ public class FacilityControllerTests : IDisposable
         var actionResult = result.Result as IActionResult;
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
-        Assert.IsType<FacilityModel>(objectResult.Value);
+        var updatedFacility = Assert.IsType<FacilityModel>(objectResult.Value);
+        var storedFacility = await _dbContext.Facilities.AsNoTracking().SingleAsync(facility => facility.FacilityId == facilityId);
+
+        Assert.Equal(vendorVersion.Id, storedFacility.VendorVersionId);
+        Assert.Equal(vendorVersion.Id, updatedFacility.VendorVersionId);
     }
 
     [Fact]
@@ -200,6 +267,23 @@ public class FacilityControllerTests : IDisposable
         Assert.IsType<NoContentResult>(result);
     }
 
+    /// <summary>
+    /// Every client error answers with RFC 7807 problem details rather than a bare string, so the
+    /// assertion has to look at <see cref="ProblemDetails.Detail"/>. A result whose value is still a
+    /// string would satisfy a <c>Contains</c> on <c>Value.ToString()</c> and hide the regression.
+    /// </summary>
+    private static ProblemDetails AssertProblem(IActionResult? result, int expectedStatusCode, string expectedDetail)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(expectedStatusCode, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(expectedStatusCode, problem.Status);
+        Assert.Contains(expectedDetail, problem.Detail);
+
+        return problem;
+    }
+
     [Fact]
     public async Task SoftDeleteFacility_FacilityNotFound_ReturnsNotFound()
     {
@@ -207,8 +291,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -241,8 +324,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
     }
 
     [Fact]
@@ -262,8 +344,50 @@ public class FacilityControllerTests : IDisposable
         // Try to restore a facility that is not deleted
         var result = await _controller.RestoreFacility(facilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("is not deleted", badRequestResult.Value?.ToString());
+        AssertProblem(result, StatusCodes.Status400BadRequest, "is not deleted");
+    }
+
+    /// <summary>
+    /// The endpoints reach the scheduler through <see cref="IFacilityOperations"/>, so the jobs are the
+    /// only proof the scheduling half of each operation still runs. Asserting on the response alone
+    /// would pass with the scheduling dropped entirely.
+    /// </summary>
+    [Fact]
+    public async Task Facility_lifecycle_keeps_the_scheduled_jobs_in_step()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = $"Scheduled Jobs Test {facilityId}",
+            TimeZone = "America/Chicago",
+            ScheduledReports = new TenantScheduledReportConfig
+            {
+                Daily = Array.Empty<string>(),
+                Weekly = Array.Empty<string>(),
+                Monthly = new[] { "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
+            }
+        };
+
+        Assert.IsType<CreatedResult>(await _controller.StoreFacility(facility, CancellationToken.None));
+        Assert.True(await MonthlyJobExistsAsync(facilityId), "Creating a facility should schedule its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.SoftDeleteFacility(facilityId, CancellationToken.None));
+        Assert.False(await MonthlyJobExistsAsync(facilityId), "Soft deleting a facility should remove its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.RestoreFacility(facilityId, CancellationToken.None));
+        Assert.True(await MonthlyJobExistsAsync(facilityId), "Restoring a facility should recreate its jobs.");
+
+        Assert.IsType<NoContentResult>(await _controller.DeleteFacility(facilityId, CancellationToken.None));
+        Assert.False(await MonthlyJobExistsAsync(facilityId), "Deleting a facility should remove its jobs.");
+    }
+
+    private async Task<bool> MonthlyJobExistsAsync(string facilityId)
+    {
+        var scheduler = await _scope.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler();
+
+        return await scheduler.CheckExists(
+            new JobKey($"{facilityId}-{ScheduleService.MONTHLY}", nameof(KafkaTopic.ReportScheduled)));
     }
 
     [Fact]
@@ -354,8 +478,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.GenerateAdHocReport(facilityId, request);
         var actionResult = result.Result as IActionResult;
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
-        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+        AssertProblem(actionResult, StatusCodes.Status400BadRequest, "FacilityId must be provided");
     }
 
     [Fact]
@@ -372,7 +495,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.GenerateAdHocReport(Guid.NewGuid().ToString(), request);
         var actionResult = result.Result as IActionResult;
-        Assert.IsType<NotFoundObjectResult>(actionResult);
+        AssertProblem(actionResult, StatusCodes.Status404NotFound, "Facility does not exist");
     }
 
     [Theory]
@@ -384,8 +507,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RegenerateReport(facilityId, request);
         var actionResult = result.Result as IActionResult;
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
-        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+        AssertProblem(actionResult, StatusCodes.Status400BadRequest, "FacilityId must be provided");
     }
 
     [Fact]
@@ -395,7 +517,7 @@ public class FacilityControllerTests : IDisposable
 
         var result = await _controller.RegenerateReport(Guid.NewGuid().ToString(), request);
         var actionResult = result.Result as IActionResult;
-        Assert.IsType<NotFoundObjectResult>(actionResult);
+        AssertProblem(actionResult, StatusCodes.Status404NotFound, "Facility does not exist");
     }
 
     private class StubHttpMessageHandler : HttpMessageHandler

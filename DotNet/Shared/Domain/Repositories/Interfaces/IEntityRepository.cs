@@ -25,6 +25,10 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
         Task<T> SingleAsync(Expression<Func<T, bool>> predicate);
         Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
         void Remove(T entity);
+
+        Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate);
+        Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
+
         void Update(T entity);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken);

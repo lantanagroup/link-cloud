@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 using Hl7.Fhir.Model;
 using System.Text.Json.Serialization;
@@ -18,7 +18,9 @@ public enum ImportedPatientSource
 /// <summary>
 /// Describes a single imported patient as configured on a scenario.
 /// One of <see cref="PatientId"/> (for <see cref="ImportedPatientSource.ExistingId"/>)
-/// or <see cref="BundleJson"/> (for <see cref="ImportedPatientSource.Bundle"/>) is required.
+/// or <see cref="UploadedBundleId"/> (for <see cref="ImportedPatientSource.Bundle"/>) is required.
+/// Raw <see cref="BundleJson"/> is an execution-only value populated after resolving the
+/// external bundle reference, with support retained for legacy inline inputs.
 /// </summary>
 public sealed class ImportedPatientInput
 {
@@ -38,7 +40,11 @@ public sealed class ImportedPatientInput
     /// </summary>
     public Guid? UploadedBundleId { get; set; }
 
-    /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON.</summary>
+    /// <summary>
+    /// For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON available
+    /// only to execution-time processing. New persisted models use <see cref="UploadedBundleId"/>
+    /// instead; this remains for legacy inline inputs and hydrated execution copies.
+    /// </summary>
     public string? BundleJson { get; set; }
 
     /// <summary>

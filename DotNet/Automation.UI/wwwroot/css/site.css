@@ -247,6 +247,44 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-summary-item code { font-size: .82rem; }
 
 /* ===================================================================
+   Live simulation panel (Run Details)
+   =================================================================== */
+.au-live-panel .au-live-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.au-live-panel .au-live-log {
+  max-height: 16rem;
+  overflow: auto;
+  font-size: .8125rem;
+}
+.au-live-panel .au-live-log-time {
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-live-panel .au-live-actions-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .au-live-panel .au-live-actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.au-live-panel .au-live-metric-accent {
+  border-left: 3px solid var(--au-accent);
+  padding-left: .6rem;
+}
+.au-live-panel .au-live-pool-wrap {
+  max-height: 22rem;
+  overflow: auto;
+}
+.au-live-panel details > summary {
+  cursor: pointer;
+}
+
+/* ===================================================================
    Cohort summary table (Details page)
    =================================================================== */
 .au-cohort-summary-table {
@@ -322,6 +360,176 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   .au-table { font-size: .8rem; }
   .au-summary-item { font-size: .8rem; }
   .au-scenario-modal-dialog { max-width: 96vw; }
+}
+
+/* ===================================================================
+   Suggest-from-patient-data wizard
+   =================================================================== */
+.au-cfggen-dialog {
+  width: 100%;
+  max-width: 760px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.au-cfggen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.au-cfggen-kicker {
+  display: block;
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .7;
+  margin-bottom: .15rem;
+}
+.au-cfggen-title { font-size: 1.05rem; }
+.au-cfggen-sub {
+  font-size: .8rem;
+  font-weight: 400;
+  opacity: .78;
+  margin-top: .2rem;
+}
+.au-cfggen-steps {
+  display: flex;
+  gap: .35rem;
+  padding: .75rem 1rem 0;
+  background: #fff;
+  border-bottom: 1px solid #eef0f3;
+}
+.au-cfggen-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  border: 0;
+  background: transparent;
+  padding: .45rem .35rem .7rem;
+  color: var(--au-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: left;
+}
+.au-cfggen-step-num {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9ecef;
+  color: #555;
+  font-size: .72rem;
+  flex: 0 0 auto;
+}
+.au-cfggen-step.is-active { color: #111; }
+.au-cfggen-step.is-active .au-cfggen-step-num {
+  background: var(--au-accent);
+  color: #fff;
+}
+.au-cfggen-step.is-done { color: #111; }
+.au-cfggen-step.is-done .au-cfggen-step-num {
+  background: var(--au-success);
+  color: #fff;
+}
+.au-cfggen-body {
+  padding: 1.1rem 1.15rem 1.25rem;
+  overflow: auto;
+}
+.au-cfggen-intro {
+  font-size: .92rem;
+  margin-bottom: .9rem;
+}
+.au-cfggen-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 576px) {
+  .au-cfggen-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.au-cfggen-choice {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .85rem .95rem;
+  background: #fff;
+  margin-bottom: .65rem;
+}
+.au-cfggen-choice.is-recommended {
+  border-color: #b8d9ff;
+  background: #f5f9ff;
+}
+.au-cfggen-choice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: flex-start;
+}
+.au-cfggen-choice-actions { margin-top: .7rem; }
+.au-cfggen-op {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: 1px solid #f0f2f4;
+}
+.au-cfggen-op:last-child { border-bottom: 0; }
+.au-cfggen-op-type {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--au-accent);
+  margin-bottom: .1rem;
+}
+.au-cfggen-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1.15rem;
+  border-top: 1px solid #eef0f3;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.au-cfggen-loading {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--au-muted);
+}
+.au-cfggen-error {
+  display: none;
+  margin: 0 1.15rem 0;
+}
+.au-cfggen-details {
+  margin-top: .65rem;
+  font-size: .8rem;
+}
+.au-cfggen-details summary {
+  cursor: pointer;
+  color: var(--au-muted);
+}
+.au-cfggen-pre {
+  max-height: 7.5rem;
+  overflow: auto;
+  margin: .4rem 0 0;
+  padding: .55rem .7rem;
+  background: #f7f8fa;
+  border: 1px solid #e9ecef;
+  border-radius: .35rem;
+  font-size: .75rem;
+}
+.au-cfggen-selected {
+  font-size: .8rem;
+  color: var(--au-success);
+  margin-bottom: .75rem;
 }
 
 /* ===================================================================

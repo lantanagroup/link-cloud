@@ -195,6 +195,16 @@ public class DataAcquisitionDbContext : DbContext
                 .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
                 .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
 
+            // Covers GetResourceIdsForReportPatient and sibling EXISTS checks in
+            // GetNextEligibleBatchForFacility. The unique ReferenceLogKey index above is
+            // filtered to ReferenceResourceType IS NOT NULL, so regular query logs miss it.
+            entity.HasIndex(e => new { e.FacilityId, e.CorrelationId })
+                .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_CorrelationId")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.Status),
+                    nameof(DataAcquisitionLog.ReportTrackingId));
+
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
                 .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default")

@@ -1,12 +1,16 @@
 ﻿using Hl7.Fhir.Model;
+using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
@@ -27,6 +31,7 @@ public class ReportApiHelper
     private readonly IAdminBffIntegrationClient _adminBffClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
+    private readonly KafkaConnection _kafkaConnection;
 
     public ReportApiHelper(
         IReportServiceClient reportClient,
@@ -34,7 +39,8 @@ public class ReportApiHelper
         ISubmissionServiceClient submissionClient,
         IAdminBffIntegrationClient adminBffClient,
         IAutomationOutput output,
-        AutomationConfig config)
+        AutomationConfig config,
+        KafkaConnection kafkaConnection)
     {
         _reportClient = reportClient;
         _facilityClient = facilityClient;
@@ -42,6 +48,7 @@ public class ReportApiHelper
         _adminBffClient = adminBffClient;
         _output = output;
         _automationConfig = config;
+        _kafkaConnection = kafkaConnection;
     }
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
@@ -110,20 +117,51 @@ public class ReportApiHelper
             ? Guid.NewGuid().ToString()
             : reportTrackingId.Trim();
 
-        var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
+        if (!Guid.TryParse(trackingId, out var trackingGuid))
+            throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
 
-        var response = await _adminBffClient.CreateReportScheduledAsync(
-            facilityId,
-            frequency,
-            reportTypes,
-            startDateUtc.UtcDateTime,
-            delayMinutes,
-            trackingId);
+        if (reportDuration <= TimeSpan.Zero)
+            throw new ArgumentException("reportDuration must be greater than zero.", nameof(reportDuration));
 
-        AutomationInvariant.Require(response.IsSuccessStatusCode,
-            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {response.StatusCode}: {response.RawBody}");
+        var endDateUtc = startDateUtc.UtcDateTime.Add(reportDuration);
+        if (endDateUtc <= startDateUtc.UtcDateTime)
+            throw new ArgumentException("Scheduled report end date must be later than start date.", nameof(reportDuration));
 
-        _output.WriteLine($"Scheduled report event produced: reportTrackingId={trackingId}, start={startDateUtc:O}, delayMinutes={delayMinutes}");
+        var producerConfig = new ProducerConfig
+        {
+            Acks = Acks.All,
+            EnableIdempotence = true
+        };
+
+        var producerFactory = new KafkaProducerFactory<string, ReportScheduledValue>(_kafkaConnection);
+        using var producer = producerFactory.CreateProducer(producerConfig, useOpenTelemetry: false);
+
+        var value = new ReportScheduledValue
+        {
+            ReportTypes = reportTypes.ToList(),
+            Frequency = frequency,
+            StartDate = startDateUtc,
+            EndDate = new DateTimeOffset(DateTime.SpecifyKind(endDateUtc, DateTimeKind.Utc)),
+            ReportTrackingId = trackingGuid
+        };
+
+        await producer.ProduceAsync(
+            nameof(KafkaTopic.ReportScheduled),
+            new Message<string, ReportScheduledValue>
+            {
+                Key = facilityId,
+                Value = value,
+                Headers = new Headers
+                {
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
+                }
+            });
+
+        producer.Flush(TimeSpan.FromSeconds(5));
+
+        _output.WriteLine(
+            $"Scheduled report event produced via Kafka: reportTrackingId={trackingId}, " +
+            $"start={startDateUtc:O}, end={endDateUtc:O}, durationMinutes={reportDuration.TotalMinutes:F0}");
         return trackingId;
     }
 
@@ -255,8 +293,16 @@ public class ReportApiHelper
 
             var milestoneReached = false;
             var milestonePhaseStart = DateTime.UtcNow;
-            while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - milestonePhaseStart < hardTimeout)
+            var milestoneDeadline = hardTimeout == TimeSpan.MaxValue
+                ? DateTime.MaxValue
+                : milestonePhaseStart + hardTimeout;
+            while (true)
             {
+                if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
+                {
+                    if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
+                        break;
+                }
                 if (diagnostics.HasCriticalFailure)
                 {
                     _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
@@ -269,6 +315,20 @@ public class ReportApiHelper
                     milestoneReached = true;
                     var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
                     _output.WriteLine($"Milestone '{milestoneToAwait}' reached after {elapsed:F0}s.");
+                    break;
+                }
+
+                // Entryless scheduled runs are valid when prediction says no
+                // patients should participate. In that case the report can reach a terminal
+                // status without ever emitting ReportEntriesCreated.
+                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
+                if (scheduleProbe.IsSuccessStatusCode
+                    && scheduleProbe.Body?.Status.IsTerminal() == true)
+                {
+                    milestoneReached = true;
+                    var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
+                    _output.WriteLine(
+                        $"Milestone '{milestoneToAwait}' was not observed, but report is already terminal ({scheduleProbe.Body.Status}) after {elapsed:F0}s. Continuing.");
                     break;
                 }
 
@@ -306,8 +366,16 @@ public class ReportApiHelper
 
         string? lastStatus = null;
         var submissionPhaseStart = DateTime.UtcNow;
-        while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - submissionPhaseStart < hardTimeout)
+        var submissionDeadline = hardTimeout == TimeSpan.MaxValue
+            ? DateTime.MaxValue
+            : submissionPhaseStart + hardTimeout;
+        while (true)
         {
+            if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
+            {
+                if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
+                    break;
+            }
             if (diagnostics?.HasCriticalFailure == true)
             {
                 _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
@@ -370,6 +438,7 @@ public class ReportApiHelper
     public async Task<ReportTerminalState> WaitForTerminalReportStateAsync(
         string reportId,
         TimeSpan? timeout = null,
+        bool allowEntrylessTerminal = false,
         CancellationToken cancellationToken = default)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
@@ -393,6 +462,14 @@ public class ReportApiHelper
             var entriesResponse = await _reportClient.GetEntriesByScheduleAsync(reportId, cancellationToken);
             if (!entriesResponse.IsSuccessStatusCode || entriesResponse.Body == null)
             {
+                if (allowEntrylessTerminal
+                    && scheduleResponse.Body.Status.IsTerminal())
+                {
+                    _output.WriteLine(
+                        $"Report {reportId} reached terminal status {scheduleResponse.Body.Status} with no report-entry payload available; treating as terminal entryless report.");
+                    return new ReportTerminalState([], []);
+                }
+
                 await Task.Delay(pollingInterval, cancellationToken);
                 continue;
             }
@@ -407,7 +484,7 @@ public class ReportApiHelper
                 lastState = state;
             }
 
-            if (scheduleResponse.Body.Status == ScheduleStatus.Submitted && !hasIncompleteEntries)
+            if (scheduleResponse.Body.Status.IsTerminal() && !hasIncompleteEntries)
             {
                 var entryPatientIds = entries
                     .Select(e => e.PatientId)
@@ -442,7 +519,8 @@ public class ReportApiHelper
             or ReportingStatus.FailedValidation;
 
         var submissionTerminal = entry.SubmissionStatus is SubmissionStatus.Submitted
-            or SubmissionStatus.NotEligable;
+            or SubmissionStatus.NotEligable
+            or SubmissionStatus.NotSubmitted;
 
         return reportingTerminal && submissionTerminal;
     }
@@ -454,10 +532,37 @@ public class ReportApiHelper
 
         // Adaptive lower bound to avoid premature timeout on high-volume tests.
         // Example: 1000 patients => at least ~20 minutes.
+        // Large single-patient resource counts are handled by the DA keep-alive
+        // (resource-count growth slides this deadline) rather than a bigger static floor.
         var adaptiveFloor = TimeSpan.FromSeconds(Math.Max(300, config.PatientIds.Count * 1.2));
         return config.MaxPollingDuration > adaptiveFloor
             ? config.MaxPollingDuration
             : adaptiveFloor;
+    }
+
+    private bool TryKeepAlive(
+        BackgroundDiagnosticsMonitor? diagnostics,
+        DateTime phaseStart,
+        TimeSpan hardTimeout,
+        ref DateTime deadline)
+    {
+        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
+        if (!AcquisitionActivityTracker.TryExtendDeadline(
+                DateTime.UtcNow,
+                phaseStart,
+                hardTimeout,
+                hasProgress,
+                ref deadline,
+                out var extendedBy))
+        {
+            return false;
+        }
+
+        _output.WriteLine(
+            $"[DIAG][DataAcq] Keep-alive: acquisition still progressing " +
+            $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
+            $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
+        return true;
     }
 
     public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)

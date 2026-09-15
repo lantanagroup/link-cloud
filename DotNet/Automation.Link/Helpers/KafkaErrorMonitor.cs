@@ -2,6 +2,7 @@
 using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -19,8 +20,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
 {
     private readonly string _kafkaBootstrapServers;
     private readonly string _kafkaRestProxyBase;
-    private readonly string _kafkaUser;
-    private readonly string _kafkaPassword;
+    private readonly KafkaConnection _kafkaConnection;
 
     private readonly IAutomationOutput _output;
     private IConsumer<string, string>? _consumer;
@@ -76,13 +76,12 @@ public class KafkaErrorMonitor : IAsyncDisposable
     private const int ResourceNormalizedValuePreviewLength = 4000;
     private const int ResourceNormalizedHeaderPreviewLength = 2000;
 
-    public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config)
+    public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config, KafkaConnection kafkaConnection)
     {
         _output = output;
-        _kafkaBootstrapServers = config.Kafka.BootstrapServers;
+        _kafkaConnection = kafkaConnection;
+        _kafkaBootstrapServers = string.Join(", ", kafkaConnection.BootstrapServers);
         _kafkaRestProxyBase = config.Kafka.RestProxyBaseUrl;
-        _kafkaUser = config.Kafka.User;
-        _kafkaPassword = config.Kafka.Password;
     }
 
     /// <summary>
@@ -136,17 +135,12 @@ public class KafkaErrorMonitor : IAsyncDisposable
                 SocketTimeoutMs = 5000,
             };
 
-            // Only enable SASL when credentials are actually configured. The Link services
-            // gate SASL behind KafkaConnection.SaslProtocolEnabled (default false) and the
-            // local/dev/docker brokers use PLAINTEXT. Forcing SaslPlaintext/Plain here with
-            // empty credentials makes librdkafka throw "sasl.username and sasl.password must
-            // be set", which silently disabled dead-letter monitoring for the whole run.
-            if (!string.IsNullOrWhiteSpace(_kafkaUser) && !string.IsNullOrWhiteSpace(_kafkaPassword))
+            if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
-                config.SaslUsername = _kafkaUser;
-                config.SaslPassword = _kafkaPassword;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
             _consumer = new ConsumerBuilder<string, string>(config)

@@ -7,7 +7,7 @@ export interface ISaveOperationModel {
   operation: IOperation;
   isDisabled? : boolean;
   resourceTypes : string[];
-  vendorIds: string[];
+  vendorVersionIds: string[];
 }
 
 

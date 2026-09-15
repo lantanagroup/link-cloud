@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var bearerToken = await createLinkBearerToken.ExecuteAsync(_systemPrincipal, 2);
+                var bearerToken = await createLinkBearerToken.ExecuteAsync(_systemPrincipal, 2, cancellationToken);
                 if (string.IsNullOrEmpty(bearerToken))
                 {
                     _logger.LogLinkAdminTokenGenerationException("Failed to create bearer token for user account retrieval");

@@ -45,6 +45,73 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         SendAsync<FacilityModel>(() => Request($"/Facility/{facilityId}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<VendorModel>> CreateVendorAsync(
+        CreateVendorModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorModel>(() => Request("/Vendor")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<VendorModel>> GetVendorAsync(
+        Guid vendorId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorModel>(() => Request($"/Vendor/{vendorId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<VendorModel>>> GetVendorsAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<VendorModel>>(() => Request("/Vendor")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<VendorModel>> UpdateVendorAsync(
+        Guid vendorId,
+        UpdateVendorModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorModel>(() => Request($"/Vendor/{vendorId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteVendorAsync(
+        Guid vendorId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/Vendor/{vendorId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<VendorVersionModel>> CreateVendorVersionAsync(
+        CreateVendorVersionModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorVersionModel>(() => Request("/VendorVersion")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<VendorVersionModel>> GetVendorVersionAsync(
+        Guid vendorVersionId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorVersionModel>(() => Request($"/VendorVersion/{vendorVersionId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<VendorVersionModel>>> GetVendorVersionsAsync(
+        Guid? vendorId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Request("/VendorVersion");
+        if (vendorId.HasValue)
+            request = request.SetQueryParam("vendorId", vendorId.Value);
+
+        return SendAsync<List<VendorVersionModel>>(() => request
+            .GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<VendorVersionModel>> UpdateVendorVersionAsync(
+        Guid vendorVersionId,
+        UpdateVendorVersionModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<VendorVersionModel>(() => Request($"/VendorVersion/{vendorVersionId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteVendorVersionAsync(
+        Guid vendorVersionId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/VendorVersion/{vendorVersionId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> CheckFacilityExistsAsync(
         string facilityId,
         CancellationToken cancellationToken = default)

@@ -17,12 +17,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFacilityServiceClient, FacilityServiceClient>();
         services.AddSingleton<ICensusServiceClient, CensusServiceClient>();
         services.AddSingleton<IDataAcquisitionServiceClient, DataAcquisitionServiceClient>();
+        services.AddSingleton<IDmrpServiceClient, DmrpServiceClient>();
         services.AddSingleton<INormalizationServiceClient, NormalizationServiceClient>();
         services.AddSingleton<IQueryDispatchServiceClient, QueryDispatchServiceClient>();
         services.AddSingleton<IReportServiceClient, ReportServiceClient>();
         services.AddSingleton<IMeasureEvalServiceClient, MeasureEvalServiceClient>();
         services.AddSingleton<IValidationServiceClient, ValidationServiceClient>();
         services.AddSingleton<ISubmissionServiceClient, SubmissionServiceClient>();
+        services.AddSingleton<ITerminologyServiceClient, TerminologyServiceClient>();
 
         return services;
     }

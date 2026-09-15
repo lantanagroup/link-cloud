@@ -18,6 +18,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -85,7 +86,9 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
-        if (configureRedis.GetValueOrDefault())
+        var useExistingRedisConnection = configureRedis.GetValueOrDefault();
+
+        if (useExistingRedisConnection)
         {
             builder.RegisterRedis();
         }
@@ -99,7 +102,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterRepositories();
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
-        builder.Services.AddResourceCache(builder.Configuration);
+        builder.Services.AddResourceCache(builder.Configuration, useExistingRedisConnection);
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
@@ -137,6 +140,7 @@ public static class GeneralStartupExtensions
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
         services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
         services.Configure<DataSourceAuthSettings>(configuration.GetSection(DataSourceAuthSettings.SectionName));
+        services.Configure<FhirSearchSettings>(configuration.GetSection(FhirSearchSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -319,6 +323,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
         services.AddTransient<IFhirApiService, FhirApiService>();
         services.AddTransient<ILocationMappingService, LocationMappingService>();
+        services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
@@ -388,6 +393,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourceAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourcesAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<ResourceKey, MappingOutcomeEvaluatedValue>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);

@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Generic test run monitor that orchestrates pluggable probes, detects stalls,
-/// and emits events. Platform-agnostic — the probes themselves carry the
+/// and emits events. Platform-agnostic ï¿½ the probes themselves carry the
 /// domain-specific logic.
 /// </summary>
 public sealed class TestRunMonitor
@@ -127,10 +127,26 @@ public sealed class TestRunMonitor
             State.HasCriticalFailure = true;
 
         if (result.StallDuration.HasValue)
+        {
             State.StallDuration = result.StallDuration.Value;
+            if (result.StallDuration.Value <= TimeSpan.Zero)
+            {
+                State.StalledStage = null;
+                _stallDiagnosticsDumped = false;
+            }
+        }
 
         if (result.StalledStage != null)
             State.StalledStage = result.StalledStage;
+
+        if (result.LastProgressUtc.HasValue)
+            State.LastProgressUtc = result.LastProgressUtc.Value;
+
+        if (result.AcquisitionResourcesAcquired.HasValue)
+            State.AcquisitionResourcesAcquired = result.AcquisitionResourcesAcquired.Value;
+
+        if (result.AcquisitionInFlight.HasValue)
+            State.AcquisitionInFlight = result.AcquisitionInFlight.Value;
 
         if (result.MessageBusErrorCount.HasValue)
             State.MessageBusErrorCount = result.MessageBusErrorCount.Value;

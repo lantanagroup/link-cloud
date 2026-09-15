@@ -255,7 +255,7 @@ public class PatientCensusService : IPatientCensusService
             (bool? isQueryParam, object? authHeader) authHeader = (false, null);
             if (facilityConfig.Authentication != null)
             {
-                authHeader = await BuildeAuthHeader(query.FacilityId, facilityConfig.Authentication);
+                authHeader = await BuildeAuthHeader(query.FacilityId, facilityConfig.Authentication, cancellationToken);
             }
 
             var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
@@ -365,7 +365,7 @@ public class PatientCensusService : IPatientCensusService
         return results;
     }
 
-    private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth)
+    private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth, CancellationToken cancellationToken)
     {
         (bool isQueryParam, object authHeader) authHeader = (false, null);
         IAuth authService = _authRetrievalService.GetAuthenticationService(auth);
@@ -375,7 +375,7 @@ public class PatientCensusService : IPatientCensusService
             return (false, null);
         }
 
-        authHeader = await authService.SetAuthentication(facilityId, auth);
+        authHeader = await authService.SetAuthentication(facilityId, auth, cancellationToken);
         return authHeader;
     }
 

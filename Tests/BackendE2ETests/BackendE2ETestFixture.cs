@@ -35,9 +35,6 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton<ConsoleAutomationOutput>();
         builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<ConsoleAutomationOutput>());
 
-        // Infrastructure
-        builder.Services.AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
-
         // ServiceRegistry — point each service directly at its host
         builder.Services.Configure<ServiceRegistry>(opts =>
         {
@@ -66,12 +63,10 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddHttpClient<LokiScraper>((sp, client) =>
         {
             var cfg = sp.GetRequiredService<AutomationConfig>();
-            var configuredBaseUrl = string.IsNullOrWhiteSpace(cfg.LokiBaseUrl)
-                ? "http://localhost:3100"
-                : cfg.LokiBaseUrl;
+            if (!Uri.TryCreate(cfg.LokiBaseUrl, UriKind.Absolute, out var baseUri))
+                throw new InvalidOperationException("Loki__Url must be an absolute URI.");
 
-            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri))
-                client.BaseAddress = baseUri;
+            client.BaseAddress = baseUri;
         });
 
         // Automation infrastructure

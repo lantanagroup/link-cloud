@@ -23,6 +23,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
+    private readonly ILivePatientEventInjector _liveInjector;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -35,7 +36,11 @@ public class AutomationRunManager : IAutomationRunManager
         ISnapshotStore snapshotStore,
         IQueryPlanTemplateStore queryPlanTemplateStore,
         INormalizationStore normalizationStore,
-        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore)
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
+        ILivePatientEventInjector liveInjector)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -47,6 +52,7 @@ public class AutomationRunManager : IAutomationRunManager
         _normalizationSuiteResolver = new NormalizationSuiteResolver(normalizationStore);
         _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
+        _liveInjector = liveInjector;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -55,8 +61,12 @@ public class AutomationRunManager : IAutomationRunManager
             _queryPlanResolver,
             _normalizationSuiteResolver,
             _organizationResourceMapResolver,
+            importedBundleResolver,
+            generatedTemplateCache,
+            generatedTemplateVersionStore,
             configuration,
-            _logger);
+            _logger,
+            liveInjector);
     }
 
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
@@ -65,7 +75,7 @@ public class AutomationRunManager : IAutomationRunManager
         var options = StartScenarioRequestResolver.Resolve(request);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
+        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
         await PersistRunInputAsync(runId, request);
@@ -145,7 +155,7 @@ public class AutomationRunManager : IAutomationRunManager
         if (!_runs.TryGetValue(runId, out var state))
             return await CancelZombieRunAsync(runId, cancellationToken);
 
-        if (state.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
+        if (!state.Status.IsCancellable())
             return false;
 
         // â”€â”€ Path 2: live in-process run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -157,6 +167,7 @@ public class AutomationRunManager : IAutomationRunManager
         state.Status = AutomationRunStatus.Cancelled;
         state.Error = "Cancelled by user.";
         state.FinishedAt = DateTimeOffset.UtcNow;
+        _liveInjector.CloseSession(runId);
         await BroadcastStatus(state);
 
         try
@@ -191,7 +202,7 @@ public class AutomationRunManager : IAutomationRunManager
         if (summary == null)
             return false;
 
-        if (summary.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
+        if (!summary.Status.IsCancellable())
             return false;
 
         summary.Status = AutomationRunStatus.Cancelled;
@@ -444,6 +455,133 @@ public class AutomationRunManager : IAutomationRunManager
         return _dashboardAggregator.BuildAsync(inMemory, cancellationToken);
     }
 
+    public async Task<PatientStateEvent> InjectAdmitAsync(
+        Guid runId,
+        string? patientId,
+        string source,
+        string? notes = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.AdmitAsync(runId, patientId, source, notes, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live admit failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<PatientStateEvent> InjectDischargeAsync(
+        Guid runId,
+        string patientId,
+        string source,
+        string? notes = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.DischargeAsync(runId, patientId, source, notes, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live discharge failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public Task<IReadOnlyList<PatientStateEvent>> GetLiveEventsAsync(Guid runId, CancellationToken cancellationToken = default)
+        => _liveInjector.GetEventsAsync(runId, cancellationToken);
+
+    public async Task<LivePatientPoolEntry> GenerateLivePoolPatientAsync(
+        Guid runId,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live generate failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<LivePatientPoolEntry> UploadLivePoolPatientAsync(
+        Guid runId,
+        string content,
+        string? fileName,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live upload failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<LivePatientPoolEntry> ReferenceLivePoolPatientAsync(
+        Guid runId,
+        string patientId,
+        string source,
+        CancellationToken cancellationToken = default)
+    {
+        _ = source;
+        EnsureLiveWindowOpen(runId);
+        try
+        {
+            return await _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken);
+        }
+        catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Live reference failed for run {RunId}.", runId);
+            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public Task<LivePatientStateSnapshot> GetLivePatientStateAsync(Guid runId, CancellationToken cancellationToken = default)
+        => _liveInjector.GetStateAsync(runId, cancellationToken);
+
+    private void EnsureLiveWindowOpen(Guid runId)
+    {
+        if (!_runs.TryGetValue(runId, out var state) || state.Status != AutomationRunStatus.LiveWindowOpen)
+            throw new LiveInjectionException("Live window is not accepting injections.", StatusCodes.Status409Conflict);
+    }
+
     private void WriteLog(MutableRunState state, string message)
     {
         var line = $"[{DateTimeOffset.Now:HH:mm:ss}] {message}";
@@ -556,6 +694,10 @@ public class AutomationRunManager : IAutomationRunManager
                 Error = state.Error,
                 FacilityId = state.FacilityId,
                 ReportId = state.ReportId,
+                GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
+                GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
+                GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
+                GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
                 Logs = state.Logs.ToList()
             };
         }

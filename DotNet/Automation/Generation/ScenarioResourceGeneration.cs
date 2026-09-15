@@ -544,7 +544,9 @@ internal static class ScenarioResourceGeneration
         FhirGenerationConfig? config,
         FhirBundleGenerator.SharedIds ids,
         GenerationRequirementsPlan? generationRequirementsPlan = null,
-        bool addHypoglycemicMedicationPair = false)
+        bool addHypoglycemicMedicationPair = false,
+        DateTime? measurementPeriodStart = null,
+        DateTime? measurementPeriodEnd = null)
     {
         // Core anchors — order matters: Patient → Device → primary Condition →
         // Encounter → CareTeam → CarePlan → (optional hypo meds) → scenario fan-out.
@@ -573,7 +575,8 @@ internal static class ScenarioResourceGeneration
         if (addHypoglycemicMedicationPair)
         {
             AddHypoglycemicQualifyingMedicationEntries(entries, patientId, anchors.EncounterId,
-                anchors.AttendingPractId, patientSeed, encStart, ids);
+                anchors.AttendingPractId, patientSeed, encStart, encEnd, ids,
+                measurementPeriodStart, measurementPeriodEnd);
         }
 
         var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
@@ -601,7 +604,10 @@ internal static class ScenarioResourceGeneration
         string practitionerId,
         int seed,
         DateTime encounterStart,
-        FhirBundleGenerator.SharedIds ids)
+        DateTime encounterEnd,
+        FhirBundleGenerator.SharedIds ids,
+        DateTime? measurementPeriodStart = null,
+        DateTime? measurementPeriodEnd = null)
     {
         const string insulinRxNorm = "274783";
         const string insulinDisplay = "insulin glargine";
@@ -613,6 +619,26 @@ internal static class ScenarioResourceGeneration
         var medicationRequestId = $"{patientId}-MedReq-A01";
         var medicationAdministrationId = $"{patientId}-MedAdm-A01";
         var medicationTime = encounterStart.AddHours(1);
+
+        // For long-stay encounters that start before the measurement period,
+        // anchor the qualifying anti-diabetic medication pair inside the actual
+        // encounter∩measurement overlap window so Hypoglycemic-IP CQL predicates
+        // that apply period-aware date constraints can still match deterministically.
+        if (measurementPeriodStart.HasValue && measurementPeriodEnd.HasValue)
+        {
+            var overlapStart = encounterStart > measurementPeriodStart.Value
+                ? encounterStart
+                : measurementPeriodStart.Value;
+            var overlapEnd = encounterEnd < measurementPeriodEnd.Value
+                ? encounterEnd
+                : measurementPeriodEnd.Value;
+
+            if (overlapEnd >= overlapStart)
+            {
+                var candidate = overlapStart.AddHours(1);
+                medicationTime = candidate <= overlapEnd ? candidate : overlapStart;
+            }
+        }
 
         entries.Add(Entry($"MedicationRequest/{medicationRequestId}",
             MedicationRequestFactory.Create(

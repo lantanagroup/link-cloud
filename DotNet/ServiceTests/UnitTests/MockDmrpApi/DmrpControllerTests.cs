@@ -1,0 +1,478 @@
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using FluentAssertions;
+using LantanaGroup.Link.MockDmrpApi.Application.Services;
+using LantanaGroup.Link.MockDmrpApi.Contracts.Generated;
+using LantanaGroup.Link.MockDmrpApi.Domain.Entities;
+using LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
+using LantanaGroup.Link.MockDmrpApi.Settings;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Xunit;
+
+using Task = System.Threading.Tasks.Task;
+
+namespace UnitTests.MockDmrpApi;
+
+/// <summary>
+/// Drives the two contract endpoints through the full MVC pipeline via <c>TestServer</c> --
+/// in-process, no sockets and no listening port -- so the assertions cover routing, model
+/// binding, status codes and serialization rather than just the method bodies.
+/// </summary>
+/// <remarks>
+/// Both endpoints are placeholders whose shape is expected to change when the published
+/// contract arrives, so these tests assert <em>behaviour</em> -- which component is served,
+/// which rows are excluded, how an empty plan reads, what an unauthenticated call gets -- and
+/// avoid pinning field-level detail that the next contract is likely to move.
+/// <para>
+/// Link's authentication is deliberately absent from this host. These endpoints carry
+/// <c>[AllowAnonymous]</c> and check the third party's token themselves, and a host with no
+/// authentication middleware is the sharpest way to prove that: if the attribute were ever
+/// dropped, the 401s below would come from the wrong system, and the token-bearing tests
+/// would fail outright.
+/// </para>
+/// </remarks>
+public class DmrpControllerTests : IAsyncLifetime
+{
+    private const string ClientId = "contract-test-client";
+    private const string ClientSecret = "contract-test-client-secret";
+
+    private readonly FakeEntryRepository _repository = new();
+    private IHost _host = null!;
+    private HttpClient _client = null!;
+    private IAuthTokenService _tokens = null!;
+
+    public async Task InitializeAsync()
+    {
+        var settings = new DmrpApiSettings
+        {
+            AuthClientId = ClientId,
+            AuthClientSecret = ClientSecret,
+            SigningKey = "controller-test-signing-key-long-enough-for-hmac-sha512-which-needs-64",
+            Issuer = "link-mock-dmrp-tests",
+            Audience = "dmrp-api-tests",
+            TokenLifetimeSeconds = 3600
+        };
+
+        _host = await new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureServices(services =>
+                {
+                    services.AddSingleton<IBaseEntityRepository<ReportingPlanEntryEntity>>(_repository);
+                    services.AddSingleton<IOptions<DmrpApiSettings>>(Options.Create(settings));
+                    services.AddScoped<IReportingPlanService, ReportingPlanService>();
+                    services.AddSingleton<IAuthTokenService, AuthTokenService>();
+                    services.AddControllers()
+                            .AddApplicationPart(typeof(DmrpController).Assembly);
+                });
+                web.Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapControllers());
+                });
+            })
+            .StartAsync();
+
+        _client = _host.GetTestClient();
+        _tokens = _host.Services.GetRequiredService<IAuthTokenService>();
+    }
+
+    public async Task DisposeAsync()
+    {
+        _client.Dispose();
+        await _host.StopAsync();
+        _host.Dispose();
+    }
+
+    /// <summary>Seeds a monthly (MSC) entry.</summary>
+    private ReportingPlanEntryEntity Seed(
+        string facilityId = "F1",
+        string measure = "HOB",
+        int month = 5,
+        int year = 2026,
+        string isReporting = "Y",
+        string component = ReportingComponents.Msc)
+    {
+        var entry = new ReportingPlanEntryEntity
+        {
+            Id = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Component = component,
+            Measure = measure,
+            ReportingMonth = month,
+            ReportingYear = year,
+            IsReporting = isReporting,
+            CreateDate = DateTime.UtcNow
+        };
+
+        _repository.Seed(entry);
+        return entry;
+    }
+
+    /// <summary>Seeds a patient-safety (PS) entry, which carries a month like any other.</summary>
+    private ReportingPlanEntryEntity SeedPatientSafety(
+        string facilityId = "F1", string measure = "HAI", int month = 5, int year = 2026,
+        string isReporting = "Y") =>
+        Seed(facilityId, measure, month, year, isReporting, ReportingComponents.Ps);
+
+    /// <summary>
+    /// Mints a third-party token directly rather than through the support surface, so these
+    /// tests do not depend on a host that has Link's authentication wired up.
+    /// </summary>
+    private string ThirdPartyToken()
+    {
+        var result = _tokens.Issue("client_credentials", ClientId, ClientSecret, "dmrp.read");
+        result.Succeeded.Should().BeTrue();
+        return result.AccessToken!;
+    }
+
+    private async Task<HttpResponseMessage> GetAuthorizedAsync(string url)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("Authorization", $"Bearer {ThirdPartyToken()}");
+        return await _client.SendAsync(request);
+    }
+
+    // -------------------------------------------------------------- routing
+
+    [Fact]
+    public async Task TheContractEndpointsSitAtTheRootWithNoPrefix()
+    {
+        // The spec's server URL no longer carries a path, so NSwag emits no class-level
+        // route and both operations land at the root. Repointing a consumer at the real
+        // service is then a base-URL change and nothing else. If a prefix ever crept back
+        // in -- via the spec's server URL or a stray [Route] -- this is what would say so.
+        Seed();
+
+        (await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await GetAuthorizedAsync("/dmrp/mock/msc?nhsnorgid=F1&year=2026&month=5"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound, "the old prefix must be gone");
+    }
+
+    [Fact]
+    public async Task TheSupportSurfaceCannotBeServedWithoutAuthorizationMiddleware()
+    {
+        // This host wires no authorization middleware, and ASP.NET refuses outright to
+        // serve an endpoint that carries authorization metadata without it -- so reaching
+        // DELETE /mock throws rather than wiping the store.
+        //
+        // That refusal is the assertion. It holds only while MockController actually
+        // carries [Authorize]; drop the attribute and this call quietly succeeds instead,
+        // which is precisely the regression worth catching.
+        var act = async () => await _client.DeleteAsync("/api/mock-dmrp/entries");
+
+        (await act.Should().ThrowAsync<InvalidOperationException>())
+            .WithMessage("*authorization metadata*");
+        _repository.Entries.Should().BeEmpty();
+    }
+
+    // ------------------------------------------------------------------ /msc
+
+    [Fact]
+    public async Task GetMonthlyPlan_WithoutAToken_Returns401()
+    {
+        var response = await _client.GetAsync("/msc?nhsnorgid=F1&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_WithAnUnrelatedToken_Returns401()
+    {
+        // A token this service did not sign must not be accepted, or the endpoint would be
+        // effectively anonymous to anyone who can send a plausible-looking bearer.
+        Seed();
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, "/msc?nhsnorgid=F1&year=2026&month=5");
+        request.Headers.Add("Authorization", "Bearer not-a-token-this-service-issued");
+
+        (await _client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_ListsOnlyEnrolledMeasuresForThePeriod()
+    {
+        Seed(measure: "HOB");
+        Seed(measure: "HTCDI", isReporting: "N");
+        Seed(measure: "OTHER", month: 6);
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Orgid.Should().BeNull("F1 is not numeric, so it cannot be represented by the root orgid");
+        plan.Month.Should().Be(5);
+        plan.Year.Should().Be(2026);
+        plan.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HOB");
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_DoesNotServePatientSafetyEntries()
+    {
+        // The two endpoints share a table, so component isolation is the property that
+        // keeps them from becoming one another. A patient-safety measure surfacing in the
+        // medicine plan is silent -- the response still looks well formed.
+        Seed(measure: "HOB");
+        SeedPatientSafety(measure: "HAI");
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HOB");
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
+    {
+        // Not 204 and not 404. An empty plan is a meaningful answer -- "enrolled in
+        // nothing" -- and the caller iterates measures unconditionally.
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=Nobody&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().NotBeNull();
+        plan.Plans.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_WithoutNhsnOrgId_Returns400()
+    {
+        // The only required parameter. [BindRequired] on the generated base rejects the call
+        // before the token is even looked at.
+        var response = await GetAuthorizedAsync("/msc?year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_WithOnlyNhsnOrgId_ReturnsTheWholePlanForThatComponent()
+    {
+        // Everything but nhsnorgid narrows the result, so omitting all of them is a valid
+        // request for the facility's entire medicine plan -- not a 400, and not empty.
+        Seed(measure: "HOB", month: 5, year: 2026);
+        Seed(measure: "HTCDI", month: 6, year: 2026);
+        Seed(measure: "OLD", month: 1, year: 2025);
+        SeedPatientSafety(measure: "HAI");
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Select(m => m.Name).Should().BeEquivalentTo("HOB", "HTCDI", "OLD");
+        plan.Month.Should().BeNull("no month was supplied to narrow by");
+        plan.Year.Should().BeNull("no year was supplied to narrow by");
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_NarrowsByNameWhenSupplied()
+    {
+        Seed(measure: "HOB");
+        Seed(measure: "HTCDI");
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1&name=HOB");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HOB");
+    }
+
+    [Fact]
+    public async Task GetMonthlyPlan_NarrowsByYearAloneWhenNoMonthIsSupplied()
+    {
+        Seed(measure: "HOB", month: 5, year: 2026);
+        Seed(measure: "HTCDI", month: 6, year: 2026);
+        Seed(measure: "OLD", month: 5, year: 2025);
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Select(m => m.Name).Should().BeEquivalentTo("HOB", "HTCDI");
+        plan.Year.Should().Be(2026);
+        plan.Month.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("year=notayear")]
+    [InlineData("month=May")]
+    [InlineData("month=0")]
+    [InlineData("month=13")]
+    public async Task GetMonthlyPlan_WithAMalformedPeriod_Returns400(string filter)
+    {
+        // A typo must not read as "enrolled in nothing". Answering 200 with an empty plan
+        // would let a malformed request convey the exact conclusion this API exists to
+        // convey, and the caller would have no way to tell the difference.
+        Seed(measure: "HOB");
+
+        var response = await GetAuthorizedAsync($"/msc?nhsnorgid=F1&{filter}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // ------------------------------------------------------------ /ps/annual/mrp
+
+    [Fact]
+    public async Task GetAnnualPlan_WithoutAToken_Returns401()
+    {
+        var response = await _client.GetAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetPatientSafetyPlan_ListsTheMeasuresForThePeriod()
+    {
+        SeedPatientSafety(measure: "HAI");
+        SeedPatientSafety(measure: "SSI");
+        SeedPatientSafety(measure: "OLD", year: 2025);
+
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Orgid.Should().BeNull("F1 is not numeric, so it cannot be represented by the root orgid");
+        plan.Year.Should().Be(2026);
+        plan.Month.Should().BeNull("no month was asked for, so none is echoed back");
+        plan.Plans.Select(m => m.Name).Should().BeEquivalentTo("HAI", "SSI");
+    }
+
+    [Fact]
+    public async Task ThePlanSerialisesThePeriodAsNumbersAndTheFacilityAsAStringInsidePlans()
+    {
+        // The JSON types are part of the contract, and a typed read would hide them - the
+        // generated DTO would happily parse either shape. So this asserts the wire format.
+        //
+        // month and year are numbers in both places. The facility is not: numeric at the
+        // root, a string inside plans. That asymmetry is the real API's and is reproduced
+        // rather than tidied up, because a consumer that codes against a cleaned-up shape
+        // breaks on first contact with the real endpoint.
+        Seed(facilityId: "100", measure: "HOB", month: 5, year: 2026);
+
+        var response = await GetAuthorizedAsync("/msc?nhsnorgid=100&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+
+        root.GetProperty("orgid").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        root.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
+
+        var item = root.GetProperty("plans")[0];
+
+        item.GetProperty("nhsnorgid").ValueKind.Should().Be(JsonValueKind.String);
+        item.GetProperty("year").ValueKind.Should().Be(JsonValueKind.Number);
+        item.GetProperty("month").ValueKind.Should().Be(JsonValueKind.Number);
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_DoesNotServeMedicineEntries()
+    {
+        // This call supplies a year but no month, so nothing narrows the period. Without
+        // the component in the predicate that would pull in every medicine entry for the year.
+        SeedPatientSafety(measure: "HAI");
+        Seed(measure: "HOB");
+        Seed(measure: "HTCDI", month: 6);
+
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HAI");
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_ExcludesEntriesNotBeingReported()
+    {
+        SeedPatientSafety(measure: "HAI");
+        SeedPatientSafety(measure: "SSI", isReporting: "N");
+
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026");
+
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HAI");
+    }
+
+    [Fact]
+    public async Task GetAnnualPlan_ForAFacilityEnrolledInNothing_Returns200WithAnEmptyArray()
+    {
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=Nobody&year=2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Plans.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetPatientSafetyPlan_NarrowsByTheReportingMonth()
+    {
+        // The month is a real filter here, not a parameter accepted and dropped. Seeding a
+        // second month proves it narrows, and the medicine entry proves the component still
+        // separates the two plans.
+        SeedPatientSafety(measure: "HAI", month: 5);
+        SeedPatientSafety(measure: "SSI", month: 6);
+        Seed(measure: "HOB", month: 5);
+
+        var response = await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026&month=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = await response.Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        plan!.Month.Should().Be(5);
+        plan.Plans.Should().ContainSingle();
+        plan.Plans.Single().Name.Should().Be("HAI");
+    }
+
+    // -------------------------------------------------------- shared behaviour
+
+    [Fact]
+    public async Task BothEndpointsAcceptTheSameToken()
+    {
+        // One authorization server stands behind both, so a caller acquires a token once.
+        Seed(measure: "HOB");
+        SeedPatientSafety(measure: "HAI");
+
+        var token = ThirdPartyToken();
+
+        foreach (var url in new[]
+                 {
+                     "/msc?nhsnorgid=F1&year=2026&month=5",
+                     "/ps/annual/mrp?nhsnorgid=F1&year=2026"
+                 })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            (await _client.SendAsync(request)).StatusCode
+                .Should().Be(HttpStatusCode.OK, "{0} must accept the same token", url);
+        }
+    }
+
+    [Fact]
+    public async Task BothEndpointsScopeToTheRequestedFacility()
+    {
+        Seed(facilityId: "F2", measure: "HOB");
+        SeedPatientSafety(facilityId: "F2", measure: "HAI");
+
+        var monthly = await (await GetAuthorizedAsync("/msc?nhsnorgid=F1&year=2026&month=5"))
+            .Content.ReadFromJsonAsync<ReportingPlanResponse>();
+        var annual = await (await GetAuthorizedAsync("/ps/annual/mrp?nhsnorgid=F1&year=2026"))
+            .Content.ReadFromJsonAsync<ReportingPlanResponse>();
+
+        monthly!.Plans.Should().BeEmpty();
+        annual!.Plans.Should().BeEmpty();
+    }
+}

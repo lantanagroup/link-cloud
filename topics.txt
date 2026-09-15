@@ -10,6 +10,9 @@ EvaluationRequested-Retry:3:1
 GenerateReportRequested:3:1
 GenerateReportRequested-Error:3:1
 GenerateReportRequested-Retry:3:1
+MappingOutcomeEvaluated:3:1
+MappingOutcomeEvaluated-Error:3:1
+MappingOutcomeEvaluated-Retry:3:1
 MeasureReportGenerated:3:1
 MeasureReportGenerated-Error:3:1
 MeasureReportGenerated-Retry:3:1

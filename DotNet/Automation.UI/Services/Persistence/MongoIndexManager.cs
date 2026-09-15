@@ -35,10 +35,12 @@ public sealed class MongoIndexManager
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
+        EnsureGeneratedTemplateCacheVersionIndexes();
         EnsureQueryPlanTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
         EnsureApiHealthRunIndexes();
+        EnsureApiHealthRunResultIndexes();
         EnsureApiHealthExecutionRunIndexes();
     }
 
@@ -46,9 +48,21 @@ public sealed class MongoIndexManager
 
     private void EnsureOrganizationResourceMapTemplateIndexes()
     {
-        var collection = _database.GetCollection<BsonDocument>("automation_org_resource_map_templates");
-        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
-        CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
+        var collection = _database.GetCollection<BsonDocument>(
+            "automation_org_resource_map_templates");
+
+        // Retain Name index because GetAllAsync sorts by display Name.
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Name", 1 } },
+            unique: false,
+            "idx_name_asc");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "IsDefault", 1 } },
+            unique: false,
+            "idx_isDefault");
     }
 
     // --- automation_runs ---
@@ -147,6 +161,20 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "ScenarioIds", 1 } }, unique: false, "idx_scenarioIds");
     }
 
+    // --- automation_generated_template_versions ---
+
+    private void EnsureGeneratedTemplateCacheVersionIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_generated_template_versions");
+
+        // Supports latest-version lookup per scenario key (SortByDescending VersionNumber).
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "VersionNumber", -1 } }, unique: false, "idx_scenarioKey_versionNumber_desc");
+
+        // Supports exact lookup by scenario + template hash and must be UNIQUE to
+        // preserve GeneratedTemplateCacheVersionStore's schema invariant.
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "TemplateSetHash", 1 } }, unique: true, "ux_generated_template_versions_scenario_hash");
+    }
+
     // --- automation_query_plan_templates ---
 
     private void EnsureQueryPlanTemplateIndexes()
@@ -182,6 +210,34 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "StartedAt", -1 } }, unique: false, "idx_startedAt_desc");
         CreateIndexSafe(collection, new BsonDocument { { "ServiceName", 1 }, { "StartedAt", -1 } }, unique: false, "idx_serviceName_startedAt");
         CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
+    }
+
+    // --- api_health_run_results ---
+
+    private void EnsureApiHealthRunResultIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_run_results");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "EndpointKey", 1 },
+            { "StartedAt", -1 }
+            },
+            unique: false,
+            "idx_endpointKey_startedAt");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "RunId", 1 },
+            { "ServiceName", 1 },
+            { "EndpointKey", 1 }
+            },
+            unique: true,
+            "ux_runId_serviceName_endpointKey");
     }
 
     // --- api_health_execution_runs ---
@@ -259,7 +315,7 @@ public sealed class MongoIndexManager
             if (!string.Equals(left.Name, right.Name, StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            if (left.Value.ToInt32() != right.Value.ToInt32())
+            if (!left.Value.Equals(right.Value))
                 return false;
         }
 

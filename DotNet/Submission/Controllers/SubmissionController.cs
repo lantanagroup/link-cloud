@@ -93,8 +93,21 @@ public class SubmissionController(
             throw new Exception("Missing 'payloadRootUri' in the response.");
         }
 
+        var reportTypes = new List<string>();
+        if (jsonResponse.RootElement.TryGetProperty("reportTypes", out var reportTypesElement))
+        {
+            foreach (JsonElement reportTypeElement in reportTypesElement.EnumerateArray())
+            {
+                string? reportType = reportTypeElement.GetString();
+                if (reportType != null)
+                {
+                    reportTypes.Add(reportType);
+                }
+            }
+        }
+
         IDictionary<string, byte[]> files = external
-            ? await blobStorageService.DownloadFromExternalAsync(payloadRootUri.GetString())
+            ? await blobStorageService.DownloadFromExternalAsync(reportTypes, payloadRootUri.GetString())
             : await blobStorageService.DownloadFromInternalAsync(payloadRootUri.GetString());
 
         var compressedData = this.CompressFiles(files);

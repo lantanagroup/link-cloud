@@ -39,7 +39,7 @@ namespace UnitTests.DataAcquisition.Factories
             var resourceIds = new List<string> { "id1", "id2", "id3" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource, It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(resourceIds);
 
             // Act
@@ -71,7 +71,7 @@ namespace UnitTests.DataAcquisition.Factories
             var resourceIds = new List<string> { "id1", "id2", "id3" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource, It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(resourceIds);
 
             // Act
@@ -102,7 +102,7 @@ namespace UnitTests.DataAcquisition.Factories
             var resourceIds = new List<string> { "id1", "id2", "id3", "id4", "id5" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource, It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(resourceIds);
 
             // Act
@@ -117,6 +117,62 @@ namespace UnitTests.DataAcquisition.Factories
             Assert.Equal(new[] { "id1", "id2" }, result.values[0]);
             Assert.Equal(new[] { "id3", "id4" }, result.values[1]);
             Assert.Equal(new[] { "id5" }, result.values[2]);
+        }
+
+        [Fact]
+        public async Task Build_WhenPagedNotSetAndIdsExceedDefaultCap_ReturnsPagedEntries()
+        {
+            var parameter = new ResourceIdsParameter
+            {
+                Name = "encounter",
+                Resource = "Encounter",
+                Paged = null
+            };
+            var request = new GetPatientDataRequest
+            {
+                CorrelationId = "CorrId",
+                FacilityId = "FacId"
+            };
+            var resourceIds = Enumerable.Range(1, 150).Select(i => $"enc-{i}").ToList();
+
+            _dataAcquisitionLogQueriesMock
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(resourceIds);
+
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+
+            Assert.NotNull(result);
+            Assert.True(result.paged);
+            Assert.Equal(2, result.values!.Count);
+            Assert.Equal(100, result.values[0].Count());
+            Assert.Equal(50, result.values[1].Count());
+        }
+
+        [Fact]
+        public async Task Build_WhenPagedIs100AndIdsFitInOneQuery_DoesNotPage()
+        {
+            var parameter = new ResourceIdsParameter
+            {
+                Name = "encounter",
+                Resource = "Encounter",
+                Paged = "100"
+            };
+            var request = new GetPatientDataRequest
+            {
+                CorrelationId = "CorrId",
+                FacilityId = "FacId"
+            };
+            var resourceIds = Enumerable.Range(1, 68).Select(i => $"enc-{i}").ToList();
+
+            _dataAcquisitionLogQueriesMock
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(resourceIds);
+
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+
+            Assert.NotNull(result);
+            Assert.False(result.paged);
+            Assert.Equal(68, result.value!.Split(',').Length);
         }
 
         [Fact]
@@ -135,7 +191,7 @@ namespace UnitTests.DataAcquisition.Factories
             };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource, It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<string>());
 
             // Act
@@ -143,6 +199,61 @@ namespace UnitTests.DataAcquisition.Factories
 
             // Assert
             Assert.Null(result);
+        }
+
+        [Fact]
+        public async Task Build_WhenScheduledReportPresent_ForwardsReportTrackingId()
+        {
+            var parameter = new ResourceIdsParameter
+            {
+                Name = "TestParam",
+                Resource = "Encounter"
+            };
+            var reportTrackingId = Guid.NewGuid().ToString();
+            var request = new GetPatientDataRequest
+            {
+                CorrelationId = "CorrId",
+                FacilityId = "FacId",
+                ConsumeResult = new Confluent.Kafka.ConsumeResult<string, LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka.DataAcquisitionRequested>
+                {
+                    Message = new Confluent.Kafka.Message<string, LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka.DataAcquisitionRequested>
+                    {
+                        Value = new LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka.DataAcquisitionRequested
+                        {
+                            PatientId = "Patient/1",
+                            ScheduledReports =
+                            [
+                                new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+                                {
+                                    ReportTrackingId = reportTrackingId
+                                }
+                            ]
+                        }
+                    }
+                }
+            };
+
+            _dataAcquisitionLogQueriesMock
+                .Setup(q => q.GetResourceIdsForReportPatient(
+                    request.CorrelationId,
+                    request.FacilityId,
+                    reportTrackingId,
+                    parameter.Resource,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(["enc-1"]);
+
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+
+            Assert.NotNull(result);
+            Assert.Equal("enc-1", result.value);
+            _dataAcquisitionLogQueriesMock.Verify(
+                q => q.GetResourceIdsForReportPatient(
+                    request.CorrelationId,
+                    request.FacilityId,
+                    reportTrackingId,
+                    parameter.Resource,
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
         }
     }
 }

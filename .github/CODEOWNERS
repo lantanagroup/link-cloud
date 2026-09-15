@@ -3,6 +3,13 @@
 **/pom.xml @lantanagroup/link-release-management-team
 **/application*.yml @lantanagroup/link-release-management-team @lantanagroup/devops
 
+# The configuration catalog: which keys exist, what they mean, and which are required. A change
+# here is a change to what every environment must provision. Note it is not covered by the
+# patterns above - application*.yml matches neither the stem nor the extension of
+# app-config.yaml. The per-environment exports it catalogues moved to the private link-cac
+# repository, which owns them under the same pattern in its own CODEOWNERS.
+/app-config.yaml @lantanagroup/link-release-management-team @lantanagroup/devops
+
 docs/* @lantanagroup/devops @lantanagroup/link-arch
 
 # Similarly, the DevOps team is interested in any changes to Kafka topics

@@ -9,6 +9,10 @@ public class EncounterLocationModel
     public int EncounterMappingId { get; set; }
     public int OrganizationLocationMappingId { get; set; }
     public string? LocationId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public string? PartOfValue { get; set; }
+    public bool IsOrgLocation { get; set; }    
     public DateTime CreateDate { get; set; }
     public DateTime ModifiedDate { get; set; }
 }

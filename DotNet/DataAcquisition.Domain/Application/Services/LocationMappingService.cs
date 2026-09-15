@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Data.SqlClient;
@@ -107,16 +108,29 @@ public interface ILocationMappingService
     /// acquired-resource cache before the tail's ResourcesAcquired event is produced. The Encounter is
     /// fetched and cached by its own (ungated) primary log, so marking a dependent log NotReportable does
     /// not keep the non-org encounter out of MeasureEval; this strip does. A patient whose encounters are
-    /// all non-org ends up with no cached encounter — MeasureEval evaluates no qualifying encounter and
-    /// produces a non-reportable outcome — while a patient with a mix keeps only the org encounters.
-    /// No-op when org-location mapping is not active for the facility.
+    /// all non-org ends up with no cached encounter. The tail finalizer then omits that empty
+    /// Encounter key from ResourcesAcquired so Normalization is not pointed at an empty location.
+    /// MeasureEval evaluates no qualifying encounter and produces a non-reportable outcome.
+    /// A patient with a mix keeps only the org encounters. No-op when org-location mapping
+    /// is not active for the facility.
+    /// <para>
+    /// Also reports how the patient resolved, so the result can be recorded against the report it was
+    /// acquired for. The outcome is scoped to this correlation's encounters rather than to every encounter
+    /// the patient has ever had at the facility, so it describes one report rather than their history.
+    /// </para>
     /// </summary>
     /// <param name="facilityId">The facility the correlation belongs to.</param>
     /// <param name="correlationId">The acquisition correlation whose cached encounters to filter.</param>
     /// <param name="patientId">The patient whose encounter mappings determine org membership.</param>
     /// <param name="cancellationToken">Used to signal a cancellation in the request.</param>
-    /// <returns>The number of non-org encounters stripped from the cache.</returns>
-    Task<int> StripNonOrgEncountersFromCacheAsync(string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default);
+    /// <returns>
+    /// The patient's org-location resolution for this correlation: its status, the encounter counts behind
+    /// it, and the locations those encounters referenced. <see cref="LocationOrgStatus.NotApplicable"/>
+    /// with zero counts when org-location mapping is not active for the facility, when there is no patient
+    /// to evaluate, or when the correlation acquired no encounters.
+    /// </returns>
+    Task<LocationOrgOutcome> StripNonOrgEncountersFromCacheAsync(
+        string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Evaluates and upserts a batch of Location resources for a facility — the shared routine used by
@@ -163,6 +177,15 @@ public class LocationMappingService(
     private readonly IResourceCache _resourceCache = resourceCache;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
+    // Reported when there is nothing to resolve: org-location mapping is not active for the facility, or
+    // no patient was supplied. LocationOrgOutcome is immutable, so one shared instance is safe.
+    private static readonly LocationOrgOutcome NotApplicableOutcome = new(
+        Status: LocationOrgStatus.NotApplicable,
+        EncounterCount: 0,
+        OrgEncounterCount: 0,
+        AssumedOrgEncounterCount: 0,
+        Matches: []);
+
     // FhirPath strings are validated (compiled) at config-write time and are low-cardinality per
     // facility, so caching the compiled expression avoids recompiling per Location in the acquire loop.
     private static readonly ConcurrentDictionary<string, CompiledExpression> CompiledFhirPaths = new();
@@ -173,7 +196,7 @@ public class LocationMappingService(
     public async Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location,
         string? locationAlias = null, CancellationToken cancellationToken = default)
     {
-        var conditions = await GetActiveConditionsForFacility(facilityId);
+        var conditions = await GetActiveConditionsForFacility(facilityId, cancellationToken);
         if (conditions.Count == 0)
         {
             throw new NotFoundException($"FacilityId {facilityId} does not have any location mappings configured");
@@ -310,7 +333,7 @@ public class LocationMappingService(
                 locationId: location.PartOf.Reference.SplitReference());
         }
 
-        var isOrgLocation = await IsOrgLocationAsync(facilityId, location) || partOf?.IsOrgLocation == true;
+        var isOrgLocation = await IsOrgLocationAsync(facilityId, location, cancellationToken) || partOf?.IsOrgLocation == true;
 
         if (locationMapping is null)
         {
@@ -339,7 +362,7 @@ public class LocationMappingService(
 
     public async Task<bool> IsConfigured(string facilityId, CancellationToken cancellationToken)
     {
-        var mappings = await GetActiveConditionsForFacility(facilityId);
+        var mappings = await GetActiveConditionsForFacility(facilityId, cancellationToken);
 
         return mappings.Count != 0;
     }
@@ -475,11 +498,12 @@ public class LocationMappingService(
         return reportable;
     }
 
-    public async Task<int> StripNonOrgEncountersFromCacheAsync(string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default)
+    public async Task<LocationOrgOutcome> StripNonOrgEncountersFromCacheAsync(
+        string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrWhiteSpace(patientId))
         {
-            return 0;
+            return NotApplicableOutcome;
         }
 
         // Stripping only applies when org-location mapping is active; otherwise every encounter is
@@ -488,26 +512,42 @@ public class LocationMappingService(
             .HasActiveByFacilityIdAsync(facilityId, cancellationToken);
         if (!organizationLocationMappingIsConfigured)
         {
-            return 0;
+            return NotApplicableOutcome;
         }
 
+        // The cached encounters are this correlation's encounters, so they also bound what the outcome
+        // describes. Nothing cached means nothing was acquired for this patient in this correlation, which
+        // is not a failure to resolve — there was nothing to resolve.
         var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
-        var cachedEncounters = _resourceCache.Get(cacheKey);
+        var cachedEncounters = await _resourceCache.GetAsync(cacheKey, cancellationToken);
         if (cachedEncounters.Count == 0)
         {
-            return 0;
+            return NotApplicableOutcome;
         }
 
-        var encounterMappings = await _encounterMappingQueries
-            .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken);
+        // GetByFacilityIdAndPatientIdAsync returns every mapping the patient has ever had at this facility,
+        // across every report they have appeared in. Scope it to the encounters this correlation actually
+        // acquired so the outcome describes this report rather than the patient's whole history.
+        var cachedEncounterIds = cachedEncounters
+            .Select(encounter => encounter.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var encounterMappings = (await _encounterMappingQueries
+                .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken))
+            .Where(mapping => cachedEncounterIds.Contains(mapping.EncounterId))
+            .ToList();
+
+        var outcome = BuildLocationOrgOutcome(encounterMappings);
+
+        // Scoped to the same set, which changes nothing about the strip: a mapping for an encounter absent
+        // from the cache could never have matched anything being filtered.
         var nonOrgEncounterIds = encounterMappings
             .Where(mapping => !mapping.MappedToOrg)
             .Select(mapping => mapping.EncounterId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (nonOrgEncounterIds.Count == 0)
         {
-            return 0;
+            return outcome;
         }
 
         var orgEncounters = cachedEncounters
@@ -517,23 +557,77 @@ public class LocationMappingService(
         var strippedCount = cachedEncounters.Count - orgEncounters.Count;
         if (strippedCount == 0)
         {
-            return 0;
+            return outcome;
         }
 
-        // UpdateCorrelationCache is an additive HashSet, so removing entries requires deleting the key
+        // UpdateCorrelationCacheAsync is an additive HashSet, so removing entries requires deleting the key
         // and rewriting it with only the org encounters. When none remain the key is left empty, so
         // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
-        _resourceCache.Delete([cacheKey]);
+        await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
         if (orgEncounters.Count > 0)
         {
-            _resourceCache.UpdateCorrelationCache(cacheKey, orgEncounters, ResourceType.Encounter);
+            await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
         }
 
         _logger.LogDebug(
             "Stripped {StrippedCount} non-org encounter(s) from cache key {CacheKey} for facility {FacilityId} (patient {PatientId}); {RemainingCount} org encounter(s) remain.",
             strippedCount, cacheKey.SanitizeForLog(), facilityId.SanitizeForLog(), patientId.SanitizeForLog(), orgEncounters.Count);
 
-        return strippedCount;
+        return outcome;
+    }
+
+    /// <summary>
+    /// Projects the encounter mappings for one correlation into the org-location outcome reported
+    /// alongside that correlation's acquired resources.
+    /// </summary>
+    /// <remarks>
+    /// Reads only what <see cref="IEncounterMappingQueries.GetByFacilityIdAndPatientIdAsync"/> already
+    /// returned, so it issues no query of its own.
+    /// </remarks>
+    /// <param name="encounterMappings">
+    /// The patient's mappings, already narrowed to the encounters this correlation acquired. Passing the
+    /// unscoped result would make every count describe the patient's history rather than this report.
+    /// </param>
+    private static LocationOrgOutcome BuildLocationOrgOutcome(
+        IReadOnlyCollection<EncounterMappingModel> encounterMappings)
+    {
+        var orgEncounterCount = encounterMappings.Count(mapping => mapping.MappedToOrg);
+
+        // An encounter with no location rows is one that carried no resolvable location references, which
+        // UpdateEncounterLocationMappingAsync treats as belonging to the org by default. Counted apart from
+        // the rest so membership that was never verified against the facility's configuration stays
+        // distinguishable from membership that was.
+        var assumedOrgEncounterCount = encounterMappings
+            .Count(mapping => mapping.MappedToOrg && mapping.EncounterLocations.Count == 0);
+
+        // No mapping rows for any of this correlation's encounters means none were evaluated, which is not
+        // a failure to resolve — there was nothing to resolve.
+        var status = encounterMappings.Count == 0
+            ? LocationOrgStatus.NotApplicable
+            : orgEncounterCount > 0
+                ? LocationOrgStatus.Found
+                : LocationOrgStatus.NotFound;
+
+        // Deduplicated on the mapping's own key: a patient with a dozen encounters in one ward references
+        // that location a dozen times, and the outcome describes locations rather than visits.
+        var matches = encounterMappings
+            .SelectMany(mapping => mapping.EncounterLocations)
+            .Where(location => location.LocationId is not null)
+            .DistinctBy(location => location.OrganizationLocationMappingId)
+            .Select(location => new LocationOrgMatch(
+                location.LocationId!,
+                location.LocationName,
+                location.LocationAlias,
+                location.PartOfValue,
+                location.IsOrgLocation))
+            .ToList();
+
+        return new LocationOrgOutcome(
+            Status: status,
+            EncounterCount: encounterMappings.Count,
+            OrgEncounterCount: orgEncounterCount,
+            AssumedOrgEncounterCount: assumedOrgEncounterCount,
+            Matches: matches);
     }
 
     public async Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default)
@@ -773,7 +867,7 @@ public class LocationMappingService(
         foreach (var location in cachedLocations.Values)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            directOrgById[location.Id] = await IsOrgLocationAsync(facilityId, location);
+            directOrgById[location.Id] = await IsOrgLocationAsync(facilityId, location, cancellationToken);
             parentById[location.Id] = location.PartOf?.Reference?.SplitReference();
         }
 
@@ -838,14 +932,15 @@ public class LocationMappingService(
 
     private async Task<bool> IsOrgLocationAsync(
         string facilityId,
-        Location? location)
+        Location? location,
+        CancellationToken cancellationToken)
     {
         if (location is null)
         {
             return false;
         }
 
-        var conditions = await GetActiveConditionsForFacility(facilityId);
+        var conditions = await GetActiveConditionsForFacility(facilityId, cancellationToken);
 
         if (conditions.Count == 0)
         {
@@ -874,11 +969,11 @@ public class LocationMappingService(
         return false;
     }
 
-    private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId)
+    private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId, CancellationToken cancellationToken)
     {
         var cacheKey = OrgLocationCacheKeys.Conditions(facilityId);
 
-        var conditions = _cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey);
+        var conditions = await _cacheService.GetAsync<List<OrganizationLocationConditionModel>?>(cacheKey, cancellationToken);
 
         if (conditions is not null)
         {
@@ -894,7 +989,7 @@ public class LocationMappingService(
             .OrderBy(c => c.Priority)
             .ToList();
 
-        _cacheService.Set(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute);
+        await _cacheService.SetAsync(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute, cancellationToken);
 
         return conditions;
     }
