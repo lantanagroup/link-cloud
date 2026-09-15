@@ -9,6 +9,7 @@ public static class NormalizationEngineServiceCollectionExtensions
     {
         services.AddSingleton<CopyPropertyOperationService>();
         services.AddSingleton<CodeMapOperationService>();
+        services.AddSingleton<HSLOCMapOperationService>();
         services.AddSingleton<ConditionalTransformOperationService>();
         services.AddSingleton<CopyLocationOperationService>();
         services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
