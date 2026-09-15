@@ -27,6 +27,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const report = draft.report;
 
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [requesting, setRequesting] = useState(false);
   const [advanceAfterRequest, setAdvanceAfterRequest] = useState(false);
 
@@ -68,8 +69,25 @@ export function ReportStep({onNext, onBack}: StepProps) {
     });
   }
 
+  function markTouched(field: string) {
+    setTouched(previous => (previous[field] ? previous : {...previous, [field]: true}));
+  }
+
+  function draftForValidation() {
+    return {...draft, report: {...draft.report, measures: selectedMeasures}};
+  }
+
+  function refreshErrors() {
+    setErrors(validateReport(draftForValidation()));
+  }
+
+  function fieldError(field: string): string | undefined {
+    return touched[field] && errors[field] ? t(errors[field]) : undefined;
+  }
+
   async function handleGenerate() {
-    const nextErrors = validateReport(draft);
+    setTouched({measures: true, startDate: true, endDate: true, patientIds: true});
+    const nextErrors = validateReport(draftForValidation());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       return;
@@ -128,6 +146,8 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const validMeasureNames = new Set(availableMeasures.map(measure => measure.name));
   const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
 
+  const isFormValid = Object.keys(validateReport(draftForValidation())).length === 0;
+
   if (loading) {
     return <NHSNLoadingIndicator />;
   }
@@ -149,10 +169,14 @@ export function ReportStep({onNext, onBack}: StepProps) {
             placeholder={t('onboarding:report.fields.measuresPlaceholder')}
             selectedLabel={t('onboarding:report.fields.measuresSelected')}
             removeLabel={label => t('onboarding:report.fields.measuresRemove', {measure: label})}
-            error={errors.measures ? t(errors.measures) : undefined}
+            error={fieldError('measures')}
             onChange={selected => {
               patch('report', {measures: selected});
               clearFieldError('measures');
+            }}
+            onBlur={() => {
+              markTouched('measures');
+              refreshErrors();
             }} />
 
           <div className="triplet">
@@ -161,27 +185,35 @@ export function ReportStep({onNext, onBack}: StepProps) {
               label={t('onboarding:report.fields.startDateLabel')}
               required
               value={report.startDate}
-              error={errors.startDate ? t(errors.startDate) : undefined}
+              error={fieldError('startDate')}
               onChange={value => {
                 patch('report', {startDate: value});
                 clearFieldError('startDate');
+              }}
+              onBlur={() => {
+                markTouched('startDate');
+                refreshErrors();
               }} />
             <DateField
               id="reportEndDate"
               label={t('onboarding:report.fields.endDateLabel')}
               required
               value={report.endDate}
-              error={errors.endDate ? t(errors.endDate) : undefined}
+              error={fieldError('endDate')}
               onChange={value => {
                 patch('report', {endDate: value});
                 clearFieldError('endDate');
+              }}
+              onBlur={() => {
+                markTouched('endDate');
+                refreshErrors();
               }} />
           </div>
 
           <PatientSelection
             patientIds={report.patientIds ?? []}
             disabled={requesting}
-            error={errors.patientIds ? t(errors.patientIds) : undefined}
+            error={fieldError('patientIds')}
             onChange={next => {
               patch('report', {patientIds: next});
               clearFieldError('patientIds');
@@ -194,7 +226,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
           </Button>
           <Button
             onClick={handleGenerate}
-            disabled={saving || requesting}
+            disabled={saving || requesting || !isFormValid}
             loading={requesting}>
             {t('onboarding:report.actions.generate')}
           </Button>
