@@ -216,7 +216,7 @@ public class CodeMapIndicatorTests
     }
 
     [Fact]
-    public void CombiningTwoCappedCodeLists_StaysWithinTheCap()
+    public void CombiningCodeListsRetainsCodesFromEveryPass()
     {
         var first = Enumerable.Range(0, 20).Select(index => $"FIRST-{index}").ToList();
         var second = Enumerable.Range(0, 20).Select(index => $"SECOND-{index}").ToList();
@@ -226,11 +226,31 @@ public class CodeMapIndicatorTests
             "Supplemental",
             CodeMap(HslocSystem, mapped: 0, unmapped: 20, unmappedCodes: second));
 
-        // Each pass caps its own list, so combining two full ones would otherwise double the blob on every
-        // pass. The counts are unaffected -- they are totals, not a list length.
+        // The counts are unaffected -- they are totals, not a list length.
         var outcome = Assert.Single(details.CodeMaps);
-        Assert.Equal(20, outcome.UnmappedCodes.Count);
+        Assert.Equal(40, outcome.UnmappedCodes.Count);
         Assert.Equal(40, outcome.UnmappedCount);
+    }
+
+    [Fact]
+    public void MappedCodesAcrossPasses_DeduplicateExactPairsButKeepTotalCount()
+    {
+        var initial = new CodeMapOutcome(LocalSystem, HslocSystem, MappingStatus.Mapped, 2, 0, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1027-4")]);
+        var supplemental = new CodeMapOutcome(LocalSystem, HslocSystem, MappingStatus.Mapped, 3, 0, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1160-1"),
+                new CodeMapping("icu", "1027-4")]);
+
+        var details = Record(Record(null, "Initial", initial), "Supplemental", supplemental);
+
+        var outcome = Assert.Single(details.CodeMaps);
+        Assert.Equal(5, outcome.MappedCount);
+        Assert.Equal(MappingStatus.Mapped, outcome.Status);
+        Assert.Equal(3, outcome.MappedCodes.Count);
+        Assert.Contains(new CodeMapping("ICU", "1027-4"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("ICU", "1160-1"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("icu", "1027-4"), outcome.MappedCodes);
+        Assert.Equal(2, details.Passes.Count);
     }
 
     [Fact]

@@ -2420,15 +2420,17 @@ namespace IntegrationTests.Normalization
             Assert.Equal(ObservationStatus.Preliminary, modifiedResource.Status.Value);
         }
 
-        [Fact]
-        public async Task Integration_CopyLocation()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Integration_CopyLocation_AndHSLOCMap(bool useHSLOCMap)
         {
-            var operation = new CopyLocationOperation();
+            IOperation operation = useHSLOCMap ? new HSLOCMapOperation([]) : new CopyLocationOperation();
 
             var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
             {
-                OperationJson = JsonSerializer.Serialize(operation),
-                OperationType = OperationType.CopyLocation.ToString(),
+                OperationJson = JsonSerializer.Serialize(operation, operation.GetType()),
+                OperationType = operation.OperationType.ToString(),
                 FacilityId = "TestFacilityId",
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
@@ -2459,12 +2461,22 @@ namespace IntegrationTests.Normalization
             }
 
             Assert.NotNull(fetched.OperationJson);
-            var copyOperation = JsonSerializer.Deserialize<CopyLocationOperation>(fetched.OperationJson);
-
-            Assert.NotNull(copyOperation);
-
-            var operationResult = await _copyLocationOperationService.ProcessOperationAsync(copyOperation, location);
-            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+            OperationResult operationResult;
+            if (useHSLOCMap)
+            {
+                var hslocOperation = Assert.IsType<HSLOCMapOperation>(
+                    OperationHelper.GetOperation(fetched.OperationType, fetched.OperationJson));
+                var service = _scope.ServiceProvider.GetRequiredService<HSLOCMapOperationService>();
+                operationResult = await service.ProcessOperationAsync(hslocOperation, location);
+                Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+            }
+            else
+            {
+                var copyOperation = JsonSerializer.Deserialize<CopyLocationOperation>(fetched.OperationJson);
+                Assert.NotNull(copyOperation);
+                operationResult = await _copyLocationOperationService.ProcessOperationAsync(copyOperation, location);
+                Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+            }
 
             var modifiedLocation = (Location)operationResult.Resource;
 
@@ -2475,7 +2487,14 @@ namespace IntegrationTests.Normalization
             FhirJsonSerializer serializer = new FhirJsonSerializer();
             _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
 
-            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
+            Assert.Contains(modifiedLocation.Type.SelectMany(concept => concept.Coding), coding =>
+                coding.System == location.Identifier[0].System && coding.Code == location.Identifier[0].Value);
+            if (useHSLOCMap)
+            {
+                Assert.All(location.Alias, alias =>
+                    Assert.Contains(modifiedLocation.Type.SelectMany(concept => concept.Coding), coding =>
+                        coding.System == HSLOCMapOperationService.LocationAliasCodeSystem && coding.Code == alias));
+            }
         }
 
         [Fact]
