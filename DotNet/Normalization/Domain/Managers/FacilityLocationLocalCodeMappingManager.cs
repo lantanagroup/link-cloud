@@ -160,7 +160,18 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         }
 
         IReadOnlyDictionary<string, Guid>? hslocCodes = null;
-        var existingLocationsAndMappings = await _dbContext.FacilityLocations.AsNoTracking().Include(i => i.FacilityLocationLocalCodeMappings).Where(q => q.FacilityId == facilityId).ToListAsync(cancellationToken);
+        var locationIds = hslocMappingResults
+            .Select(r => r.Location.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .ToList();
+
+        var existingLocationsAndMappings = await _dbContext.FacilityLocations
+            .AsNoTracking()
+            .Include(i => i.FacilityLocationLocalCodeMappings)
+            .Where(q => q.FacilityId == facilityId && locationIds.Contains(q.LocationId))
+            .ToListAsync(cancellationToken);
+
         foreach(var hslocMappingResult in hslocMappingResults)
         {
             //add or update the FacilityLocation
@@ -196,8 +207,12 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                         }
                     }
 
-                    //reload the existing locations and mappings since another thread may have added the location while we were trying to add it
-                    existingLocationsAndMappings =await _dbContext.FacilityLocations.AsNoTracking().Include(i => i.FacilityLocationLocalCodeMappings).Where(q => q.FacilityId == facilityId).ToListAsync(cancellationToken);
+                    //reload the entire list of locations and mappings since the other thread may have added multiple locations while we were trying to add this one
+                    existingLocationsAndMappings = await _dbContext.FacilityLocations
+                        .AsNoTracking()
+                        .Include(i => i.FacilityLocationLocalCodeMappings)
+                        .Where(q => q.FacilityId == facilityId && locationIds.Contains(q.LocationId))
+                        .ToListAsync(cancellationToken);
                     existingLocation = existingLocationsAndMappings.FirstOrDefault(f => f.LocationId == hslocMappingResult.Location.Id);
                     facilityLocationId = existingLocation?.Id;
 
