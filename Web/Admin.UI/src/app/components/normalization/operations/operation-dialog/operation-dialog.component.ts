@@ -92,6 +92,7 @@ export class OperationDialogComponent implements OnInit {
         this.conditionalTransformForm?.submitConfiguration();
         break;
       case OperationType.CodeMap:
+      case OperationType.HSLOCMap:
         this.codeMapForm?.submitConfiguration();
         break;
       case OperationType.CopyLocation:
