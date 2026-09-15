@@ -156,6 +156,14 @@ export interface EncounterCode {
   categoryName?: string;
 }
 
+export interface EncounterCodeDetail {
+  system: string;
+  code: string;
+  display: string;
+  name?: string;
+  version?: string;
+}
+
 // ---------------------------------------------------------------- fhir server
 
 export interface FhirConfig {

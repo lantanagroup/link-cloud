@@ -173,6 +173,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IHslocMappingService, HslocMappingService>();
     builder.Services.AddScoped<IReportingService, ReportingService>();
     builder.Services.Configure<OnboardingReadSettings>(builder.Configuration.GetSection(OnboardingReadSettings.SectionName));
+    builder.Services.Configure<EncounterCodeSettings>(builder.Configuration.GetSection(EncounterCodeSettings.SectionName));
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
     builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));

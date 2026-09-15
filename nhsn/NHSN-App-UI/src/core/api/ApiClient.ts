@@ -8,6 +8,7 @@ import type {
   CommitResult,
   ConnectionResult,
   EncounterCode,
+  EncounterCodeDetail,
   FhirConfig,
   HslocCode,
   HslocMapping,
@@ -81,6 +82,7 @@ export interface ApiClient {
   getMeasures(): Promise<Measure[]>;
   getHslocCodes(): Promise<HslocCode[]>;
   getEncounterCodes(query?: string): Promise<EncounterCode[]>;
+  lookupEncounterCode(system: string, code: string): Promise<EncounterCodeDetail | null>;
   /** Authenticated fetch — a plain <a href> will not work. Key from the vendor profile. */
   getDocument(documentKey: string): Promise<Blob>;
 

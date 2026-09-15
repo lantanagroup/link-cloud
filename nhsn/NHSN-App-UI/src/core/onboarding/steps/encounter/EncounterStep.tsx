@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {EncounterCode, EncounterMapping} from '../../../api/contracts';
+import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
 import {Button, NHSNLoadingIndicator, PageHeader, Select, StepActions, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
@@ -75,7 +75,9 @@ export function EncounterStep({onNext, onBack}: StepProps) {
 
   const systemOptions = useMemo(() => {
     const systems = Array.from(new Set(referenceCodes.map(code => code.system))).sort();
-    return systems.map(system => ({value: system, label: system}));
+    // Filter by the raw system (a FHIR canonical url, e.g. http://www.ama-assn.org/go/cpt) but show
+    // the short mnemonic the badges already use (CPT/SNOMED) — the url is correct, not readable.
+    return systems.map(system => ({value: system, label: systemBadgeLabel(system)}));
   }, [referenceCodes]);
 
   const categoryOptions = useMemo(() => {
@@ -125,6 +127,32 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   );
 
   const selectedReferenceRow = filteredReferenceRows.find(row => row.key === selectedKey) ?? null;
+
+  const [codeDetail, setCodeDetail] = useState<EncounterCodeDetail | null>(null);
+
+  useEffect(() => {
+    if (!selectedReferenceRow) {
+      setCodeDetail(null);
+      return;
+    }
+    let mounted = true;
+    setCodeDetail(null);
+    api
+      .lookupEncounterCode(selectedReferenceRow.system, selectedReferenceRow.code)
+      .then(detail => {
+        if (mounted) {
+          setCodeDetail(detail);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setCodeDetail(null);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [api, selectedReferenceRow?.system, selectedReferenceRow?.code]);
 
   const matchedLocalMappings = useMemo(() => {
     if (!selectedReferenceRow) {
@@ -291,16 +319,14 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                     value={systemFilter}
                     popupClassName="nhsn-facility-info-popup"
                     onChange={setSystemFilter} />
-                  {categoryOptions.length > 0 && (
-                    <Select
-                      id="encounterCategoryFilter"
-                      label={t('onboarding:encounter.reference.categoryFilterLabel')}
-                      placeholder={t('onboarding:encounter.reference.categoryFilterAll')}
-                      options={categoryOptions}
-                      value={categoryFilter}
-                      popupClassName="nhsn-facility-info-popup"
-                      onChange={setCategoryFilter} />
-                  )}
+                  <Select
+                    id="encounterCategoryFilter"
+                    label={t('onboarding:encounter.reference.categoryFilterLabel')}
+                    placeholder={t('onboarding:encounter.reference.categoryFilterAll')}
+                    options={categoryOptions}
+                    value={categoryFilter}
+                    popupClassName="nhsn-facility-info-popup"
+                    onChange={setCategoryFilter} />
                 </div>
 
                 <p className="form-hint">
@@ -375,6 +401,16 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                     {selectedReferenceRow.categoryName && (
                       <p className="form-hint">
                         {selectedReferenceRow.categoryName} ({selectedReferenceRow.category})
+                      </p>
+                    )}
+                    {codeDetail?.name && (
+                      <p className="form-hint encounter-detail-codesystem">
+                        {codeDetail.version
+                          ? t('onboarding:encounter.reference.detailCodeSystem', {
+                              name: codeDetail.name,
+                              version: codeDetail.version
+                            })
+                          : codeDetail.name}
                       </p>
                     )}
                     <div className="section-title">{t('onboarding:encounter.reference.detailMappedTitle')}</div>
@@ -627,7 +663,7 @@ function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: Mappi
                     event.preventDefault();
                     selectMatch(code);
                   }}>
-                  <span className="encounter-code-option-system">{code.system}</span>{' '}
+                  <span className="encounter-code-option-system">{systemBadgeLabel(code.system)}</span>{' '}
                   <span className="encounter-code-option-code">{code.code}</span> — {code.display}
                 </div>
               ))
@@ -665,7 +701,9 @@ function systemBadgeLabel(system: string): string {
 }
 
 function referenceLabel(code: EncounterCode): string {
-  return `${code.system} ${code.code} — ${code.display}`;
+  // Shown as the picker's query text once a code is selected — the short mnemonic (CPT/SNOMED)
+  // reads far better there than the FHIR canonical url code.system actually holds.
+  return `${systemBadgeLabel(code.system)} ${code.code} — ${code.display}`;
 }
 
 function encodeTarget(system: string, code: string): string {

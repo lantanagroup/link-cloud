@@ -35,6 +35,7 @@ export class TestAuthApiClient implements ApiClient {
   getMeasures = () => this.inner.getMeasures();
   getHslocCodes = () => this.inner.getHslocCodes();
   getEncounterCodes: ApiClient['getEncounterCodes'] = q => this.inner.getEncounterCodes(q);
+  lookupEncounterCode: ApiClient['lookupEncounterCode'] = (system, code) => this.inner.lookupEncounterCode(system, code);
   getDocument: ApiClient['getDocument'] = key => this.inner.getDocument(key);
 
   testFhirConnection: ApiClient['testFhirConnection'] = c => this.inner.testFhirConnection(c);
