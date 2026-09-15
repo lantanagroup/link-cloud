@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.Json;
@@ -2493,7 +2494,7 @@ namespace IntegrationTests.Normalization
             {
                 Assert.All(location.Alias, alias =>
                     Assert.Contains(modifiedLocation.Type.SelectMany(concept => concept.Coding), coding =>
-                        coding.System == HSLOCMapOperationService.LocationAliasCodeSystem && coding.Code == alias));
+                        coding.System == MappingTargetSystems.LocationAliasCodeSystem && coding.Code == alias));
             }
         }
 

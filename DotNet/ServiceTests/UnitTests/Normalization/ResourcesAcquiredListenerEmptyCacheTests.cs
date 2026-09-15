@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
