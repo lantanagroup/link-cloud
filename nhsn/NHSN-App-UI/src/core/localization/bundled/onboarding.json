@@ -123,7 +123,7 @@
     "messages": {
       "incomplete": "Please complete all fields before continuing.",
       "invalidBaseUrl": "Enter a valid URL starting with http:// or https:// (e.g. https://ehr.example.org/fhir/r4).",
-      "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number of 1 or greater.",
+      "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number between 1 and 8.",
       "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
       "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
       "invalidLagDays": "Days must be a whole number between 0 and 30.",
