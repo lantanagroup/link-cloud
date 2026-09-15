@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from './api/ApiClientContext';
 import {
@@ -38,16 +38,21 @@ const routePathMap: Record<RouteName, string> = {
 export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
   const { t } = useTranslation('common');
   const api = useApiClient();
+  const queryClient = useQueryClient();
   const {
     data: userInfo,
     isLoading: loading,
-    error: userInfoError
+    error: userInfoError,
   } = useQuery({
     queryKey: ['userInfo'],
     queryFn: () => api.getUserInfo(),
-    staleTime: Infinity
+    staleTime: Infinity,
   });
-  const error = userInfoError ? (userInfoError instanceof Error ? userInfoError.message : t('errors.unexpected')) : null;
+  const error = userInfoError
+    ? userInfoError instanceof Error
+      ? userInfoError.message
+      : t('errors.unexpected')
+    : null;
   const [route, setRoute] = useState<RouteName>('home');
   const normalizedBaseUrl = useMemo(() => normalizeBaseUrl(baseUrl), [baseUrl]);
 
@@ -142,7 +147,21 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
         <OnboardingProvider
           user={userInfo}
           baseUrl={normalizedBaseUrl}
-          onGoHome={() => navigateTo('home')}>
+          onGoHome={async () => {
+            // isOnboarded flipping true happens server-side; the staleTime: Infinity
+            // userInfo query above never learns that on its own. Re-checking it here
+            // is the gate: only navigate once it actually reports onboarded, otherwise
+            // stay on the current step.
+            try {
+              const refreshed = await api.getUserInfo();
+              queryClient.setQueryData(['userInfo'], refreshed);
+              if (refreshed.isOnboarded) {
+                navigateTo('home');
+              }
+            } catch {
+              // Could not confirm onboarding status -- stay put rather than navigate.
+            }
+          }}>
           <div className="nhsn-link__layout">
             <NavigationRail
               title={t('app.linkTitle')}
