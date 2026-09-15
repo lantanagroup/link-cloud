@@ -231,6 +231,15 @@ export class MockApiClient implements ApiClient {
     );
   }
 
+  async lookupEncounterCode(system: string, code: string): Promise<C.EncounterCodeDetail | null> {
+    await tick();
+    const match = ENCOUNTER_REFERENCE_CODES.find(c => c.system === system && c.code === code);
+    if (!match) {
+      return null;
+    }
+    return {system, code, display: match.display, name: `${system} (simulated)`, version: '1.0.0-simulated'};
+  }
+
   async getDocument(documentKey: string): Promise<Blob> {
     await tick();
     return new Blob([`simulated document: ${documentKey}`], {type: 'text/plain'});

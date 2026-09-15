@@ -1,24 +1,43 @@
+using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Normalization;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
-using LantanaGroup.Link.Nhsn.App.Bff.Domain.EncounterCodes;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Sdk.Clients;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reference;
 
-// BFF-owned reference data: the vendor profiles, the time zone list, and the encounter code
+// BFF-owned reference data: the vendor profiles and the time zone list. Encounter codes and
+// HSLOC codes are read live from Terminology and Normalization respectively — see
+// GetEncounterCodesAsync/LookupEncounterCodeAsync and GetHslocCodesAsync.
 public sealed class ReferenceDataService : IReferenceDataService
 {
-    private const string ServiceName = "Normalization";
+    private const string NormalizationServiceName = "Normalization";
+    private const string TerminologyServiceName = "Terminology";
+
+    private static readonly JsonSerializerOptions FhirJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private readonly INormalizationServiceClient _normalizationClient;
+    private readonly ITerminologyServiceClient _terminologyClient;
+    private readonly EncounterCodeSettings _encounterCodeSettings;
     private readonly ILogger<ReferenceDataService> _logger;
 
-    public ReferenceDataService(INormalizationServiceClient normalizationClient, ILogger<ReferenceDataService> logger)
+    public ReferenceDataService(
+        INormalizationServiceClient normalizationClient,
+        ITerminologyServiceClient terminologyClient,
+        IOptions<EncounterCodeSettings> encounterCodeSettings,
+        ILogger<ReferenceDataService> logger)
     {
         _normalizationClient = normalizationClient;
+        _terminologyClient = terminologyClient;
+        _encounterCodeSettings = encounterCodeSettings.Value;
         _logger = logger;
     }
 
@@ -66,18 +85,86 @@ public sealed class ReferenceDataService : IReferenceDataService
 
     public IReadOnlyList<TimezoneResponse> GetTimezones() => Timezones.Value;
 
-    public IReadOnlyList<EncounterCode> GetEncounterCodes(string? query = null)
+    public async Task<IReadOnlyList<EncounterCode>> GetEncounterCodesAsync(CancellationToken cancellationToken = default)
     {
-        var q = query?.Trim();
-        if (string.IsNullOrEmpty(q))
+        var codes = new List<EncounterCode>();
+
+        foreach (var (system, url) in _encounterCodeSettings.ValueSetUrls)
         {
-            return EncounterCodeCatalog.All;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                continue;
+            }
+
+            var response = await _terminologyClient.ExpandValueSetAsync(url: url, cancellationToken: cancellationToken);
+            var body = LinkResponseHandler.Optional<string>(response, TerminologyServiceName, nameof(GetEncounterCodesAsync));
+            if (body is null)
+            {
+                _logger.LogInformation(
+                    "No ValueSet loaded in Terminology for encounter code system {System} (url {Url}); skipping.", system, url);
+                continue;
+            }
+
+            var valueSet = DeserializeFhir<ValueSetJson>(body, TerminologyServiceName, nameof(GetEncounterCodesAsync));
+            foreach (var contains in valueSet?.Expansion?.Contains ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(contains.Code) || string.IsNullOrWhiteSpace(contains.Display))
+                {
+                    continue;
+                }
+
+                var resolvedSystem = string.IsNullOrWhiteSpace(contains.System) ? system : contains.System;
+
+                codes.Add(new EncounterCode
+                {
+                    System = resolvedSystem,
+                    Code = contains.Code,
+                    Display = contains.Display,
+                    Category = null,
+                    CategoryName = null
+                });
+            }
         }
 
-        return EncounterCodeCatalog.All
-            .Where(code => $"{code.System} {code.Code} {code.Display} {code.Category} {code.CategoryName}"
-                .Contains(q, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        return codes;
+    }
+
+    public async Task<EncounterCodeDetail?> LookupEncounterCodeAsync(string system, string code, CancellationToken cancellationToken = default)
+    {
+        var response = await _terminologyClient.LookupCodeInCodeSystemAsync(system: system, code: code, cancellationToken: cancellationToken);
+        var body = LinkResponseHandler.Optional<string>(response, TerminologyServiceName, nameof(LookupEncounterCodeAsync));
+        if (body is null)
+        {
+            return null;
+        }
+
+        var parameters = DeserializeFhir<ParametersJson>(body, TerminologyServiceName, nameof(LookupEncounterCodeAsync));
+        var display = parameters?.Parameter?.FirstOrDefault(p => p.Name == "display")?.ValueString;
+        if (string.IsNullOrWhiteSpace(display))
+        {
+            return null;
+        }
+
+        return new EncounterCodeDetail
+        {
+            System = system,
+            Code = code,
+            Display = display,
+            Name = parameters?.Parameter?.FirstOrDefault(p => p.Name == "name")?.ValueString,
+            Version = parameters?.Parameter?.FirstOrDefault(p => p.Name == "version")?.ValueString
+        };
+    }
+
+    private static T? DeserializeFhir<T>(string json, string service, string operation) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json, FhirJsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            throw new LinkServiceException(service, operation, 0, null, json, null, ex);
+        }
     }
 
     // The NHSN HSLOC reference vocabulary, read live from Normalization's HSLOC reference-data,
@@ -87,7 +174,7 @@ public sealed class ReferenceDataService : IReferenceDataService
     public async Task<IReadOnlyList<HslocCode>> GetHslocCodesAsync(CancellationToken cancellationToken = default)
     {
         var response = await _normalizationClient.GetHslocCodesAsync(includeInactive: false, cancellationToken: cancellationToken);
-        var rows = LinkResponseHandler.OptionalFromRawBody<List<HslocReferenceCodeJson>>(response, ServiceName, nameof(GetHslocCodesAsync))
+        var rows = LinkResponseHandler.OptionalFromRawBody<List<HslocReferenceCodeJson>>(response, NormalizationServiceName, nameof(GetHslocCodesAsync))
                    ?? [];
 
         var codes = new List<HslocCode>(rows.Count);

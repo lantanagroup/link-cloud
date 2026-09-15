@@ -872,7 +872,18 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
     const friendlyDetailMeasures = detail
       ? friendlyMeasuresFor(detail.measures, detail.reportId, reportResults.requestedMeasuresByReportId)
       : [];
-    const dqmOptions = Array.from(new Set(friendlyDetailMeasures.map(measure => DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure]).filter(Boolean)));
+    const realDqmInfoByName = new Map(
+      (detail?.measures ?? [])
+        .map(id => DQM_INFO_BY_REAL_ID[id])
+        .filter((info): info is {name: string; url: string} => Boolean(info))
+        .map(info => [info.name, info] as const)
+    );
+    const dqmOptions = Array.from(
+      new Set([
+        ...friendlyDetailMeasures.map(measure => DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure]).filter(Boolean),
+        ...realDqmInfoByName.keys()
+      ])
+    );
     const currentDqm = activeDqm && dqmOptions.includes(activeDqm) ? activeDqm : dqmOptions[0];
     const reportIsComplete = detail ? demoDisplayStatus(detail.status, detail.reportId) === 'Complete' : false;
     // Population narrows to patients with a measure report for the active dQM -- real per-dQM
@@ -1009,7 +1020,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                   {friendlyDetailMeasures.map(measure => {
                     const tabName = DIGITAL_QUALITY_MEASURE_BY_MEASURE[measure];
                     const realDqmId = tabName ? REAL_REPORT_TYPE_BY_DQM_NAME[tabName] : undefined;
-                    const dqmInfo = realDqmId ? DQM_INFO_BY_REAL_ID[realDqmId] : undefined;
+                    const dqmInfo =
+                      (realDqmId ? DQM_INFO_BY_REAL_ID[realDqmId] : undefined) ??
+                      (realDqmInfoByName.size === 1 ? realDqmInfoByName.values().next().value : undefined);
                     return (
                       <tr key={measure}>
                         <td>{measure}</td>

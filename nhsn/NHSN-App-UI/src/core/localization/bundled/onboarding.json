@@ -401,6 +401,7 @@
         "description": "Description"
       },
       "detailNoSelection": "No matching codes to display.",
+      "detailCodeSystem": "{{name}} v{{version}}",
       "detailMappedTitle": "Your Mapped Encounter.type Codes",
       "detailNoMappedCodes": "No Encounter.type codes you've entered map to this code yet."
     },

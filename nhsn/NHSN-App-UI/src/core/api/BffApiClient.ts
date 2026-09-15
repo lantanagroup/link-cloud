@@ -11,6 +11,7 @@ import type {
   CommitResult,
   ConnectionResult,
   EncounterCode,
+  EncounterCodeDetail,
   FhirConfig,
   HslocCode,
   HslocMapping,
@@ -143,6 +144,13 @@ export class BffApiClient implements ApiClient {
       `/encounter/encounter-codes?q=${encodeURIComponent(q)}`
     );
     return data;
+  }
+
+  async lookupEncounterCode(system: string, code: string): Promise<EncounterCodeDetail | null> {
+    const {data} = await this.http.get<EncounterCodeDetail | null>(
+      `/encounter/encounter-codes/lookup?system=${encodeURIComponent(system)}&code=${encodeURIComponent(code)}`
+    );
+    return data ?? null;
   }
 
   async getDocument(documentKey: string): Promise<Blob> {
