@@ -59,6 +59,27 @@ public class MappingOutcomeAccumulatorTests
     }
 
     [Fact]
+    public void MappedCodesAcrossResources_DeduplicateExactPairsButKeepTotalCount()
+    {
+        var accumulator = new MappingOutcomeAccumulator();
+
+        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 2, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1027-4")])]);
+        accumulator.Add([new CodeMappingOutcome(LocalSystem, HslocSystem, 4, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1160-1"),
+                new CodeMapping("icu", "1027-4"), new CodeMapping("ICU", "1027-4A")])]);
+
+        var outcome = Assert.Single(accumulator.BuildAll());
+        Assert.Equal(6, outcome.MappedCount);
+        Assert.Equal(MappingStatus.Mapped, outcome.Status);
+        Assert.Equal(4, outcome.MappedCodes.Count);
+        Assert.Contains(new CodeMapping("ICU", "1027-4"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("ICU", "1160-1"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("icu", "1027-4"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("ICU", "1027-4A"), outcome.MappedCodes);
+    }
+
+    [Fact]
     public void SameCodeFromDifferentResources_IsListedOnce()
     {
         var accumulator = new MappingOutcomeAccumulator();

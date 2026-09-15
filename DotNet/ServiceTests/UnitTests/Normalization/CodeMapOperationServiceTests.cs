@@ -151,6 +151,25 @@ public class CodeMapOperationServiceTests
     }
 
     [Fact]
+    public async Task RepeatedMappedCode_CountsEveryOccurrenceButListsThePairOnce()
+    {
+        var location = LocationWithTypeCodes(LocalSystem, "ICU", "ICU", "ICU");
+        var operation = Operation(Map(LocalSystem, HslocSystem, ("ICU", "1027-4")));
+
+        var result = await _service.ProcessOperationAsync(operation, location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        var outcome = Assert.Single(result.CodeMapping);
+        Assert.Equal(3, outcome.MappedCount);
+        Assert.Equal(new CodeMapping("ICU", "1027-4"), Assert.Single(outcome.MappedCodes));
+        Assert.All(location.Type.SelectMany(type => type.Coding), coding =>
+        {
+            Assert.Equal(HslocSystem, coding.System);
+            Assert.Equal("1027-4", coding.Code);
+        });
+    }
+
+    [Fact]
     public async Task RepeatedUnmappedCode_CountsEveryOccurrenceButListsItOnce()
     {
         var location = LocationWithTypeCodes(LocalSystem, "PHARMACY", "PHARMACY", "PHARMACY");

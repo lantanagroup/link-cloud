@@ -143,7 +143,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
         {
             public int MappedCount { get; set; }
             public int UnmappedCount { get; set; }
-            public List<CodeMapping> MappedCodes { get; } = [];
+            public HashSet<CodeMapping> MappedCodes { get; } = [];
 
             /// <summary>
             /// Distinct unmapped codes. A resource repeating the same missing code says nothing new about

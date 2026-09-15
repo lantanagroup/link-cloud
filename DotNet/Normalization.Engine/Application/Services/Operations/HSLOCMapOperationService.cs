@@ -34,15 +34,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return copyResult;
             }
 
-            //Now that location.type is normalized, execute the code map.
-            var codeMapOperation = new CodeMapOperation(
-            operation.Name,
-            operation.FhirPath,
-            operation.CodeSystemMaps,
-            operation.Description);
-
             var codeMapOperationResult = await _codeMapOperationService.ProcessOperationAsync(
-                codeMapOperation,
+                operation,
                 resource,
                 supportingResources,
                 cancellationToken);
@@ -94,7 +87,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 //2. copy identifier to type
                 foreach (var identifier in location.Identifier)
                 {
-                    if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value))
+                    if (string.IsNullOrWhiteSpace(identifier.System) || string.IsNullOrWhiteSpace(identifier.Value))
                     {
                         continue;
                     }

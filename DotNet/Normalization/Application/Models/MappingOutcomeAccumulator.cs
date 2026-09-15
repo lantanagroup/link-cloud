@@ -16,8 +16,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models;
 public sealed class MappingOutcomeAccumulator
 {
     /// <summary>
-    /// Distinct unmapped codes retained per (source, target) pair. The true total is carried in
-    /// <c>UnmappedCount</c>; the list identifies the codes a facility needs to configure.
+    /// Distinct codes per (source, target) pair.
     /// </summary>
     private readonly Dictionary<(string SourceSystem, string TargetSystem), Tally> _tallies = new();
 
@@ -150,6 +149,6 @@ public sealed class MappingOutcomeAccumulator
         public int UnmappedCount { get; set; }
         public int FailureCount { get; set; }
         public HashSet<string> UnmappedCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public List<CodeMapping> MappedCodes { get; } = [];
+        public HashSet<CodeMapping> MappedCodes { get; } = [];
     }
 }

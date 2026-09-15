@@ -233,6 +233,27 @@ public class CodeMapIndicatorTests
     }
 
     [Fact]
+    public void MappedCodesAcrossPasses_DeduplicateExactPairsButKeepTotalCount()
+    {
+        var initial = new CodeMapOutcome(LocalSystem, HslocSystem, MappingStatus.Mapped, 2, 0, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1027-4")]);
+        var supplemental = new CodeMapOutcome(LocalSystem, HslocSystem, MappingStatus.Mapped, 3, 0, 0, [],
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ICU", "1160-1"),
+                new CodeMapping("icu", "1027-4")]);
+
+        var details = Record(Record(null, "Initial", initial), "Supplemental", supplemental);
+
+        var outcome = Assert.Single(details.CodeMaps);
+        Assert.Equal(5, outcome.MappedCount);
+        Assert.Equal(MappingStatus.Mapped, outcome.Status);
+        Assert.Equal(3, outcome.MappedCodes.Count);
+        Assert.Contains(new CodeMapping("ICU", "1027-4"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("ICU", "1160-1"), outcome.MappedCodes);
+        Assert.Contains(new CodeMapping("icu", "1027-4"), outcome.MappedCodes);
+        Assert.Equal(2, details.Passes.Count);
+    }
+
+    [Fact]
     public void RecordingAgainstNothingStored_KeepsTheIncomingOutcomes()
     {
         var details = Record(null, "Initial", CodeMap(HslocSystem, mapped: 1, unmapped: 0));
