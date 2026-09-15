@@ -1,4 +1,4 @@
-﻿﻿﻿using Hl7.Fhir.Model;
+﻿﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -30,12 +31,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
+        private readonly HSLOCMapOperationService _hslocMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
         private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
         private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, HSLOCMapOperationService hslocMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
@@ -43,6 +45,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
+            _hslocMapOperationService = hslocMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
             _copyLocationOperationService = copyLocationOperationService;
             _removeExtensionsOperationService = removeExtensionsOperationService;
@@ -195,6 +198,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> PostOperation(PostOperationModel model)
         {
             try
@@ -294,6 +298,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> PutOperation(PutOperationModel model)
         {
             try
@@ -357,7 +362,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(TestOperationModel model)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> OperationTest(TestOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -383,12 +389,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = model.Operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operationImplementation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
-                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operationImplementation, domainResource),
-                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operationImplementation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
                     _ => null
                 };
 
@@ -412,7 +419,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -432,12 +440,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource),
-                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, domainResource),
-                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, domainResource, cancellationToken: cancellationToken),
                     _ => null
                 };
 
@@ -461,6 +470,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+         [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
         {
             try
@@ -497,6 +507,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null)
         {
             try
