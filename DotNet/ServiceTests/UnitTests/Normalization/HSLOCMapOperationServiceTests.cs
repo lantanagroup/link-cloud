@@ -2,6 +2,7 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -94,8 +95,8 @@ public class HSLOCMapOperationServiceTests
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Same(location, result.Resource);
         AssertCode(location, "urn:local", "123");
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "ICU");
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "Stepdown");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Stepdown");
         Assert.Equal(3, location.Type.Count);
     }
 
@@ -107,7 +108,7 @@ public class HSLOCMapOperationServiceTests
         await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
 
         Assert.Single(location.Type);
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "ICU, Stepdown");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU, Stepdown");
     }
 
     [Fact]
@@ -119,7 +120,7 @@ public class HSLOCMapOperationServiceTests
             Identifier = [new Identifier("urn:local", "123"), new Identifier("urn:other", "123")],
             Type =
             [
-                new CodeableConcept(HSLOCMapOperationService.LocationAliasCodeSystem, "ICU"),
+                new CodeableConcept(MappingTargetSystems.LocationAliasCodeSystem, "ICU"),
                 new CodeableConcept("urn:local", "123")
             ]
         };
@@ -128,7 +129,7 @@ public class HSLOCMapOperationServiceTests
 
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Equal(3, location.Type.Count);
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "ICU");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU");
         AssertCode(location, "urn:local", "123");
         AssertCode(location, "urn:other", "123");
 
@@ -152,9 +153,9 @@ public class HSLOCMapOperationServiceTests
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Same(child, result.Resource);
         Assert.Equal(3, child.Type.Count);
-        AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
-        AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Parent");
-        AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Grandparent");
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Child");
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Parent");
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Grandparent");
         Assert.Empty(parent.Type);
         Assert.Empty(grandparent.Type);
     }
@@ -166,7 +167,7 @@ public class HSLOCMapOperationServiceTests
 
         await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location, []);
 
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Child");
         VerifyWarning("Parent location with reference missing-parent not found");
     }
 
@@ -182,7 +183,7 @@ public class HSLOCMapOperationServiceTests
         await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location, [unrelatedLocation]);
 
         Assert.Single(location.Type);
-        AssertCode(location, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Child");
         _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
             It.IsAny<It.IsAnyType>(), It.IsAny<Exception>(),
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
@@ -204,9 +205,9 @@ public class HSLOCMapOperationServiceTests
         Assert.Equal(hasValues ? (selfReference ? 1 : 2) : 0, child.Type.Count);
         if (hasValues)
         {
-            AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Child");
+            AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Child");
             if (!selfReference)
-                AssertCode(child, HSLOCMapOperationService.LocationAliasCodeSystem, "Parent");
+                AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Parent");
         }
         Assert.Empty(parent.Type);
         VerifyWarning("Circular location hierarchy detected");
@@ -225,7 +226,7 @@ public class HSLOCMapOperationServiceTests
             }).ToList();
         var operation = new HSLOCMapOperation(
         [
-            new CodeSystemMap(HSLOCMapOperationService.LocationAliasCodeSystem, "urn:hsloc",
+            new CodeSystemMap(MappingTargetSystems.LocationAliasCodeSystem, "urn:hsloc",
                 new Dictionary<string, CodeMap> { [$"Alias-{chainLength - 1}"] = new("1027-4", "Medical critical care") })
         ]);
 
@@ -234,7 +235,7 @@ public class HSLOCMapOperationServiceTests
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         Assert.Equal(chainLength, locations[0].Type.Count);
         foreach (var index in Enumerable.Range(0, chainLength - 1))
-            AssertCode(locations[0], HSLOCMapOperationService.LocationAliasCodeSystem, $"Alias-{index}");
+            AssertCode(locations[0], MappingTargetSystems.LocationAliasCodeSystem, $"Alias-{index}");
         AssertCode(locations[0], "urn:hsloc", "1027-4");
         Assert.All(locations.Skip(1), location => Assert.Empty(location.Type));
         _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
@@ -250,7 +251,7 @@ public class HSLOCMapOperationServiceTests
         var operation = new HSLOCMapOperation(
         [
             new CodeSystemMap("urn:local", "urn:hsloc", new Dictionary<string, CodeMap> { ["123"] = new("1027-4", "Medical critical care") }),
-            new CodeSystemMap(HSLOCMapOperationService.LocationAliasCodeSystem, "urn:hsloc", new Dictionary<string, CodeMap> { ["ICU"] = new("1027-4", "Medical critical care") })
+            new CodeSystemMap(MappingTargetSystems.LocationAliasCodeSystem, "urn:hsloc", new Dictionary<string, CodeMap> { ["ICU"] = new("1027-4", "Medical critical care") })
         ]);
 
         var result = await _service.ProcessOperationAsync(operation, child, [parent]);
