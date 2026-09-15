@@ -23,6 +23,7 @@ using System.Text.Json;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -260,6 +261,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
                 else
                 {
+                    var hslocMappingResults = new List<HSLOCMappingResult>();
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
                     foreach (var resource in resources)
                     {
@@ -313,6 +315,12 @@ public class ResourcesAcquiredListener : BackgroundService
                                                     new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
                                                         operationResult.SuccessCode == OperationStatus.Success);
                                 }
+                                
+                                if(operation.OperationType == OperationType.HSLOCMap)
+                                {
+                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping?.Count ?? 0, result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                    hslocMappingResults.AddRange(BuildHSLOCMappingResults(result.Message.Key.FacilityId, resource, operationResult));
+                                }
                             }
                             else
                             {
@@ -343,6 +351,25 @@ public class ResourcesAcquiredListener : BackgroundService
                             resource.TypeName.SanitizeForLog(),
                             resource.Id.SanitizeForLog(),
                             stepSummaryText);
+                    }
+
+                    try{
+                        var facilityLocationLocalCodeMappingManager = scope.ServiceProvider.GetRequiredService<IFacilityLocationLocalCodeMappingManager>();
+                        await facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(result.Message.Key.FacilityId, hslocMappingResults, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(
+                            exception,
+                            "Failed to save HSLOC map results for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                            result.Message.Key.FacilityId.SanitizeForLog(),
+                            correlationId.SanitizeForLog());
+
+                        throw new TransientException("Failed to save HSLOC map results.", exception);
                     }
                 }
 
@@ -380,6 +407,46 @@ public class ResourcesAcquiredListener : BackgroundService
 
             await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
         }
+    }
+
+    private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
+    {
+        var hslocMappingResults = new List<HSLOCMappingResult>();
+        if(operationResult == null || operationResult.SuccessCode == OperationStatus.Failure || resource is not Location location)
+        {
+            return hslocMappingResults;
+        }
+        var hslocMappingResult = new HSLOCMappingResult(facilityId, (Location)resource);
+        foreach (var mapping in operationResult.CodeMapping ?? [])
+        {
+            var sourceSystem = mapping.SourceSystem ?? string.Empty;
+            if (mapping.MappedCodes != null)
+            {
+                foreach (var mappedCode in mapping.MappedCodes)
+                {
+                    hslocMappingResult.LocationTypeCodes.Add(new HSLOCMappingResultCode
+                    {
+                        SourceSystem = sourceSystem,
+                        SourceCode = mappedCode.SourceCode,
+                        TargetCode = mappedCode.TargetCode
+                    });
+                }
+            }
+            if (mapping.UnmappedCodes != null)
+            {
+                foreach (var unmappedCode in mapping.UnmappedCodes)
+                {
+                    hslocMappingResult.LocationTypeCodes.Add(new HSLOCMappingResultCode
+                    {
+                        SourceSystem = sourceSystem,
+                        SourceCode = unmappedCode,
+                        TargetCode = null
+                    });
+                }
+            }
+        }
+        hslocMappingResults.Add(hslocMappingResult);
+        return hslocMappingResults;
     }
 
     private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)

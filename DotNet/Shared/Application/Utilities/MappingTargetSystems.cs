@@ -1,9 +1,10 @@
-namespace LantanaGroup.Link.Report.Domain;
+namespace LantanaGroup.Link.Shared.Application.Utilities;
 
 public static class MappingTargetSystems
 {
     public const string HslocUrl = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
     public const string HslocOid = "urn:oid:2.16.840.1.113883.6.259";
+    public const string LocationAliasCodeSystem = "https://nhsnlink.org/location-alias";
 
     /// <summary>
     /// Whether a configured code map targets HSLOC, and so answers the report's HSLOC indicator.
