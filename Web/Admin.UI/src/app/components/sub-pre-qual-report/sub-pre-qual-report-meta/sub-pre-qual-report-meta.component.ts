@@ -56,6 +56,13 @@ export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
       icon: 'success-status.svg',
       label: 'Submitted',
       class: 'success',
+    },
+    // The report completed successfully; only the submission was deliberately skipped, so
+    // this is a success rather than the failure New reads as.
+    [ScheduleStatus.CompletedNotSubmitted]: {
+      icon: 'success-status.svg',
+      label: 'Completed (Submission Skipped)',
+      class: 'success',
     }
   };
 

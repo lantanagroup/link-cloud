@@ -224,7 +224,8 @@ public enum SubmissionStatus
     Submitting,
     Submitted,
     FailedSubmission,
-    NotEligable
+    NotEligable,
+    NotSubmitted
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

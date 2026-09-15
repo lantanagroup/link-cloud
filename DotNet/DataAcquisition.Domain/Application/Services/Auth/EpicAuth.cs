@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -61,27 +62,46 @@ public class EpicAuth : IAuth
 
         try
         {
-            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-www-form-urlencoded"));
             var responseMessage = await _httpClient
                 .PostAsync($"{authSettings.TokenUrl}",
                 new StringContent($"grant_type=client_credentials&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_assertion={jwt}",
                 Encoding.UTF8,
                 "application/x-www-form-urlencoded"));
             var responseBody = await responseMessage.Content.ReadAsStringAsync();
-            var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
 
-            if (responseJson != null)
+            if (!responseMessage.IsSuccessStatusCode)
             {
-                var expirationInSeconds = responseJson.RootElement.GetProperty("expires_in").GetInt32();
-                var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
-                if (!string.IsNullOrWhiteSpace(accessToken))
-                {
-                    await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
-                    return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
-                }
+                _logger.LogError(
+                    "Token endpoint returned {StatusCode} acquiring an access token for facility {FacilityId}. Response: {Response}",
+                    (int)responseMessage.StatusCode, facilityId.SanitizeForLog(), Truncate(responseBody).SanitizeForLog());
+                return (false, null);
             }
+
+            using var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
+
+            string? accessToken = null;
+            if (responseJson.RootElement.TryGetProperty("access_token", out var accessTokenElement))
+            {
+                accessToken = Sanitize(accessTokenElement.GetString());
+            }
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                _logger.LogError(
+                    "Token endpoint response for facility {FacilityId} did not contain an access token.",
+                    facilityId.SanitizeForLog());
+                return (false, null);
+            }
+
+            int expirationInSeconds = 300;
+            if (responseJson.RootElement.TryGetProperty("expires_in", out var expiresInElement))
+            {
+                expirationInSeconds = expiresInElement.GetInt32();
+            }
+
+            await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
+            return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
         }
-        catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error Acquiring Access Token Encountered");
         }
@@ -89,10 +109,19 @@ public class EpicAuth : IAuth
         return (false, null);
     }
 
-    private string Sanitize(string input)
+    private string Sanitize(string? input)
     {
+        if (string.IsNullOrEmpty(input))
+            return "";
         var sanitizedInput = Regex.Replace(input, @"\t|\n|\r", string.Empty, RegexOptions.Compiled).Trim();
         return sanitizedInput;
+    }
+
+    private string Truncate(string? input, int maxLength = 500)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "";
+        return input.Length <= maxLength ? input : input[..maxLength] + "...";
     }
 
     private async Task<string> GetJwt(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
@@ -117,15 +146,24 @@ public class EpicAuth : IAuth
         {
             var algorithm = GetECDsaAlgorithm(ecdsa);
             if (algorithm is not null)
-                return GetToken(clientId, audience, new SigningCredentials(new ECDsaSecurityKey(ecdsa), algorithm));
+                return GetToken(clientId, audience,
+                    new SigningCredentials(new ECDsaSecurityKey(ecdsa) { CryptoProviderFactory = NonCachingCryptoProviderFactory() }, algorithm));
         }
 
         using var rsa = TryGetRSA(resolvedPem);
         if (rsa is not null)
-            return GetToken(clientId, audience, new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256));
+            return GetToken(clientId, audience,
+                new SigningCredentials(new RsaSecurityKey(rsa) { CryptoProviderFactory = NonCachingCryptoProviderFactory() }, SecurityAlgorithms.RsaSha256));
 
         throw new InvalidOperationException("PEM uses unsupported algorithm.");
     }
+
+    /// <summary>
+    /// The default <see cref="CryptoProviderFactory"/> is a static singleton that caches signature providers by a
+    /// key derived from the key material, so a provider built here would outlive the ECDsa/RSA instance disposed
+    /// above and throw ObjectDisposedException when the cached provider was reused on a later call.
+    /// </summary>
+    private static CryptoProviderFactory NonCachingCryptoProviderFactory() => new() { CacheSignatureProviders = false };
 
     private async Task<string> ResolvePem(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken)
     {

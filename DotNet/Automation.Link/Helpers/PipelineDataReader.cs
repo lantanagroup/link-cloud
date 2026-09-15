@@ -137,7 +137,7 @@ public class PipelineDataReader
     public record EncounterLocationInfo(string? LocationId);
     public record EncounterMappingInfo(string? FacilityId, string? PatientId, string? EncounterId, bool MappedToOrg, List<EncounterLocationInfo> EncounterLocations);
 
-    public Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
+    public virtual Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
         return GetOrFetchAsync($"schedule:{scheduleId}", async () =>
         {
@@ -164,7 +164,7 @@ public class PipelineDataReader
     public Task<List<ReportEntryInfo>> GetReportEntriesAsync(Guid scheduleId)
         => GetReportEntriesWithMeasureReportsAsync(scheduleId);
 
-    public async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
+    public virtual async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
     {
         var result = await GetOrFetchAsync($"entries:{scheduleId}", async () =>
         {

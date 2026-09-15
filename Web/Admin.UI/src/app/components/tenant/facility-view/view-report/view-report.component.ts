@@ -50,6 +50,7 @@ import {
   ReportingStatus,
   SubmissionStatus
 } from '../../../../interfaces/report/report-entry.interface';
+import { scheduleStatusBadgeClass, scheduleStatusLabel } from '../../../../interfaces/report/schedule-status';
 
 @Component({
   selector: 'app-view-report',
@@ -121,6 +122,7 @@ export class ViewReportComponent implements OnInit {
     'Submitted': '#2ca02c',          // green - good
     'Failed Submission': '#d62728',  // red - bad
     'Not Eligible': '#9e9e9e',       // grey - neutral
+    'Submission Skipped': '#7e57c2', // purple - deliberate, not a failure
     'Pending': '#bdbdbd',            // light grey - neutral
   };
 
@@ -147,13 +149,19 @@ export class ViewReportComponent implements OnInit {
     ReportingStatus.PassedValidation,
     ReportingStatus.FailedValidation
   ];
+  // Schedule status display comes from the shared map; bound as fields so the template
+  // can call them.
+  readonly statusLabel = scheduleStatusLabel;
+  readonly statusBadgeClass = scheduleStatusBadgeClass;
+
   submissionStatuses: Array<SubmissionStatus | 'pending'> = [
     'pending',
     SubmissionStatus.PendingValidation,
     SubmissionStatus.Submitting,
     SubmissionStatus.Submitted,
     SubmissionStatus.FailedSubmission,
-    SubmissionStatus.NotEligable
+    SubmissionStatus.NotEligable,
+    SubmissionStatus.NotSubmitted
   ];
 
   constructor(
@@ -462,6 +470,8 @@ export class ViewReportComponent implements OnInit {
         return 'status-failed';
       case SubmissionStatus.NotEligable:
         return 'status-not-reportable';
+      case SubmissionStatus.NotSubmitted:
+        return 'status-not-submitted';
       default:
         return 'status-pending';
     }
@@ -496,6 +506,8 @@ export class ViewReportComponent implements OnInit {
         return 'Failed Submission';
       case SubmissionStatus.NotEligable:
         return 'Not Eligible';
+      case SubmissionStatus.NotSubmitted:
+        return 'Submission Skipped';
       default:
         return 'Pending';
     }
