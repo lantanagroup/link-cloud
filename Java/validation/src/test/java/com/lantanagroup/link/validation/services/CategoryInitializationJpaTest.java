@@ -90,7 +90,8 @@ class CategoryInitializationJpaTest {
                     objectMapper,
                     categoryRepository,
                     categoryRuleRepository,
-                    resultRepository);
+                    resultRepository,
+                    new ValidationMetrics(io.opentelemetry.api.OpenTelemetry.noop()));
         }
     }
 
