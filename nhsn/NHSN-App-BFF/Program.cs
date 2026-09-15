@@ -177,6 +177,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
     builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));
     builder.Services.AddScoped<IManualUploadTemplateService, ManualUploadTemplateService>();
+    builder.Services.AddScoped<IPackageZipDownloadService, PackageZipDownloadService>();
     builder.Services.AddScoped<IDocumentProvider, DocumentProvider>();
     builder.Services.Configure<DocumentSettings>(builder.Configuration.GetSection(DocumentSettings.SectionName));
 

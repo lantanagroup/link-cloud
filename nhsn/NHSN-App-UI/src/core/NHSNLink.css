@@ -967,6 +967,20 @@
 
 /* ------------------------------------------------------- manual upload */
 
+/* The intro sentence, the download action and the file picker read as one instruction, so they
+   sit closer together than the page's default block rhythm. */
+.nhsn-link__manual-upload .nhsn-link__subtitle {
+  margin-bottom: 10px;
+}
+
+.nhsn-link__manual-upload .nhsn-link__download-field {
+  margin: 0 0 12px;
+}
+
+.nhsn-link__manual-upload .nhsn-link__upload-field {
+  margin: 0;
+}
+
 .nhsn-link__download-field {
   margin: 1.25rem 0;
 }

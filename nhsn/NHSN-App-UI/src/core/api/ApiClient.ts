@@ -67,6 +67,10 @@ export interface ApiClient {
    */
   saveDraft(draft: FacilityDraft): Promise<DraftEnvelope>;
   importDraft(file: File): Promise<ImportResult>;
+  /**
+   * The vendor's import package — a zip of the import sheet and its instruction documents,
+   * assembled server-side from the facility's vendor. Rejects until a vendor is chosen.
+   */
   exportDraft(): Promise<Blob>;
   completeOnboarding(): Promise<CommitResult>;
   getCommitState(): Promise<CommitResult | null>;

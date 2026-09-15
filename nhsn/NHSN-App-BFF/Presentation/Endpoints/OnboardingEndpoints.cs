@@ -90,21 +90,36 @@ public class OnboardingEndpoints : IApi
             });
 
         group.MapGet("/export", async (
-                IManualUploadTemplateService templateService,
+                IPackageZipDownloadService packageService,
                 CancellationToken cancellationToken) =>
             {
-                var content = await templateService.ExportAsync(cancellationToken);
-                return Results.File(
-                    content,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    "manual-upload-import-sheet.xlsx");
+                var result = await packageService.ExportAsync(cancellationToken);
+                return result.Status switch
+                {
+                    PackageZipDownloadStatus.Ok => Results.File(result.Content!, "application/zip", result.FileName),
+                    PackageZipDownloadStatus.VendorNotSelected => Results.BadRequest(new
+                    {
+                        message = "Select an EHR vendor before downloading the import package."
+                    }),
+                    PackageZipDownloadStatus.AssetsUnavailable => Results.Problem(
+                        title: "Import package assets unavailable",
+                        statusCode: StatusCodes.Status503ServiceUnavailable),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                };
             })
             .WithName("ExportOnboardingDraft")
-            .Produces(StatusCodes.Status200OK, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .Produces(StatusCodes.Status200OK, contentType: "application/zip")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithOpenApi(operation =>
             {
-                operation.Summary = "Download the manual-upload import sheet, pre-filled from the current draft.";
+                operation.Summary = "Download the manual-upload import package for the facility's vendor.";
+                operation.Description =
+                    "A zip named {facilityId}_import_sheet.zip holding the vendor's import sheet, its " +
+                    "census instructions and its JWKS instructions, plus the org-resolution guidance " +
+                    "for Epic. Every entry is a byte-for-byte copy of the deployed static asset. " +
+                    "400 when the facility has not chosen a vendor yet.";
                 return operation;
             });
     }
