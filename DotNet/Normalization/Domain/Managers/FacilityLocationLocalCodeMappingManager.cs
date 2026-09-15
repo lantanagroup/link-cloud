@@ -238,7 +238,9 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                 hslocCodes ??= await _hslocQueries.GetActiveLookup(cancellationToken);
                 var sourceSystem = locationTypeCode.SourceSystem ?? string.Empty;
                 var sourceCode = locationTypeCode.SourceCode ?? string.Empty;
-                var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m => m.LocalCodeSystem == sourceSystem && m.LocalCode == sourceCode);
+                var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m =>
+                    string.Equals(m.LocalCodeSystem, sourceSystem, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(m.LocalCode, sourceCode, StringComparison.OrdinalIgnoreCase));
                 if(existingMapping == null)
                 {
                     //never seen this location type code before, create it
