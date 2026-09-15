@@ -75,7 +75,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     {
         var hsloc = await SeedHSLOC();
         using var cancellation = new CancellationTokenSource();
-        _hslocQueries.Setup(queries => queries.GetAll(false, cancellation.Token)).ReturnsAsync([hsloc]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(cancellation.Token)).ReturnsAsync(new Dictionary<string, Guid> { [hsloc.HSLOCCode] = hsloc.Id });
         var result = CreateResult(new HSLOCMappingResultCode
         {
             SourceSystem = "local-system", SourceCode = "ward", TargetCode = hsloc.HSLOCCode
@@ -96,7 +96,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
         var unmapped = Assert.Single(mappings, mapping => mapping.LocalCode == "");
         Assert.Equal("", unmapped.LocalCodeSystem);
         Assert.Null(unmapped.HSLOCId);
-        _hslocQueries.Verify(queries => queries.GetAll(false, cancellation.Token), Times.Once);
+        _hslocQueries.Verify(queries => queries.GetActiveLookup(cancellation.Token), Times.Once);
     }
 
     [Theory]
@@ -106,7 +106,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     public async Task UpdateFacilityLocationLocalCodeMappings_NullSourceValues_UpdatesExistingMapping(string? sourceSystem, string? sourceCode)
     {
         var hsloc = await SeedHSLOC();
-        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([hsloc]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, Guid> { [hsloc.HSLOCCode] = hsloc.Id });
         var code = new HSLOCMappingResultCode
         {
             SourceSystem = sourceSystem, SourceCode = sourceCode, TargetCode = "unknown"
@@ -142,7 +142,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     public async Task UpdateFacilityLocationLocalCodeMappings_HSLOCSource_UsesSourceInsteadOfTarget(string sourceSystem, bool knownSource)
     {
         var hsloc = await SeedHSLOC();
-        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([hsloc]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, Guid> { [hsloc.HSLOCCode] = hsloc.Id });
         var result = CreateResult(new HSLOCMappingResultCode
         {
             SourceSystem = sourceSystem,
@@ -186,7 +186,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     {
         var hsloc = await SeedHSLOC();
         var mapping = await SeedMapping(clearMapping ? hsloc.Id : null);
-        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([hsloc]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, Guid> { [hsloc.HSLOCCode] = hsloc.Id });
         var result = CreateResult(new HSLOCMappingResultCode
         {
             SourceSystem = "local-system", SourceCode = "ward", TargetCode = clearMapping ? "unknown" : hsloc.HSLOCCode
@@ -207,7 +207,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     {
         var hsloc = await SeedHSLOC();
         await SeedMapping(hsloc.Id);
-        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([hsloc]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, Guid> { [hsloc.HSLOCCode] = hsloc.Id });
         var locations = new Mock<IFacilityLocationManager>(MockBehavior.Strict);
         var result = CreateResult(new HSLOCMappingResultCode
         {
@@ -224,7 +224,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     [Fact]
     public async Task UpdateFacilityLocationLocalCodeMappings_RepeatedLocationAndCode_DoesNotDuplicateAndContinues()
     {
-        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _hslocQueries.Setup(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, Guid>());
         var code = new HSLOCMappingResultCode { SourceSystem = "local-system", SourceCode = "ward" };
         var first = CreateResult(code, code);
         var second = CreateResult(code, new HSLOCMappingResultCode { SourceSystem = "local-system", SourceCode = "second" });
@@ -236,7 +236,7 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
         Assert.Equal(2, mappings.Count);
         Assert.Single(mappings, mapping => mapping.LocalCode == "ward");
         Assert.Single(mappings, mapping => mapping.LocalCode == "second");
-        _hslocQueries.Verify(queries => queries.GetAll(false, It.IsAny<CancellationToken>()), Times.Once);
+        _hslocQueries.Verify(queries => queries.GetActiveLookup(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

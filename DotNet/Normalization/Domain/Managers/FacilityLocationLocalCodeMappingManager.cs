@@ -159,7 +159,7 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
             return;
         }
 
-        List<HSLOC>? hslocCodes = null;
+        IReadOnlyDictionary<string, Guid>? hslocCodes = null;
         var existingLocationsAndMappings = await _dbContext.FacilityLocations.AsNoTracking().Include(i => i.FacilityLocationLocalCodeMappings).Where(q => q.FacilityId == facilityId).ToListAsync(cancellationToken);
         foreach(var hslocMappingResult in hslocMappingResults)
         {
@@ -220,7 +220,7 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
             //add or update the FacilityLocationLocalCodeMapping
             foreach(var locationTypeCode in hslocMappingResult.LocationTypeCodes)
             {
-                hslocCodes ??= await _hslocQueries.GetAll(false, cancellationToken);
+                hslocCodes ??= await _hslocQueries.GetActiveLookup(cancellationToken);
                 var sourceSystem = locationTypeCode.SourceSystem ?? string.Empty;
                 var sourceCode = locationTypeCode.SourceCode ?? string.Empty;
                 var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m => m.LocalCodeSystem == sourceSystem && m.LocalCode == sourceCode);
@@ -280,19 +280,21 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
         }
     }
 
-    private Guid? findHSLOCId(List<HSLOC> hslocCodes, HSLOCMappingResultCode locationTypeCode)
+    private Guid? findHSLOCId(IReadOnlyDictionary<string, Guid> hslocCodes, HSLOCMappingResultCode locationTypeCode)
     {
         //If the source system was already HSLOC, use the source code to find the HSLOC id, otherwise use the target code.
         if(MappingTargetSystems.IsHsloc(locationTypeCode.SourceSystem))
         {
-            var hslocId = hslocCodes.FirstOrDefault(h => h.HSLOCCode == locationTypeCode.SourceCode)?.Id;
+            Guid? hslocId = locationTypeCode.SourceCode != null && hslocCodes.TryGetValue(locationTypeCode.SourceCode, out var sourceId)
+                ? sourceId : null;
             if(hslocId == null)
             {
                 _logger.LogWarning("Mapping system {TargetSystem} is HSLOC, but the target code {TargetCode} does not match any known HSLOC codes.", locationTypeCode.SourceSystem.SanitizeForLog(), locationTypeCode.SourceCode.SanitizeForLog());
             }
             return hslocId;
         }
-        return hslocCodes.FirstOrDefault(h => h.HSLOCCode == locationTypeCode.TargetCode)?.Id;
+        return locationTypeCode.TargetCode != null && hslocCodes.TryGetValue(locationTypeCode.TargetCode, out var targetId)
+            ? targetId : null;
     }
 
     protected bool HasLocationChanged(FacilityLocation existing, Location incoming)

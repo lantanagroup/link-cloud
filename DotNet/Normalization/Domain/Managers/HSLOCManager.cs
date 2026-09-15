@@ -24,10 +24,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private readonly NormalizationDbContext _dbContext;
         private readonly ILogger<HSLOCManager> _logger;
 
-        public HSLOCManager(NormalizationDbContext dbContext, ILogger<HSLOCManager> logger)
+        private readonly LantanaGroup.Link.Normalization.Domain.Queries.IHSLOCLookupCache _lookupCache;
+
+        public HSLOCManager(NormalizationDbContext dbContext, ILogger<HSLOCManager> logger,
+            LantanaGroup.Link.Normalization.Domain.Queries.IHSLOCLookupCache lookupCache)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _lookupCache = lookupCache;
         }
 
         public async Task Update(
@@ -90,6 +94,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await _dbContext.SaveChangesAsync(cancellationToken);
+                _lookupCache.Invalidate();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -116,6 +121,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             try
             {
                 await _dbContext.HSLOCS.ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -133,6 +139,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             try
             {
                 await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -150,6 +157,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             try
             {
                 await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

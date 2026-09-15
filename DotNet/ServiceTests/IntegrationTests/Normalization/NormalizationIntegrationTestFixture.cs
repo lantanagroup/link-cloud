@@ -126,6 +126,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddScoped<IFacilityLocationLocalCodeMappingManager, FacilityLocationLocalCodeMappingManager>();
             builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
             builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+            builder.Services.AddSingleton<IHSLOCLookupCache, HSLOCLookupCache>();
             builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
             builder.Services.AddScoped<IOperationQueries, OperationQueries>();
             builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();

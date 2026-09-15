@@ -205,6 +205,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
     builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+    builder.Services.AddSingleton<IHSLOCLookupCache, HSLOCLookupCache>();
     builder.Services.AddScoped<IHSLOCManager, HSLOCManager>();
     builder.Services.AddScoped<IFacilityLocationManager, FacilityLocationManager>();
     builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
