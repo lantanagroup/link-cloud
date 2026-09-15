@@ -13,6 +13,13 @@ public class DataAcquisitionLog
 {
     public const int MaxRetryAttempts = 5;
 
+    /// <summary>
+    /// How long a <see cref="TailClaimedAt"/> claim blocks siblings and recovery.
+    /// After this, a claim with <see cref="TailSent"/> still false can be reclaimed.
+    /// Matches the default TailMessageRecoveryJob min-age.
+    /// </summary>
+    public static readonly TimeSpan TailClaimLease = TimeSpan.FromMinutes(15);
+
     [Required]
     [MaxLength(128)]
     public string FacilityId { get; set; }
@@ -52,6 +59,13 @@ public class DataAcquisitionLog
     public ReportableEvent? ReportableEvent { get; set; }
 
     public bool TailSent { get; set; } = false;
+
+    /// <summary>
+    /// Set when a worker claims the tail so a sibling cannot produce a duplicate.
+    /// Cleared if finalize/produce fails. <see cref="TailSent"/> is set only after Kafka produce.
+    /// Stale claims (older than the recovery min-age) can be reclaimed.
+    /// </summary>
+    public DateTime? TailClaimedAt { get; set; }
 
     public bool IsDeleted { get; set; } = false;
 

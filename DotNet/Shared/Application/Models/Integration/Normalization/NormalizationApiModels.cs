@@ -18,7 +18,7 @@ public class CreateNormalizationOperationRequestApiModel
     public string? FacilityId { get; set; }
     public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
     public string? Description { get; set; }
-    public List<string> VendorIds { get; set; } = [];
+    public List<Guid> VendorVersionIds { get; set; } = [];
 }
 
 public class CreateNormalizationOperationDetailsApiModel
@@ -50,7 +50,13 @@ public class CreateNormalizationOperationDetailsApiModel
 public class CreateNormalizationConditionApiModel
 {
     public string FhirPathSource { get; set; } = string.Empty;
-    public string Operator { get; set; } = "Equal";
+
+    /// <summary>
+    /// Numeric <c>ConditionOperator</c> value expected by the Normalization API
+    /// (0=Equal, 1=GreaterThan, 2=GreaterThanOrEqual, 3=LessThan, 4=LessThanOrEqual, 5=NotEqual, 6=Exists, 7=NotExists).
+    /// </summary>
+    public int Operator { get; set; }
+
     public object? Value { get; set; }
 }
 
@@ -100,29 +106,79 @@ public class CreateNormalizationOperationSequenceApiModel
     public int? Sequence { get; set; }
 }
 
-public class NormalizationVendorApiModel
+public class CreateNormalizationVendorVersionOperationPresetRequestApiModel
 {
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public List<NormalizationVendorVersionApiModel> Versions { get; set; } = [];
-}
-
-public class NormalizationVendorVersionApiModel
-{
-    public Guid Id { get; set; }
-    public Guid VendorId { get; set; }
-    public string Version { get; set; } = string.Empty;
-}
-
-public class CreateNormalizationVendorPresetRequestApiModel
-{
-    public Guid? VendorId { get; set; }
+    public Guid? VendorVersionId { get; set; }
     public Guid? OperationResourceTypeId { get; set; }
 }
 
-public class NormalizationVendorPresetApiModel
+public class NormalizationVendorVersionOperationPresetApiModel
 {
     public Guid Id { get; set; }
     public Guid VendorVersionId { get; set; }
     public Guid OperationResourceTypeId { get; set; }
+}
+
+public class FacilityLocationApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
+    public string LocationId { get; set; } = string.Empty;
+    public string? PartOfId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
+}
+
+public class CreateFacilityLocationRequestApiModel
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string? PartOfId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+}
+
+public class FacilityLocationLocalCodeMappingApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
+    public string LocationId { get; set; } = string.Empty;
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+    public string? HSLOCCode { get; set; }
+    public string? HSLOCVersion { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
+}
+
+public class SearchFacilityLocationLocalCodeMappingsRequestApiModel
+{
+    public string? Id { get; set; }
+    public string? FacilityId { get; set; }
+    public string? LocationId { get; set; }
+    public string? LocalCodeSystem { get; set; }
+    public string? LocalCode { get; set; }
+    public Guid? HSLOCId { get; set; }
+    public bool? Unmapped { get; set; }
+    public int? PageSize { get; set; }
+    public int? PageNumber { get; set; }
+}
+
+public class CreateFacilityLocationLocalCodeMappingRequestApiModel
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+}
+
+public class UpdateFacilityLocationLocalCodeMappingRequestApiModel
+{
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
 }

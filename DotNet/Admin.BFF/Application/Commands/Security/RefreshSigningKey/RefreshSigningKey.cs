@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         }
 
         //TODO: Add back data protection once key persience is implemented
-        public async Task<bool> ExecuteAsync(ClaimsPrincipal user)
+        public async Task<bool> ExecuteAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Refresh Link Bearer Service Signing Key",
             [
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
 
             //update secret manager
-            var result = await _secretManager.SetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, CancellationToken.None);
+            var result = await _secretManager.SetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, cancellationToken);
 
             if (!result)
             {
@@ -61,11 +61,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             {
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
 
-                _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key), TimeSpan.FromMinutes(5));
+                await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key), TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
             }
             else
             {
-                _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, TimeSpan.FromMinutes(5));
+                await _cache.SetAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, TimeSpan.FromMinutes(5), cancellationToken: cancellationToken);
             }
 
             return true;

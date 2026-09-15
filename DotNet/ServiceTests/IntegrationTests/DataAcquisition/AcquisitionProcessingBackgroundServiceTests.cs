@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,7 +46,9 @@ public class AcquisitionProcessorBackgroundServiceTests
     {
         // Arrange
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
-        var service = new AcquisitionProcessorBackgroundService(loggerMock.Object, _fixture.ServiceProvider, null);
+        var service = new AcquisitionProcessorBackgroundService(
+            loggerMock.Object, _fixture.ServiceProvider, null,
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
 
         // Use an ID that definitely does not exist
         var workItem = new AcquisitionWorkItem(999999, "NonExistent");
@@ -227,8 +230,8 @@ public class AcquisitionProcessorBackgroundServiceTests
         // stopping the service mid-tail. The resource cache returns an empty encounter set so the
         // non-org strip in the tail path runs without touching a real cache.
         _fixture.ResourceCacheMock
-            .Setup(c => c.Get(It.IsAny<string>()))
-            .Returns(new List<Hl7.Fhir.Model.DomainResource>());
+            .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Hl7.Fhir.Model.DomainResource>());
 
         var tailProducedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _fixture.ResourcesAcquiredProducerMock.Reset();
@@ -241,7 +244,8 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
         var service = new AcquisitionProcessorBackgroundService(
-            loggerMock.Object, _fixture.ServiceProvider, _fixture.ResourcesAcquiredProducerMock.Object);
+            loggerMock.Object, _fixture.ServiceProvider, _fixture.ResourcesAcquiredProducerMock.Object,
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
         using var cts = new CancellationTokenSource();
         await service.StartAsync(cts.Token);
         await service.EnqueueAsync(new AcquisitionWorkItem(conditionLogId, facilityId), cts.Token);

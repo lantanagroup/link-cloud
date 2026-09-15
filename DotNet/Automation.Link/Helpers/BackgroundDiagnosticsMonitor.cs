@@ -1,6 +1,7 @@
 ﻿using System.Threading.Channels;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Validation;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -37,6 +38,21 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     /// </summary>
     public IReadOnlyList<string> KafkaErrors => _kafkaMonitor.CapturedErrors;
     public IReadOnlyCollection<string> CompletedMilestones => _monitor.State.CompletedMilestones;
+
+    /// <summary>
+    /// Latest Data Acquisition resource count observed by the progress probe.
+    /// </summary>
+    public int AcquisitionResourcesAcquired => _monitor.State.AcquisitionResourcesAcquired;
+
+    /// <summary>
+    /// True when DA completed a log, acquired more resources, or paged FHIR results within <paramref name="window"/>.
+    /// Used as a poll-loop keep-alive so large acquisitions are not treated as timeouts.
+    /// </summary>
+    public bool HasRecentAcquisitionProgress(TimeSpan window)
+    {
+        var last = _monitor.State.LastProgressUtc;
+        return last != default && DateTime.UtcNow - last <= window;
+    }
 
     /// <summary>
     /// Returns true if the named milestone has been reached.
@@ -76,6 +92,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         IAutomationOutput output,
         LokiScraper lokiScraper,
         AutomationConfig config,
+        KafkaConnection kafkaConnection,
         int expectedPatientCount = 0,
         TimeSpan? pollInterval = null,
         bool forwardInternalLogsToOutput = true,
@@ -97,7 +114,10 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         var reader = pipelineReader ?? BuildPipelineReader(config);
 
-        _kafkaMonitor = new KafkaErrorMonitor(eventingOutput, config);
+        _kafkaMonitor = new KafkaErrorMonitor(
+            eventingOutput,
+            config,
+            kafkaConnection);
         var progressMonitor = new ProgressMonitor(eventingOutput, expectedPatientCount, lokiScraper, reader, expectsDataAcquisition);
         _milestoneOrchestrator = new MilestoneValidationOrchestrator(eventingOutput, reader, expectedPatientCount, expectsDataAcquisition);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);

@@ -18,9 +18,10 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<OperationResourceType> OperationResourceTypes { get; set; }
     public virtual DbSet<ResourceType> ResourceTypes { get; set; }
     public virtual DbSet<OperationSequence> OperationSequences { get; set; }
-    public virtual DbSet<Vendor> Vendors { get; set; }
-    public virtual DbSet<VendorVersion> VendorVersions { get; set; }
     public virtual DbSet<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
+    public virtual DbSet<HSLOC> HSLOCS { get; set; }
+    public virtual DbSet<FacilityLocation> FacilityLocations { get; set; }
+    public virtual DbSet<FacilityLocationLocalCodeMapping> FacilityLocationLocalCodeMappings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,34 +55,38 @@ public partial class NormalizationDbContext : DbContext
             entity.HasIndex(e => e.Name).IsUnique();
         });
 
-        modelBuilder.Entity<Vendor>(entity =>
-        {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-        });
-
-        modelBuilder.Entity<VendorVersion>(entity =>
-        {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-
-            entity.HasOne(d => d.Vendor).WithMany(p => p.VendorVersions)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_VendorVersion_Vendor");
-        });
-
         modelBuilder.Entity<VendorVersionOperationPreset>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_VendorOperationPreset");
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.HasIndex(e => e.VendorVersionId);
 
             entity.HasOne(d => d.OperationResourceType).WithMany(p => p.VendorVersionOperationPresets)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_VendorOperationPreset_OperationResourceTypes");
+        });
 
-            entity.HasOne(d => d.VendorVersion).WithMany(p => p.VendorVersionOperationPresets)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_VendorOperationPreset_VendorVersion");
+        modelBuilder.Entity<HSLOC>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.Version, e.HSLOCCode }).IsUnique();
+        });
+
+        modelBuilder.Entity<FacilityLocation>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.FacilityId, e.LocationId }).IsUnique();
+            entity.HasOne(e => e.ParentFacilityLocation).WithMany().HasForeignKey(e => e.ParentFacilityLocationId).HasConstraintName("FK_FacilityLocation_ParentFacilityLocation");
+        });
+
+        modelBuilder.Entity<FacilityLocationLocalCodeMapping>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.FacilityLocationId, e.LocalCodeSystem, e.LocalCode }).IsUnique();
+            entity.HasOne(d => d.FacilityLocation).WithMany(p => p.FacilityLocationLocalCodeMappings).HasConstraintName("FK_FacilityLocationLocalCodeMapping_FacilityLocation");
+            entity.HasOne(d => d.HSLOC).WithMany().HasConstraintName("FK_FacilityLocationLocalCodeMapping_HSLOC");
         });
 
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore

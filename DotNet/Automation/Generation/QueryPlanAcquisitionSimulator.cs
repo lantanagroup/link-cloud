@@ -195,9 +195,10 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
-                // FHIR Observation/DiagnosticReport `date` matching may consider either
-                // effective[x] or issued, while our generic extractor returns only one range.
-                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                // Observation/DiagnosticReport `date` is FHIR effective[x] only.
+                // Including issued here over-predicts boundary resources (issued slightly
+                // after period start while effective is before it) — the DxRpt-042 class of
+                // scheduled ABS misses.
                 if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
                     && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
@@ -208,13 +209,7 @@ public static class QueryPlanAcquisitionSimulator
                     if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
                     {
                         recognizedAny = true;
-                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
-                    }
-
-                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
-                    {
-                        recognizedAny = true;
-                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
+                        matchedAny |= PassesTemporalBound(isGe, bound.Value, effStart, effEnd);
                     }
 
                     if (!recognizedAny)
@@ -273,19 +268,7 @@ public static class QueryPlanAcquisitionSimulator
                     return false;
                 }
 
-                if (isGe && resourceEnd < bound.Value)
-                {
-                    if (allowEncounterAnchoredDateOverrideForOutOfRange
-                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
-                    {
-                        continue;
-                    }
-
-                    return false;
-                }
-
-                if (isLe && resourceStart > bound.Value)
+                if (!PassesTemporalBound(isGe, bound.Value, resourceStart, resourceEnd))
                 {
                     if (allowEncounterAnchoredDateOverrideForOutOfRange
                         && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
@@ -303,6 +286,35 @@ public static class QueryPlanAcquisitionSimulator
     }
 
     /// <summary>
+    /// FHIR date search values carry an interval implied by their precision.
+    /// Data Acquisition formats PeriodEnd as <c>yyyy-MM-ddTHH:mm:ssZ</c> (second
+    /// precision, no fraction), so <c>le2023-01-15T23:59:59Z</c> matches any instant
+    /// in <c>[23:59:59.000, 24:00:00.000)</c> — HAPI inclusive-whole-second semantics.
+    /// Treating the bound as an exact tick (<c>resourceStart &lt;= 23:59:59.000</c>)
+    /// drops the last Observation of a Daily ACH 1-day window (spread across a
+    /// ±6h padded encounter at 0.3 of 1000 resources lands at ~23:59:59.167).
+    /// </summary>
+    private static bool PassesTemporalBound(
+        bool isGe,
+        DateTimeOffset bound,
+        DateTimeOffset resourceStart,
+        DateTimeOffset resourceEnd)
+    {
+        if (isGe)
+            return resourceEnd >= bound;
+
+        return resourceStart < ExclusiveLeBound(bound);
+    }
+
+    private static DateTimeOffset ExclusiveLeBound(DateTimeOffset bound)
+    {
+        if (bound.Millisecond == 0 && bound.Ticks % TimeSpan.TicksPerSecond == 0)
+            return bound.AddSeconds(1);
+
+        return bound.AddTicks(1);
+    }
+
+    /// <summary>
     /// Some DA query paths are encounter-anchored and can include resources linked to an
     /// already-acquired encounter. The simulator always uses this as a fallback when a
     /// resource doesn't expose a recognizable date field, and can optionally apply it to
@@ -315,8 +327,10 @@ public static class QueryPlanAcquisitionSimulator
         GeneratedResource resource,
         Dictionary<string, HashSet<string>> acquiredByType)
     {
+        // DiagnosticReport date search is effective[x] only. Encounter-anchoring DRs
+        // (including unrecognized-date fallback) over-predicts scheduled ABS
+        // (DxRpt-042 / DxRpt-043 class).
         if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
-              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
               || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
         {
             return false;
@@ -362,7 +376,50 @@ public static class QueryPlanAcquisitionSimulator
             }
         }
 
+        if (string.Equals(targetType, "Location", StringComparison.OrdinalIgnoreCase))
+            ExpandReferencedLocationParents(result, typeMap);
+
         return result;
+    }
+
+    /// <summary>
+    /// Data Acquisition follows <c>Location.partOf</c> when resolving referenced locations
+    /// (ward → hospital). Expand the referenced-id set so the Hospital parent is acquired
+    /// along with encounter stay locations.
+    /// </summary>
+    private static void ExpandReferencedLocationParents(
+        HashSet<string> referencedIds,
+        Dictionary<string, List<GeneratedResource>> typeMap)
+    {
+        if (!typeMap.TryGetValue("Location", out var locations) || locations.Count == 0)
+            return;
+
+        var byId = new Dictionary<string, GeneratedResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var location in locations)
+        {
+            if (!string.IsNullOrWhiteSpace(location.ResourceId))
+                byId[location.ResourceId] = location;
+        }
+
+        var pending = new Queue<string>(referencedIds);
+        while (pending.Count > 0)
+        {
+            var id = pending.Dequeue();
+            if (!byId.TryGetValue(id, out var location))
+                continue;
+
+            foreach (var reference in EnumerateReferences(location.Resource))
+            {
+                if (!reference.StartsWith("Location/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var parentId = reference["Location/".Length..];
+                if (string.IsNullOrWhiteSpace(parentId))
+                    continue;
+                if (referencedIds.Add(parentId))
+                    pending.Enqueue(parentId);
+            }
+        }
     }
 
     private static IEnumerable<string> EnumerateReferences(JsonElement element)
@@ -478,7 +535,7 @@ public static class QueryPlanAcquisitionSimulator
     /// <summary>
     /// Determines whether a FHIR search parameter name is a temporal (date-like) filter.
     /// Recognized names: <c>date</c>, <c>authoredon</c>, <c>authored</c>, <c>issued</c>,
-    /// <c>effective</c>, <c>onset-date</c>, <c>recorded-date</c>.
+    /// <c>effective</c>, <c>effective-time</c>, <c>onset-date</c>, <c>recorded-date</c>.
     /// </summary>
     private static bool IsTemporalSearchParam(string paramName)
         => string.Equals(paramName, "date", StringComparison.OrdinalIgnoreCase)
@@ -486,6 +543,7 @@ public static class QueryPlanAcquisitionSimulator
            || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase);
 
@@ -509,7 +567,8 @@ public static class QueryPlanAcquisitionSimulator
             return TryGetInstant(resource, "issued", out start, out end);
         }
 
-        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase))
         {
             return TryGetEffective(resource, out start, out end);
         }
@@ -634,7 +693,52 @@ public static class QueryPlanAcquisitionSimulator
     {
         return TryGetInstant(resource, "effectiveDateTime", out start, out end)
             || TryGetInstant(resource, "effectiveInstant", out start, out end)
-            || TryGetPeriod(resource, "effectivePeriod", out start, out end);
+            || TryGetPeriod(resource, "effectivePeriod", out start, out end)
+            || TryGetTiming(resource, "effectiveTiming", out start, out end);
+    }
+
+    /// <summary>
+    /// Reads a Timing-shaped property as (start, end) by using either event instants
+    /// (min..max) or repeat.boundsPeriod when events are absent.
+    /// </summary>
+    private static bool TryGetTiming(JsonElement element, string propertyName,
+        out DateTimeOffset start, out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+
+        if (!element.TryGetProperty(propertyName, out var timing) || timing.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (timing.TryGetProperty("event", out var events)
+            && events.ValueKind == JsonValueKind.Array)
+        {
+            var parsedEvents = events.EnumerateArray()
+                .Where(e => e.ValueKind == JsonValueKind.String)
+                .Select(e => e.GetString())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+                    ? (DateTimeOffset?)parsed
+                    : null)
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .ToList();
+
+            if (parsedEvents.Count > 0)
+            {
+                start = parsedEvents.Min();
+                end = parsedEvents.Max();
+                return true;
+            }
+        }
+
+        if (timing.TryGetProperty("repeat", out var repeat)
+            && repeat.ValueKind == JsonValueKind.Object)
+        {
+            return TryGetPeriod(repeat, "boundsPeriod", out start, out end);
+        }
+
+        return false;
     }
 
     private static void AddByType(Dictionary<string, HashSet<string>> acquiredByType, string resourceType, string resourceId)

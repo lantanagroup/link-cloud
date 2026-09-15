@@ -34,6 +34,18 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(
+        Guid vendorVersionId,
+        bool includeDisabled = true,
+        int pageSize = 100,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() => Request($"normalization/Operations/vendor-version/{vendorVersionId}")
+            .SetQueryParam("includeDisabled", includeDisabled)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> CreateOperationAsync(
         CreateNormalizationOperationRequestApiModel requestBody,
         CancellationToken cancellationToken = default) =>
@@ -44,6 +56,12 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         string facilityId,
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(
+        Guid vendorVersionId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/operations/vendor-version/{vendorVersionId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(
@@ -74,49 +92,92 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         return SendAsync(() => req.DeleteAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<LinkApiResponse<NormalizationVendorApiModel>> CreateVendorAsync(
-        string vendorName,
+    public Task<LinkApiResponse<NormalizationVendorVersionOperationPresetApiModel>> CreateVendorVersionOperationPresetAsync(
+        CreateNormalizationVendorVersionOperationPresetRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync<NormalizationVendorApiModel>(() => Request($"normalization/Vendor/{vendorName}")
-            .PostAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetVendorAsync(
-        string vendor,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<List<NormalizationVendorApiModel>>(() => Request($"normalization/Vendor/{vendor}")
-            .GetAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetAllVendorsAsync(
-        CancellationToken cancellationToken = default) =>
-        SendAsync<List<NormalizationVendorApiModel>>(() => Request("normalization/Vendor/vendors")
-            .GetAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse> DeleteVendorAsync(
-        string vendor,
-        CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"normalization/Vendor/{vendor}")
-            .DeleteAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<NormalizationVendorPresetApiModel>> CreateVendorPresetAsync(
-        CreateNormalizationVendorPresetRequestApiModel request,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<NormalizationVendorPresetApiModel>(() => Request("normalization/Vendor/presets")
+        SendAsync<NormalizationVendorVersionOperationPresetApiModel>(() => Request("normalization/vendor-version-operation-presets")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse<List<NormalizationVendorPresetApiModel>>> GetVendorPresetsAsync(
-        string vendor,
+    public Task<LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>> GetVendorVersionOperationPresetsAsync(
+        Guid? vendorVersionId = null,
         string? resource = null,
         CancellationToken cancellationToken = default)
     {
-        var req = Request($"normalization/Vendor/presets/{vendor}");
+        var req = Request("normalization/vendor-version-operation-presets");
+        if (vendorVersionId.HasValue) req = req.SetQueryParam("vendorVersionId", vendorVersionId.Value);
         if (!string.IsNullOrWhiteSpace(resource)) req = req.SetQueryParam("resource", resource);
-        return SendAsync<List<NormalizationVendorPresetApiModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
+        return SendAsync<List<NormalizationVendorVersionOperationPresetApiModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<LinkApiResponse> DeleteVendorPresetAsync(
-        string vendor,
+    public Task<LinkApiResponse> DeleteVendorVersionOperationPresetAsync(
+        Guid vendorVersionId,
         Guid presetId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"normalization/Vendor/presets/{vendor}/{presetId}")
+        SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(
+        string facilityId,
+        string locationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationApiModel>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations/{locationId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationApiModel>> CreateFacilityLocationAsync(
+        string facilityId,
+        CreateFacilityLocationRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationApiModel>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>> SearchFacilityLocationLocalCodeMappingsAsync(
+        SearchFacilityLocationLocalCodeMappingsRequestApiModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var apiRequest = Request("normalization/hsloc-mappings/search");
+        if (!string.IsNullOrWhiteSpace(request.Id)) apiRequest = apiRequest.SetQueryParam("id", request.Id);
+        if (!string.IsNullOrWhiteSpace(request.FacilityId)) apiRequest = apiRequest.SetQueryParam("facilityId", request.FacilityId);
+        if (!string.IsNullOrWhiteSpace(request.LocationId)) apiRequest = apiRequest.SetQueryParam("locationId", request.LocationId);
+        if (!string.IsNullOrWhiteSpace(request.LocalCodeSystem)) apiRequest = apiRequest.SetQueryParam("localCodeSystem", request.LocalCodeSystem);
+        if (!string.IsNullOrWhiteSpace(request.LocalCode)) apiRequest = apiRequest.SetQueryParam("localCode", request.LocalCode);
+        if (request.HSLOCId.HasValue) apiRequest = apiRequest.SetQueryParam("HSLOCId", request.HSLOCId.Value);
+        if (request.Unmapped.HasValue) apiRequest = apiRequest.SetQueryParam("unmapped", request.Unmapped.Value);
+        if (request.PageSize.HasValue) apiRequest = apiRequest.SetQueryParam("pageSize", request.PageSize.Value);
+        if (request.PageNumber.HasValue) apiRequest = apiRequest.SetQueryParam("pageNumber", request.PageNumber.Value);
+
+        return SendAsync<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>(() => apiRequest
+            .GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> GetFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> CreateFacilityLocationLocalCodeMappingAsync(
+        string facilityId,
+        CreateFacilityLocationLocalCodeMappingRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        UpdateFacilityLocationLocalCodeMappingRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityLocationLocalCodeMappingApiModel>(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(
+        string mappingId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/hsloc-mappings/{mappingId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 }

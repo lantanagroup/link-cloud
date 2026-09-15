@@ -15,18 +15,16 @@ public class LokiScraper
     {
         if (lokiClient.BaseAddress == null)
         {
-            var configuredBaseUrl = string.IsNullOrWhiteSpace(config.LokiBaseUrl)
-                ? "http://localhost:3100"
-                : config.LokiBaseUrl;
+            if (!Uri.TryCreate(config.LokiBaseUrl, UriKind.Absolute, out var lokiBaseUri))
+                throw new InvalidOperationException("LokiBaseUrl must be an absolute URI.");
 
-            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var lokiBaseUri))
-                lokiClient.BaseAddress = lokiBaseUri;
+            lokiClient.BaseAddress = lokiBaseUri;
         }
 
         _output = output;
         _lokiClient = lokiClient;
         _lokiAppLabel = string.IsNullOrWhiteSpace(config.LokiAppLabel)
-            ? "link-cloud"
+            ? throw new InvalidOperationException("LokiAppLabel is required.")
             : config.LokiAppLabel.Trim();
     }
 
@@ -690,6 +688,56 @@ public class LokiScraper
             }
 
             return $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetDataAcquisitionActivitySummaryAsync(
+        TimeSpan lookback,
+        string? facilityId = null,
+        string? reportId = null)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var query =
+            $"{{app=\"{_lokiAppLabel}\", component=~\"DataAcquisition.*\"}} |= \"{DataAcquisitionPagingActivity.LogToken}\"";
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            query += $" |= \"{facilityId}\"";
+        if (!string.IsNullOrWhiteSpace(reportId))
+            query += $" |= \"{reportId}\"";
+        try
+        {
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
+                return null;
+
+            var jsonResponse = JObject.Parse(content);
+            var results = jsonResponse["data"]?["result"] as JArray;
+            if (results == null)
+                return null;
+
+            var logLines = new List<string>();
+            foreach (var result in results)
+            {
+                var values = result["values"] as JArray;
+                if (values == null)
+                    continue;
+
+                foreach (var value in values)
+                {
+                    var logLine = value[1]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(logLine))
+                        logLines.Add(logLine);
+                }
+            }
+
+            return DataAcquisitionPagingActivity.Summarize(logLines, lookback);
         }
         catch
         {

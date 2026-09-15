@@ -52,6 +52,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
         options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
     });
 
     builder.Services.AddTerminologyProblemDetails(
@@ -124,6 +125,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeGroupCacheService>();
     builder.Services.AddSingleton<ICodeGroupCacheService>(sp => sp.GetRequiredService<CodeGroupCacheService>());
     builder.Services.AddSingleton<FhirService>();
+    builder.Services.AddSingleton<ICodeSearchService, CodeSearchService>();
 
     builder.Services.AddOptions<TerminologyConfig>()
         .Bind(builder.Configuration.GetSection(TerminologyConstants.AppSettingsSectionNames.Terminology))

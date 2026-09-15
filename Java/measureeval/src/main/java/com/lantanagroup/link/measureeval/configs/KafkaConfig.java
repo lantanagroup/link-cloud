@@ -1,11 +1,17 @@
 package com.lantanagroup.link.measureeval.configs;
 
+import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.records.*;
-import com.lantanagroup.link.measureeval.services.EvaluationRequestedConsumer;
-import com.lantanagroup.link.measureeval.services.ResourcesNormalizedConsumer;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.measureeval.services.RedisResourceService;
+import com.lantanagroup.link.measureeval.services.ResourceCacheCleanup;
+import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
+import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
+import com.lantanagroup.link.shared.config.KafkaRetryConfig;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
@@ -17,21 +23,29 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.*;
+import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
+import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
+import org.springframework.kafka.retrytopic.RetryTopicHeaders;
 import org.springframework.kafka.support.serializer.*;
+import org.springframework.messaging.MessageHandlingException;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -52,7 +66,7 @@ public class KafkaConfig {
     }
 
     @Bean
-    public DefaultErrorHandler defaultErrorHandler(ConsumerRecordRecoverer recoverer) {
+    public DefaultErrorHandler defaultErrorHandler(@Qualifier("deadLetterPublishingRecoverer") ConsumerRecordRecoverer recoverer) {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(0L, 0L));
         errorHandler.setSeekAfterError(false);
         return errorHandler;
@@ -220,30 +234,126 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
     }
 
+    // Delay + termination are driven by the custom recoverer; this config only provisions
+    // the backoff-aware retry listener. Do not rely on Spring's own retry/DLT routing here.
+    //
+    // Both retried topics (ResourcesNormalized and EvaluationRequested) share one
+    // RetryTopicConfiguration. Spring Kafka 3.1.x does not reliably bootstrap multiple
+    // RetryTopicConfiguration beans — only one listener's containers get provisioned and the
+    // other @KafkaListener is silently dropped (no error). A single config with includeTopics
+    // covers both deterministically. The settings are identical across the two topics, so there
+    // is no behavioral difference vs. the previous per-topic beans.
+    @Bean
+    @ConditionalOnProperty(prefix = "spring.kafka.retry", name = "disable-retry-consumer", havingValue = "false", matchIfMissing = true)
+    public RetryTopicConfiguration measureEvalRetryTopics(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, Object> template) {
+        return RetryTopicConfigurationBuilder
+                .newInstance()
+                .concurrency(1)
+                .includeTopics(List.of(Topics.RESOURCES_NORMALIZED, Topics.EVALUATION_REQUESTED))
+                .retryTopicSuffix("-Retry")
+                .dltSuffix("-Error")
+                // Container-thread poison (malformed payload / deserialization) never succeeds on retry,
+                // so route it straight to -Error. Mirrors the NON_RETRYABLE set (RetryTopicRecovererFactory)
+                // used on the async path.
+                .notRetryOn(DeserializationException.class)
+                .useSingleTopicForSameIntervals()
+                .doNotAutoCreateRetryTopics()
+                // Keep the DLT in the destination chain — it is the routing target for container-thread
+                // poison (see notRetryOn above), so removing it with doNotConfigureDlt() would leave a
+                // malformed record with no destination and drop it instead of preserving it.
+                // Only suppress its *listener*: nothing consumes -Error (there is no @DltHandler), so the
+                // container it would otherwise start just re-reads each dead letter, fails again on the
+                // same bytes, and commits the offset — which both doubles the error logging for poison
+                // and advances the group past records that dead-letter replay will need to re-read.
+                .autoStartDltHandler(false)
+                .create(template);
+    }
+
+    /**
+     * Exceptions that can never succeed on retry (malformed content / deserialization); routed
+     * straight to the error topic. Supplied to the shared {@link RetryTopicRecovererFactory} — the
+     * FHIR/HAPI types live on this module's classpath, not in shared.
+     *
+     * <p>Package-private (not {@code private}) so {@code KafkaConfigTest} exercises the resolver and
+     * classifier against this exact production set rather than a copy that can silently drift.</p>
+     */
+    static final Set<Class<? extends Throwable>> NON_RETRYABLE = Set.of(
+            FhirParseException.class,
+            ValidationException.class,
+            MessageHandlingException.class,
+            DataFormatException.class,
+            DeserializationException.class);
+
+    private RetryTopicRecoverer createRetryTopicRecoverer(
+            KafkaTemplate<?, ?> kafkaTemplate,
+            String retryTopic,
+            String errorTopic,
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup cacheCleanup) {
+        // The consumer no longer cleans up the resource cache on failure — a record routed to -Retry
+        // is redelivered and still needs its cached resources. This hook is the failure-path cleanup:
+        // it runs only on terminal decisions (poison / exhausted / retries disabled), after the dead
+        // letter is durably published. A record whose value never deserialized is skipped; the cache
+        // expiration policy reclaims whatever it left behind.
+        return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE,
+                (record, exception) -> {
+                    if (record.value() instanceof AbstractResourceRecord resourceRecord) {
+                        cacheCleanup.cleanup(resourceRecord.getCacheKey(), resourceRecord.getCacheType());
+                    }
+                });
+    }
 
     @Bean
-    public ConcurrentMessageListenerContainer<String, EvaluationRequested> evaluationRequestedContainer(
-            ConcurrentKafkaListenerContainerFactory<String, EvaluationRequested> factory,
-            EvaluationRequestedConsumer consumer) {
-        return getAsyncListenerContainer(factory, consumer, Topics.EVALUATION_REQUESTED);
+    public ResourceCacheCleanup resourceCacheCleanup(
+            RedisResourceService redisResourceService,
+            ObjectProvider<AbsResourceService> absResourceService) {
+        return new ResourceCacheCleanup(redisResourceService, absResourceService.getIfAvailable());
     }
 
     @Bean
-    public ConcurrentMessageListenerContainer<String, ResourcesNormalized> resourcesNormalizedContainer(
-            ConcurrentKafkaListenerContainerFactory<String, ResourcesNormalized> factory,
-            ResourcesNormalizedConsumer consumer) {
-        return getAsyncListenerContainer(factory, consumer, Topics.RESOURCES_NORMALIZED);
+    public ConsumerRecordRecoverer resourceNormalizedRecoverer(
+            @Qualifier("compressedKafkaTemplate")
+            KafkaTemplate<String, ResourcesNormalized> kafkaTemplate,
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup resourceCacheCleanup) {
+
+        return createRetryTopicRecoverer(
+                kafkaTemplate,
+                "ResourcesNormalized-Retry",
+                "ResourcesNormalized-Error",
+                retryConfig,
+                resourceCacheCleanup
+        );
     }
 
-    private <K, V> ConcurrentMessageListenerContainer<K, V> getAsyncListenerContainer(
-            ConcurrentKafkaListenerContainerFactory<K, V> factory,
-            AsyncListener<?, ?> listener,
-            String... topics) {
-        ConcurrentMessageListenerContainer<K, V> container = factory.createContainer(topics);
-        ContainerProperties containerProperties = container.getContainerProperties();
-        containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-        containerProperties.setAsyncAcks(true);
-        containerProperties.setMessageListener(listener);
-        return container;
+    @Bean
+    public ConsumerRecordRecoverer evaluationRequestedRecoverer(
+            @Qualifier("compressedKafkaTemplate")
+            KafkaTemplate<String, EvaluationRequested> kafkaTemplate,
+            KafkaRetryConfig retryConfig,
+            ResourceCacheCleanup resourceCacheCleanup) {
+
+        return createRetryTopicRecoverer(
+                kafkaTemplate,
+                "EvaluationRequested-Retry",
+                "EvaluationRequested-Error",
+                retryConfig,
+                resourceCacheCleanup
+        );
     }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> manualAckListenerContainerFactory(
+            ConsumerFactory<String, Object> consumerFactory,
+            @Qualifier("defaultErrorHandler") CommonErrorHandler errorHandler) {
+
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.getContainerProperties().setAsyncAcks(true);
+        factory.setCommonErrorHandler(errorHandler);
+        return factory;
+    }
+
 }

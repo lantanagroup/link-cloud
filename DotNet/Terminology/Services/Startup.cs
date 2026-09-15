@@ -18,7 +18,7 @@ public class Startup(ICodeGroupCacheService codeGroupCacheService) : IHostedServ
     /// <return>A task that represents the asynchronous startup operation.</return>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await codeGroupCacheService.LoadCache();
+        await codeGroupCacheService.LoadCache(cancellationToken);
     }
 
     /// <summary>

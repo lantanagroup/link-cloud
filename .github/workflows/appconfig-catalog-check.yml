@@ -1,0 +1,66 @@
+name: "App Config Catalog Check"
+
+# Verifies app-config.yaml is internally sound: it conforms to the JSON Schema embedded in
+# itself, and the rules deciding whether a catalog key is satisfied by a store row still hold.
+#
+# It does NOT check the catalog against the environment stores. That comparison needs the
+# per-environment exports, which live in the private link-cac repository (LEGLINK-912), and
+# this repository is public in both directions that matter:
+#
+#   * Actions logs here are world-readable. check_required_config.py reports store rows that
+#     are absent from the catalog, and the labels those rows carry - private key names, even
+#     though it never prints a value.
+#   * A read token for link-cac sitting in this repository's secrets can be read by anyone with
+#     write access here, via a workflow change on a same-repo pull request.
+#
+# So link-cac is never read from here. It runs the required-key check itself, against a public
+# checkout of this repository, on every pull request there plus daily - see
+# .github/workflows/appconfig-checks.yml in that repository. The daily run is what catches a
+# key marked required: true merged here with no rows added there.
+#
+# Runs on every PR rather than filtering on paths, so it can be made a required status check
+# without further change. It is not one today. A path filter would leave PRs that touch nothing
+# here reporting no status at all, which is what makes such a check unusable.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  push:
+    branches:
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  merge_group:
+    branches:
+      - dev
+
+# This job only reads this repository: checkout, install PyYAML, then run the catalog checks.
+# Nothing is written back and nothing else is read, so the token needs no more than read access.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Validate catalog schema and rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install "pyyaml==6.0.*"
+
+      - name: Unit tests
+        run: python -m unittest discover Scripts/AzureAppConfig/tests
+
+      - name: Validate catalog schema
+        run: python Scripts/AzureAppConfig/validate_app_config_schema.py
