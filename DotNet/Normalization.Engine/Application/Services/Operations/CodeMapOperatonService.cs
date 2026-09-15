@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             // configured systems rather than the coding's, so they do not inherit that dependency.
             foreach (var codeSystemMap in codeSystemMaps.Where(x => x.SourceSystem == coding.System))
             {
-                if (codeSystemMap == null)
+                if (codeSystemMap == null || string.IsNullOrWhiteSpace(coding.Code))
                     continue;
 
                 var tally = GetOrCreateTally(tallies, codeSystemMap);
