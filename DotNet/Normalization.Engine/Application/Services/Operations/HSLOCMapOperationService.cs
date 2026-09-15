@@ -12,9 +12,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
     {
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ILogger<HSLOCMapOperationService> _logger;
-
-        public static string LocationAliasCodeSystem = "https://nhsnlink.org/location-alias";
-
         public HSLOCMapOperationService(ILogger<HSLOCMapOperationService> logger,
                                         CodeMapOperationService codeMapOperationService,
                                         TimeSpan? operationTimeout = null)
@@ -170,13 +167,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             // de-dupe on (system, code)
             var exists = location.Type.Any(cc =>
                 cc.Coding.Any(cd =>
-                    string.Equals(cd.System, LocationAliasCodeSystem, StringComparison.Ordinal) &&
+                    string.Equals(cd.System, MappingTargetSystems.LocationAliasCodeSystem, StringComparison.Ordinal) &&
                     string.Equals(cd.Code, trimmedAlias, StringComparison.Ordinal)));
 
             if (exists)
                 return 0;
 
-            CodeableConcept codeableConcept = new(LocationAliasCodeSystem, trimmedAlias);
+            CodeableConcept codeableConcept = new(MappingTargetSystems.LocationAliasCodeSystem, trimmedAlias);
             location.Type.Add(codeableConcept);
             return 1;
         }
