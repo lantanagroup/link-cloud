@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
@@ -47,6 +47,14 @@ function toMappingRow(mapping: HslocMapping): MappingRow {
   };
 }
 
+function toMappings(rows: MappingRow[]): HslocMapping[] {
+  return rows.map(row => ({
+    sourceCode: row.sourceCode.trim(),
+    sourceDisplay: row.sourceDisplay.trim() || undefined,
+    hslocCode: row.hslocCode.trim()
+  }));
+}
+
 /** Badge render order — matches the POC's HSLOC_FACILITY_TYPES list. */
 const FACILITY_TYPE_ORDER: HslocFacilityType[] = [
   'acuteCareAll',
@@ -76,6 +84,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const [mappingsLoading, setMappingsLoading] = useState(true);
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+  const hasSyncedInitialLoad = useRef(false);
 
   const {
     data: codes = [],
@@ -126,6 +135,19 @@ export function HslocStep({onNext, onBack}: StepProps) {
       mounted = false;
     };
   }, [api]);
+
+  // Marks the draft dirty as soon as the user edits a row. Skips the render where the
+  // async load above first settles `rows` -- that's the mappings arriving, not an edit.
+  useEffect(() => {
+    if (mappingsLoading) {
+      return;
+    }
+    if (!hasSyncedInitialLoad.current) {
+      hasSyncedInitialLoad.current = true;
+      return;
+    }
+    patch('hsloc', {mappings: toMappings(rows)});
+  }, [rows, mappingsLoading, patch]);
 
   useEffect(() => {
     if (codesError) {
@@ -214,11 +236,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
     setSubmitting(true);
     try {
-      const mappings: HslocMapping[] = rows.map(row => ({
-        sourceCode: row.sourceCode.trim(),
-        sourceDisplay: row.sourceDisplay.trim() || undefined,
-        hslocCode: row.hslocCode.trim()
-      }));
+      const mappings = toMappings(rows);
 
       await api.saveHslocMappings(mappings);
       patch('hsloc', {mappings});

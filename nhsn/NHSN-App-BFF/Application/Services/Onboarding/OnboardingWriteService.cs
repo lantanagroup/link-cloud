@@ -41,6 +41,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IFacilityAdministrationService _facilityAdministrationService;
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly IEncounterMappingService _encounterMappingService;
+    private readonly IHslocMappingService _hslocMappingService;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -56,6 +57,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IFacilityAdministrationService facilityAdministrationService,
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IEncounterMappingService encounterMappingService,
+        IHslocMappingService hslocMappingService,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -70,6 +72,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _facilityAdministrationService = facilityAdministrationService;
         _organizationLocationGateway = organizationLocationGateway;
         _encounterMappingService = encounterMappingService;
+        _hslocMappingService = hslocMappingService;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -118,8 +121,6 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         {
             "fhir" => state with { Fhir = new FhirWorkflowState { ConnectionTested = draft.Fhir.ConnectionTested } },
 
-            "hsloc" => state with { Hsloc = new HslocWorkflowState { Mappings = [.. draft.Hsloc.Mappings] } },
-
             "encounter" => state with { Encounter = new EncounterWorkflowState { CodeSystems = [.. draft.Encounter.CodeSystems] } },
 
             "manual-upload" => state with
@@ -151,9 +152,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             "reporting-plan" => state with { ReportingPlan = new ReportingPlanWorkflowState { Reviewed = draft.ReportingPlan.Reviewed } },
 
-            // welcome, facility-info, census, location-org, mrn-intake, complete: no workflow slice
-            // of their own. Their data is configuration, or a BFF table written through its own
-            // endpoint.
+            // welcome, facility-info, census, location-org, hsloc, mrn-intake, complete: no
+            // workflow slice of their own. Their data is configuration, or a BFF table written
+            // through its own endpoint.
             _ => state
         };
 
@@ -263,6 +264,16 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             case "encounter":
                 await _encounterMappingService.SaveAsync(draft.Encounter.Mappings, cancellationToken);
+                break;
+
+            case "hsloc":
+                // Same data HslocStep's own PUT /hsloc-mappings writes. That endpoint stays --
+                // Report Results' inline "+ Add Mapping" needs a save callable outside the
+                // onboarding step -- but the generic dirty-save flow (OnboardingProvider's
+                // unsaved-changes prompt, transition auto-save) only ever calls the generic
+                // PUT /onboarding, so this case is what makes THAT path actually persist HSLOC
+                // edits instead of silently discarding them.
+                await _hslocMappingService.SaveAsync(draft.Hsloc.Mappings, cancellationToken);
                 break;
 
             default:

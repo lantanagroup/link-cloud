@@ -22,9 +22,6 @@ public sealed record OnboardingDraftState
 
     public FhirWorkflowState Fhir { get; init; } = new();
 
-    // Contract-pending: HSLOC mappings have no Link owner until Normalization support lands.
-    public HslocWorkflowState Hsloc { get; init; } = new();
-
     public EncounterWorkflowState Encounter { get; init; } = new();
 
     public ManualUploadWorkflowState ManualUpload { get; init; } = new();
@@ -50,19 +47,6 @@ public sealed record FhirWorkflowState
     public bool? ConnectionTested { get; init; }
 }
 
-// HSLOC mappings, held here only until Normalization can own them. The code list itself is not
-// here — that's reference data proxied from Normalization. Only the facility's mapping choices are
-// contract-pending.
-public sealed record HslocWorkflowState
-{
-    public List<HslocMappingState> Mappings { get; init; } = [];
-}
-
-public sealed record HslocMappingState
-{
-    public string? LocationId { get; init; }
-    public string? HslocCode { get; init; }
-}
 
 public sealed record EncounterWorkflowState
 {
