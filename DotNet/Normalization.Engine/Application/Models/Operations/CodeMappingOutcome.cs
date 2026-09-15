@@ -30,7 +30,10 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     /// The distinct codes behind <paramref name="UnmappedCount"/> — the codes a facility would add to the
     /// map to close the gap.
     /// </param>
-    /// <param name="MappedCodes">The source codes rewritten and the target codes they were rewritten to.</param>
+    /// <param name="MappedCodes">
+    /// Distinct source/target code pairs, compared case-sensitively. <paramref name="MappedCount"/>
+    /// retains the total number of rewritten codings.
+    /// </param>
     public sealed record CodeMappingOutcome(
         string SourceSystem,
         string TargetSystem,

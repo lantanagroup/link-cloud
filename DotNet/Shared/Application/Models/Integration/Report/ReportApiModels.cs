@@ -144,7 +144,7 @@ public class CodeMapOutcomeApiModel
     public int FailureCount { get; set; }
 
     /// <summary>
-    /// The distinct source codes that had no entry in the map -- what an operator would go and configure.code
+    /// The distinct source codes that had no entry in the map -- what an operator would go and configure.
     /// </summary>
     public List<string> UnmappedCodes { get; set; } = [];
     public List<CodeMappingApiModel> MappedCodes { get; set; } = [];
@@ -223,7 +223,8 @@ public enum SubmissionStatus
     Submitting,
     Submitted,
     FailedSubmission,
-    NotEligable
+    NotEligable,
+    NotSubmitted
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

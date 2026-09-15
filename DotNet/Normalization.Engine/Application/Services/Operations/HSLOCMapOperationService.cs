@@ -50,14 +50,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 .ToList();
 
             //Now that location.type is normalized, execute the code map.
-            var codeMapOperation = new CodeMapOperation(
-            operation.Name,
-            operation.FhirPath,
-            operation.CodeSystemMaps,
-            operation.Description);
-
             var codeMapOperationResult = await _codeMapOperationService.ProcessOperationAsync(
-                codeMapOperation,
+                operation,
                 resource,
                 supportingResources,
                 cancellationToken);

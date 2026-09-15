@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -410,7 +411,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 batch = await _context.ReportSchedule
                     .Where(r => r.FacilityId == facilityId &&
-                                r.Status == ScheduleStatus.Submitted &&
+                                ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) &&
                                 (deleted
                                     ? !r.IsDeleted.HasValue || r.IsDeleted == false
                                     : r.IsDeleted == true))
@@ -569,7 +570,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             ReportTypes = reportSchedule.ReportTypes.Select(reportType => reportType.ReportType).ToList(),
                             Status = reportSchedule.IsDeleted == true
                             ? ReportStatus.Canceled
-                                : reportSchedule.Status == ScheduleStatus.Submitted
+                                : ScheduleStatusExtensions.TerminalStatuses.Contains(reportSchedule.Status)
                                 ? ReportStatus.Completed
                                     : reportSchedule.Status == ScheduleStatus.New ||
                                       reportSchedule.Status == ScheduleStatus.Scheduled ||

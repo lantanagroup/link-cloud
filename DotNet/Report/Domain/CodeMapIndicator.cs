@@ -25,9 +25,6 @@ namespace LantanaGroup.Link.Report.Domain;
 public static class CodeMapIndicator
 {
     /// <summary>
-    /// Distinct unmapped codes retained per (source, target) pair.
-    /// </summary>
-    /// <summary>
     /// Records one pass's outcomes against what earlier passes stored, returning the details to store.
     /// </summary>
     /// <remarks>
@@ -203,6 +200,6 @@ public static class CodeMapIndicator
         public int UnmappedCount { get; set; }
         public int FailureCount { get; set; }
         public HashSet<string> UnmappedCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public List<CodeMapping> MappedCodes { get; } = [];
+        public HashSet<CodeMapping> MappedCodes { get; } = [];
     }
 }

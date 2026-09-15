@@ -45,8 +45,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 /// intended to show which codes a facility needs to add to the map. It is not used for counting.
 /// </param>
 /// <param name="MappedCodes">
-/// A sample of the source codes rewritten and the target codes they were rewritten to. Intended for
-/// troubleshooting, not for counting.
+/// Distinct source/target code pairs, compared case-sensitively.
 /// </param>
 public sealed record CodeMapOutcome(
     string SourceSystem,
