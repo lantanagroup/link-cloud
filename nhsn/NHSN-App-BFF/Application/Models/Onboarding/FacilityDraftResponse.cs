@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Hsloc;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
@@ -114,10 +115,10 @@ public sealed record LocationIdentifierEntry
     public string Code { get; init; } = string.Empty;
 }
 
-// Contract-pending — held in DraftJson until Normalization owns it.
+// Normalization (SearchFacilityLocationLocalCodeMappingsAsync et al.) — not DraftJson.
 public sealed record HslocSection
 {
-    public IReadOnlyList<HslocMappingState> Mappings { get; init; } = [];
+    public IReadOnlyList<HslocMapping> Mappings { get; init; } = [];
 }
 
 // Normalization (SearchFacilityOperationsAsync / CreateOperationAsync) — not Data Acquisition.

@@ -57,6 +57,10 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+  // Captured once, at mount -- not a "have we run yet" flag, because StrictMode invokes
+  // effects twice on mount against the same committed state, and a boolean flag would be
+  // flipped by the first invocation and wrongly let the second one patch.
+  const initialGroupsRef = useRef(groups);
 
   useEffect(() => {
     if (readyToAdvance) {
@@ -64,6 +68,16 @@ export function EncounterStep({onNext, onBack}: StepProps) {
       onNext();
     }
   }, [readyToAdvance, onNext]);
+
+  // Marks the draft dirty as soon as the user edits a code system or mapping row. `groups`
+  // only differs from the mount-time reference once a setGroups mutator has actually run.
+  useEffect(() => {
+    if (groups === initialGroupsRef.current) {
+      return;
+    }
+    const {codeSystems, mappings} = flattenGroups(groups);
+    patch('encounter', {codeSystems, mappings});
+  }, [groups, patch]);
 
   useEffect(() => {
     if (referenceCodesError) {

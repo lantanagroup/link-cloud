@@ -65,6 +65,17 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setBaseUrl(value);
     setTestedBaseUrl(null);
     setTestResult(null);
+    patch('fhir', {fhirServerBaseUrl: value});
+  }
+
+  function patchLagDuration(overrides: {lagDays?: number; lagHours?: number; lagMinutes?: number}) {
+    patch('fhir', {
+      lagDuration: buildIso8601Duration(
+        overrides.lagDays ?? lagDays,
+        overrides.lagHours ?? lagHours,
+        overrides.lagMinutes ?? lagMinutes
+      )
+    });
   }
 
   function currentFieldValues(overrides: Partial<FhirFieldValues> = {}): FhirFieldValues {
@@ -104,6 +115,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setter(normalized);
     markTouched(field);
     refreshErrors({[field]: normalized});
+    patch('fhir', {[field]: normalized});
   }
 
   async function handleTestConnection() {
@@ -251,6 +263,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 setMaxConcurrentRequests(value);
                 markTouched('maxConcurrentRequests');
                 refreshErrors({maxConcurrentRequests: value});
+                patch('fhir', {maxConcurrentRequests: value});
               }}
               onBlur={() => {
                 markTouched('maxConcurrentRequests');
@@ -270,6 +283,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 setMaxRetries(value);
                 markTouched('maxRetries');
                 refreshErrors({maxRetries: value});
+                patch('fhir', {maxRetries: value});
               }}
               onBlur={() => {
                 markTouched('maxRetries');
@@ -287,7 +301,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
               required
               value={minPullTime}
               error={fieldError('minAcquisitionPullTime')}
-              onChange={value => setMinPullTime(digitsOnly(value))}
+              onChange={value => {
+                const normalized = digitsOnly(value);
+                setMinPullTime(normalized);
+                patch('fhir', {minAcquisitionPullTime: normalized});
+              }}
               onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime')} />
             <TextField
               id="maxPullTime"
@@ -298,7 +316,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
               required
               value={maxPullTime}
               error={fieldError('maxAcquisitionPullTime')}
-              onChange={value => setMaxPullTime(digitsOnly(value))}
+              onChange={value => {
+                const normalized = digitsOnly(value);
+                setMaxPullTime(normalized);
+                patch('fhir', {maxAcquisitionPullTime: normalized});
+              }}
               onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime')} />
           </div>
 
@@ -324,6 +346,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagDays(value);
                   markTouched('lagDays');
                   refreshErrors({lagDays: value});
+                  patchLagDuration({lagDays: value});
                 }}
                 onBlur={() => {
                   markTouched('lagDays');
@@ -342,6 +365,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagHours(value);
                   markTouched('lagHours');
                   refreshErrors({lagHours: value});
+                  patchLagDuration({lagHours: value});
                 }}
                 onBlur={() => {
                   markTouched('lagHours');
@@ -360,6 +384,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagMinutes(value);
                   markTouched('lagMinutes');
                   refreshErrors({lagMinutes: value});
+                  patchLagDuration({lagMinutes: value});
                 }}
                 onBlur={() => {
                   markTouched('lagMinutes');
