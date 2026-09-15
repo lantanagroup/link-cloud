@@ -78,7 +78,7 @@
     "title": "Manual Upload Option",
     "intro": "If you are not able to complete the onboarding form online, download the form, complete it with your facility's technical team, and upload it here. You can upload a partially completed form and return later to finish the process.",
     "downloadTemplate": "Download Import Sheet & Instructions",
-    "downloadHint": "Downloads the .xlsx import sheet.",
+    "downloadHint": "Downloads a .zip containing the import sheet with vendor related instructions.",
     "uploadFile": "Upload Completed Import Sheet",
     "reading": "Reading file...",
     "imported": "Imported {{imported}} of {{total}} field(s) from {{fileName}}.",

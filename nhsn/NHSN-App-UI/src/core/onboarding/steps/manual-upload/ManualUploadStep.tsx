@@ -8,7 +8,7 @@ import {useOnboarding} from '../../OnboardingProvider';
 /** Manual Upload Option: download the import sheet, complete it offline, upload it back. */
 export function ManualUploadStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving, patch} = useOnboarding();
+  const {saving, patch, user} = useOnboarding();
   const api = useApiClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();
@@ -56,8 +56,14 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
       <DownloadLinkButton
         buttonText={t('onboarding:manualUpload.downloadTemplate')}
         hint={t('onboarding:manualUpload.downloadHint')}
-        fileName="manual-upload-import-sheet.xlsx"
-        onDownload={() => api.exportDraft()}
+        // The BFF names the file too, on Content-Disposition; a programmatic <a download> uses
+        // this one, so the two are kept the same shape deliberately.
+        fileName={`${user.facilityId ?? 'facility'}_import_sheet.zip`}
+        onDownload={() => {
+          setError(undefined);
+          return api.exportDraft();
+        }}
+        onError={cause => setError(cause instanceof Error ? cause.message : String(cause))}
         disabled={uploading}
       />
 

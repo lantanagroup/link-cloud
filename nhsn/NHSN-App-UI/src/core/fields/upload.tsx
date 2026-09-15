@@ -6,6 +6,8 @@ export interface DownloadLinkButtonProps {
   buttonText: string;
   fileName: string;
   onDownload: () => Promise<Blob>;
+  /** Called instead of rejecting, so a failed download reports itself on the page. */
+  onError?: (cause: unknown) => void;
   hint?: string;
   disabled?: boolean;
 }
@@ -15,6 +17,7 @@ export function DownloadLinkButton({
   buttonText,
   fileName,
   onDownload,
+  onError,
   hint,
   disabled
 }: DownloadLinkButtonProps) {
@@ -33,8 +36,11 @@ export function DownloadLinkButton({
       link.download = fileName;
       link.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setError(t('onboarding:messages.downloadFailed'));
+    } catch (cause) {
+      if (!onError) {
+        throw cause;
+      }
+      onError(cause);
     } finally {
       setDownloading(false);
     }

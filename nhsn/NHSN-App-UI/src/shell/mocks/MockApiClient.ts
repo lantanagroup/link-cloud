@@ -93,9 +93,14 @@ export class MockApiClient implements ApiClient {
     return {accepted: true, cellErrors: [], fieldsImported: 0, totalFields: 17};
   }
 
+  // The one call this mock will not answer. The import package is the vendor's reviewed
+  // documents, copied byte for byte out of the BFF's StaticAssets - a facility extracts the
+  // real sheet and the real instructions, so there is nothing here that could stand in for
+  // them. Faking it would produce a zip of invented files, which is worse than no download.
+  // Switch the harness to live mode to exercise this against the BFF.
   async exportDraft(): Promise<Blob> {
     await tick();
-    return new Blob(['simulated import sheet'], {type: 'text/plain'});
+    throw new Error('The import package is served by the BFF. Switch the harness to live mode to download it.');
   }
 
   async completeOnboarding(): Promise<C.CommitResult> {
