@@ -31,6 +31,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return copyResult;
             }
 
+            //Location.type is now normalized, so we can proceed with the code mapping operation.
+
+            // Identify codings that are not covered by any configured code map and create CodeMappingOutcome for them
+            // This allows us to report all location.type codings even if they are not covered by any configured code map.
             var configuredSourceSystems = operation.CodeSystemMaps.Select(map => map.SourceSystem).ToHashSet();
             var unconfiguredOutcomes = resource.Select(operation.FhirPath)
                 .SelectMany(source => source switch
@@ -46,7 +50,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     group.Select(coding => coding.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList()))
                 .ToList();
 
-            //Now that location.type is normalized, execute the code map.
+            //perform the code mapping operation using the normalized Location.type values
             var codeMapOperationResult = await _codeMapOperationService.ProcessOperationAsync(
                 operation,
                 resource,
@@ -58,7 +62,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return codeMapOperationResult;
             }
 
+            // Combine the code mapping outcomes from the code mapping operation with the unconfigured outcomes
             var codeMapping = (codeMapOperationResult.CodeMapping ?? []).Concat(unconfiguredOutcomes).ToList();
+            
             if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
             {
                 return OperationResult.Success(resource, codeMapping);
