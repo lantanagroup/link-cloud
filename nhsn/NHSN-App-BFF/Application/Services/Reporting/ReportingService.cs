@@ -91,17 +91,15 @@ public sealed class ReportingService : IReportingService
     // DataAcquisition scopes one query plan per facility+Frequency (Discharge/Daily/Weekly/
     // Monthly/Adhoc) -- not per EHR vendor; there is no vendor lookup to make here.
     //
-    // "Discharge", not "Adhoc": DataAcquisition's real acquisition trigger
-    // (PatientDataService.CreateLogEntries) resolves a facility's plan via
+    // "Discharge", not "Adhoc": an ad hoc report does trigger its own acquisition, on demand, for
+    // the requested patients -- Tenant's AdHocReport endpoint produces GenerateReportRequested,
+    // which Report's GenerateReportListener turns into a DataAcquisitionRequestedProducer call
+    // carrying ReportableEvent="Adhoc" per patient. But DataAcquisition's
+    // PatientDataService.CreateLogEntries resolves which plan to search for via
     // ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent, which maps
-    // ReportableEvent.Adhoc -> Frequency.Discharge (not Frequency.Adhoc). More fundamentally, the
-    // only producer of the DataAcquisitionRequested message that trigger reads
-    // (QueryDispatchJob) hardcodes ReportableEvent.Discharge -- nothing in this platform ever
-    // requests acquisition tagged Adhoc. Frequency.Adhoc exists as a plan-type option but nothing
-    // live reads a plan filed under it. Tenant's ad hoc report request (RequestAdHocReportAsync,
-    // BypassSubmission = true) evaluates against whatever the facility's normal Discharge-driven
-    // feed has already acquired rather than triggering its own acquisition run, so "Discharge" is
-    // the plan that actually governs what an ad hoc report can see.
+    // ReportableEvent.Adhoc -> Frequency.Discharge (not Frequency.Adhoc). So the acquisition still
+    // fails to find anything unless a "Discharge"-type plan already exists for the facility --
+    // Frequency.Adhoc is a plan-type option nothing ever searches for.
     private const string OperationalQueryPlanType = "Discharge";
 
     public Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default)
