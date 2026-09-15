@@ -100,6 +100,41 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, null)]
+    [InlineData("local-system", null)]
+    [InlineData(null, "ward")]
+    public async Task UpdateFacilityLocationLocalCodeMappings_NullSourceValues_UpdatesExistingMapping(string? sourceSystem, string? sourceCode)
+    {
+        var hsloc = await SeedHSLOC();
+        _hslocQueries.Setup(queries => queries.GetAll(false, It.IsAny<CancellationToken>())).ReturnsAsync([hsloc]);
+        var code = new HSLOCMappingResultCode
+        {
+            SourceSystem = sourceSystem, SourceCode = sourceCode, TargetCode = "unknown"
+        };
+        var result = CreateResult(code);
+        var manager = CreateManager();
+
+        await manager.UpdateFacilityLocationLocalCodeMappings(FacilityId, [result]);
+        var original = Assert.Single(await _context.FacilityLocationLocalCodeMappings.AsNoTracking().ToListAsync());
+        Assert.Null(original.HSLOCId);
+        _context.ChangeTracker.Clear();
+        code.TargetCode = hsloc.HSLOCCode;
+
+        await manager.UpdateFacilityLocationLocalCodeMappings(FacilityId, [result]);
+
+        var stored = Assert.Single(await _context.FacilityLocationLocalCodeMappings.AsNoTracking().ToListAsync());
+        Assert.Equal(original.Id, stored.Id);
+        Assert.Equal(sourceSystem ?? string.Empty, stored.LocalCodeSystem);
+        Assert.Equal(sourceCode ?? string.Empty, stored.LocalCode);
+        Assert.Equal(hsloc.Id, stored.HSLOCId);
+        Assert.NotNull(stored.ModifyDate);
+
+        _context.ChangeTracker.Clear();
+        await manager.UpdateFacilityLocationLocalCodeMappings(FacilityId, [result]);
+        Assert.Equal(stored.ModifyDate, (await _context.FacilityLocationLocalCodeMappings.AsNoTracking().SingleAsync()).ModifyDate);
+    }
+
+    [Theory]
     [InlineData(MappingTargetSystems.HslocUrl, true)]
     [InlineData(MappingTargetSystems.HslocOid, true)]
     [InlineData(MappingTargetSystems.HslocUrl, false)]

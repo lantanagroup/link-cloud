@@ -221,7 +221,9 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
             foreach(var locationTypeCode in hslocMappingResult.LocationTypeCodes)
             {
                 hslocCodes ??= await _hslocQueries.GetAll(false, cancellationToken);
-                var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m => m.LocalCodeSystem == locationTypeCode.SourceSystem && m.LocalCode == locationTypeCode.SourceCode);
+                var sourceSystem = locationTypeCode.SourceSystem ?? string.Empty;
+                var sourceCode = locationTypeCode.SourceCode ?? string.Empty;
+                var existingMapping = existingLocation?.FacilityLocationLocalCodeMappings?.FirstOrDefault(m => m.LocalCodeSystem == sourceSystem && m.LocalCode == sourceCode);
                 if(existingMapping == null)
                 {
                     //never seen this location type code before, create it
@@ -232,8 +234,8 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                         await Create(facilityId, new FacilityLocationLocalCodeMappingPostModel
                         {
                             LocationId = hslocMappingResult.Location.Id,
-                            LocalCodeSystem = locationTypeCode.SourceSystem ?? string.Empty,
-                            LocalCode = locationTypeCode.SourceCode ?? string.Empty,
+                            LocalCodeSystem = sourceSystem,
+                            LocalCode = sourceCode,
                             HSLOCId = hslocId
                         }, cancellationToken);
                     }
@@ -268,8 +270,8 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
                         //mapping has changed since it was last seen, update it
                         await Update(existingMapping.Id, new FacilityLocationLocalCodeMappingPutModel
                         {
-                            LocalCodeSystem = locationTypeCode.SourceSystem ?? string.Empty,
-                            LocalCode = locationTypeCode.SourceCode ?? string.Empty,
+                            LocalCodeSystem = sourceSystem,
+                            LocalCode = sourceCode,
                             HSLOCId = hslocId
                         }, cancellationToken);
                     }
@@ -303,8 +305,8 @@ public class FacilityLocationLocalCodeMappingManager : IFacilityLocationLocalCod
 
     protected bool HasMappingChanged(FacilityLocationLocalCodeMapping existing, HSLOCMappingResultCode incoming, Guid? hslocId)
     {
-        return !(existing.LocalCodeSystem == incoming.SourceSystem &&
-               existing.LocalCode == incoming.SourceCode &&
+         return !(existing.LocalCodeSystem == (incoming.SourceSystem ?? string.Empty) &&
+             existing.LocalCode == (incoming.SourceCode ?? string.Empty) &&
                existing.HSLOCId == hslocId);
     }
 }
