@@ -188,7 +188,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
     patch('fhir', {
       fhirServerBaseUrl: trimmedBaseUrl,
       maxConcurrentRequests: maxConcurrentRequests!,
-      maxRetries: maxRetries!,
+      maxRetries,
       minAcquisitionPullTime: minPullTime,
       maxAcquisitionPullTime: maxPullTime,
       lagDuration: buildIso8601Duration(lagDays, lagHours, lagMinutes),
@@ -256,6 +256,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               hint={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsTooltip')}
               required
               min={1}
+              max={8}
               step={1}
               value={maxConcurrentRequests}
               error={fieldError('maxConcurrentRequests')}
@@ -273,7 +274,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               id="maxRetries"
               label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxRetriesTooltip')}
-              required
               min={0}
               max={10}
               step={1}
@@ -298,7 +298,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               hint={t('onboarding:fhirServerInfo.fields.minPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
               maxLength={5}
-              required
               value={minPullTime}
               error={fieldError('minAcquisitionPullTime')}
               onChange={value => {
@@ -313,7 +312,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               hint={t('onboarding:fhirServerInfo.fields.maxPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
               maxLength={5}
-              required
               value={maxPullTime}
               error={fieldError('maxAcquisitionPullTime')}
               onChange={value => {

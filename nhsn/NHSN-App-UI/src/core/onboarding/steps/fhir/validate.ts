@@ -42,43 +42,46 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
     errors.fhirServerBaseUrl = 'onboarding:fhirServerInfo.messages.invalidBaseUrl';
   }
 
-  if (values.maxConcurrentRequests === undefined) {
+  if (values.maxConcurrentRequests == null) {
     errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.maxConcurrentRequests) || values.maxConcurrentRequests < 1) {
+  } else if (!Number.isInteger(values.maxConcurrentRequests) || values.maxConcurrentRequests < 1 || values.maxConcurrentRequests > 8) {
     errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.messages.invalidMaxConcurrentRequests';
   }
 
-  if (values.maxRetries === undefined) {
-    errors.maxRetries = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.maxRetries) || values.maxRetries < 0 || values.maxRetries > 10) {
+  if (values.maxRetries != null &&
+    (!Number.isInteger(values.maxRetries) || values.maxRetries < 0 || values.maxRetries > 10)) {
     errors.maxRetries = 'onboarding:fhirServerInfo.messages.invalidMaxRetries';
   }
 
   if (!values.minAcquisitionPullTime) {
-    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+    if (values.maxAcquisitionPullTime) {
+      errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+    }
   } else if (!PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
     errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
   if (!values.maxAcquisitionPullTime) {
-    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+    if (values.minAcquisitionPullTime) {
+      errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+    }
   } else if (!PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
     errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
-  if (values.lagDays === undefined) {
+  if (values.lagDays == null) {
     errors.lagDays = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > 30) {
     errors.lagDays = 'onboarding:fhirServerInfo.messages.invalidLagDays';
   }
 
-  if (values.lagHours === undefined) {
+  if (values.lagHours == null) {
     errors.lagHours = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagHours) || values.lagHours < 0 || values.lagHours > 23) {
     errors.lagHours = 'onboarding:fhirServerInfo.messages.invalidLagHours';
   }
 
-  if (values.lagMinutes === undefined) {
+  if (values.lagMinutes == null) {
     errors.lagMinutes = 'onboarding:fhirServerInfo.errors.fieldRequired';
   } else if (!Number.isInteger(values.lagMinutes) || values.lagMinutes < 0 || values.lagMinutes > 59) {
     errors.lagMinutes = 'onboarding:fhirServerInfo.messages.invalidLagMinutes';
