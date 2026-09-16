@@ -10,6 +10,7 @@
     },
     "http-docker": {
       "commandName": "Project",
+      "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Docker",
         "KafkaConnection__BootstrapServers__0": "localhost:9094",
@@ -17,20 +18,14 @@
         "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
         "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
         "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
-        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072"
+        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
+        "DMRP__Api__BaseUrl": "http://localhost:6159",
+        "DMRP__Api__TokenUrl": "http://localhost:6159/api/mock-dmrp/oauth2/token",
+        "DMRP__Api__ClientId": "link-cloud-dev",
+        "DMRP__Api__ClientSecret": "link-cloud-dev-secret"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:8074"
-    },
-    "Container (Dockerfile)": {
-      "commandName": "Docker",
-      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
-      "environmentVariables": {
-        "ASPNETCORE_HTTPS_PORTS": "8081",
-        "ASPNETCORE_HTTP_PORTS": "8080"
-      },
-      "publishAllPorts": true,
-      "useSSL": true
     }
   }
 }
