@@ -11,11 +11,13 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
@@ -1170,6 +1172,8 @@ internal sealed class RunExecutor
             // place for inspection.
             validatorRunner.ThrowIfAnyFailed();
 
+            await QuiescePipelineAsync(state, output, cancellationToken);
+
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
                 services.GetRequiredService<IFacilityServiceClient>(),
@@ -1210,6 +1214,7 @@ internal sealed class RunExecutor
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
+            await QuiescePipelineAsync(state, output, CancellationToken.None);
         }
         finally
         {
@@ -1245,6 +1250,32 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    private async Task QuiescePipelineAsync(MutableRunState state, IAutomationOutput output, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(state.FacilityId))
+            return;
+
+        try
+        {
+            var leftoverCleanup = _hostServices.GetService<LeftoverRunCleanupService>();
+            if (leftoverCleanup == null)
+                return;
+
+            output.WriteLine($"Aborting in-flight pipeline work for facility '{state.FacilityId}'.");
+            await leftoverCleanup.QuiesceFacilityAsync(
+                state.FacilityId,
+                state.ReportId,
+                cancellationToken,
+                deactivateSchedules: false);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
+            _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
+            throw;
         }
     }
 
