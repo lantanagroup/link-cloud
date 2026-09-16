@@ -86,6 +86,8 @@ public static class StartScenarioRequestResolver
         var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
+        var enableDmrp = request.EnableDmrp
+            || ExtractBoolFromJson(request.RunConfigurationJson, "enableDmrp") == true;
         var isLiveSimulation = request.IsLiveSimulation
             || ExtractBoolFromJson(request.RunConfigurationJson, "isLiveSimulation") == true;
         var scheduledLike = isLiveSimulation
@@ -131,6 +133,7 @@ public static class StartScenarioRequestResolver
             ReportPeriodStart = reportStart,
             ReportPeriodEnd = reportEnd,
             NhsnOrganizationId = nhsnOrganizationId,
+            EnableDmrp = enableDmrp,
             IsLiveSimulation = isLiveSimulation,
             ReportingWindowMinutes = reportingWindowMinutes
         };

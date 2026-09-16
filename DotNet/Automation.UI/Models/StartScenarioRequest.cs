@@ -78,6 +78,11 @@ public class StartScenarioRequest : IValidatableObject
     public string? NhsnOrganizationId { get; set; }
 
     /// <summary>
+    /// When true, this run uses DMRP enrollment to derive its reporting schedule.
+    /// </summary>
+    public bool EnableDmrp { get; set; }
+
+    /// <summary>
     /// Optional query plan template ID. When set, the run uses this template's
     /// query plan instead of the built-in defaults. When null, the system default is used.
     /// </summary>
@@ -140,6 +145,7 @@ public class StartScenarioRequest : IValidatableObject
         ReportPeriodStart = scenario.ReportPeriodStart,
         ReportPeriodEnd = scenario.ReportPeriodEnd,
         NhsnOrganizationId = scenario.NhsnOrganizationId,
+        EnableDmrp = scenario.EnableDmrp,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
