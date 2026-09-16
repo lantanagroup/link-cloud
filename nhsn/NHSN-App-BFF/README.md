@@ -150,6 +150,18 @@ For larger independently managed resource sets, a persistent volume or other mou
 
 ### Required app settings
 
+The JWT validation settings below have no file-based defaults. Docker Compose supplies them as
+environment variables for the local stack; deployed environments must provision them in Azure App
+Configuration under either no label or the exact service label `NHSN-App-BFF`:
+
+| Setting | Docker Compose environment variable | Azure App Configuration key | Required |
+|---|---|---|---|
+| Accepted JWT issuer | `NhsnJwt__Issuer` | `NhsnJwt:Issuer` | Yes |
+| JWT signature validation certificate | `NhsnJwt__PublicCertificatePem` | `NhsnJwt:PublicCertificatePem` | Yes |
+
+`PublicCertificatePem` is the public certificate used to validate signatures, not the private key
+used by the test harness to sign JWTs.
+
 ### Azure App Configuration support
 
 This project follows the same platform pattern used by other backend services and already calls:

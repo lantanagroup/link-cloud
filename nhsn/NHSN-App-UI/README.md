@@ -51,6 +51,55 @@ Change any of them to test the negative paths. Defaults can come from the shell 
 - `NHSN_APP_UI_DEFAULT_JWT_KEY_ID`
 - `NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM`
 
+### Test harness server configuration
+
+The standalone test harness server can source all of its runtime settings from environment
+variables, Azure App Configuration, or hard-coded defaults. To enable Azure App Configuration, set:
+
+- `ExternalConfigurationSource=AzureAppConfiguration`
+- `DatabaseConnections__AzureAppConfiguration=<AAC connection string>`
+
+The server loads only `/nhsn_app_ui/*` values in these two AAC scopes:
+
+1. Values with no label.
+2. Values labeled exactly `NhsnAppUI`.
+
+The labeled values are loaded second and override matching unlabeled values. Values carrying any
+other label are not selected by the server.
+
+Configuration precedence is **environment variable first, then AAC, then the hard-coded default**.
+This means the server requires no runtime environment variables unless AAC is enabled; only
+`ExternalConfigurationSource` and `DatabaseConnections__AzureAppConfiguration` are needed to
+bootstrap AAC.
+
+#### Supported settings
+
+| Setting | Environment variable | Azure App Configuration key | Hard-coded default |
+|---|---|---|---|
+| BFF proxy target | `BFF_BASE_URL` | `/nhsn_app_ui/bff/base_url` | `http://nhsn-app-bff:8079/api` |
+| Server port | `PORT` | `/nhsn_app_ui/server/port` | `8080` |
+| Default JWT issuer | `NHSN_APP_UI_DEFAULT_JWT_ISSUER` | `/nhsn_app_ui/default_jwt/issuer` | Empty |
+| Default JWT key ID | `NHSN_APP_UI_DEFAULT_JWT_KEY_ID` | `/nhsn_app_ui/default_jwt/key_id` | Empty |
+| Default JWT private key PEM | `NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM` | `/nhsn_app_ui/default_jwt/private_key_pem` | Empty |
+
+For every row, an environment variable overrides AAC, and AAC overrides the hard-coded default.
+
+Docker Compose sets `PORT=8090` to match its `8090:8090` port mapping and supplies all three JWT
+defaults as environment variables. Outside Docker Compose, the three `/nhsn_app_ui/default_jwt/*`
+keys are required deployment configuration and should be provisioned through AAC. The private key
+must be stored as an Azure Key Vault reference rather than as a literal AAC value.
+
+Any AAC value may be an Azure Key Vault reference. The server resolves references with
+`DefaultAzureCredential`, so the deployed
+identity needs access to the referenced secret. The runtime configuration loader depends on a
+provider function rather than directly on Azure, allowing another external configuration provider
+to be registered without changing the Express server.
+
+At startup, the server writes `[NHSN-App-UI configuration]` diagnostics showing the selected
+provider, AAC key prefix and labels, connection success, whether each expected key was found, and
+the effective source of each value. Connection strings and JWT values are always redacted; the logs
+report only whether a value is populated.
+
 ---
 
 ## Commands
@@ -66,6 +115,7 @@ npm run lint
 npm test               # unit + component tests
 npm run test:watch
 npm run test:boundary  # builds the embed bundle and inspects it (~20s)
+npm test --prefix server  # runtime server configuration tests
 ```
 
 ---

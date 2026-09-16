@@ -2,13 +2,12 @@ import {TestUserProfile} from './models';
 
 const profilesKey = 'nhsn-app-ui.testUsers';
 const activeProfileKey = 'nhsn-app-ui.activeTestUserId';
-const defaultIssuer = 'https://dev-nhsn-app.example.org';
 
 function normalizeProfile(profile: Partial<TestUserProfile> & Pick<TestUserProfile, 'id' | 'label' | 'email' | 'name' | 'groups' | 'facilityId' | 'lastUsedOn'>): TestUserProfile {
   return {
     ...profile,
     facilityName: profile.facilityName ?? '',
-    issuer: profile.issuer?.trim() || defaultIssuer,
+    issuer: profile.issuer?.trim() || '',
     keyId: profile.keyId?.trim() || '',
     privateKeyPem: profile.privateKeyPem ?? ''
   };
