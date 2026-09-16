@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace LantanaGroup.Link.Terminology.Application.Models;
+namespace LantanaGroup.Link.Shared.Application.Models.Terminology;
 
 /// <summary>
 /// The status of a code in the CodeSet

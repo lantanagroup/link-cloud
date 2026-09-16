@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMeasureEvalServiceClient, MeasureEvalServiceClient>();
         services.AddSingleton<IValidationServiceClient, ValidationServiceClient>();
         services.AddSingleton<ISubmissionServiceClient, SubmissionServiceClient>();
+        services.AddSingleton<ITerminologyServiceClient, TerminologyServiceClient>();
 
         return services;
     }

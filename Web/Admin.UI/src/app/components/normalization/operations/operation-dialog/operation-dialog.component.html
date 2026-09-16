@@ -6,8 +6,8 @@
   @if (operationType === OperationType.CopyProperty) {
     <app-copy-property  #copyPropertyForm [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-property>
   }
-  @if (operationType === OperationType.CodeMap) {
-    <app-code-map  #codeMap [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-code-map>
+  @if (operationType === OperationType.CodeMap || operationType === OperationType.HSLOCMap) {
+    <app-code-map  #codeMap [operationType]="operationType" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-code-map>
   }
   @if (operationType === OperationType.CopyLocation) {
     <app-copy-location  #copylocation [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location>

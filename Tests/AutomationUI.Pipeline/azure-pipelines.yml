@@ -719,72 +719,72 @@ stages:
           # -------------------------------------------------------------
           # Fetch Slack webhook from Azure App Configuration.
           # -------------------------------------------------------------
-          - task: AzureCLI@2
-            displayName: "Fetch Slack webhook from Azure App Configuration"
-            condition: and(always(), ne(variables.SKIP_RUN, 'true'))
-            continueOnError: true
-            inputs:
-              azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
-              scriptType: "pscore"
-              scriptLocation: "inlineScript"
-              inlineScript: |
-                $value = az appconfig kv show `
-                  --name  "$(APP_CONFIG_NAME)" `
-                  --key   "$(APP_CONFIG_SLACK_KEY)" `
-                  --label "$(APP_CONFIG_SLACK_LABEL)" `
-                  --query value -o tsv 2>&1
+          # - task: AzureCLI@2
+          #   displayName: "Fetch Slack webhook from Azure App Configuration"
+          #   condition: and(always(), ne(variables.SKIP_RUN, 'true'))
+          #   continueOnError: true
+          #   inputs:
+          #     azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
+          #     scriptType: "pscore"
+          #     scriptLocation: "inlineScript"
+          #     inlineScript: |
+          #       $value = az appconfig kv show `
+          #         --name  "$(APP_CONFIG_NAME)" `
+          #         --key   "$(APP_CONFIG_SLACK_KEY)" `
+          #         --label "$(APP_CONFIG_SLACK_LABEL)" `
+          #         --query value -o tsv 2>&1
 
-                $azExit = $LASTEXITCODE
+          #       $azExit = $LASTEXITCODE
 
-                if ($azExit -ne 0) {
-                  $azMessage = "$value"
-                  if ($azMessage -match "does not exist|not found") {
-                    Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
-                    Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
-                    exit 0
-                  }
+          #       if ($azExit -ne 0) {
+          #         $azMessage = "$value"
+          #         if ($azMessage -match "does not exist|not found") {
+          #           Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
+          #           Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
+          #           exit 0
+          #         }
 
-                  Write-Error "Failed to read Slack webhook from App Config (exit code: $azExit)."
-                  Write-Host "az output: $azMessage"
-                  exit 1
-                }
+          #         Write-Error "Failed to read Slack webhook from App Config (exit code: $azExit)."
+          #         Write-Host "az output: $azMessage"
+          #         exit 1
+          #       }
 
-                if (-not $value) {
-                  Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
-                  Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
-                  exit 0
-                }
+          #       if (-not $value) {
+          #         Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
+          #         Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
+          #         exit 0
+          #       }
 
-                # Sensitive App Config keys are stored as Key Vault references:
-                #   {"uri":"https://<vault>.vault.azure.net/secrets/<name>"}
-                # Interpolating that JSON into PowerShell as $(SLACK_WEBHOOK_URL)
-                # fails with Unexpected token 'uri'.
-                $trimmed = "$value".Trim()
-                if ($trimmed.StartsWith('{')) {
-                  $ref = $null
-                  try { $ref = $trimmed | ConvertFrom-Json } catch { }
-                  if (-not $ref -or -not $ref.uri) {
-                    Write-Error "Slack webhook App Config value looks like JSON but is not a Key Vault reference with a uri."
-                    exit 1
-                  }
+          #       # Sensitive App Config keys are stored as Key Vault references:
+          #       #   {"uri":"https://<vault>.vault.azure.net/secrets/<name>"}
+          #       # Interpolating that JSON into PowerShell as $(SLACK_WEBHOOK_URL)
+          #       # fails with Unexpected token 'uri'.
+          #       $trimmed = "$value".Trim()
+          #       if ($trimmed.StartsWith('{')) {
+          #         $ref = $null
+          #         try { $ref = $trimmed | ConvertFrom-Json } catch { }
+          #         if (-not $ref -or -not $ref.uri) {
+          #           Write-Error "Slack webhook App Config value looks like JSON but is not a Key Vault reference with a uri."
+          #           exit 1
+          #         }
 
-                  Write-Host "App Config value is a Key Vault reference; resolving secret."
-                  $secretOut = az keyvault secret show --id $ref.uri --query value -o tsv 2>&1
-                  if ($LASTEXITCODE -ne 0) {
-                    Write-Error "Failed to resolve Slack webhook from Key Vault. The '$(AZURE_SERVICE_CONNECTION)' service connection needs Get on that secret."
-                    Write-Host "az output: $secretOut"
-                    exit 1
-                  }
-                  $value = "$secretOut".Trim()
-                }
+          #         Write-Host "App Config value is a Key Vault reference; resolving secret."
+          #         $secretOut = az keyvault secret show --id $ref.uri --query value -o tsv 2>&1
+          #         if ($LASTEXITCODE -ne 0) {
+          #           Write-Error "Failed to resolve Slack webhook from Key Vault. The '$(AZURE_SERVICE_CONNECTION)' service connection needs Get on that secret."
+          #           Write-Host "az output: $secretOut"
+          #           exit 1
+          #         }
+          #         $value = "$secretOut".Trim()
+          #       }
 
-                if ($value -notmatch '^https://') {
-                  Write-Error "Slack webhook is not an https URL after resolution. Check App Config key '$(APP_CONFIG_SLACK_KEY)'."
-                  exit 1
-                }
+          #       if ($value -notmatch '^https://') {
+          #         Write-Error "Slack webhook is not an https URL after resolution. Check App Config key '$(APP_CONFIG_SLACK_KEY)'."
+          #         exit 1
+          #       }
 
-                Write-Host "Fetched Slack webhook from App Config."
-                Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL;issecret=true]$value"
+          #       Write-Host "Fetched Slack webhook from App Config."
+          #       Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL;issecret=true]$value"
 
           # -------------------------------------------------------------
           # Slack notification - consolidated multi-suite report.

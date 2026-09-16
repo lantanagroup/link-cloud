@@ -2,6 +2,7 @@ using LantanaGroup.Link.Normalization.Application.Models.FacilityLocationMapping
 using LantanaGroup.Link.Normalization.Controllers;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Models.Requests;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -22,7 +23,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetAll(true, 25, 2);
+        var result = await controller.GetAll(true, new PagingRequest { PageSize = 25, PageNumber = 2 });
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
@@ -51,7 +52,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetForFacility("facility-1", false, 10, 1);
+        var result = await controller.GetForFacility("facility-1", false, new PagingRequest());
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
@@ -67,7 +68,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetForLocation("facility-1", "location-1", true, 10, 1);
+        var result = await controller.GetForLocation("facility-1", "location-1", true, new PagingRequest());
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
@@ -81,7 +82,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>();
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetForLocation("facility-1", " ", null, 10, 1);
+        var result = await controller.GetForLocation("facility-1", " ", null, new PagingRequest());
 
         AssertProblem(result.Result!, HttpStatusCode.BadRequest);
         queries.Verify(query => query.Search(It.IsAny<FacilityLocationLocalCodeMappingSearchModel>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -96,7 +97,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
             .ReturnsAsync(CreatePage());
         var controller = CreateController(manager, queries);
 
-        var result = await controller.GetForLocalCode("facility-1", "local-code", true, 10, 1);
+        var result = await controller.GetForLocalCode("facility-1", "local-code", true, new PagingRequest());
 
         Assert.IsType<OkObjectResult>(result.Result);
         queries.Verify(query => query.Search(It.Is<FacilityLocationLocalCodeMappingSearchModel>(model =>
@@ -113,7 +114,7 @@ public class FacilityLocationLocalCodeMappingsControllerTests
         var controller = CreateController(manager, queries);
         var hslocId = Guid.NewGuid();
 
-        var result = await controller.Search(new FacilityLocationLocalCodeMappingSearchModel
+        var result = await controller.Search(new FacilityLocationLocalCodeMappingSearchRequest
         {
             FacilityId = "facility-1",
             LocationId = "location-1",

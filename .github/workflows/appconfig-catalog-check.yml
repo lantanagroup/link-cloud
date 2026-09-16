@@ -1,14 +1,26 @@
 name: "App Config Catalog Check"
 
-# Verifies app-config.yaml describes reality: every key marked required: true has a row in
-# every environment store, no store row carries a label no service selects, and the Serilog
-# sink index the catalog depends on is still pinned.
+# Verifies app-config.yaml is internally sound: it conforms to the JSON Schema embedded in
+# itself, and the rules deciding whether a catalog key is satisfied by a store row still hold.
 #
-# LEGLINK-775 will make a pipeline import Config/app-config.*.json into the stores, at which
-# point a missing required key becomes a deployment defect rather than a documentation one.
+# It does NOT check the catalog against the environment stores. That comparison needs the
+# per-environment exports, which live in the private link-cac repository (LEGLINK-912), and
+# this repository is public in both directions that matter:
 #
-# Runs on every PR rather than filtering on paths, so it stays valid as a required status
-# check. A path filter would leave PRs that touch nothing here reporting no status at all.
+#   * Actions logs here are world-readable. check_required_config.py reports store rows that
+#     are absent from the catalog, and the labels those rows carry - private key names, even
+#     though it never prints a value.
+#   * A read token for link-cac sitting in this repository's secrets can be read by anyone with
+#     write access here, via a workflow change on a same-repo pull request.
+#
+# So link-cac is never read from here. It runs the required-key check itself, against a public
+# checkout of this repository, on every pull request there plus daily - see
+# .github/workflows/appconfig-checks.yml in that repository. The daily run is what catches a
+# key marked required: true merged here with no rows added there.
+#
+# Runs on every PR rather than filtering on paths, so it can be made a required status check
+# without further change. It is not one today. A path filter would leave PRs that touch nothing
+# here reporting no status at all, which is what makes such a check unusable.
 on:
   pull_request:
     branches:
@@ -26,14 +38,14 @@ on:
     branches:
       - dev
 
-# This job only reads the repository: checkout, install PyYAML, then run the catalog checks.
-# Nothing is written back, so the token needs no more than read access.
+# This job only reads this repository: checkout, install PyYAML, then run the catalog checks.
+# Nothing is written back and nothing else is read, so the token needs no more than read access.
 permissions:
   contents: read
 
 jobs:
   check:
-    name: Validate catalog and required keys
+    name: Validate catalog schema and rules
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -44,7 +56,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # validate_aac_secrets.py is stdlib-only; these two need a YAML parser.
       - name: Install dependencies
         run: pip install "pyyaml==6.0.*"
 
@@ -53,13 +64,3 @@ jobs:
 
       - name: Validate catalog schema
         run: python Scripts/AzureAppConfig/validate_app_config_schema.py
-
-      # Enforcing. The gaps this was advisory for are closed: the three required keys now have
-      # rows in every environment file and the orphaned "Automation" label is gone.
-      #
-      # A failure here means app-config.yaml and Config/app-config.*.json have drifted - most
-      # often a key marked required: true in the catalog with no row added to each environment
-      # file. Fix it in the same PR: either add the row, or set required: false and record the
-      # shipped default in defaultValue.
-      - name: Check required keys are provisioned
-        run: python Scripts/AzureAppConfig/check_required_config.py

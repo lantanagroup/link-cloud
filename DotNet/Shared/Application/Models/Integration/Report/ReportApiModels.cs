@@ -145,9 +145,15 @@ public class CodeMapOutcomeApiModel
 
     /// <summary>
     /// The distinct source codes that had no entry in the map -- what an operator would go and configure.
-    /// Capped; <see cref="UnmappedCount"/> is the true total.
     /// </summary>
     public List<string> UnmappedCodes { get; set; } = [];
+    public List<CodeMappingApiModel> MappedCodes { get; set; } = [];
+}
+
+public class CodeMappingApiModel
+{
+    public string SourceCode { get; set; } = string.Empty;
+    public string TargetCode { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -217,7 +223,8 @@ public enum SubmissionStatus
     Submitting,
     Submitted,
     FailedSubmission,
-    NotEligable
+    NotEligable,
+    NotSubmitted
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
