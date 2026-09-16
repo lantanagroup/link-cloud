@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                     $"The host application must register an {nameof(IFacilityTimeZoneSource)} before calling " +
                     $"{nameof(AddDmrpModule)}. " +
                     $"The module needs to know the timezone of a facility to resolve its reporting period, " + 
-                    " which is the month the facility is in by its own timezone, not UTC.");
+                    "which is the month the facility is in by its own timezone, not UTC.");
             }
 
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what

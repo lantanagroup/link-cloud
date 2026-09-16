@@ -963,6 +963,40 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithRefreshButNoWindow_SyncsTheLocalMonthAndReadsEveryPeriod()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        GivenFacilityTimeZone("Pacific/Majuro");
+        _clock.SetUtcNow(MajuroInNovember);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: null, isReporting: null,
+            refresh: true, cancellationToken: CancellationToken.None);
+
+        // The refresh still needs the current period, so it is resolved - in the facility's timezone. With
+        // no window nothing is projected from it: the answer is every period on record, October included.
+        Assert.Equal((FacilityId, 11, 2026), Assert.Single(_sync.Calls));
+        Assert.Equal([(2026, 10), (2026, 11)], PeriodsOf(result));
+    }
+
+    [Fact]
+    public void Constructor_RefusesAMissingPeriodResolver()
+    {
+        var sp = _scope.ServiceProvider;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => new FacilityReportingPlansController(
+            sp.GetRequiredService<ILogger<FacilityReportingPlansController>>(),
+            sp.GetRequiredService<IFacilityReportingPlanManager>(),
+            sp.GetRequiredService<IFacilityReportingPlanQueries>(),
+            sp.GetRequiredService<IFacilityReportingPlanLookAhead>(),
+            _sync,
+            _fixture.FacilityExistenceMock.Object,
+            null!));
+
+        Assert.Equal("facilityReportingPeriodResolver", exception.ParamName);
+    }
+
+    [Fact]
     public async Task GetFacilityReportingPlansForFacility_WithRefreshAndNoPeriod_SyncsTheFacilitysLocalMonth()
     {
         GivenFacilityTimeZone("Pacific/Pago_Pago");

@@ -422,6 +422,17 @@ namespace UnitTests.DMRP
             _planManager.VerifyNoOtherCalls();
         }
 
+        [Fact]
+        public void Constructor_refuses_a_missing_period_resolver()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() =>
+                new DmrpFacilityOperations(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object,
+                    new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance),
+                    _planManager.Object, _planRepository.Object, null!));
+
+            Assert.Equal("facilityReportingPeriodResolver", exception.ParamName);
+        }
+
         private sealed class FixedTimeProvider : TimeProvider
         {
             private readonly DateTimeOffset _utcNow;
