@@ -140,21 +140,20 @@ public sealed class HslocMappingRunValidator
         var runTag = FhirGenerationPipeline.TryInferRunTag(generatedPatientIds ?? []);
         if (!string.IsNullOrWhiteSpace(runTag))
         {
-            if (identifierMapped.Count == 0)
+            var ids = new FhirBundleGenerator.SharedIds(runTag);
+            var icuHsloc = HslocMappingDefaults.RoleCodeToHsloc["ICU"].Code;
+            var icuIdentifierMapped = mappings.Any(m =>
+                string.Equals(m.LocationId, ids.IcuLocation, StringComparison.Ordinal)
+                && string.Equals(m.LocalCodeSystem, HslocMappingDefaults.IdentifierSystem, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(m.LocalCode, ids.IcuLocation, StringComparison.Ordinal)
+                && m.HSLOCId.HasValue
+                && string.Equals(m.HSLOCCode, icuHsloc, StringComparison.OrdinalIgnoreCase));
+            if (!icuIdentifierMapped)
             {
                 AddError(errors,
-                    "No mapped identifier row was written. Proof of HSLOCMap is LocalCodeSystem=" +
-                    $"{HslocMappingDefaults.IdentifierSystem} with HSLOCId set; a pre-stamped HSLOC type coding is not enough.");
-            }
-            else
-            {
-                var expectedCodes = HslocMappingDefaults.RoleCodeToHsloc.Values.Select(v => v.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (identifierMapped.All(m => !expectedCodes.Contains(m.HSLOCCode ?? string.Empty)))
-                {
-                    AddError(errors,
-                        "Mapped identifier rows did not use the CodeSystemMap target HSLOC codes " +
-                        $"(found {string.Join(", ", identifierMapped.Select(m => m.HSLOCCode).Distinct())}).");
-                }
+                    $"No mapped identifier row for ICU Location '{ids.IcuLocation}' " +
+                    $"(LocalCodeSystem={HslocMappingDefaults.IdentifierSystem}, LocalCode={ids.IcuLocation}, HSLOCCode={icuHsloc}). " +
+                    "A hospital-only or pre-stamped HSLOC type coding is not enough.");
             }
         }
         else if (identifierMapped.Count == 0 && roleMapped.Count == 0)

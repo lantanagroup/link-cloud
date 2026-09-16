@@ -17,6 +17,6 @@ public static class HslocMappingDefaults
             ["ER"] = ("1108-0", "Emergency Department"),
             ["HU"] = ("1093-4", "Step Down Unit"),
             ["HOSP"] = ("1060-3", "Medical Ward"),
-            ["OF"] = ("1160-1", "Outpatient Clinic")
+            ["OF"] = ("1160-1", "Urgent Care Center")
         };
 }

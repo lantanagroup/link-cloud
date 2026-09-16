@@ -22,24 +22,9 @@ public static class HslocAutomationMaps
             }
         };
 
-        var runTag = FhirGenerationPipeline.TryInferRunTag(generatedPatientIds ?? []);
-        if (!string.IsNullOrWhiteSpace(runTag))
-        {
-            var ids = new FhirBundleGenerator.SharedIds(runTag);
-            maps.Add(new NormalizationCodeSystemMap
-            {
-                SourceSystem = HslocMappingDefaults.IdentifierSystem,
-                TargetSystem = MappingTargetSystems.HslocUrl,
-                CodeMaps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal)
-                {
-                    [ids.IcuLocation] = Entry("ICU"),
-                    [ids.EdLocation] = Entry("ER"),
-                    [ids.StepDownLocation] = Entry("HU"),
-                    [ids.HospitalLocation] = Entry("HOSP"),
-                    [ids.OutpatientLocation] = Entry("OF")
-                }
-            });
-        }
+        var identifierMap = BuildIdentifierCodeSystemMap(generatedPatientIds);
+        if (identifierMap != null)
+            maps.Add(identifierMap);
 
         return maps;
     }
@@ -56,22 +41,48 @@ public static class HslocAutomationMaps
             merged.Add(Clone(map));
         }
 
-        foreach (var generated in BuildCodeSystemMaps(generatedPatientIds))
-        {
-            var match = merged.FirstOrDefault(m =>
-                string.Equals(m.SourceSystem, generated.SourceSystem, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(m.TargetSystem, generated.TargetSystem, StringComparison.OrdinalIgnoreCase));
-            if (match == null)
-            {
-                merged.Add(generated);
-                continue;
-            }
+        var identifierMap = BuildIdentifierCodeSystemMap(generatedPatientIds);
+        if (identifierMap == null)
+            return merged;
 
-            foreach (var (code, entry) in generated.CodeMaps)
+        var match = merged.FirstOrDefault(m =>
+            string.Equals(m.SourceSystem, identifierMap.SourceSystem, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(m.TargetSystem, identifierMap.TargetSystem, StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+        {
+            merged.Add(identifierMap);
+            return merged;
+        }
+
+        foreach (var (code, entry) in identifierMap.CodeMaps)
+        {
+            if (!match.CodeMaps.ContainsKey(code))
                 match.CodeMaps[code] = entry;
         }
 
         return merged;
+    }
+
+    private static NormalizationCodeSystemMap? BuildIdentifierCodeSystemMap(IReadOnlyList<string>? generatedPatientIds)
+    {
+        var runTag = FhirGenerationPipeline.TryInferRunTag(generatedPatientIds ?? []);
+        if (string.IsNullOrWhiteSpace(runTag))
+            return null;
+
+        var ids = new FhirBundleGenerator.SharedIds(runTag);
+        return new NormalizationCodeSystemMap
+        {
+            SourceSystem = HslocMappingDefaults.IdentifierSystem,
+            TargetSystem = MappingTargetSystems.HslocUrl,
+            CodeMaps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal)
+            {
+                [ids.IcuLocation] = Entry("ICU"),
+                [ids.EdLocation] = Entry("ER"),
+                [ids.StepDownLocation] = Entry("HU"),
+                [ids.HospitalLocation] = Entry("HOSP"),
+                [ids.OutpatientLocation] = Entry("OF")
+            }
+        };
     }
 
     private static NormalizationCodeMapEntry Entry(string roleCode)

@@ -166,12 +166,11 @@ public sealed class NormalizationSuiteSeedService : IHostedService
         {
             Id = SeqDefaultLocationId,
             Name = "Default Location Normalization",
-            Description = "Applies CopyLocation, CopyProperty, and HSLOCMap operations to Location resources.",
+            Description = "Applies CopyLocation and HSLOCMap operations to Location resources. HSLOCMap copies identifiers and aliases onto type before mapping, so the old CopyProperty overwrite is not in this sequence.",
             Entries =
             [
                 new NormalizationSequenceEntry { OperationId = OpCopyLocationId, Sequence = 1 },
-                new NormalizationSequenceEntry { OperationId = OpCopyIdentifierToTypeId, Sequence = 2 },
-                new NormalizationSequenceEntry { OperationId = OpHslocMapId, Sequence = 3 }
+                new NormalizationSequenceEntry { OperationId = OpHslocMapId, Sequence = 2 }
             ],
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow

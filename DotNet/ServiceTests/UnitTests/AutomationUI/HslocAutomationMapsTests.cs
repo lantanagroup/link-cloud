@@ -1,3 +1,4 @@
+using Automation.UI.Models;
 using Automation.UI.Services;
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -40,5 +41,44 @@ public class HslocAutomationMapsTests
         merged.Should().Contain(m =>
             m.SourceSystem == HslocMappingDefaults.IdentifierSystem
             && m.CodeMaps.ContainsKey("abcd1234-Loc-ED"));
+    }
+
+    [Fact]
+    public void Merge_DoesNotOverwriteConfiguredRoleCodeMaps()
+    {
+        var existing = new List<NormalizationCodeSystemMap>
+        {
+            new()
+            {
+                SourceSystem = HslocMappingDefaults.RoleCodeSystem,
+                TargetSystem = MappingTargetSystems.HslocUrl,
+                CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "9999-9", Display = "Custom ICU" } }
+            }
+        };
+
+        var merged = HslocAutomationMaps.Merge(existing, ["Patient-abcd1234-001"]);
+
+        merged.Should().ContainSingle(m => m.SourceSystem == HslocMappingDefaults.RoleCodeSystem)
+            .Which.CodeMaps["ICU"].Code.Should().Be("9999-9");
+        merged.Should().Contain(m => m.SourceSystem == HslocMappingDefaults.IdentifierSystem);
+    }
+
+    [Fact]
+    public void Merge_DoesNotOverwriteConfiguredIdentifierKeys()
+    {
+        var existing = new List<NormalizationCodeSystemMap>
+        {
+            new()
+            {
+                SourceSystem = HslocMappingDefaults.IdentifierSystem,
+                TargetSystem = MappingTargetSystems.HslocUrl,
+                CodeMaps = { ["abcd1234-Loc-ICU"] = new NormalizationCodeMapEntry { Code = "1108-0", Display = "Emergency Department" } }
+            }
+        };
+
+        var merged = HslocAutomationMaps.Merge(existing, ["Patient-abcd1234-001"]);
+        var identifier = merged.Single(m => m.SourceSystem == HslocMappingDefaults.IdentifierSystem);
+        identifier.CodeMaps["abcd1234-Loc-ICU"].Code.Should().Be("1108-0");
+        identifier.CodeMaps["abcd1234-Loc-Hospital"].Code.Should().Be("1060-3");
     }
 }

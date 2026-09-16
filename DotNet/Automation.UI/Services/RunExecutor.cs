@@ -940,7 +940,7 @@ internal sealed class RunExecutor
                 string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
             await RunValidator("HSLOC MAPPING RUN VALIDATION", () =>
-                hslocMappingRunValidator.ValidateAllAsync(facilityId, hslocMapEnabled, patientIds));
+                hslocMappingRunValidator.ValidateAllAsync(facilityId, hslocMapEnabled, patientIds, cancellationToken));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));
