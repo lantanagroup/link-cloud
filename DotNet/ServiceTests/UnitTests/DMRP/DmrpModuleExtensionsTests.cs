@@ -155,6 +155,32 @@ namespace UnitTests.DMRP
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
 
+        [Fact]
+        public void AddDmrpModule_registers_the_reporting_period_resolver()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            var registration = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(IFacilityReportingPeriodResolver));
+            Assert.Equal(typeof(FacilityReportingPeriodResolver), registration.ImplementationType);
+        }
+
+        /// <summary>
+        /// Where a facility is lives in the host's records, which the module cannot see. Like the
+        /// existence check, the host supplies it.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_registers_no_time_zone_source_of_its_own()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityTimeZoneSource));
+        }
+
         /// <summary>
         /// The module decorates whatever the host registered, so it has to be registered first.
         /// Getting that order wrong is otherwise invisible: RemoveAll finds nothing to remove, the
@@ -249,6 +275,7 @@ namespace UnitTests.DMRP
             builder.Services.AddScoped(_ => Mock.Of<IEntityRepository<MeasureMapping>>());
             builder.Services.AddScoped(_ => Mock.Of<IEntityRepository<FacilityReportingPlan>>());
             builder.Services.AddScoped(_ => Mock.Of<IFacilityExistence>());
+            builder.Services.AddScoped(_ => Mock.Of<IFacilityTimeZoneSource>());
 
             return builder.Services.BuildServiceProvider();
         }

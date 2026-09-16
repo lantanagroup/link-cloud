@@ -31,13 +31,17 @@ namespace UnitTests.DMRP
         private readonly Mock<IReportingPlanSource> _plans = new();
         private readonly Mock<IFacilityReportingPlanManager> _planManager = new();
         private readonly Mock<IEntityRepository<FacilityReportingPlan>> _planRepository = new();
+        private readonly Mock<IFacilityTimeZoneSource> _timeZoneSource = new();
 
         private DmrpFacilityOperations CreateOperations() =>
-            // The real projector rather than a mock: these tests assert on the schedule that comes
-            // out, and that derivation is exactly what moved behind the seam.
+            // The real projector and period resolver rather than mocks: these tests assert on the
+            // schedule that comes out and the period it was read for, and both derivations are
+            // exactly what moved behind their seams.
             new(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object,
                 new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance),
-                _planManager.Object, _planRepository.Object, new FixedTimeProvider(FixedNow));
+                _planManager.Object, _planRepository.Object,
+                new FacilityReportingPeriodResolver(NullLogger<FacilityReportingPeriodResolver>.Instance,
+                    new FixedTimeProvider(FixedNow), _timeZoneSource.Object));
 
         private void GivenPlan(params ReportingPlanEntry[] entries) =>
             _plans.Setup(p => p.GetForPeriodAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
@@ -194,6 +198,36 @@ namespace UnitTests.DMRP
 
             _plans.Verify(p => p.GetForPeriodAsync(FacilityId, 6, 2026, It.IsAny<CancellationToken>()), Times.Once);
             _inner.Verify(i => i.CreateAsync(It.IsAny<FacilityModel>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        /// <summary>
+        /// A facility that moves timezone in the same save is scheduled against the period of the zone
+        /// it is moving to, not the one on record.
+        /// </summary>
+        [Fact]
+        public async Task Update_reads_the_period_in_the_timezone_being_saved()
+        {
+            GivenPlan();
+
+            // FixedNow is 1 June 02:30 UTC: still June on record in UTC, already back in May in Chicago.
+            await CreateOperations().UpdateAsync(Facility(timeZone: "UTC"), Facility(timeZone: "America/Chicago"));
+
+            _plans.Verify(p => p.GetForPeriodAsync(FacilityId, 5, 2026, It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        /// <summary>
+        /// The write path already holds the timezone being saved, so it never asks the host for the
+        /// stored one - which, on a create, does not exist yet.
+        /// </summary>
+        [Fact]
+        public async Task Never_asks_the_host_for_the_facilitys_timezone()
+        {
+            GivenPlan();
+
+            await CreateOperations().CreateAsync(Facility(timeZone: "America/Chicago"));
+            await CreateOperations().UpdateAsync(Facility(timeZone: "UTC"), Facility(timeZone: "America/Chicago"));
+
+            _timeZoneSource.VerifyNoOtherCalls();
         }
 
         [Theory]
