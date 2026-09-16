@@ -1,0 +1,307 @@
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Task = System.Threading.Tasks.Task;
+
+namespace UnitTests.Normalization;
+
+[Trait("Category", "UnitTests")]
+public class HSLOCMapOperationServiceTests
+{
+    private readonly Mock<ILogger<HSLOCMapOperationService>> _logger = new();
+    private readonly HSLOCMapOperationService _service;
+
+    public HSLOCMapOperationServiceTests()
+    {
+        _service = new HSLOCMapOperationService(_logger.Object,
+            new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()));
+    }
+
+    [Fact]
+    public async Task ReportsEveryTypeCodeWhenNoMapsAreConfigured()
+    {
+        var location = new Location
+        {
+            Type = [new CodeableConcept("urn:local", "existing"), new CodeableConcept(null, "no-system")],
+            Identifier = [new Identifier("urn:identifier", "123")],
+            Alias = ["ICU"]
+        };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.NotNull(result.CodeMapping);
+        Assert.Equal(4, result.CodeMapping.Count);
+        Assert.All(result.CodeMapping, outcome =>
+        {
+            Assert.Equal(0, outcome.MappedCount);
+            Assert.Equal(1, outcome.UnmappedCount);
+            Assert.Single(outcome.UnmappedCodes);
+            Assert.Empty(outcome.TargetSystem);
+        });
+        Assert.Equal(new[] { "123", "ICU", "existing", "no-system" },
+            result.CodeMapping.SelectMany(outcome => outcome.UnmappedCodes).OrderBy(code => code, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReportsConfiguredAndUnconfiguredCodesTogether()
+    {
+        var location = new Location
+        {
+            Type =
+            [
+                new CodeableConcept("urn:local", "mapped"),
+                new CodeableConcept("urn:local", "missing"),
+                new CodeableConcept("urn:other", "other"),
+                new CodeableConcept("urn:other", "other")
+            ]
+        };
+        var operation = new HSLOCMapOperation(
+        [
+            new CodeSystemMap("urn:local", "urn:hsloc",
+                new Dictionary<string, CodeMap> { ["mapped"] = new("1027-4", "Medical critical care") })
+        ]);
+
+        var result = await _service.ProcessOperationAsync(operation, location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.NotNull(result.CodeMapping);
+        Assert.Equal(2, result.CodeMapping.Count);
+        var configured = Assert.Single(result.CodeMapping, outcome => outcome.SourceSystem == "urn:local");
+        Assert.Equal(1, configured.MappedCount);
+        Assert.Equal("mapped", Assert.Single(configured.MappedCodes!).SourceCode);
+        Assert.Equal("missing", Assert.Single(configured.UnmappedCodes));
+        var unconfigured = Assert.Single(result.CodeMapping, outcome => outcome.SourceSystem == "urn:other");
+        Assert.Equal(2, unconfigured.UnmappedCount);
+        Assert.Equal("other", Assert.Single(unconfigured.UnmappedCodes));
+        AssertCode(location, "urn:hsloc", "1027-4");
+    }
+
+    [Fact]
+    public async Task CopiesIdentifiersAndAliasesToType()
+    {
+        var location = new Location
+        {
+            Identifier = [new Identifier("urn:local", "123")],
+            Alias = [" ICU ", "Stepdown", " ", ""]
+        };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Same(location, result.Resource);
+        AssertCode(location, "urn:local", "123");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU");
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Stepdown");
+        Assert.Equal(3, location.Type.Count);
+    }
+
+    [Fact]
+    public async Task CopiesFullCommaSeparatedAlias()
+    {
+        var location = new Location { Alias = [" ICU, Stepdown "] };
+
+        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Single(location.Type);
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU, Stepdown");
+    }
+
+    [Fact]
+    public async Task ExistingCodingsAreNotDuplicated()
+    {
+        var location = new Location
+        {
+            Alias = ["ICU", " ICU "],
+            Identifier = [new Identifier("urn:local", "123"), new Identifier("urn:other", "123")],
+            Type =
+            [
+                new CodeableConcept(MappingTargetSystems.LocationAliasCodeSystem, "ICU"),
+                new CodeableConcept("urn:local", "123")
+            ]
+        };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Equal(3, location.Type.Count);
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "ICU");
+        AssertCode(location, "urn:local", "123");
+        AssertCode(location, "urn:other", "123");
+
+        var repeatedResult = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location);
+
+        Assert.Equal(OperationStatus.NoAction, repeatedResult.SuccessCode);
+        Assert.Equal(3, location.Type.Count);
+    }
+
+    [Theory]
+    [InlineData("parent")]
+    [InlineData("Location/parent")]
+    public async Task CopiesAncestorAliasesToOriginalLocationWithoutModifyingAncestors(string reference)
+    {
+        var child = new Location { Id = "child", Alias = ["Child"], PartOf = new ResourceReference(reference) };
+        var parent = new Location { Id = "parent", Alias = ["Parent"], PartOf = new ResourceReference("Location/grandparent") };
+        var grandparent = new Location { Id = "grandparent", Alias = ["Grandparent", "Child"] };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), child, [parent, grandparent]);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Same(child, result.Resource);
+        Assert.Equal(3, child.Type.Count);
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Child");
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Parent");
+        AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Grandparent");
+        Assert.Empty(parent.Type);
+        Assert.Empty(grandparent.Type);
+    }
+
+    [Fact]
+    public async Task MissingParentStillCopiesAliasAndLogsWarning()
+    {
+        var location = new Location { Id = "child", Alias = ["Child"], PartOf = new ResourceReference("missing-parent") };
+
+        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location, []);
+
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Child");
+        VerifyWarning("Parent location with reference missing-parent not found");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task BlankParentReferenceStopsWithoutLookupOrWarning(string? reference)
+    {
+        var location = new Location { Id = "child", Alias = ["Child"], PartOf = new ResourceReference(reference) };
+        var unrelatedLocation = new Location { Id = reference, Alias = ["Unrelated"] };
+
+        await _service.ProcessOperationAsync(new HSLOCMapOperation([]), location, [unrelatedLocation]);
+
+        Assert.Single(location.Type);
+        AssertCode(location, MappingTargetSystems.LocationAliasCodeSystem, "Child");
+        _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(), It.IsAny<Exception>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CircularParentReferenceStopsAfterVisitingEachLocation(bool selfReference, bool hasValues)
+    {
+        var child = new Location { Id = "child", Alias = hasValues ? ["Child"] : [], PartOf = new ResourceReference(selfReference ? "child" : "parent") };
+        var parent = new Location { Id = "parent", Alias = hasValues ? ["Parent"] : [], PartOf = new ResourceReference("child") };
+
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), child, [child, parent]);
+
+        Assert.Equal(hasValues ? OperationStatus.Success : OperationStatus.NoAction, result.SuccessCode);
+        Assert.Equal(hasValues ? (selfReference ? 1 : 2) : 0, child.Type.Count);
+        if (hasValues)
+        {
+            AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Child");
+            if (!selfReference)
+                AssertCode(child, MappingTargetSystems.LocationAliasCodeSystem, "Parent");
+        }
+        Assert.Empty(parent.Type);
+        VerifyWarning("Circular location hierarchy detected");
+    }
+
+    [Fact]
+    public async Task TraversalCopiesAndMapsEntireLongAcyclicChain()
+    {
+        const int chainLength = 64;
+        var locations = Enumerable.Range(0, chainLength)
+            .Select(index => new Location
+            {
+                Id = $"location-{index}",
+                Alias = [$"Alias-{index}"],
+                PartOf = index < chainLength - 1 ? new ResourceReference($"location-{index + 1}") : null
+            }).ToList();
+        var operation = new HSLOCMapOperation(
+        [
+            new CodeSystemMap(MappingTargetSystems.LocationAliasCodeSystem, "urn:hsloc",
+                new Dictionary<string, CodeMap> { [$"Alias-{chainLength - 1}"] = new("1027-4", "Medical critical care") })
+        ]);
+
+        var result = await _service.ProcessOperationAsync(operation, locations[0], locations.Cast<DomainResource>().ToList());
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Equal(chainLength, locations[0].Type.Count);
+        foreach (var index in Enumerable.Range(0, chainLength - 1))
+            AssertCode(locations[0], MappingTargetSystems.LocationAliasCodeSystem, $"Alias-{index}");
+        AssertCode(locations[0], "urn:hsloc", "1027-4");
+        Assert.All(locations.Skip(1), location => Assert.Empty(location.Type));
+        _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(), It.IsAny<Exception>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Never());
+    }
+
+    [Fact]
+    public async Task MapsCopiedIdentifierAndAncestorAlias()
+    {
+        var child = new Location { Identifier = [new Identifier("urn:local", "123")], PartOf = new ResourceReference("parent") };
+        var parent = new Location { Id = "parent", Alias = ["ICU"] };
+        var operation = new HSLOCMapOperation(
+        [
+            new CodeSystemMap("urn:local", "urn:hsloc", new Dictionary<string, CodeMap> { ["123"] = new("1027-4", "Medical critical care") }),
+            new CodeSystemMap(MappingTargetSystems.LocationAliasCodeSystem, "urn:hsloc", new Dictionary<string, CodeMap> { ["ICU"] = new("1027-4", "Medical critical care") })
+        ]);
+
+        var result = await _service.ProcessOperationAsync(operation, child, [parent]);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Equal(2, child.Type.Count);
+        Assert.All(child.Type.SelectMany(concept => concept.Coding), coding =>
+        {
+            Assert.Equal("urn:hsloc", coding.System);
+            Assert.Equal("1027-4", coding.Code);
+            Assert.Equal("Medical critical care", coding.Display);
+        });
+        Assert.NotNull(result.CodeMapping);
+        Assert.Empty(parent.Type);
+    }
+
+    [Fact]
+    public async Task NonLocationResourceReturnsFailure()
+    {
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), new Patient());
+
+        Assert.Equal(OperationStatus.Failure, result.SuccessCode);
+        Assert.Contains("Resource must be a Location", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task NullResourceReturnsFailure()
+    {
+        var result = await _service.ProcessOperationAsync(new HSLOCMapOperation([]), null!);
+
+        Assert.Equal(OperationStatus.Failure, result.SuccessCode);
+    }
+
+    [Fact]
+    public async Task NullOperationReturnsFailure()
+    {
+        var result = await _service.ProcessOperationAsync(null!, new Location());
+
+        Assert.Equal(OperationStatus.Failure, result.SuccessCode);
+    }
+
+    private static void AssertCode(Location location, string system, string code)
+    {
+        Assert.Single(location.Type.SelectMany(concept => concept.Coding), coding => coding.System == system && coding.Code == code);
+    }
+
+    private void VerifyWarning(string message)
+    {
+        _logger.Verify(logger => logger.Log(LogLevel.Warning, It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((value, _) => value.ToString()!.Contains(message)),
+            It.IsAny<Exception>(), It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once());
+    }
+}

@@ -12,6 +12,7 @@ namespace LantanaGroup.Link.Normalization.Engine;
 public sealed class NormalizationEngine(
     CopyPropertyOperationService copyProperty,
     CodeMapOperationService codeMap,
+    HSLOCMapOperationService hslocMap,
     ConditionalTransformOperationService conditionalTransform,
     CopyLocationOperationService copyLocation,
     RemoveExtensionsOperationService removeExtensions,
@@ -71,6 +72,8 @@ public sealed class NormalizationEngine(
                 await copyProperty.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
             OperationType.CodeMap =>
                 await codeMap.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
+            OperationType.HSLOCMap =>
+                await hslocMap.ProcessOperationAsync((HSLOCMapOperation)operation, resource, supportingResources, cancellationToken),
             OperationType.ConditionalTransform =>
                 await conditionalTransform.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
             OperationType.CopyLocation =>

@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.Domain;
 
@@ -23,12 +24,6 @@ namespace LantanaGroup.Link.Report.Domain;
 /// </remarks>
 public static class CodeMapIndicator
 {
-    /// <summary>
-    /// Maximum distinct unmapped codes retained per (source, target) pair, matching the cap Normalization
-    /// applies per message. Re-applied to the totals because combining capped lists can otherwise exceed it.
-    /// </summary>
-    private const int MaxUnmappedCodeSamples = 20;
-
     /// <summary>
     /// Records one pass's outcomes against what earlier passes stored, returning the details to store.
     /// </summary>
@@ -84,7 +79,8 @@ public static class CodeMapIndicator
                 entry.Value.MappedCount,
                 entry.Value.UnmappedCount,
                 entry.Value.FailureCount,
-                entry.Value.UnmappedCodes.ToList()))
+                entry.Value.UnmappedCodes.ToList(),
+                entry.Value.MappedCodes.ToList()))
             .ToList();
     }
 
@@ -188,12 +184,12 @@ public static class CodeMapIndicator
 
             foreach (var code in outcome.UnmappedCodes)
             {
-                if (tally.UnmappedCodes.Count >= MaxUnmappedCodeSamples)
-                {
-                    break;
-                }
-
                 tally.UnmappedCodes.Add(code);
+            }
+
+            foreach (var mapping in outcome.MappedCodes ?? [])
+            {
+                tally.MappedCodes.Add(mapping);
             }
         }
     }
@@ -204,5 +200,6 @@ public static class CodeMapIndicator
         public int UnmappedCount { get; set; }
         public int FailureCount { get; set; }
         public HashSet<string> UnmappedCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<CodeMapping> MappedCodes { get; } = [];
     }
 }

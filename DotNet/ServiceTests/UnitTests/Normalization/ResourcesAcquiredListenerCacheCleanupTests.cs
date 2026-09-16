@@ -3,6 +3,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -128,6 +129,8 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             Mock.Of<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
+            new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
+                new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>())),
             new ConditionalTransformOperationService(Mock.Of<ILogger<ConditionalTransformOperationService>>()),
             new CopyLocationOperationService(Mock.Of<ILogger<CopyLocationOperationService>>()),
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
