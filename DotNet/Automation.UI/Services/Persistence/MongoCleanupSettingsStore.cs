@@ -87,21 +87,31 @@ public sealed class MongoCleanupSettingsStore(
         return defaults;
     }
 
-    public async Task SaveAsync(LeftoverRunCleanupSettings settings, CancellationToken cancellationToken = default)
+    public Task SaveAsync(LeftoverRunCleanupSettings settings, CancellationToken cancellationToken = default)
     {
-        var existing = await _collection.Find(d => d.Id == DefaultId).FirstOrDefaultAsync(cancellationToken);
         var doc = ToDocument(settings);
-        doc.LastDailyTeardownAt = existing?.LastDailyTeardownAt;
-        doc.LastDailyTeardownResult = existing?.LastDailyTeardownResult;
-        doc.LastWeeklyPurgeAt = existing?.LastWeeklyPurgeAt;
-        doc.LastWeeklyPurgeResult = existing?.LastWeeklyPurgeResult;
-        doc.HasUserOverrides = true;
-        doc.UpdatedAt = DateTimeOffset.UtcNow;
+        var update = Builders<CleanupSettingsDocument>.Update
+            .SetOnInsert(d => d.Id, DefaultId)
+            .Set(d => d.Enabled, doc.Enabled)
+            .Set(d => d.QuiesceEnabled, doc.QuiesceEnabled)
+            .Set(d => d.QuiesceIntervalMinutes, doc.QuiesceIntervalMinutes)
+            .Set(d => d.QuiesceGraceMinutes, doc.QuiesceGraceMinutes)
+            .Set(d => d.TeardownRetentionDays, doc.TeardownRetentionDays)
+            .Set(d => d.AbortTtlDays, doc.AbortTtlDays)
+            .Set(d => d.MaxFacilitiesPerPass, doc.MaxFacilitiesPerPass)
+            .Set(d => d.DailyTeardownEnabled, doc.DailyTeardownEnabled)
+            .Set(d => d.DailyTeardownTimeUtc, doc.DailyTeardownTimeUtc)
+            .Set(d => d.WeeklyHistoryPurgeEnabled, doc.WeeklyHistoryPurgeEnabled)
+            .Set(d => d.WeeklyHistoryPurgeDay, doc.WeeklyHistoryPurgeDay)
+            .Set(d => d.WeeklyHistoryPurgeTimeUtc, doc.WeeklyHistoryPurgeTimeUtc)
+            .Set(d => d.CatchUpWindowHours, doc.CatchUpWindowHours)
+            .Set(d => d.HasUserOverrides, true)
+            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow);
 
-        await _collection.ReplaceOneAsync(
+        return _collection.UpdateOneAsync(
             d => d.Id == DefaultId,
-            doc,
-            new ReplaceOptions { IsUpsert = true },
+            update,
+            new UpdateOptions { IsUpsert = true },
             cancellationToken);
     }
 

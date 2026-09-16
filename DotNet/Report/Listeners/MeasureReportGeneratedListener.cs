@@ -173,7 +173,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (schedule == null)
             {
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "{Name}: Skipping MeasureReportGenerated; no scheduled report remains (ReportId = {ReportId}, FacilityId = {FacilityId}).",
                     Name, messageValue.ReportTrackingId, facilityId);
                 return;

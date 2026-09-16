@@ -126,6 +126,19 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
+    public void History_purge_excludes_active_runs_even_when_old()
+    {
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var activeId = Guid.NewGuid();
+        var active = Run(activeId, activeId.ToString(), AutomationRunStatus.Running, finishedAt: null);
+        active.CreatedAt = now.AddDays(-20);
+        active.StartedAt = now.AddDays(-20);
+
+        RunCleanupHelper.SelectHistoryPurgeRuns([active], now, TeardownRetention)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void Custom_range_selects_terminal_runs_in_utc_window()
     {
         var from = DateTimeOffset.Parse("2026-08-01T00:00:00Z");
@@ -190,6 +203,20 @@ public class RunCleanupHelperTests
                 Body = new FacilityModel { FacilityId = "gone", IsDeleted = true }
             },
             "gone");
+
+        RunCleanupHelper.EnsureTenantFacilityRemoved(
+            new LinkApiResponse<FacilityModel> { StatusCode = 204 },
+            "gone");
+    }
+
+    [Fact]
+    public void EnsureTenantFacilityRemoved_throws_when_tenant_forbids_the_get()
+    {
+        var act = () => RunCleanupHelper.EnsureTenantFacilityRemoved(
+            new LinkApiResponse<FacilityModel> { StatusCode = 403 },
+            "leftover");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*HTTP 403*");
     }
 
     [Fact]

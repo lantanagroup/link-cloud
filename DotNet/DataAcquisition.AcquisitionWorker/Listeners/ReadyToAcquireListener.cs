@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
@@ -57,9 +58,9 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         if (abortRegistry != null &&
             await abortRegistry.IsAbortedAsync(value.FacilityId, value.ReportTrackingId, cancellationToken))
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Skipping ReadyToAcquire for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}, LogId={LogId}.",
-                value.FacilityId, value.ReportTrackingId, value.LogId);
+                value.FacilityId.SanitizeForLog(), value.ReportTrackingId.SanitizeForLog(), value.LogId);
             return;
         }
 

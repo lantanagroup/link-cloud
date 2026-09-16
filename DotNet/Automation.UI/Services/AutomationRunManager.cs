@@ -5,6 +5,7 @@ using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -226,12 +227,13 @@ public class AutomationRunManager : IAutomationRunManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Zombie-run quiesce failed for {RunId} facility {FacilityId}.", runId, summary.FacilityId);
+            _logger.LogWarning(ex, "Zombie-run quiesce failed for {RunId} facility {FacilityId}.", runId, summary.FacilityId.SanitizeForLog());
+            throw;
         }
 
         _logger.LogInformation(
             "Cancelled zombie run {RunId}. Pipeline quiesced for facility {FacilityId}; resting data remains until teardown retention.",
-            runId, summary.FacilityId);
+            runId, summary.FacilityId.SanitizeForLog());
 
         return true;
     }
@@ -255,8 +257,11 @@ public class AutomationRunManager : IAutomationRunManager
             var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
             var censusClient = scope.ServiceProvider.GetRequiredService<ICensusServiceClient>();
             var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
-            var abortTtl = scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
-                           ?? TimeSpan.FromDays(14);
+            var settingsStore = scope.ServiceProvider.GetService<ICleanupSettingsStore>();
+            var abortTtl = settingsStore != null
+                ? (await settingsStore.GetEffectiveAsync(CancellationToken.None)).AbortTtl
+                : scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
+                  ?? TimeSpan.FromDays(14);
             var fhirDataLoader = state.FhirDataLoader
                 ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 

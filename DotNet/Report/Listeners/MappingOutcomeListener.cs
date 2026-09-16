@@ -239,10 +239,10 @@ public class MappingOutcomeListener : BackgroundService
 
         if (scheduleIds.Count == 0)
         {
-            if (unusable.Count > 0)
+            // Aborted schedules are skipped on purpose. An empty or unparsable list is malformed:
+            // committing would retire a message that recorded nothing.
+            if (trackingIds.Count == 0 || unusable.Count > 0)
             {
-                // Nothing left to write to. Committing here would retire a message that recorded nothing,
-                // which is the same outcome as the malformed ones the guard above rejects.
                 throw new DeadLetterException(
                     "MappingOutcomeEvaluated message carried no usable report tracking id");
             }

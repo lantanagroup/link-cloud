@@ -718,6 +718,7 @@ services:
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
       Redis__Password: ${REDIS_PASS}
+      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:

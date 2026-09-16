@@ -38,8 +38,8 @@ public static class PipelineAbortRegistryExtensions
             {
                 sp.GetRequiredService<ILoggerFactory>()
                     .CreateLogger("PipelineAbortRegistry")
-                    .LogWarning(ex, "Pipeline abort registry could not connect to Redis; abort flags will be process-local.");
-                return new InMemoryPipelineAbortRegistry();
+                    .LogError(ex, "Pipeline abort registry could not connect to Redis. Abort flags must be shared across services.");
+                throw;
             }
         });
 

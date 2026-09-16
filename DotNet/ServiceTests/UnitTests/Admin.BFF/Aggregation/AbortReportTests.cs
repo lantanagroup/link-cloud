@@ -161,6 +161,41 @@ public class AbortReportTests
     }
 
     [Fact]
+    public async Task Handle_InvalidId_Returns400()
+    {
+        var abort = new InMemoryPipelineAbortRegistry();
+        var handler = new MockHttpMessageHandler(_ => throw new InvalidOperationException("Downstream should not be called"));
+        var (report, da) = BuildServices(handler);
+        var result = await AbortReport.Handle(_loggerFactory, BuildHttpContext(), report, da, abort, "not-a-guid");
+
+        Assert.Equal(StatusCodes.Status400BadRequest, await ExecuteResultAsync(result));
+        Assert.False(await abort.IsAbortedAsync(null, "not-a-guid"));
+    }
+
+    [Fact]
+    public async Task Handle_SoftDeleteFailure_ClearsAbortFlag()
+    {
+        var abort = new InMemoryPipelineAbortRegistry();
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            if (request.Method == HttpMethod.Get && path.Contains($"api/schedules/{ReportId}"))
+                return OkJson("{\"status\":\"New\"}");
+            if (request.Method == HttpMethod.Post && path.Contains("cancel-by-filter"))
+                return Accepted();
+            if (request.Method == HttpMethod.Delete && path.Contains($"api/schedules/{ReportId}"))
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+            throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
+        });
+
+        var (report, da) = BuildServices(handler);
+        var result = await AbortReport.Handle(_loggerFactory, BuildHttpContext(), report, da, abort, ReportId);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, await ExecuteResultAsync(result));
+        Assert.False(await abort.IsAbortedAsync(null, ReportId));
+    }
+
+    [Fact]
     public async Task Handle_MissingReport_Returns404()
     {
         var abort = new InMemoryPipelineAbortRegistry();

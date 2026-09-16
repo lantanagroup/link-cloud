@@ -247,6 +247,25 @@ public class AcquisitionProcessingJob : IJob
                     .Select(r => r.Id)
                     .ToList();
 
+                var abortedRequestIds = new HashSet<long>();
+                if (abortRegistry != null)
+                {
+                    foreach (var request in requests)
+                    {
+                        if (await abortRegistry.IsAbortedAsync(facilityId, request.ReportTrackingId, cancellationToken))
+                            abortedRequestIds.Add(request.Id);
+                    }
+                }
+
+                if (abortedRequestIds.Count > 0)
+                {
+                    _logger.LogInformation(
+                        "Skipping {Count} aborted acquisition logs for facility {FacilityId}.",
+                        abortedRequestIds.Count, facilityId.SanitizeForLog());
+                    pendingLogIds = pendingLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
+                    retryableFailedLogIds = retryableFailedLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
+                }
+
                 if (maxRetriesReachedIds.Any())
                 {
                     await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, false, cancellationToken);
@@ -266,12 +285,11 @@ public class AcquisitionProcessingJob : IJob
                 {
                     if (maxRetriesReachedIds.Contains(request.Id)) continue;
 
-                    if (abortRegistry != null &&
-                        await abortRegistry.IsAbortedAsync(null, request.ReportTrackingId, cancellationToken))
+                    if (abortedRequestIds.Contains(request.Id))
                     {
-                        _logger.LogInformation(
+                        _logger.LogDebug(
                             "Skipping ReadyToAcquire for aborted report {ReportTrackingId}, log {LogId}.",
-                            request.ReportTrackingId, request.Id);
+                            request.ReportTrackingId.SanitizeForLog(), request.Id.SanitizeForLog());
                         continue;
                     }
 

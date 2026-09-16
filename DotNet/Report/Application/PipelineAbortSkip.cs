@@ -25,7 +25,7 @@ internal static class PipelineAbortSkip
         if (!await abortRegistry.IsAbortedAsync(facilityId, reportId, cancellationToken))
             return false;
 
-        logger.LogInformation(
+        logger.LogDebug(
             "{Listener}: Skipping aborted pipeline FacilityId={FacilityId}, ReportId={ReportId}.",
             listenerName,
             facilityId,

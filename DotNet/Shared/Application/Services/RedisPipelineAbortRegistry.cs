@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -26,7 +27,9 @@ public sealed class RedisPipelineAbortRegistry(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to write pipeline abort flag for facility {FacilityId}, report {ReportId}.", facilityId, reportId);
+            logger.LogWarning(ex, "Failed to write pipeline abort flag for facility {FacilityId}, report {ReportId}.",
+                facilityId.SanitizeForLog(), reportId.SanitizeForLog());
+            throw;
         }
     }
 
@@ -45,7 +48,9 @@ public sealed class RedisPipelineAbortRegistry(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to read pipeline abort flag for facility {FacilityId}, report {ReportId}.", facilityId, reportId);
+            logger.LogWarning(ex, "Failed to read pipeline abort flag for facility {FacilityId}, report {ReportId}.",
+                facilityId.SanitizeForLog(), reportId.SanitizeForLog());
+            throw;
         }
 
         return false;
@@ -66,7 +71,9 @@ public sealed class RedisPipelineAbortRegistry(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clear pipeline abort flag for facility {FacilityId}, report {ReportId}.", facilityId, reportId);
+            logger.LogWarning(ex, "Failed to clear pipeline abort flag for facility {FacilityId}, report {ReportId}.",
+                facilityId.SanitizeForLog(), reportId.SanitizeForLog());
+            throw;
         }
     }
 }

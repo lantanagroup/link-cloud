@@ -398,6 +398,9 @@
         .build();
 
     connection.on('cleanupUpdate', applyActivity);
+    connection.onreconnected(function () {
+        return connection.invoke('SubscribeCleanup').then(refreshProgress);
+    });
     connection.start()
         .then(function () { return connection.invoke('SubscribeCleanup'); })
         .then(refreshProgress)

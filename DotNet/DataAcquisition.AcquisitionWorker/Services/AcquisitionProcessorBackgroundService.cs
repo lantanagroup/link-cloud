@@ -144,6 +144,16 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
 
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            if (abortRegistry != null &&
+                await abortRegistry.IsAbortedAsync(log.FacilityId, log.ReportTrackingId, ct))
+            {
+                _logger.LogDebug(
+                    "Skipping queued acquisition LogId {LogId} for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}.",
+                    log.Id.SanitizeForLog(), log.FacilityId.SanitizeForLog(), log.ReportTrackingId.SanitizeForLog());
+                return;
+            }
+
             var depResult = await dependencyChecker.CheckDependenciesAsync(log, ct);
             if (!depResult.AreDependenciesMet)
             {

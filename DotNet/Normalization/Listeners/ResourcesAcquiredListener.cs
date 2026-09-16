@@ -226,18 +226,36 @@ public class ResourcesAcquiredListener : BackgroundService
         var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
         if (abortRegistry != null)
         {
-            var reportId = result.Message.Value.ScheduledReports
-                .Select(sr => sr.ReportTrackingId)
-                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
-            if (await abortRegistry.IsAbortedAsync(result.Message.Key.FacilityId, reportId, cancellationToken))
+            var facilityId = result.Message.Key.FacilityId;
+            if (await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
             {
-                _logger.LogInformation(
-                    "Skipping ResourcesAcquired for aborted pipeline FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
-                    result.Message.Key.FacilityId.SanitizeForLog(),
+                _logger.LogDebug(
+                    "Skipping ResourcesAcquired for aborted facility FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    facilityId.SanitizeForLog(),
                     correlationId.SanitizeForLog());
                 await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
                 return;
             }
+
+            var remaining = new List<ScheduledReport>();
+            foreach (var schedule in result.Message.Value.ScheduledReports ?? [])
+            {
+                if (await abortRegistry.IsAbortedAsync(facilityId, schedule.ReportTrackingId, cancellationToken))
+                    continue;
+                remaining.Add(schedule);
+            }
+
+            if (remaining.Count == 0)
+            {
+                _logger.LogDebug(
+                    "Skipping ResourcesAcquired; every scheduled report is aborted FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    facilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+                await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
+                return;
+            }
+
+            result.Message.Value.ScheduledReports = remaining;
         }
 
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);

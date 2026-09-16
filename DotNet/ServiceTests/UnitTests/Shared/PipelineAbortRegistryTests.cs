@@ -51,6 +51,20 @@ public class PipelineAbortRegistryTests
     }
 
     [Fact]
+    public async Task Abort_expires_after_ttl()
+    {
+        var time = new FrozenTimeProvider { UtcNow = DateTimeOffset.Parse("2026-09-16T12:00:00Z") };
+        var registry = new InMemoryPipelineAbortRegistry(time);
+        var facilityId = Guid.NewGuid().ToString();
+
+        await registry.AbortAsync(facilityId, reportId: null, TimeSpan.FromMinutes(5));
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeTrue();
+
+        time.UtcNow = time.UtcNow.AddMinutes(5).AddSeconds(1);
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Blank_ids_are_never_aborted()
     {
         var registry = new InMemoryPipelineAbortRegistry();
@@ -111,6 +125,12 @@ public class PipelineAbortRegistryTests
         var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
 
         result.Should().Contain("password=from-cache");
+    }
+
+    private sealed class FrozenTimeProvider : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; }
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 
     [Fact]

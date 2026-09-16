@@ -66,6 +66,8 @@ public static class RunCleanupHelper
         if (string.IsNullOrWhiteSpace(facilityId))
             return;
 
+        var errors = new List<string>();
+
         if (abortRegistry != null)
         {
             try
@@ -75,6 +77,7 @@ public static class RunCleanupHelper
             }
             catch (Exception ex)
             {
+                errors.Add($"pipeline abort flag: {ex.Message}");
                 output.WriteLine($"Warning: pipeline abort flag failed for '{facilityId}': {ex.Message}");
             }
         }
@@ -85,34 +88,46 @@ public static class RunCleanupHelper
                 new { FacilityId = facilityId },
                 minAgeHours: 0,
                 cancellationToken);
+            EnsureApiSuccess(cancelResult, $"DA cancel leftover work for '{facilityId}'", 404);
             output.WriteLine($"Cancelled leftover DA work for '{facilityId}' (cancelled={cancelResult?.Body?.Cancelled ?? 0}).");
         }
         catch (Exception ex)
         {
+            errors.Add($"DA cancel: {ex.Message}");
             output.WriteLine($"Warning: DA cancel failed for '{facilityId}': {ex.Message}");
         }
 
         try
         {
-            await censusClient.DisableFacilityJobsAsync(facilityId, cancellationToken);
+            var disableResult = await censusClient.DisableFacilityJobsAsync(facilityId, cancellationToken);
+            EnsureApiSuccess(disableResult, $"census disable for '{facilityId}'", 404);
             output.WriteLine($"Disabled census jobs for '{facilityId}'.");
         }
         catch (Exception ex)
         {
+            errors.Add($"census disable: {ex.Message}");
             output.WriteLine($"Warning: census disable failed for '{facilityId}': {ex.Message}");
         }
 
         try
         {
             if (!string.IsNullOrWhiteSpace(reportId))
-                await reportClient.SoftDeleteScheduleAsync(reportId, cancellationToken);
-            await reportClient.SetReportsDeletedStatusForFacilityAsync(facilityId, deleted: true, cancellationToken);
+            {
+                var scheduleResult = await reportClient.SoftDeleteScheduleAsync(reportId, cancellationToken);
+                EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{reportId}'", 404);
+            }
+            var reportsResult = await reportClient.SetReportsDeletedStatusForFacilityAsync(facilityId, deleted: true, cancellationToken);
+            EnsureApiSuccess(reportsResult, $"report schedule deactivate for '{facilityId}'", 404);
             output.WriteLine($"Deactivated report schedules for '{facilityId}'.");
         }
         catch (Exception ex)
         {
+            errors.Add($"report schedule deactivate: {ex.Message}");
             output.WriteLine($"Warning: report schedule deactivate failed for '{facilityId}': {ex.Message}");
         }
+
+        if (errors.Count > 0)
+            throw new InvalidOperationException($"Quiesce incomplete for '{facilityId}': {string.Join("; ", errors)}");
     }
 
     /// <summary>
@@ -186,23 +201,11 @@ public static class RunCleanupHelper
             abortTtl,
             cancellationToken);
 
-        try
-        {
-            await dataAcqClient.SoftDeleteLogsByFacilityAsync(facilityId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            output.WriteLine($"Warning: leftover DA log soft-delete failed for '{facilityId}': {ex.Message}");
-        }
+        var daLogs = await dataAcqClient.SoftDeleteLogsByFacilityAsync(facilityId, cancellationToken);
+        EnsureApiSuccess(daLogs, $"leftover DA log soft-delete for '{facilityId}'", 404);
 
-        try
-        {
-            await censusClient.DeleteCensusConfigAsync(facilityId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            output.WriteLine($"Warning: leftover census config delete failed for '{facilityId}': {ex.Message}");
-        }
+        var censusConfig = await censusClient.DeleteCensusConfigAsync(facilityId, cancellationToken);
+        EnsureApiSuccess(censusConfig, $"leftover census config delete for '{facilityId}'", 404);
 
         try
         {
@@ -241,13 +244,27 @@ public static class RunCleanupHelper
     /// </summary>
     public static void EnsureTenantFacilityRemoved(LinkApiResponse<FacilityModel> remaining, string facilityId)
     {
-        if (remaining.StatusCode is >= 500 or 0)
-            throw new InvalidOperationException(
-                $"Tenant leftover teardown could not confirm delete for '{facilityId}' (HTTP {remaining.StatusCode}).");
+        if (remaining.StatusCode is 404 or 204)
+            return;
 
-        if (remaining.IsSuccessStatusCode && remaining.Body is not { IsDeleted: true })
+        if (remaining.IsSuccessStatusCode && remaining.Body is { IsDeleted: true })
+            return;
+
+        if (remaining.IsSuccessStatusCode)
             throw new InvalidOperationException(
                 $"Tenant leftover teardown left facility '{facilityId}' in place.");
+
+        throw new InvalidOperationException(
+            $"Tenant leftover teardown could not confirm delete for '{facilityId}' (HTTP {remaining.StatusCode}).");
+    }
+
+    public static void EnsureApiSuccess(LinkApiResponse response, string operation, params int[] allowedStatusCodes)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+        if (allowedStatusCodes.Contains(response.StatusCode))
+            return;
+        throw new InvalidOperationException($"{operation} failed (HTTP {response.StatusCode}).");
     }
 
     public static bool IsAutomationFacilityId(string? facilityId) =>
@@ -319,7 +336,7 @@ public static class RunCleanupHelper
         IReadOnlyList<AutomationRunSummary> runs,
         DateTimeOffset now,
         TimeSpan retention)
-        => runs.Where(run => now - RunTimestamp(run) >= retention).ToList();
+        => runs.Where(run => run.Status.IsTerminal() && now - RunTimestamp(run) >= retention).ToList();
 
     public static IReadOnlyList<AutomationRunSummary> SelectRunsFinishedInRange(
         IReadOnlyList<AutomationRunSummary> runs,

@@ -17,8 +17,8 @@ public static class RestoreReport
     {
         var logger = loggerFactory.CreateLogger("RestoreReport");
 
-        if (string.IsNullOrWhiteSpace(reportScheduleId))
-            return Results.BadRequest("Report schedule ID is required.");
+        if (string.IsNullOrWhiteSpace(reportScheduleId) || !Guid.TryParse(reportScheduleId, out _))
+            return Results.BadRequest("Invalid Id format");
 
         // Step 1: Restore the report schedule
         HttpResponseMessage reportResponse;
@@ -65,7 +65,9 @@ public static class RestoreReport
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clear pipeline abort flag while restoring report {ReportScheduleId}", reportScheduleId);
+            logger.LogError(ex, "Failed to clear pipeline abort flag while restoring report {ReportScheduleId} — rolling back restore", reportScheduleId);
+            await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to clear the abort flag. Report restore has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully restored", reportScheduleId);

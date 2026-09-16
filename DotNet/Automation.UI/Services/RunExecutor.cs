@@ -11,6 +11,7 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -1014,7 +1015,8 @@ internal sealed class RunExecutor
         catch (Exception ex)
         {
             output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
-            _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId);
+            _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
+            throw;
         }
     }
 

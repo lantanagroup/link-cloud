@@ -4,6 +4,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Services;
 
@@ -19,6 +20,7 @@ public sealed class LeftoverRunCleanupService(
     ICleanupSettingsStore settingsStore,
     IPipelineAbortRegistry abortRegistry,
     IHubContext<CleanupHub> cleanupHub,
+    IOptions<LeftoverRunCleanupOptions> leftoverOptions,
     ILogger<LeftoverRunCleanupService> logger) : BackgroundService, ILeftoverRunCleanup
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -128,7 +130,10 @@ public sealed class LeftoverRunCleanupService(
 
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            var startupDelay = leftoverOptions.Value.StartupDelay;
+            if (startupDelay < TimeSpan.Zero)
+                startupDelay = TimeSpan.Zero;
+            await Task.Delay(startupDelay, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -261,18 +266,12 @@ public sealed class LeftoverRunCleanupService(
             trigger,
             (facilities, runs, now, settings) =>
             {
-                var leftover = RunCleanupHelper.SelectTeardownAutomationFacilities(
-                    facilities, runs, now, settings.TeardownRetention);
-                var stale = RunCleanupHelper.SelectStaleActiveAutomationFacilities(
-                    facilities, runs, now, settings.TeardownRetention);
                 var history = RunCleanupHelper.SelectHistoryPurgeRuns(runs, now, settings.TeardownRetention);
-                return (
-                    leftover.Concat(stale).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-                    history);
+                return ([], history);
             },
             cancellationToken,
             maxFacilitiesOverride,
-            teardownFacilities: true,
+            teardownFacilities: false,
             purgeHistory: true);
 
     private async Task<LeftoverCleanupResult> RunScopedAsync(
@@ -411,9 +410,9 @@ public sealed class LeftoverRunCleanupService(
             }
 
             var result = new LeftoverCleanupResult(
-                facilityIds.Count,
+                teardownFacilities ? 0 : facilityIds.Count,
                 quiesced,
-                facilityIds.Count,
+                teardownFacilities ? facilityIds.Count : 0,
                 tornDown,
                 historyRuns.Count,
                 purged,

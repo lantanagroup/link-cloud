@@ -22,8 +22,8 @@ public static class AbortReport
     {
         var logger = loggerFactory.CreateLogger("AbortReport");
 
-        if (string.IsNullOrWhiteSpace(reportScheduleId))
-            return Results.BadRequest("Report schedule ID is required.");
+        if (string.IsNullOrWhiteSpace(reportScheduleId) || !Guid.TryParse(reportScheduleId, out _))
+            return Results.BadRequest("Invalid Id format");
 
         HttpResponseMessage getResponse;
         try
@@ -107,6 +107,15 @@ public static class AbortReport
 
         if (!reportResponse.IsSuccessStatusCode)
         {
+            try
+            {
+                await abortRegistry.ClearAsync(facilityId: null, reportScheduleId, context.RequestAborted);
+            }
+            catch (Exception clearEx)
+            {
+                logger.LogError(clearEx, "Failed to clear abort flag after soft-delete failure for {ReportScheduleId}", reportScheduleId.SanitizeForLog());
+            }
+
             var detail = await ReadDetailAsync(reportResponse);
             logger.LogWarning("Report schedule soft-delete failed after abort for {ReportScheduleId} with status {StatusCode}", reportScheduleId.SanitizeForLog(), reportResponse.StatusCode);
             return ProblemDetailsExtension.UserFacingProblem(detail ?? "Failed to soft-delete aborted report schedule.", (int)reportResponse.StatusCode);
