@@ -157,8 +157,11 @@
    the label text when the field is `required`) - shown, not hidden. */
 .census-poi .k-label svg {
   display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 3px;
-  vertical-align: middle;
+  vertical-align: top;
+  align-self: flex-start;
 }
 
 .census-poi .k-input,

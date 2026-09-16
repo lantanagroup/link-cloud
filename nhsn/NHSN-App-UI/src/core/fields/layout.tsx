@@ -7,7 +7,8 @@ import {
   NHSNLoadingIndicator,
   NoData,
   PageHeader,
-  RequiredFieldNotice
+  RequiredFieldNotice,
+  TbAsterisk
 } from '@nhsn/nhsn-react-core';
 import {Button as KendoButton} from '@progress/kendo-react-buttons';
 import {InfoTooltip} from './InfoTooltip';
@@ -110,19 +111,16 @@ export function FieldLabel({children, checked = true, tooltip}: FieldLabelProps)
 }
 
 /**
- * Required-field marker for a hand-rolled label - a group heading that isn't
- * one Kendo field's own label, so it never goes through MistFormLabel (which
- * renders its own required-marker icon automatically whenever a Kendo field
- * is `required`). Rendered as a plain "*" glyph right after the label text
- * rather than an icon, so it sits on the same baseline as the label instead
- * of floating beside it as a separate element.
+ * Required-field marker for a hand-rolled label - a group heading or custom
+ * field (ChipMultiSelect, PatientSelection's patient-id picker, a step's own
+ * label) that isn't one Kendo field's own label, so it never goes through
+ * MistFormLabel (which renders this same icon automatically whenever a Kendo
+ * field is `required`). The single place `size`/`strokeWidth` are set for
+ * every hand-rolled marker in the app, so they stay in lockstep with each
+ * other without each call site repeating the numbers.
  */
 export function RequiredAsterisk() {
-  return (
-    <span aria-hidden="true" className="nhsn-link__required-asterisk">
-      *
-    </span>
-  );
+  return <TbAsterisk aria-hidden="true" className="nhsn-link__required-asterisk" color="red" size={8} strokeWidth={3} />;
 }
 
 export interface SidePanelLayoutProps {

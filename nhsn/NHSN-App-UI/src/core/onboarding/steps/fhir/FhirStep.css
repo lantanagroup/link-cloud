@@ -223,8 +223,11 @@
    the label text when the field is `required`) - shown, not hidden. */
 .fhir-server-info .k-label svg {
   display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 3px;
-  vertical-align: middle;
+  vertical-align: top;
+  align-self: flex-start;
 }
 
 .fhir-server-info .k-input,
