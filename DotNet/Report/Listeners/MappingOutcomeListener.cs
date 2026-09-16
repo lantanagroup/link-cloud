@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Domain.Models;
@@ -196,16 +197,14 @@ public class MappingOutcomeListener : BackgroundService
             throw new DeadLetterException("Invalid MappingOutcomeEvaluated message");
         }
 
+        if (await PipelineAbortSkip.ShouldSkipAsync(
+                scope.ServiceProvider, _logger, nameof(MappingOutcomeListener), facilityId, reportId: null, consumeCancellationToken))
+            return;
+
         // Deserialization writes a null over the property initializer, so the collection is only
         // non-null by convention.
         var trackingIds = (value.ScheduledReports ?? [])
             .Select(sr => sr.ReportTrackingId)
-            .ToList();
-
-        var scheduleIds = trackingIds
-            .Where(id => Guid.TryParse(id, out _))
-            .Select(Guid.Parse!)
-            .Distinct()
             .ToList();
 
         // A tracking id is a ReportSchedule id put on the wire as a string, so one that will not parse is
@@ -229,12 +228,26 @@ public class MappingOutcomeListener : BackgroundService
                 string.Join(", ", unusable).SanitizeForLog());
         }
 
+        var scheduleIds = new List<Guid>();
+        foreach (var id in trackingIds.Where(id => Guid.TryParse(id, out _)).Select(Guid.Parse!).Distinct())
+        {
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, _logger, nameof(MappingOutcomeListener), facilityId, id.ToString(), consumeCancellationToken))
+                continue;
+            scheduleIds.Add(id);
+        }
+
         if (scheduleIds.Count == 0)
         {
-            // Nothing left to write to. Committing here would retire a message that recorded nothing,
-            // which is the same outcome as the malformed ones the guard above rejects.
-            throw new DeadLetterException(
-                "MappingOutcomeEvaluated message carried no usable report tracking id");
+            // Aborted schedules are skipped on purpose. An empty or unparsable list is malformed:
+            // committing would retire a message that recorded nothing.
+            if (trackingIds.Count == 0 || unusable.Count > 0)
+            {
+                throw new DeadLetterException(
+                    "MappingOutcomeEvaluated message carried no usable report tracking id");
+            }
+
+            return;
         }
 
         var now = DateTime.UtcNow;
