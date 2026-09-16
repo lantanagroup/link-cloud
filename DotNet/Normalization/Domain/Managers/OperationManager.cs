@@ -61,6 +61,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor Version IDs, but not both.");
                 }
 
+                if (model.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
+                    await _database.Operations.AnyAsync(operation => operation.FacilityId == model.FacilityId && operation.OperationType == "HSLOCMap"))
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = "Only one HSLOC Map operation is allowed per facility.";
+                    return taskResult;
+                }
+
                 var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
 
                 if (!result.IsValid)
@@ -141,6 +150,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 #endregion
 
                 var operation = await _database.Operations.GetAsync(model.Id);
+                if (operation.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
+                    await _database.Operations.AnyAsync(existing => existing.FacilityId == model.FacilityId && existing.OperationType == "HSLOCMap" && existing.Id != model.Id))
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = "Only one HSLOC Map operation is allowed per facility.";
+                    return taskResult;
+                }
+
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
                 var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
