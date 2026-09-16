@@ -63,7 +63,7 @@ describe('CodeMapComponent', () => {
         const isHSLOCMap = operationType === OperationType.HSLOCMap;
         const expectedName = isHSLOCMap ? 'HSLOC Location Mapping' : 'Map locations';
         const expectedDescription = isHSLOCMap
-          ? 'Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable Copy Location operation.'
+          ? 'Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable CopyLocation operation and the CopyLocationAliasToTypeIteratively operation.'
           : 'Map locations';
         expect(component.nameControl.disabled).toBe(isHSLOCMap);
         expect(component.descriptionControl.disabled).toBe(isHSLOCMap);

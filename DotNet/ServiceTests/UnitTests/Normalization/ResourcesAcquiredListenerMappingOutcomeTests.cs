@@ -8,6 +8,7 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -448,6 +449,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
 
         var services = new ServiceCollection();
         services.AddSingleton(sequenceQueries.Object);
+        services.AddScoped<IFacilityLocationLocalCodeMappingManager>(_ => Mock.Of<IFacilityLocationLocalCodeMappingManager>());
         var serviceProvider = services.BuildServiceProvider();
 
         var scope = new Mock<IServiceScope>();
