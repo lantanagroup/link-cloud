@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
@@ -156,6 +157,10 @@ namespace LantanaGroup.Link.Report.Listeners
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
             var reportId = Guid.Parse(value.ReportTrackingId);
+
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, _logger, nameof(ValidationCompleteListener), facilityId, value.ReportTrackingId, cancellationToken))
+                return;
 
             var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 

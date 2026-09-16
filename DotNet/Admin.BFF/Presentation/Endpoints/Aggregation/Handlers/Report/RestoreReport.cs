@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
@@ -11,12 +12,13 @@ public static class RestoreReport
         HttpContext context,
         ReportService reportService,
         DataAcquisitionService dataAcquisitionService,
+        IPipelineAbortRegistry abortRegistry,
         string reportScheduleId)
     {
         var logger = loggerFactory.CreateLogger("RestoreReport");
 
-        if (string.IsNullOrWhiteSpace(reportScheduleId))
-            return Results.BadRequest("Report schedule ID is required.");
+        if (string.IsNullOrWhiteSpace(reportScheduleId) || !Guid.TryParse(reportScheduleId, out _))
+            return Results.BadRequest("Invalid Id format");
 
         // Step 1: Restore the report schedule
         HttpResponseMessage reportResponse;
@@ -57,6 +59,18 @@ public static class RestoreReport
             return ProblemDetailsExtension.UserFacingProblem("Failed to restore acquisition logs. Report restore has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
+        try
+        {
+            await abortRegistry.ClearAsync(facilityId: null, reportScheduleId, context.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to clear pipeline abort flag while restoring report {ReportScheduleId} — rolling back restore", reportScheduleId);
+            await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, reportScheduleId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to clear the abort flag. Report restore has been rolled back.", StatusCodes.Status500InternalServerError);
+        }
+
         logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully restored", reportScheduleId);
         return Results.NoContent();
     }
@@ -86,6 +100,20 @@ public static class RestoreReport
         catch (Exception ex)
         {
             logger.LogError(ex, "Rollback failed: exception re-deleting report schedule {ReportScheduleId}", reportScheduleId);
+        }
+    }
+
+    private static async Task RollbackAcquisitionLogsAsync(DataAcquisitionService dataAcquisitionService, HttpContext context, string reportScheduleId, ILogger logger)
+    {
+        try
+        {
+            var response = await dataAcquisitionService.SoftDeleteLogsByReportTrackingIdAsync(context.User, reportScheduleId, context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                logger.LogError("Rollback failed: could not re-delete acquisition logs for report {ReportScheduleId} (status {StatusCode})", reportScheduleId, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rollback failed: exception re-deleting acquisition logs for report {ReportScheduleId}", reportScheduleId);
         }
     }
 }

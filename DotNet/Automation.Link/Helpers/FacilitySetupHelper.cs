@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -583,6 +584,9 @@ public static class FacilitySetupHelper
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Daily");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
+        var fhirList = await dataAcqClient.DeleteFhirListConfigurationAsync(facilityId);
+        if (!fhirList.IsSuccessStatusCode && fhirList.StatusCode != 404)
+            throw new InvalidOperationException($"FHIR list config delete failed for '{facilityId}' (HTTP {fhirList.StatusCode}).");
         await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
         await facilityClient.DeleteAsync(facilityId);
         output.WriteLine("Facility cleanup complete.");

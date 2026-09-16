@@ -154,6 +154,11 @@ public class RunsController(
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult CleanLeftovers()
+        => RedirectToAction("Index", "Cleanup");
+
     [HttpGet]
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {
