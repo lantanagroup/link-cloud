@@ -16,3 +16,31 @@ export function findIncompleteRowIndexes(rows: MappingRowValues[]): number[] {
   });
   return incomplete;
 }
+
+/**
+  Two rows mapping the same local code to different HSLOC codes is ambiguous —
+ * the save path (HslocMappingService.SaveAsync) groups incoming rows by local code
+ * case-insensitively and keeps only one, so an unflagged duplicate here would silently lose
+ * a row on save. Blank sourceCode values are excluded; findIncompleteRowIndexes already
+ * flags those. Both rows in a colliding pair are returned, not just the second.
+ */
+export function findDuplicateSourceCodeIndexes(rows: MappingRowValues[]): number[] {
+  const firstIndexByCode = new Map<string, number>();
+  const duplicates = new Set<number>();
+
+  rows.forEach((row, index) => {
+    const code = row.sourceCode.trim().toLowerCase();
+    if (!code) {
+      return;
+    }
+    const firstIndex = firstIndexByCode.get(code);
+    if (firstIndex === undefined) {
+      firstIndexByCode.set(code, index);
+      return;
+    }
+    duplicates.add(firstIndex);
+    duplicates.add(index);
+  });
+
+  return Array.from(duplicates).sort((a, b) => a - b);
+}

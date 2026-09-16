@@ -153,8 +153,12 @@
   margin-bottom: 0;
 }
 
+/* Required-field indicator (a red asterisk icon MistFormLabel renders after
+   the label text when the field is `required`) - shown, not hidden. */
 .census-poi .k-label svg {
-  display: none;
+  display: inline-block;
+  margin-left: 3px;
+  vertical-align: middle;
 }
 
 .census-poi .k-input,
@@ -303,6 +307,7 @@
      itself shouldn't focus that field - only the input should. */
   pointer-events: none;
 }
+
 
 .census-poi .census-inline-actions {
   display: flex;

@@ -109,6 +109,22 @@ export function FieldLabel({children, checked = true, tooltip}: FieldLabelProps)
   );
 }
 
+/**
+ * Required-field marker for a hand-rolled label - a group heading that isn't
+ * one Kendo field's own label, so it never goes through MistFormLabel (which
+ * renders its own required-marker icon automatically whenever a Kendo field
+ * is `required`). Rendered as a plain "*" glyph right after the label text
+ * rather than an icon, so it sits on the same baseline as the label instead
+ * of floating beside it as a separate element.
+ */
+export function RequiredAsterisk() {
+  return (
+    <span aria-hidden="true" className="nhsn-link__required-asterisk">
+      *
+    </span>
+  );
+}
+
 export interface SidePanelLayoutProps {
   children: React.ReactNode;
 }

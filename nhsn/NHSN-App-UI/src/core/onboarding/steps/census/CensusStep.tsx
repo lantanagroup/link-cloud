@@ -16,6 +16,7 @@ import {
   MessageContainer,
   NumberField,
   PageHeader,
+  RequiredAsterisk,
   SidePanel,
   SidePanelLayout,
   StepActions,
@@ -511,6 +512,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     <div className="form-group">
       <label className="census-field-label" htmlFor="census-frequency-hours">
         {t("onboarding:census.fields.frequencyLabel")}
+        <RequiredAsterisk />
       </label>
       <p className="form-hint">
         {t("onboarding:census.fields.frequencyTooltip")}

@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
-import {Button, NHSNLoadingIndicator, PageHeader, Select, StepActions, TextField} from '../../../fields';
+import {Button, NHSNLoadingIndicator, PageHeader, RequiredAsterisk, Select, StepActions, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
@@ -283,7 +283,10 @@ export function EncounterStep({onNext, onBack}: StepProps) {
           {activeTab === 'mapping' && (
             <div id="encounter-panel-mapping" role="tabpanel" aria-labelledby="encounter-tab-mapping">
               <div className="form-group">
-                <span className="section-label">{t('onboarding:encounter.fields.codeSystemsLabel')}</span>
+                <span className="section-label">
+                  {t('onboarding:encounter.fields.codeSystemsLabel')}
+                  <RequiredAsterisk />
+                </span>
                 <p className="form-hint">{t('onboarding:encounter.fields.codeSystemsHint')}</p>
               </div>
 

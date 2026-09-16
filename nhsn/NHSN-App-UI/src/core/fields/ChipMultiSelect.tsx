@@ -1,6 +1,7 @@
 import React, {useId, useMemo, useRef, useState} from 'react';
 import {useFieldId, type BaseFieldProps} from './fieldProps';
 import {InfoTooltip} from './InfoTooltip';
+import {RequiredAsterisk} from './layout';
 import type {SelectOption} from './Select';
 
 const CHIP_TONE_COUNT = 8;
@@ -127,11 +128,7 @@ export function ChipMultiSelect<T extends string>({
     <div className="nhsn-link__chip-select-field">
       <label className="nhsn-link__chip-select-label" htmlFor={id}>
         {base.label}
-        {base.required && (
-          <span className="nhsn-link__chip-select-required" aria-hidden="true">
-            {' *'}
-          </span>
-        )}
+        {base.required && <RequiredAsterisk />}
         {base.hint && <InfoTooltip label={base.label} content={base.hint} />}
       </label>
 

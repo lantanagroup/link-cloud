@@ -88,6 +88,7 @@
   margin-bottom: 18px;
 }
 
+
 .fhir-server-info .form-group > label {
   display: block;
   font-size: 13.5px;
@@ -218,8 +219,12 @@
   pointer-events: none;
 }
 
+/* Required-field indicator (a red asterisk icon MistFormLabel renders after
+   the label text when the field is `required`) - shown, not hidden. */
 .fhir-server-info .k-label svg {
-  display: none;
+  display: inline-block;
+  margin-left: 3px;
+  vertical-align: middle;
 }
 
 .fhir-server-info .k-input,
