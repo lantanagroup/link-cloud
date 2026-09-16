@@ -24,6 +24,7 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
     private static readonly Guid AdhocReportDailyAchTestId = new("00000000-0000-0000-0000-000000000009");
+    private static readonly Guid DmrpScheduledReportTestId = new("00000000-0000-0000-0000-000000000010");
 
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
@@ -40,6 +41,7 @@ public sealed class ScenarioSeedService : IHostedService
     private const string RegenerateReportTestNhsnOrganizationId = "10762";
     private const string MultiMeasureTestNhsnOrganizationId = "10763";
     private const string AdhocReportDailyAchTestNhsnOrganizationId = "10764";
+    private const string DmrpScheduledReportTestNhsnOrganizationId = "10765";
 
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
@@ -443,6 +445,38 @@ public sealed class ScenarioSeedService : IHostedService
                     ResourcesPerPatientMin = 250,
                     ResourcesPerPatientMax = 250,
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                }
+            ],
+            CleanupServiceData = false,
+            CleanupFhirData = true,
+        },
+
+        // --- DMRP Scheduled Report Test (scheduled, ACH Monthly, 1 patient) ---
+        new TestScenarioDefinition
+        {
+            Id = DmrpScheduledReportTestId,
+            Name = "DMRP Scheduled Report Test",
+            Description = "Single-patient ACH Monthly scheduled report using Mock DMRP enrollment and Tenant-derived reporting plans.",
+            IsSystemScenario = true,
+            ReportMethod = ReportMethod.ScheduledReport,
+            SelectedMeasures = [..DefaultMeasures],
+            NhsnOrganizationId = DmrpScheduledReportTestNhsnOrganizationId,
+            EnableDmrp = true,
+            Seed = 20260909,
+            PatientCount = 1,
+            ResourcesPerPatientMin = 50,
+            ResourcesPerPatientMax = 100,
+            PatientCohorts =
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern =
+                        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,

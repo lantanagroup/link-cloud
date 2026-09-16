@@ -46,6 +46,11 @@ public record ResolvedRunOptions(
     public string NhsnOrganizationId { get; init; } = string.Empty;
 
     /// <summary>
+    /// When true, this run uses DMRP enrollment to derive its reporting schedule.
+    /// </summary>
+    public bool EnableDmrp { get; init; }
+
+    /// <summary>
     /// When true, the run holds a short live reporting window and accepts
     /// Admit/Discharge injections before finalizing the scheduled report.
     /// </summary>
