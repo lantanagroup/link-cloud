@@ -308,6 +308,29 @@ public class SftpConnectionTestServiceTests
 
     #endregion
 
+    [Theory]
+    [MemberData(nameof(UnrelatedPreviewFailures))]
+    public async Task TestSftpConnectionAsync_UnrelatedExceptionWhilePreviewing_PropagatesRatherThanBeingReportedAsADirectoryOrDetailsProblem(
+        Exception failure)
+    {
+        SetupListFiles(RemoteFile("census_1.dat"));
+        _sessionMock
+            .Setup(s => s.DownloadFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(failure);
+
+        var thrown = await Assert.ThrowsAnyAsync<Exception>(() => TestAsync(includeFileContent: true));
+
+        Assert.Same(failure, thrown);
+    }
+
+    public static TheoryData<Exception> UnrelatedPreviewFailures => new()
+    {
+        // Only the ListFilesAsync call means a missing directory
+        new InvalidOperationException(RawExceptionDetail),
+        // Only opening the session means invalid connection details
+        new ArgumentException(RawExceptionDetail)
+    };
+
     #region Preview limits
 
     [Fact]
@@ -383,6 +406,25 @@ public class SftpConnectionTestServiceTests
             .Select(p => p.ParameterType);
 
         Assert.All(parameterTypes, type => Assert.Contains(type, allowed));
+    }
+
+    [Fact]
+    public void RequestModel_ToString_OmitsThePassword()
+    {
+        var request = new SftpTestConnectionRequestModel
+        {
+            HostName = Host,
+            HostUrlPort = Port,
+            Username = Username,
+            Password = Password,
+            ReportDirectory = ReportDirectory
+        };
+
+        var text = request.ToString();
+
+        Assert.DoesNotContain(Password, text);
+        Assert.Contains($"HostName = {Host}", text);
+        Assert.Contains($"ReportDirectory = {ReportDirectory}", text);
     }
 
     [Fact]

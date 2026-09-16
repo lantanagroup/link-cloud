@@ -136,7 +136,18 @@ public class SftpConnectionTestService(
         CancellationToken cancellationToken)
     {
         // Listing proves the directory is readable, which an existence check alone would not
-        var files = await session.ListFilesAsync(reportDirectory, null, cancellationToken);
+        List<SftpFileInfo> files;
+        try
+        {
+            files = await session.ListFilesAsync(reportDirectory, null, cancellationToken);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // ListFilesAsync reports a missing directory as InvalidOperationException, which census acquisition
+            // relies on. Narrow it here, at the one call where it means that, so an InvalidOperationException from
+            // anywhere else in the test is not reported as a missing directory.
+            throw new SftpPathNotFoundException(ex.Message, ex);
+        }
 
         var message = $"Connected to the SFTP server and read the report directory '{reportDirectory}'.";
 
@@ -312,11 +323,11 @@ public class SftpConnectionTestService(
     /// </summary>
     private static string? DescribeDirectoryFailure(Exception ex, string reportDirectory) => ex switch
     {
-        // Derives from InvalidOperationException, but means a bug here, not a missing directory
-        ObjectDisposedException => null,
-        // SftpSession.ListFilesAsync throws InvalidOperationException when the directory doesn't exist
-        InvalidOperationException or SftpPathNotFoundException =>
+        // ReadReportDirectoryAsync turns ListFilesAsync's missing-directory InvalidOperationException into this
+        SftpPathNotFoundException =>
             $"Connected to the SFTP server, but the report directory '{reportDirectory}' does not exist.",
+        // Once connected, an ArgumentException is a bug here, not invalid connection details
+        ArgumentException => null,
         SftpPermissionDeniedException =>
             $"Connected to the SFTP server, but the user does not have permission to read the report directory '{reportDirectory}'.",
         _ => DescribeConnectionFailure(ex)
