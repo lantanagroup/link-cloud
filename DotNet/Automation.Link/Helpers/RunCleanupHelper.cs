@@ -49,8 +49,8 @@ public static class RunCleanupHelper
 
     /// <summary>
     /// Stops work that is still moving: abort Kafka consumers, cancel DA retries,
-    /// disable census jobs, deactivate the report schedule. Leaves facility configs
-    /// and cancelled logs in place for debug until teardown.
+    /// disable census jobs. Optionally deactivate report schedules. Leaves facility
+    /// configs and cancelled logs in place for debug until teardown.
     /// </summary>
     public static async Task AbortAndQuiesceFacilityAsync(
         IPipelineAbortRegistry? abortRegistry,
@@ -61,7 +61,8 @@ public static class RunCleanupHelper
         string facilityId,
         string? reportId,
         TimeSpan abortTtl,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool deactivateSchedules = true)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             return;
@@ -109,21 +110,24 @@ public static class RunCleanupHelper
             output.WriteLine($"Warning: census disable failed for '{facilityId}': {ex.Message}");
         }
 
-        try
+        if (deactivateSchedules)
         {
-            if (!string.IsNullOrWhiteSpace(reportId))
+            try
             {
-                var scheduleResult = await reportClient.SoftDeleteScheduleAsync(reportId, cancellationToken);
-                EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{reportId}'", 404);
+                if (!string.IsNullOrWhiteSpace(reportId))
+                {
+                    var scheduleResult = await reportClient.SoftDeleteScheduleAsync(reportId, cancellationToken);
+                    EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{reportId}'", 404);
+                }
+                var reportsResult = await reportClient.SetReportsDeletedStatusForFacilityAsync(facilityId, deleted: true, cancellationToken);
+                EnsureApiSuccess(reportsResult, $"report schedule deactivate for '{facilityId}'", 404);
+                output.WriteLine($"Deactivated report schedules for '{facilityId}'.");
             }
-            var reportsResult = await reportClient.SetReportsDeletedStatusForFacilityAsync(facilityId, deleted: true, cancellationToken);
-            EnsureApiSuccess(reportsResult, $"report schedule deactivate for '{facilityId}'", 404);
-            output.WriteLine($"Deactivated report schedules for '{facilityId}'.");
-        }
-        catch (Exception ex)
-        {
-            errors.Add($"report schedule deactivate: {ex.Message}");
-            output.WriteLine($"Warning: report schedule deactivate failed for '{facilityId}': {ex.Message}");
+            catch (Exception ex)
+            {
+                errors.Add($"report schedule deactivate: {ex.Message}");
+                output.WriteLine($"Warning: report schedule deactivate failed for '{facilityId}': {ex.Message}");
+            }
         }
 
         if (errors.Count > 0)

@@ -1,8 +1,14 @@
 using FluentAssertions;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services;
+using Moq;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Automation;
 
@@ -230,6 +236,37 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
+    public async Task AbortAndQuiesce_without_deactivate_does_not_soft_delete_schedules()
+    {
+        var report = new Mock<IReportServiceClient>(MockBehavior.Strict);
+        var da = new Mock<IDataAcquisitionServiceClient>();
+        da.Setup(c => c.CancelAcquisitionLogsByFilterAsync(It.IsAny<object>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<DataAcquisitionBulkActionResultApiModel> { StatusCode = 200, Body = new() });
+        var census = new Mock<ICensusServiceClient>();
+        census.Setup(c => c.DisableFacilityJobsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
+
+        await RunCleanupHelper.AbortAndQuiesceFacilityAsync(
+            new InMemoryPipelineAbortRegistry(),
+            da.Object,
+            census.Object,
+            report.Object,
+            new NullOutput(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            TimeSpan.FromDays(14),
+            CancellationToken.None,
+            deactivateSchedules: false);
+
+        report.Verify(
+            c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        report.Verify(
+            c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public void IsAutomationFacilityId_accepts_guids_only()
     {
         RunCleanupHelper.IsAutomationFacilityId(Guid.NewGuid().ToString()).Should().BeTrue();
@@ -277,4 +314,10 @@ public class RunCleanupHelperTests
             CreatedAt = DateTimeOffset.Parse("2026-08-28T10:00:00Z"),
             FinishedAt = finishedAt,
         };
+
+    private sealed class NullOutput : IAutomationOutput
+    {
+        public void WriteLine(string message) { }
+        public void WriteLine(string format, params object[] args) { }
+    }
 }

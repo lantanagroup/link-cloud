@@ -1010,7 +1010,11 @@ internal sealed class RunExecutor
                 return;
 
             output.WriteLine($"Aborting in-flight pipeline work for facility '{state.FacilityId}'.");
-            await leftoverCleanup.QuiesceFacilityAsync(state.FacilityId, state.ReportId, cancellationToken);
+            await leftoverCleanup.QuiesceFacilityAsync(
+                state.FacilityId,
+                state.ReportId,
+                cancellationToken,
+                deactivateSchedules: false);
         }
         catch (Exception ex)
         {

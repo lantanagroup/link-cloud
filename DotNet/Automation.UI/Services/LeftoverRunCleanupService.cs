@@ -37,7 +37,8 @@ public sealed class LeftoverRunCleanupService(
     public async Task QuiesceFacilityAsync(
         string? facilityId,
         string? reportId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool deactivateSchedules = true)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             return;
@@ -58,7 +59,8 @@ public sealed class LeftoverRunCleanupService(
             facilityId,
             reportId,
             settings.AbortTtl,
-            cancellationToken);
+            cancellationToken,
+            deactivateSchedules);
     }
 
     public void StartQuiesceInBackground()
