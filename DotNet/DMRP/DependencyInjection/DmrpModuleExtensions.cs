@@ -94,6 +94,7 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.
             builder.Services.AddScoped<IReportingPlanScheduleProjector, ReportingPlanScheduleProjector>();
+            builder.Services.AddScoped<IFacilityReportingPeriodResolver, FacilityReportingPeriodResolver>();
             builder.Services.AddScoped<IFacilityReportingPlanLookAhead, FacilityReportingPlanLookAhead>();
 
             builder.Services.TryAddSingleton(TimeProvider.System);
