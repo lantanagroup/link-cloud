@@ -1,7 +1,9 @@
 using FluentAssertions;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Shared;
@@ -71,6 +73,52 @@ public class PipelineAbortRegistryTests
         await registry.AbortAsync(" ", " ", TimeSpan.FromDays(1));
         (await registry.IsAbortedAsync(null, null)).Should().BeFalse();
         (await registry.IsAbortedAsync("", "")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Abort_matches_equivalent_guid_representations()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var guid = Guid.Parse("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE");
+
+        await registry.AbortAsync(guid.ToString("B").ToUpperInvariant(), guid.ToString("N").ToUpperInvariant(), TimeSpan.FromDays(14));
+
+        (await registry.IsAbortedAsync(guid.ToString("D"), null)).Should().BeTrue();
+        (await registry.IsAbortedAsync(null, guid.ToString("D"))).Should().BeTrue();
+        (await registry.IsAbortedAsync(guid.ToString("P"), guid.ToString("B"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Named_facility_ids_are_trimmed_but_not_rewritten()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        await registry.AbortAsync("  echs  ", reportId: null, TimeSpan.FromDays(14));
+        (await registry.IsAbortedAsync("echs", null)).Should().BeTrue();
+        (await registry.IsAbortedAsync("ECHS", null)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AddPipelineAbortRegistry_without_redis_requires_explicit_in_memory()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        Action act = () => new ServiceCollection().AddPipelineAbortRegistry(configuration);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*AllowInMemory*");
+    }
+
+    [Fact]
+    public void AddPipelineAbortRegistry_allow_in_memory_registers_local_registry()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [PipelineAbortRegistryExtensions.AllowInMemoryConfigurationKey] = "true"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddPipelineAbortRegistry(configuration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IPipelineAbortRegistry>().Should().BeOfType<InMemoryPipelineAbortRegistry>();
     }
 
     [Fact]

@@ -182,7 +182,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
-                        scope.ServiceProvider, _logger, Name, facilityId, reportId?.ToString(), cancellationToken))
+                        scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
                     return;
 
                 if (value is { Regenerate: true, ReportId: not null })

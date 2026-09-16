@@ -259,9 +259,16 @@ public class AcquisitionProcessingJob : IJob
 
                 if (abortedRequestIds.Count > 0)
                 {
+                    var cancellableAbortedIds = abortedRequestIds.Except(maxRetriesReachedIds).ToList();
+                    if (cancellableAbortedIds.Count > 0)
+                    {
+                        await dataAcquisitionLogManager.UpdateStatusBatchAsync(
+                            cancellableAbortedIds, RequestStatus.Cancelled, false, cancellationToken);
+                    }
+
                     _logger.LogInformation(
-                        "Skipping {Count} aborted acquisition logs for facility {FacilityId}.",
-                        abortedRequestIds.Count, facilityId.SanitizeForLog());
+                        "Cancelled {Count} aborted acquisition logs for facility {FacilityId}.",
+                        cancellableAbortedIds.Count, facilityId.SanitizeForLog());
                     pendingLogIds = pendingLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
                     retryableFailedLogIds = retryableFailedLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
                 }

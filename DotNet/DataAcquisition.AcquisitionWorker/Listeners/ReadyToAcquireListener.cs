@@ -54,17 +54,24 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
         using var scope = _serviceScopeFactory.CreateScope();
         
+        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
         if (abortRegistry != null &&
             await abortRegistry.IsAbortedAsync(value.FacilityId, value.ReportTrackingId, cancellationToken))
         {
+            var logIdToCancel = value.LogId.Value;
+            await logManager.TrySetLogStatusAsync(
+                logIdToCancel,
+                [RequestStatus.Ready, RequestStatus.Pending, RequestStatus.Queued],
+                RequestStatus.Cancelled,
+                note: $"[{DateTime.UtcNow:O}] Cancelled: pipeline aborted.",
+                cancellationToken: cancellationToken);
             _logger.LogDebug(
-                "Skipping ReadyToAcquire for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}, LogId={LogId}.",
+                "Cancelled ReadyToAcquire for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}, LogId={LogId}.",
                 value.FacilityId.SanitizeForLog(), value.ReportTrackingId.SanitizeForLog(), value.LogId);
             return;
         }
 
-        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 
         // ATOMIC STEP: Attempt to "claim" the log - single DB write, no read needed

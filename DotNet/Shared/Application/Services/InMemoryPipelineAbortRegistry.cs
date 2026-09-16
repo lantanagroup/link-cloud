@@ -65,9 +65,24 @@ public sealed class InMemoryPipelineAbortRegistry : IPipelineAbortRegistry
             _expiresAtTicks.TryRemove(key, out _);
     }
 
-    internal static string? FacilityKey(string? facilityId) =>
-        string.IsNullOrWhiteSpace(facilityId) ? null : $"link:pipeline-abort:facility:{facilityId.Trim()}";
+    internal static string? FacilityKey(string? facilityId)
+    {
+        var id = CanonicalId(facilityId);
+        return id == null ? null : $"link:pipeline-abort:facility:{id}";
+    }
 
-    internal static string? ReportKey(string? reportId) =>
-        string.IsNullOrWhiteSpace(reportId) ? null : $"link:pipeline-abort:report:{reportId.Trim()}";
+    internal static string? ReportKey(string? reportId)
+    {
+        var id = CanonicalId(reportId);
+        return id == null ? null : $"link:pipeline-abort:report:{id}";
+    }
+
+    internal static string? CanonicalId(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
+        var trimmed = id.Trim();
+        return Guid.TryParse(trimmed, out var guid) ? guid.ToString("D") : trimmed;
+    }
 }

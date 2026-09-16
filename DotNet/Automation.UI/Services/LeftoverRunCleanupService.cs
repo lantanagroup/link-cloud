@@ -152,8 +152,17 @@ public sealed class LeftoverRunCleanupService(
                 if (settings.Enabled && settings.QuiesceEnabled && IsQuiesceDue(now, settings))
                 {
                     var result = await RunQuiesceAsync(stoppingToken, trigger: "scheduled");
-                    _lastQuiesceAt = now;
                     LastQuiesceResult = result;
+                    if (result.ProcessedAllCandidates)
+                    {
+                        _lastQuiesceAt = now;
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "Scheduled quiesce left remaining leftover facilities; continuing on the next sweep tick. candidates={Candidates}, quiesced={Quiesced}",
+                            result.QuiesceCandidateCount, result.QuiescedFacilityIds.Count);
+                    }
                 }
 
                 if (settings.Enabled && settings.DailyTeardownEnabled
@@ -161,15 +170,15 @@ public sealed class LeftoverRunCleanupService(
                 {
                     var result = await RunTeardownAsync(stoppingToken, trigger: "scheduled");
                     LastTeardownResult = result;
-                    if (result.Succeeded)
+                    if (result.Succeeded && result.ProcessedAllCandidates)
                     {
                         await settingsStore.RecordDailyTeardownAsync(now, FormatResult("Daily teardown", result), stoppingToken);
                     }
                     else
                     {
                         logger.LogWarning(
-                            "Daily leftover teardown finished with failures; not recording success so it can retry in the catch-up window. failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
-                            result.FailedFacilityIds.Count, result.FailedRunIds.Count);
+                            "Daily leftover teardown did not finish every candidate; not recording success so it can retry in the catch-up window. candidates={Candidates}, tornDown={TornDown}, failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
+                            result.TeardownCandidateCount, result.TornDownFacilityIds.Count, result.FailedFacilityIds.Count, result.FailedRunIds.Count);
                     }
                 }
 
@@ -183,15 +192,15 @@ public sealed class LeftoverRunCleanupService(
                 {
                     var result = await RunHistoryPurgeAsync(stoppingToken, trigger: "scheduled");
                     LastHistoryPurgeResult = result;
-                    if (result.Succeeded)
+                    if (result.Succeeded && result.ProcessedAllCandidates)
                     {
                         await settingsStore.RecordWeeklyPurgeAsync(now, FormatResult("Weekly history purge", result), stoppingToken);
                     }
                     else
                     {
                         logger.LogWarning(
-                            "Weekly leftover history purge finished with failures; not recording success so it can retry in the catch-up window. failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
-                            result.FailedFacilityIds.Count, result.FailedRunIds.Count);
+                            "Weekly leftover history purge did not finish every candidate; not recording success so it can retry in the catch-up window. candidates={Candidates}, purged={Purged}, failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
+                            result.HistoryPurgeCandidateCount, result.PurgedRunIds.Count, result.FailedFacilityIds.Count, result.FailedRunIds.Count);
                     }
                 }
             }
@@ -322,8 +331,21 @@ public sealed class LeftoverRunCleanupService(
             var now = time.GetUtcNow();
             var (facilityIds, historyRuns) = select(facilities, runs, now, settings);
 
+            IReadOnlyList<string> selectedFacilities = facilityIds;
+            if (!teardownFacilities)
+            {
+                var stillHot = new List<string>();
+                foreach (var id in facilityIds)
+                {
+                    if (!await abortRegistry.IsAbortedAsync(id, reportId: null, cancellationToken))
+                        stillHot.Add(id);
+                }
+
+                selectedFacilities = stillHot;
+            }
+
             var limit = Math.Max(1, maxFacilitiesOverride ?? settings.MaxFacilitiesPerPass);
-            var facilityWork = facilityIds.Take(limit).ToList();
+            var facilityWork = selectedFacilities.Take(limit).ToList();
             var historyWork = purgeHistory
                 ? historyRuns.Take(Math.Max(limit, 200)).ToList()
                 : [];
@@ -412,7 +434,7 @@ public sealed class LeftoverRunCleanupService(
             }
 
             var result = new LeftoverCleanupResult(
-                teardownFacilities ? 0 : facilityIds.Count,
+                teardownFacilities ? 0 : selectedFacilities.Count,
                 quiesced,
                 teardownFacilities ? facilityIds.Count : 0,
                 tornDown,
@@ -421,11 +443,11 @@ public sealed class LeftoverRunCleanupService(
                 failedFacilities,
                 failedRuns);
 
-            if (quiesced.Count > 0 || tornDown.Count > 0 || purged.Count > 0 || facilityIds.Count > 0 || historyRuns.Count > 0)
+            if (quiesced.Count > 0 || tornDown.Count > 0 || purged.Count > 0 || selectedFacilities.Count > 0 || historyRuns.Count > 0)
             {
                 logger.LogInformation(
-                    "Leftover Automation {Mode} finished. facilities={FacilityCandidates}, quiesced={Quiesced}, tornDown={TornDown}, history={HistoryCandidates}, purged={Purged}, failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
-                    mode, facilityIds.Count, quiesced.Count, tornDown.Count, historyRuns.Count, purged.Count, failedFacilities.Count, failedRuns.Count);
+                    "Leftover Automation {Mode} finished. facilities={FacilityCandidates}, quiesced={Quiesced}, tornDown={TornDown}, history={HistoryCandidates}, purged={Purged}, failedFacilities={FailedFacilities}, failedRuns={FailedRuns}, processedAll={ProcessedAll}",
+                    mode, selectedFacilities.Count, quiesced.Count, tornDown.Count, historyRuns.Count, purged.Count, failedFacilities.Count, failedRuns.Count, result.ProcessedAllCandidates);
             }
 
             await PublishAsync(new CleanupActivity
@@ -595,4 +617,9 @@ public sealed record LeftoverCleanupResult(
     IReadOnlyList<Guid> FailedRunIds)
 {
     public bool Succeeded => FailedFacilityIds.Count == 0 && FailedRunIds.Count == 0;
+
+    public bool ProcessedAllCandidates =>
+        (QuiesceCandidateCount == 0 || QuiescedFacilityIds.Count + FailedFacilityIds.Count == QuiesceCandidateCount)
+        && (TeardownCandidateCount == 0 || TornDownFacilityIds.Count + FailedFacilityIds.Count == TeardownCandidateCount)
+        && (HistoryPurgeCandidateCount == 0 || PurgedRunIds.Count + FailedRunIds.Count == HistoryPurgeCandidateCount);
 }

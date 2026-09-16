@@ -67,6 +67,7 @@ public static class RestoreReport
         {
             logger.LogError(ex, "Failed to clear pipeline abort flag while restoring report {ReportScheduleId} — rolling back restore", reportScheduleId);
             await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to clear the abort flag. Report restore has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
@@ -99,6 +100,20 @@ public static class RestoreReport
         catch (Exception ex)
         {
             logger.LogError(ex, "Rollback failed: exception re-deleting report schedule {ReportScheduleId}", reportScheduleId);
+        }
+    }
+
+    private static async Task RollbackAcquisitionLogsAsync(DataAcquisitionService dataAcquisitionService, HttpContext context, string reportScheduleId, ILogger logger)
+    {
+        try
+        {
+            var response = await dataAcquisitionService.SoftDeleteLogsByReportTrackingIdAsync(context.User, reportScheduleId, context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                logger.LogError("Rollback failed: could not re-delete acquisition logs for report {ReportScheduleId} (status {StatusCode})", reportScheduleId, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rollback failed: exception re-deleting acquisition logs for report {ReportScheduleId}", reportScheduleId);
         }
     }
 }

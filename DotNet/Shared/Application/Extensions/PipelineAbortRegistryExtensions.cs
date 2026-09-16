@@ -11,11 +11,19 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 
 public static class PipelineAbortRegistryExtensions
 {
+    public const string AllowInMemoryConfigurationKey = "PipelineAbort:AllowInMemory";
+
     public static IServiceCollection AddPipelineAbortRegistry(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = BuildRedisConfiguration(configuration);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
+            if (!bool.TryParse(configuration[AllowInMemoryConfigurationKey], out var allowInMemory) || !allowInMemory)
+            {
+                throw new InvalidOperationException(
+                    "Pipeline abort registry requires Redis (ConnectionStrings:Redis or ResourceCache:Redis:ConnectionString). Set PipelineAbort:AllowInMemory=true only for tests or single-process local use.");
+            }
+
             services.TryAddSingleton<IPipelineAbortRegistry, InMemoryPipelineAbortRegistry>();
             return services;
         }
