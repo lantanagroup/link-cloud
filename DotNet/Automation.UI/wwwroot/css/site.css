@@ -43,6 +43,20 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-navbar .nav-link:hover { color: var(--au-accent) !important; }
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
 
+.au-navbar .au-nav-admin {
+  margin-left: auto;
+}
+.au-navbar .au-nav-admin-label {
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45) !important;
+  padding-right: .65rem;
+  margin-right: .15rem;
+  border-right: 1px solid rgba(255,255,255,.2);
+  line-height: 1;
+}
+
 .au-navbar .au-nav-dropdown-menu {
   background: var(--au-dark);
   border: 1px solid rgba(255,255,255,.2);
@@ -355,6 +369,22 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 /* ===================================================================
    Responsive helpers
    =================================================================== */
+.au-cleanup-section {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #eceff3;
+}
+.au-cleanup-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: .75rem;
+}
+.au-cleanup-activity.is-running .progress-bar {
+  background: var(--au-accent);
+}
+.au-cleanup-activity .progress {
+  height: .55rem;
+}
+
 @media (max-width: 767.98px) {
   .au-card .card-body { padding: .75rem; }
   .au-table { font-size: .8rem; }
