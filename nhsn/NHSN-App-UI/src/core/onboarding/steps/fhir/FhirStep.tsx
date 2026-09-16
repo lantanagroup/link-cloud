@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, InfoTooltip, NumberField, PageHeader, StepActions, TextField} from '../../../fields';
+import {Button, InfoTooltip, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
@@ -325,6 +325,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
           <div className="form-group">
             <label>
               {t('onboarding:fhirServerInfo.fields.lagLabel')}
+              <RequiredAsterisk />
               <InfoTooltip
                 label={t('onboarding:fhirServerInfo.fields.lagLabel')}
                 content={t('onboarding:fhirServerInfo.fields.lagTooltip')}

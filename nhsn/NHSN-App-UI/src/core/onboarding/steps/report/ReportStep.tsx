@@ -163,6 +163,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
             id="reportMeasures"
             label={t('onboarding:report.fields.measuresLabel')}
             hint={t('onboarding:report.fields.measuresTooltip')}
+            required
             options={measureOptions}
             value={selectedMeasures}
             emptyText={t('onboarding:report.fields.measuresEmpty')}

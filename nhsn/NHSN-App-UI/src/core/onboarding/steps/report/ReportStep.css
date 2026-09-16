@@ -112,8 +112,12 @@
   pointer-events: none;
 }
 
+/* Required-field indicator (a red asterisk icon MistFormLabel renders after
+   the label text when the field is `required`) - shown, not hidden. */
 .report-generate .k-label svg {
-  display: none;
+  display: inline-block;
+  margin-left: 3px;
+  vertical-align: top;
 }
 
 .report-generate .k-input {
@@ -199,6 +203,7 @@
   margin-bottom: 6px;
   color: var(--report-gray-800);
 }
+
 
 .report-generate .report-tab-body {
   padding-top: 14px;

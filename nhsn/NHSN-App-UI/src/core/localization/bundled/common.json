@@ -32,7 +32,9 @@
     "refresh": "Refresh",
     "close": "Close",
     "download": "Download",
-    "testConnection": "Test Connection"
+    "testConnection": "Test Connection",
+    "chooseFile": "Choose File",
+    "noFileChosen": "No file chosen"
   },
   "commonBoolean": {
     "yes": "Yes",

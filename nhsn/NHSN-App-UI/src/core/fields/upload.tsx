@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {MessageContainer} from './layout';
 
@@ -94,13 +94,30 @@ export interface FileUploadFieldProps {
   disabled?: boolean;
 }
 
-/** A labeled, native file input — the "Upload Completed Import Sheet" control. */
+/**
+ * A labeled file upload control — the "Upload Completed Import Sheet" control.
+ *
+ * A native `<input type="file">` is one clickable widget end to end: there is
+ * no way, via CSS alone, to make only its button portion open the file dialog
+ * and leave the "No file chosen" text inert. So the native input here is
+ * visually hidden and triggered from a real button instead; the filename is
+ * rendered as plain text that can't trigger anything.
+ */
 export function FileUploadField({id, label, accept, onSelect, disabled}: FileUploadFieldProps) {
+  const {t} = useTranslation('common');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file) {
+      setFileName(file.name);
       onSelect(file);
     }
+  }
+
+  function handleChooseClick() {
+    inputRef.current?.click();
   }
 
   return (
@@ -108,7 +125,26 @@ export function FileUploadField({id, label, accept, onSelect, disabled}: FileUpl
       <label className="nhsn-link__upload-label" htmlFor={id}>
         {label}
       </label>
-      <input id={id} type="file" accept={accept} onChange={handleChange} disabled={disabled} />
+      <div className="nhsn-link__upload-control">
+        <button
+          type="button"
+          className="nhsn-link__upload-choose-button"
+          onClick={handleChooseClick}
+          disabled={disabled}>
+          {t('common:actions.chooseFile')}
+        </button>
+        <span className="nhsn-link__upload-filename">{fileName ?? t('common:actions.noFileChosen')}</span>
+        <input
+          ref={inputRef}
+          id={id}
+          className="nhsn-link__upload-native-input"
+          type="file"
+          accept={accept}
+          tabIndex={-1}
+          onChange={handleChange}
+          disabled={disabled}
+        />
+      </div>
     </div>
   );
 }

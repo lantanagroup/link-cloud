@@ -18,7 +18,7 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
-import {findIncompleteRowIndexes} from './validate';
+import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes} from './validate';
 import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
@@ -166,7 +166,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
   }
 
   const incompleteRowIndexes = useMemo(() => new Set(findIncompleteRowIndexes(rows)), [rows]);
+  const duplicateRowIndexes = useMemo(() => new Set(findDuplicateSourceCodeIndexes(rows)), [rows]);
   const requiredFieldError = t('onboarding:hsloc.mapping.fields.requiredError');
+  const duplicateFieldError = t('onboarding:hsloc.mapping.fields.duplicateError');
 
   const categories = useMemo(
     () => Array.from(new Set(codes.map(row => row.category).filter((value): value is string => Boolean(value)))).sort(),
@@ -233,6 +235,10 @@ export function HslocStep({onNext, onBack}: StepProps) {
       notifyError(t('onboarding:hsloc.messages.incomplete'));
       return;
     }
+    if (duplicateRowIndexes.size > 0) {
+      notifyError(t('onboarding:hsloc.messages.duplicate'));
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -293,6 +299,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
             renderItem={(row, index, onRowChange) => {
               const sourceDisplayInvalid = row.dirty.sourceDisplay && !row.sourceDisplay.trim();
               const sourceCodeInvalid = row.dirty.sourceCode && !row.sourceCode.trim();
+              const sourceCodeDuplicate = row.dirty.sourceCode && !sourceCodeInvalid && duplicateRowIndexes.has(index);
               const hslocCodeInvalid = row.dirty.hslocCode && !row.hslocCode.trim();
               return (
                 <>
@@ -311,7 +318,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     label={locationValueLabel}
                     placeholder={locationValueLabel}
                     value={row.sourceCode}
-                    error={sourceCodeInvalid ? requiredFieldError : undefined}
+                    error={sourceCodeInvalid ? requiredFieldError : sourceCodeDuplicate ? duplicateFieldError : undefined}
                     onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}})}
                   />
                   <div>

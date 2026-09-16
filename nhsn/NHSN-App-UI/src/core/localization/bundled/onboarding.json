@@ -308,7 +308,8 @@
         "yourCodeAriaLabel": "Your Code",
         "locationValueFallback": "Location value",
         "hslocCodePlaceholder": "Select an HSLOC code…",
-        "requiredError": "This field is required."
+        "requiredError": "This field is required.",
+        "duplicateError": "This location code is already mapped in another row."
       }
     },
     "reference": {
@@ -353,6 +354,7 @@
     },
     "messages": {
       "incomplete": "Please complete all fields for each mapping row before continuing.",
+      "duplicate": "Two or more rows map the same location code to different HSLOC codes. Each location code must be unique.",
       "loadError": "Unable to load HSLOC reference data.",
       "saveError": "Unable to save HSLOC location mappings."
     }

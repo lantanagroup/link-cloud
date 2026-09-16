@@ -848,8 +848,12 @@
   pointer-events: none;
 }
 
+/* Required-field indicator (a red asterisk icon MistFormLabel renders after
+   the label text when the field is `required`) - shown, not hidden. */
 .nhsn-facility-info .k-label svg {
-  display: none;
+  display: inline-block;
+  margin-left: 3px;
+  vertical-align: top;
 }
 
 .nhsn-link__content .k-form-field:has(.k-form-hint) .k-label {
@@ -1152,6 +1156,16 @@
   fill: #cfeee0;
 }
 
+/* core/fields/layout.tsx RequiredAsterisk - a plain "*" glyph set right after
+   the label text (not an icon), so it reads as part of the label instead of
+   a separate element floating beside it. */
+.nhsn-link__required-asterisk {
+  margin-left: 3px;
+  color: red;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
 /* Kendo's own label, visually hidden (never `display: none`) where FieldLabel already shows it. */
 .nhsn-link__field-group--labeled .k-label,
 .nhsn-link__repeatable-fields .k-label {
@@ -1346,9 +1360,6 @@
   pointer-events: auto;
 }
 
-.nhsn-link__chip-select-required {
-  color: var(--kendo-color-error, #cc1b22);
-}
 
 .nhsn-link__chip-select-label .info-icon .tooltip-bubble {
   left: 0;

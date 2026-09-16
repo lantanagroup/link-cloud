@@ -10,6 +10,7 @@ import {
   InlineSpinner,
   MessageContainer,
   RepeatableList,
+  RequiredAsterisk,
   Tabs,
   TextField
 } from '../../../fields';
@@ -351,6 +352,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     <div className="form-group report-patients">
       <span className="report-patients-label" id="reportPatientsLabel">
         {t('onboarding:report.patients.label')}
+        <RequiredAsterisk />
         <InfoTooltip
           label={t('onboarding:report.patients.label')}
           content={t('onboarding:report.patients.hint', {limit: PATIENT_ID_LIMIT})} />
