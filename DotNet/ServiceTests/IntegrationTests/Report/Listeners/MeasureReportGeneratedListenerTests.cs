@@ -179,9 +179,10 @@ public class MeasureReportGeneratedListenerTests
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_NoSchedule_CallsDeadLetterHandler()
+    public async Task ProcessMessageAsync_NoSchedule_SkipsWithoutDeadLetter()
     {
         _fixture.MeasureReportGeneratedDeadLetterHandlerMock.Reset();
+        _fixture.SubmitPayloadKafkaProducerMock.Reset();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<MeasureReportGeneratedListener>();
@@ -198,8 +199,20 @@ public class MeasureReportGeneratedListenerTests
             Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
         };
 
-        await Assert.ThrowsAsync<DeadLetterException>(async () =>
-            await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None));
+        await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
+
+        _fixture.MeasureReportGeneratedDeadLetterHandlerMock.Verify(
+            h => h.HandleException(
+                It.IsAny<ConsumeResult<Null, MeasureReportGeneratedValue>>(),
+                It.IsAny<DeadLetterException>(),
+                It.IsAny<string>()),
+            Times.Never);
+        _fixture.SubmitPayloadKafkaProducerMock.Verify(
+            p => p.Produce(
+                It.IsAny<string>(),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+            Times.Never);
     }
 
     [Fact]
