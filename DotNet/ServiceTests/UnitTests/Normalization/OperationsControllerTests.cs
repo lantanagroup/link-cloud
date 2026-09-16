@@ -45,9 +45,9 @@ public class OperationsControllerTests
     public async Task SaveAllowedOperation_ReachesManager(bool update, bool vendor)
     {
         var manager = new Mock<IOperationManager>();
-        manager.Setup(candidate => candidate.CreateOperation(It.IsAny<CreateOperationModel>()))
+        manager.Setup(candidate => candidate.CreateOperation(It.IsAny<CreateOperationModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TaskResult { IsSuccess = false, ErrorMessage = "Manager reached" });
-        manager.Setup(candidate => candidate.UpdateOperation(It.IsAny<UpdateOperationModel>()))
+        manager.Setup(candidate => candidate.UpdateOperation(It.IsAny<UpdateOperationModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TaskResult { IsSuccess = false, ErrorMessage = "Manager reached" });
         var tenantService = new Mock<ITenantApiService>();
         tenantService.Setup(candidate => candidate.CheckFacilityExists("facility", It.IsAny<CancellationToken>())).ReturnsAsync(true);

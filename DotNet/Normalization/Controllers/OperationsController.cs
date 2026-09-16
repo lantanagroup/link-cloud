@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> PostOperation(PostOperationModel model)
+        public async Task<IActionResult> PostOperation(PostOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -220,7 +220,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId, cancellationToken))
                     {
                         return Problem(detail: $"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
@@ -244,7 +244,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
                     VendorVersionIds = model.VendorVersionIds
-                });
+                }, cancellationToken);
 
                 if (!taskResult.IsSuccess)
                 {
@@ -304,7 +304,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> PutOperation(PutOperationModel model)
+        public async Task<IActionResult> PutOperation(PutOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -330,7 +330,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId, cancellationToken))
                     {
                         return Problem(detail: $"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
@@ -353,7 +353,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Description = model.Operation.Description,
                     IsDisabled = model.IsDisabled,
                     VendorVersionIds = model.VendorVersionIds
-                });
+                }, cancellationToken);
 
                 if (!taskResult.IsSuccess)
                 {

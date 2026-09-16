@@ -3,6 +3,10 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Man
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Domain;
+using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,6 +121,64 @@ namespace IntegrationTests.Normalization
                 Description = "Test",
                 IsDisabled = false
             };
+        }
+
+        [Theory]
+        [InlineData(false, "active", true)]
+        [InlineData(true, "active", true)]
+        [InlineData(false, "inactive", false)]
+        [InlineData(true, "inactive", false)]
+        [InlineData(false, "unknown", false)]
+        [InlineData(true, "unknown", false)]
+        [InlineData(false, "cdc", false)]
+        [InlineData(true, "cdc", false)]
+        public async Task SaveHSLOCMap_RequiresActiveHSLOCCode(bool update, string codeKind, bool expectedSuccess)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var context = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+            var prefix = Guid.NewGuid().ToString();
+            context.HSLOCS.AddRange(
+                new HSLOC { HSLOCCode = prefix + "active", CDCCode = prefix + "cdc", IsActive = true },
+                new HSLOC { HSLOCCode = prefix + "inactive", IsActive = false });
+            await context.SaveChangesAsync();
+
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = nameof(OperationType.HSLOCMap);
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            OperationModel? original = null;
+            if (update)
+            {
+                var created = await manager.CreateOperation(model);
+                Assert.True(created.IsSuccess, created.ErrorMessage);
+                original = Assert.IsType<OperationModel>(created.ObjectResult);
+            }
+
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation(
+                [new CodeSystemMap("urn:local", MappingTargetSystems.HslocUrl, new Dictionary<string, CodeMap>
+                {
+                    ["valid"] = new CodeMap(prefix + "active", "Active"),
+                    ["candidate"] = new CodeMap(prefix + codeKind, "Candidate")
+                })]));
+            var result = update
+                ? await manager.UpdateOperation(new UpdateOperationModel
+                {
+                    Id = original!.Id, FacilityId = model.FacilityId, Name = model.Name,
+                    OperationJson = model.OperationJson, ResourceTypes = model.ResourceTypes
+                })
+                : await manager.CreateOperation(model);
+
+            Assert.Equal(expectedSuccess, result.IsSuccess);
+            if (!expectedSuccess)
+            {
+                Assert.Contains(prefix + codeKind, result.ErrorMessage);
+                var saved = await queries.Search(new OperationSearchModel { FacilityId = model.FacilityId });
+                if (update)
+                    Assert.Equal(original!.OperationJson, Assert.Single(saved.Records).OperationJson);
+                else
+                    Assert.Empty(saved.Records);
+            }
         }
 
         [Theory]
