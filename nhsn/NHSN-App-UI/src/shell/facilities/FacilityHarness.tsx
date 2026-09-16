@@ -1,17 +1,17 @@
-import React, { FormEvent, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { AppRoot } from "../../core/AppRoot";
-import type { ApiClient } from "../../core/api/ApiClient";
-import { BffApiClient } from "../../core/api/BffApiClient";
-import { MockApiClient } from "../mocks/MockApiClient";
-import { TestAuthApiClient } from "../auth/TestAuthApiClient";
-import { TestUserProfile } from "../auth/models";
+import React, {FormEvent, useMemo, useState} from "react";
+import {useTranslation} from "react-i18next";
+import {AppRoot} from "../../core/AppRoot";
+import type {ApiClient} from "../../core/api/ApiClient";
+import {BffApiClient} from "../../core/api/BffApiClient";
+import {MockApiClient} from "../mocks/MockApiClient";
+import {TestAuthApiClient} from "../auth/TestAuthApiClient";
+import {TestUserProfile} from "../auth/models";
 import {
-  loadActiveProfileId,
-  loadProfiles,
-  removeActiveProfileId,
-  saveActiveProfileId,
-  saveProfiles,
+    loadActiveProfileId,
+    loadProfiles,
+    removeActiveProfileId,
+    saveActiveProfileId,
+    saveProfiles,
 } from "../auth/test-user-storage";
 import "./harness.css";
 
@@ -33,9 +33,7 @@ type EditorState = {
 function getRuntimeDefaults() {
   const runtimeConfig = window.__NHSN_APP_UI_CONFIG__;
   return {
-    issuer:
-      runtimeConfig?.defaultJwtIssuer?.trim() ||
-      "https://dev-nhsn-app.example.org",
+    issuer: runtimeConfig?.defaultJwtIssuer?.trim() || "",
     keyId: runtimeConfig?.defaultJwtKeyId?.trim() || "",
     privateKeyPem: runtimeConfig?.defaultJwtPrivateKeyPem || "",
   };
