@@ -102,6 +102,70 @@ public class AcquisitionProcessingJobTests
     }
 
     [Fact]
+    public async Task ProcessPendingLogs_AbortedReport_CancelsLogAndDoesNotProduce()
+    {
+        _fixture.ReadyToAcquireProducerMock.Reset();
+
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"AbortedReportFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+        var abort = scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.Shared.Application.Interfaces.IPipelineAbortRegistry>();
+
+        dbContext.FhirQueryConfigurations.Add(new FhirQueryConfiguration
+        {
+            FacilityId = facilityId,
+            FhirServerBaseUrl = "http://example.com",
+            MinAcquisitionPullTime = null,
+            MaxAcquisitionPullTime = null
+        });
+
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+
+        var log = await logManager.CreateAsync(new CreateDataAcquisitionLogModel
+        {
+            FacilityId = facilityId,
+            QueryType = FhirQueryType.Read,
+            Status = RequestStatus.Pending,
+            CorrelationId = Guid.NewGuid().ToString(),
+            PatientId = "Patient/123",
+            ReportTrackingId = reportTrackingId.ToString()
+        });
+
+        await abort.AbortAsync(facilityId: null, reportTrackingId.ToString(), TimeSpan.FromDays(14));
+
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
+        var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ReadyToAcquireProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ReadyToAcquire.ToString(),
+                It.IsAny<Message<long, ReadyToAcquire>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var cancelled = await assertDbContext.DataAcquisitionLogs.FindAsync(log.Id);
+        Assert.Equal(RequestStatus.Cancelled, cancelled!.Status);
+    }
+
+    [Fact]
     public async Task ProcessPendingLogs_NoConfig_SetsConfigurationMissingWithNoteImmediately()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();

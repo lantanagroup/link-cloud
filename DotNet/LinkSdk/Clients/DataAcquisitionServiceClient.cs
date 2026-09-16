@@ -239,4 +239,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
+        SftpTestConnectionRequestApiModel request,
+        bool includeFileContent = false,
+        CancellationToken cancellationToken = default) =>
+        // The body carries the SFTP password, so it must not be copied into LinkApiResponse.RequestBody
+        SendAsync<SftpTestConnectionResultApiModel>(() => Request("data/sftp-configurations/test-connection")
+            .SetQueryParam("includeFileContent", includeFileContent ? "true" : "false")
+            .PostJsonAsync(request, cancellationToken: cancellationToken),
+            captureRequestBody: false);
 }
