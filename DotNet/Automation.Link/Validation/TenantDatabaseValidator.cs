@@ -14,8 +14,6 @@ public class TenantDatabaseValidator
         _reader = reader;
     }
 
-    // Existing validation path.
-    // Keep this overload so all existing non-DMRP callers continue to work unchanged.
     public async Task ValidateAllAsync(string facilityId, string expectedMeasureId)
     {
         var errors = new List<string>();
@@ -34,9 +32,7 @@ public class TenantDatabaseValidator
         WriteValidationResult(errors);
     }
 
-    // New validation path for DMRP-derived schedules.
-    // This validates the complete schedule by frequency rather than only checking
-    // that one expected measure appears in Monthly.
+    // Validates the complete Daily/Weekly/Monthly schedule rather than membership of a single monthly measure.
     public async Task ValidateAllAsync(
         string facilityId,
         IReadOnlyCollection<string> expectedDaily,
@@ -128,7 +124,6 @@ public class TenantDatabaseValidator
             AddError(errors, "CreateDate should be populated.");
     }
 
-    // Existing non-DMRP validation.
     private async Task ValidateScheduledReports(
         string facilityId,
         string expectedMeasureId,
@@ -159,9 +154,6 @@ public class TenantDatabaseValidator
         }
     }
 
-    // New DMRP validation.
-    // Require the complete Daily/Weekly/Monthly schedule to match what DMRP
-    // should have derived from the seeded enrollment.
     private async Task ValidateScheduledReports(
         string facilityId,
         IReadOnlyCollection<string> expectedDaily,

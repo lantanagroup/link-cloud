@@ -227,9 +227,10 @@ internal sealed class RunExecutor
                 dmrpClient,
                 output);
 
-
             if (state.Options.EnableDmrp)
             {
+                ValidateDmrpScenario(state.Options);
+
                 await mockDmrpApiHelper.EnsureReachableAsync(
                     state.Options.NhsnOrganizationId,
                     cancellationToken);
@@ -1951,10 +1952,27 @@ internal sealed class RunExecutor
         return plan;
     }
 
+    private static void ValidateDmrpScenario(ResolvedRunOptions options)
+    {
+        if (options.ReportMethod != ReportMethod.ScheduledReport)
+        {
+            throw new InvalidOperationException(
+                "DMRP enrollment is currently supported only for scheduled report scenarios.");
+        }
+
+        if (options.SelectedMeasures.Count != 1 ||
+            options.SelectedMeasures[0] !=
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+        {
+            throw new InvalidOperationException(
+                "DMRP enrollment is currently supported only for the ACH Monthly measure.");
+        }
+    }
+
     private static async Task ValidateDmrpConfigurationAsync(
-    bool enableDmrp,
-    IDmrpServiceClient dmrpClient,
-    IAutomationOutput output)
+        bool enableDmrp,
+        IDmrpServiceClient dmrpClient,
+        IAutomationOutput output)
     {
         var tenantDmrpEnabled = await IsTenantDmrpEnabledAsync(dmrpClient);
 

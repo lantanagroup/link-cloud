@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -81,10 +82,10 @@ public sealed class MockDmrpApiHelper
                 $"HTTP {(int)response.StatusCode}. Response: {body}");
         }
 
-        return await response.Content.ReadFromJsonAsync<MockDmrpEntryResponse>(
-                   cancellationToken: cancellationToken)
-               ?? throw new InvalidOperationException(
-                   "MockDmrpApi returned an empty response when creating an entry.");
+        return JsonSerializer.Deserialize<MockDmrpEntryResponse>(
+           body, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        ?? throw new InvalidOperationException(
+           "MockDmrpApi returned an empty response when creating an entry.");
     }
 
     public async Task DeleteFacilityEntriesAsync(
