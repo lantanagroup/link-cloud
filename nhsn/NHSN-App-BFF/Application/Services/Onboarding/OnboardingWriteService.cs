@@ -6,6 +6,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -228,12 +229,14 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     await _censusGateway.SaveAcquisitionFrequencyAsync(facility.FacilityId, draft.Census.AcquisitionFrequency, cancellationToken);
                 }
 
-                if (draft.Census.PatientListIds.Count > 0)
+                var censusAcquisition = facility.Vendor is { } vendor ? VendorProfileCatalog.Find(vendor)?.CensusAcquisition : null;
+
+                if (censusAcquisition == CensusAcquisition.PatientList && draft.Census.PatientListIds.Count > 0)
                 {
                     await _patientListGateway.SaveConfigurationAsync(facility.FacilityId, draft.Census.PatientListIds, cancellationToken);
                 }
-
-                if (!string.IsNullOrWhiteSpace(draft.Census.SftpHost) && draft.Census.SftpPort is not null)
+                else if (censusAcquisition == CensusAcquisition.Sftp
+                    && !string.IsNullOrWhiteSpace(draft.Census.SftpHost) && draft.Census.SftpPort is not null)
                 {
                     // A facility can only have one census acquisition method in Data Acquisition — a
                     // facility switching from Epic to Cerner would otherwise fail to save with a
