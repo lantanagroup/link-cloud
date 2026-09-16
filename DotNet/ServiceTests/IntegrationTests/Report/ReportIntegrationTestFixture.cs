@@ -192,6 +192,7 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
 
+            builder.Services.AddSingleton<IPipelineAbortRegistry, InMemoryPipelineAbortRegistry>();
             builder.Services.AddTransient<PatientEventListener>();
             builder.Services.AddTransient<ReportScheduledListener>();
             builder.Services.AddTransient<MeasureReportGeneratedListener>();

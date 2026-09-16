@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -87,6 +88,53 @@ public class MeasureReportGeneratedListenerTests
         var contentBytes = Encoding.UTF8.GetBytes(dummyContent);
         using var stream = new MemoryStream(contentBytes);
         await blobClient.UploadAsync(stream);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_AbortedFacility_SkipsWithoutUpdatingEntry()
+    {
+        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var abort = scope.ServiceProvider.GetRequiredService<IPipelineAbortRegistry>();
+        var listener = scope.ServiceProvider.GetRequiredService<MeasureReportGeneratedListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var facilityId = "abort-facility-" + Guid.NewGuid().ToString("N");
+        var reportId = Guid.NewGuid();
+        await abort.AbortAsync(facilityId, reportId.ToString(), TimeSpan.FromDays(14));
+
+        var schedule = CreateSchedule(facilityId, reportId);
+        await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
+
+        var entry = CreateEntry(facilityId, reportId, "pat-123", MeasureReportStatus.EntryCreated, "measure-pending.json");
+        await reportEntryManager.AddAsync(entry, CancellationToken.None);
+
+        var value = new MeasureReportGeneratedValue
+        {
+            FacilityId = facilityId,
+            ReportTrackingId = reportId.ToString(),
+            PatientId = "pat-123",
+            ReportType = "DE-111"
+        };
+        var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-abort") } };
+        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        {
+            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
+        };
+
+        await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
+
+        var unchanged = await reportEntryManager.GetEntry(reportId, "pat-123", CancellationToken.None);
+        Assert.NotNull(unchanged);
+        Assert.Equal(MeasureReportStatus.EntryCreated, unchanged.MeasureReports.Single().Status);
+        _fixture.SubmitPayloadKafkaProducerMock.Verify(
+            p => p.Produce(
+                It.IsAny<string>(),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+            Times.Never);
     }
 
     [Fact]

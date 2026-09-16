@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -156,6 +157,10 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
 
             using var scope = _serviceScopeFactory.CreateScope();
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, _logger, Name, facilityId, messageValue.ReportTrackingId, cancellationToken))
+                return;
+
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();

@@ -863,6 +863,7 @@ services:
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      Redis__Password: ${REDIS_PASS}
     ports:
       - "8072:8072"
     build:
@@ -879,6 +880,8 @@ services:
         condition: service_completed_successfully
       azurite_init:
         condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
       otel-collector:
         condition: service_started
       loki:

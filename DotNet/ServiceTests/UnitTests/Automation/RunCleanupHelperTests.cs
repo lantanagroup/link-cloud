@@ -1,6 +1,8 @@
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Models;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace UnitTests.Automation;
 
@@ -139,6 +141,65 @@ public class RunCleanupHelperTests
         RunCleanupHelper.SelectRunsFinishedInRange(runs, from, to)
             .Select(r => r.RunId)
             .Should().Equal(inRange);
+    }
+
+    [Fact]
+    public void RequireFacilityList_throws_when_tenant_list_is_not_success()
+    {
+        var act = () => RunCleanupHelper.RequireFacilityList(new LinkApiResponse<Dictionary<string, string>>
+        {
+            StatusCode = 500
+        });
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*HTTP 500*");
+    }
+
+    [Fact]
+    public void RequireFacilityList_treats_204_as_empty()
+    {
+        RunCleanupHelper.RequireFacilityList(new LinkApiResponse<Dictionary<string, string>>
+        {
+            StatusCode = 204
+        }).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EnsureTenantFacilityRemoved_throws_when_facility_still_present()
+    {
+        var remaining = new LinkApiResponse<FacilityModel>
+        {
+            StatusCode = 200,
+            Body = new FacilityModel { FacilityId = "leftover", IsDeleted = false }
+        };
+
+        var act = () => RunCleanupHelper.EnsureTenantFacilityRemoved(remaining, "leftover");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*left facility 'leftover' in place*");
+    }
+
+    [Fact]
+    public void EnsureTenantFacilityRemoved_accepts_404_and_soft_deleted()
+    {
+        RunCleanupHelper.EnsureTenantFacilityRemoved(
+            new LinkApiResponse<FacilityModel> { StatusCode = 404 },
+            "gone");
+
+        RunCleanupHelper.EnsureTenantFacilityRemoved(
+            new LinkApiResponse<FacilityModel>
+            {
+                StatusCode = 200,
+                Body = new FacilityModel { FacilityId = "gone", IsDeleted = true }
+            },
+            "gone");
+    }
+
+    [Fact]
+    public void EnsureTenantFacilityRemoved_throws_when_tenant_get_fails()
+    {
+        var act = () => RunCleanupHelper.EnsureTenantFacilityRemoved(
+            new LinkApiResponse<FacilityModel> { StatusCode = 500 },
+            "leftover");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*HTTP 500*");
     }
 
     [Fact]

@@ -1,8 +1,10 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Models;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -215,7 +217,37 @@ public static class RunCleanupHelper
         catch (Exception ex)
         {
             output.WriteLine($"Warning: leftover facility teardown failed for '{facilityId}': {ex.Message}");
+            throw;
         }
+
+        var remaining = await facilityClient.GetAsync(facilityId, cancellationToken);
+        EnsureTenantFacilityRemoved(remaining, facilityId);
+    }
+
+    /// <summary>
+    /// Tenant list 204 is an empty set. 4xx/5xx must not look like "nothing to clean."
+    /// </summary>
+    public static Dictionary<string, string> RequireFacilityList(
+        LinkApiResponse<Dictionary<string, string>> response)
+    {
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Tenant facility list failed (HTTP {response.StatusCode}).");
+
+        return response.Body ?? new Dictionary<string, string>();
+    }
+
+    /// <summary>
+    /// 404/204 means the facility is gone. 5xx is unknown. 200 with IsDeleted false means teardown missed Tenant.
+    /// </summary>
+    public static void EnsureTenantFacilityRemoved(LinkApiResponse<FacilityModel> remaining, string facilityId)
+    {
+        if (remaining.StatusCode is >= 500 or 0)
+            throw new InvalidOperationException(
+                $"Tenant leftover teardown could not confirm delete for '{facilityId}' (HTTP {remaining.StatusCode}).");
+
+        if (remaining.IsSuccessStatusCode && remaining.Body is not { IsDeleted: true })
+            throw new InvalidOperationException(
+                $"Tenant leftover teardown left facility '{facilityId}' in place.");
     }
 
     public static bool IsAutomationFacilityId(string? facilityId) =>

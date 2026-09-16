@@ -154,7 +154,16 @@ public sealed class LeftoverRunCleanupService(
                 {
                     var result = await RunTeardownAsync(stoppingToken, trigger: "scheduled");
                     LastTeardownResult = result;
-                    await settingsStore.RecordDailyTeardownAsync(now, FormatResult("Daily teardown", result), stoppingToken);
+                    if (result.Succeeded)
+                    {
+                        await settingsStore.RecordDailyTeardownAsync(now, FormatResult("Daily teardown", result), stoppingToken);
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Daily leftover teardown finished with failures; not recording success so it can retry in the catch-up window. failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
+                            result.FailedFacilityIds.Count, result.FailedRunIds.Count);
+                    }
                 }
 
                 if (settings.Enabled && settings.WeeklyHistoryPurgeEnabled
@@ -167,7 +176,16 @@ public sealed class LeftoverRunCleanupService(
                 {
                     var result = await RunHistoryPurgeAsync(stoppingToken, trigger: "scheduled");
                     LastHistoryPurgeResult = result;
-                    await settingsStore.RecordWeeklyPurgeAsync(now, FormatResult("Weekly history purge", result), stoppingToken);
+                    if (result.Succeeded)
+                    {
+                        await settingsStore.RecordWeeklyPurgeAsync(now, FormatResult("Weekly history purge", result), stoppingToken);
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Weekly leftover history purge finished with failures; not recording success so it can retry in the catch-up window. failedFacilities={FailedFacilities}, failedRuns={FailedRuns}",
+                            result.FailedFacilityIds.Count, result.FailedRunIds.Count);
+                    }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -298,7 +316,7 @@ public sealed class LeftoverRunCleanupService(
             }, cancellationToken);
 
             var facilitiesResponse = await facilityClient.GetFacilityListAsync(cancellationToken: cancellationToken);
-            var facilities = facilitiesResponse.Body ?? new Dictionary<string, string>();
+            var facilities = RunCleanupHelper.RequireFacilityList(facilitiesResponse);
             var runs = await snapshotStore.GetAllRunSummariesAsync(since: null, ct: cancellationToken);
             var now = time.GetUtcNow();
             var (facilityIds, historyRuns) = select(facilities, runs, now, settings);
@@ -573,4 +591,7 @@ public sealed record LeftoverCleanupResult(
     int HistoryPurgeCandidateCount,
     IReadOnlyList<Guid> PurgedRunIds,
     IReadOnlyList<string> FailedFacilityIds,
-    IReadOnlyList<Guid> FailedRunIds);
+    IReadOnlyList<Guid> FailedRunIds)
+{
+    public bool Succeeded => FailedFacilityIds.Count == 0 && FailedRunIds.Count == 0;
+}
