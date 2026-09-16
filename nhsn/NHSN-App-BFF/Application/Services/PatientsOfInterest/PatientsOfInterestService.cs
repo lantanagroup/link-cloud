@@ -40,6 +40,7 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
     public async Task<ConnectionResult> TestSftpConnectionAsync(SftpConfig config, CancellationToken cancellationToken = default)
     {
         var facilityId = _userContext.RequireFacilityId();
+        await _patientListGateway.DeleteConfigurationIfExistsAsync(facilityId, cancellationToken);
         await _sftpConfigurationGateway.SaveConfigurationAsync(facilityId, config, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(config.Username) && !string.IsNullOrWhiteSpace(config.Password))
