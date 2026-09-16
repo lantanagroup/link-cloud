@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return Problem(detail: $"'{operationType}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return Problem(detail: $"'{operationType}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return Problem(detail: $"'{operationType}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
