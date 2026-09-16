@@ -47,6 +47,20 @@ public class CleanupControllerTests
     }
 
     [Fact]
+    public async Task SaveSettings_WithUnknownRunKind_DoesNotStart()
+    {
+        var cleanup = MockCleanup();
+        var sut = Create(cleanup, MockStore());
+
+        var result = await sut.SaveSettings(ValidForm(), "quiesce\nINFO forged", CancellationToken.None);
+
+        cleanup.Verify(c => c.StartQuiesceInBackground(), Times.Never);
+        cleanup.Verify(c => c.StartTeardownInBackground(), Times.Never);
+        cleanup.Verify(c => c.StartHistoryPurgeInBackground(), Times.Never);
+        result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
     public async Task SaveSettings_WhenAlreadyRunning_DoesNotStartAnotherPass()
     {
         var cleanup = MockCleanup();

@@ -2,6 +2,7 @@ using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
@@ -72,6 +73,10 @@ public class CleanupController(
         if (leftoverRunCleanup.IsRunning)
             return Finish("A cleanup pass is already running. Watch the activity panel; you can start another when it finishes.", started: false, error: true);
 
+        var kind = KnownRunKind(runKind);
+        if (kind is null)
+            return Finish("Unknown cleanup type.", started: false, error: true);
+
         try
         {
             if (start is not null)
@@ -80,7 +85,7 @@ public class CleanupController(
             }
             else
             {
-                switch (runKind)
+                switch (kind)
                 {
                     case "quiesce":
                         leftoverRunCleanup.StartQuiesceInBackground();
@@ -92,17 +97,19 @@ public class CleanupController(
                         leftoverRunCleanup.StartHistoryPurgeInBackground();
                         break;
                     default:
-                        return Finish($"Unknown cleanup type '{runKind}'.", started: false, error: true);
+                        return Finish("Unknown cleanup type.", started: false, error: true);
                 }
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to start leftover cleanup {RunKind}.", runKind);
+            // CodeQL cs/log-injection treats Replace as a barrier; SanitizeForLog alone is not recognized.
+            logger.LogWarning(ex, "Failed to start leftover cleanup {RunKind}.",
+                kind.Replace("\r", string.Empty).Replace("\n", string.Empty).SanitizeForLog());
             return Finish($"Could not start cleanup: {ex.Message}", started: false, error: true);
         }
 
-        var label = runKind switch
+        var label = kind switch
         {
             "quiesce" => "Quiesce leftover hot work",
             "teardown" => "Off-hours leftover teardown",
@@ -110,8 +117,17 @@ public class CleanupController(
             "custom-range" => "Custom range cleanup",
             _ => "Cleanup"
         };
-        return Finish($"{label} started. Progress updates live on this page.", started: true, mode: runKind);
+        return Finish($"{label} started. Progress updates live on this page.", started: true, mode: kind);
     }
+
+    private static string? KnownRunKind(string runKind) => runKind switch
+    {
+        "quiesce" => "quiesce",
+        "teardown" => "teardown",
+        "history-purge" => "history-purge",
+        "custom-range" => "custom-range",
+        _ => null
+    };
 
     private IActionResult Finish(string message, bool started, bool error = false, string? mode = null)
     {
