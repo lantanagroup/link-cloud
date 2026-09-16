@@ -337,11 +337,14 @@ public static class GeneralStartupExtensions
 
         //SFTP Services
         services.AddTransient<ISftpClientService, SftpClientService>();
+        services.AddTransient<ISftpConnectionTestService, SftpConnectionTestService>();
         services.AddTransient<IFileParserFactory, FileParserFactory>();
         services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
 
         //File Parsers
         services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
+        // Concrete registration for the SFTP connection test's patient preview, which isn't part of IFileParser<T>
+        services.AddTransient<CernerCclExtractParser>();
 
         //SFTP Acquisition Processors
         services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();
