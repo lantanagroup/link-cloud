@@ -22,45 +22,60 @@ public sealed class HslocMappingRunValidator
         string facilityId,
         bool hslocMapEnabled,
         IReadOnlyList<string>? generatedPatientIds = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TimeSpan? settleTimeout = null)
     {
-        var errors = new List<string>();
+        var timeout = settleTimeout.GetValueOrDefault();
+        var deadline = timeout > TimeSpan.Zero
+            ? DateTimeOffset.UtcNow.Add(timeout)
+            : DateTimeOffset.UtcNow;
+        List<string> errors;
 
-        try
+        while (true)
         {
-            var mappings = await SearchAllMappingsAsync(facilityId, unmapped: null, cancellationToken);
+            errors = [];
+            try
+            {
+                var mappings = await SearchAllMappingsAsync(facilityId, unmapped: null, cancellationToken);
 
-            if (!hslocMapEnabled)
-            {
-                if (mappings.Count > 0)
+                if (!hslocMapEnabled)
                 {
-                    AddError(errors,
-                        $"Facility '{facilityId}' has no HSLOCMap operation but hsloc-mappings search returned {mappings.Count} row(s).");
-                }
-            }
-            else
-            {
-                var codes = await GetHslocCodesAsync(cancellationToken);
-                if (codes.Count == 0)
-                {
-                    AddError(errors, "GET /api/normalization/HSLOC returned no active codes. Mapping HSLOCId cannot be resolved.");
+                    if (mappings.Count > 0)
+                    {
+                        AddError(errors,
+                            $"Facility '{facilityId}' has no HSLOCMap operation but hsloc-mappings search returned {mappings.Count} row(s).");
+                    }
                 }
                 else
                 {
-                    ValidateMappedAndUnmapped(facilityId, mappings, generatedPatientIds, errors);
-                    await ValidateFacilityLocationsAsync(facilityId, generatedPatientIds, errors, cancellationToken);
+                    var codes = await GetHslocCodesAsync(cancellationToken);
+                    if (codes.Count == 0)
+                    {
+                        AddError(errors, "GET /api/normalization/HSLOC returned no active codes. Mapping HSLOCId cannot be resolved.");
+                    }
+                    else
+                    {
+                        ValidateMappedAndUnmapped(facilityId, mappings, generatedPatientIds, errors);
+                        await ValidateFacilityLocationsAsync(facilityId, generatedPatientIds, errors, cancellationToken);
+                    }
                 }
             }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            AddError(errors, $"Unhandled exception during HSLOC mapping run validation: {ex.Message}");
-        }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                AddError(errors, $"Unhandled exception during HSLOC mapping run validation: {ex.Message}");
+            }
 
-        if (errors.Count == 0)
-        {
-            _output.WriteLine("HSLOC MAPPING RUN VALIDATION: Passed");
-            return;
+            if (errors.Count == 0)
+            {
+                _output.WriteLine("HSLOC MAPPING RUN VALIDATION: Passed");
+                return;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+                break;
+
+            _output.WriteLine($"HSLOC MAPPING RUN VALIDATION: waiting for consumer rows ({errors[0]})");
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
 
         _output.WriteLine($"HSLOC MAPPING RUN VALIDATION: Failed ({errors.Count} issue(s))");

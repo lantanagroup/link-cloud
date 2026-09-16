@@ -914,35 +914,56 @@ internal sealed class RunExecutor
                     .ToList();
             }
 
-            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
-            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
-
-            var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
-                normalizationResolution,
-                runtimeNormalizationSequences,
-                normalizationSummaryLogs);
-            NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
-            try
-            {
-                await _snapshotStore.SetDomainAsync(
-                    state.RunId,
-                    NormalizationEvidenceSnapshot.Domain,
-                    normalizationEvidence,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-            }
-
-            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
-                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
-
             var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
                 string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            var hslocSettleTimeout = hslocMapEnabled ? TimeSpan.FromSeconds(90) : TimeSpan.Zero;
+
+            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", async () =>
+            {
+                var deadline = hslocMapEnabled
+                    ? DateTimeOffset.UtcNow.Add(hslocSettleTimeout)
+                    : DateTimeOffset.UtcNow;
+                while (true)
+                {
+                    var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+                    output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+
+                    var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
+                        normalizationResolution,
+                        runtimeNormalizationSequences,
+                        normalizationSummaryLogs);
+                    NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
+                    try
+                    {
+                        await _snapshotStore.SetDomainAsync(
+                            state.RunId,
+                            NormalizationEvidenceSnapshot.Domain,
+                            normalizationEvidence,
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        await normalizationSuiteApplicationValidator.ValidateAllAsync(
+                            internalAbsResources, normalizationResolution, normalizationSummaryLogs);
+                        return;
+                    }
+                    catch (InvalidOperationException ex) when (hslocMapEnabled && DateTimeOffset.UtcNow < deadline)
+                    {
+                        output.WriteLine($"[Normalization Suite] HSLOCMap Loki evidence not ready ({ex.Message}). Retrying scrape.");
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    }
+                }
+            });
+
             await RunValidator("HSLOC MAPPING RUN VALIDATION", () =>
-                hslocMappingRunValidator.ValidateAllAsync(facilityId, hslocMapEnabled, patientIds, cancellationToken));
+                hslocMappingRunValidator.ValidateAllAsync(
+                    facilityId, hslocMapEnabled, patientIds, cancellationToken, hslocSettleTimeout));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));
@@ -1027,7 +1048,6 @@ internal sealed class RunExecutor
         {
             output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
             _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
-            throw;
         }
     }
 

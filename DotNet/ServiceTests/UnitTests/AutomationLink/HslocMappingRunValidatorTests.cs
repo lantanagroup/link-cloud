@@ -178,6 +178,58 @@ public class HslocMappingRunValidatorTests
         ex.Message.Should().Contain("abcd1234-Loc-ICU");
     }
 
+    [Fact]
+    public async Task Enabled_GeneratedPatients_MappingsAppearOnRetry_Passes()
+    {
+        var client = new Mock<INormalizationServiceClient>();
+        client.Setup(c => c.GetHslocCodesAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Ok(new List<HslocCodeApiModel>
+            {
+                new() { HSLOCCode = "1025-6", IsActive = true }
+            }));
+        client.SetupSequence(c => c.SearchFacilityLocationLocalCodeMappingsAsync(
+                It.IsAny<SearchFacilityLocationLocalCodeMappingsRequestApiModel>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page())
+            .ReturnsAsync(Page(
+                new FacilityLocationLocalCodeMappingApiModel
+                {
+                    FacilityId = "facility-1",
+                    LocationId = "abcd1234-Loc-ICU",
+                    LocalCodeSystem = HslocMappingDefaults.IdentifierSystem,
+                    LocalCode = "abcd1234-Loc-ICU",
+                    HSLOCId = Guid.NewGuid(),
+                    HSLOCCode = "1025-6"
+                },
+                new FacilityLocationLocalCodeMappingApiModel
+                {
+                    FacilityId = "facility-1",
+                    LocationId = "abcd1234-Loc-ICU",
+                    LocalCodeSystem = "https://nhsnlink.org/location-alias",
+                    LocalCode = "Alias, Intensive Care Unit"
+                }));
+        client.Setup(c => c.GetFacilityLocationAsync("facility-1", "abcd1234-Loc-ICU", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Ok(new FacilityLocationApiModel
+            {
+                FacilityId = "facility-1",
+                LocationId = "abcd1234-Loc-ICU",
+                LocationName = "Intensive Care Unit",
+                LocationAlias = "Alias, Intensive Care Unit",
+                PartOfId = "abcd1234-Loc-Hospital"
+            }));
+        var output = new CapturingOutput();
+        var sut = new HslocMappingRunValidator(output, client.Object);
+
+        await sut.ValidateAllAsync(
+            "facility-1",
+            hslocMapEnabled: true,
+            ["Patient-abcd1234-001"],
+            settleTimeout: TimeSpan.FromSeconds(5));
+
+        output.Lines.Should().Contain(l => l.Contains("waiting for consumer rows", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("HSLOC MAPPING RUN VALIDATION: Passed", StringComparison.Ordinal));
+    }
+
     private static LinkApiResponse<T> Ok<T>(T body) => new() { StatusCode = 200, Body = body };
 
     private static LinkApiResponse<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>> Page(
