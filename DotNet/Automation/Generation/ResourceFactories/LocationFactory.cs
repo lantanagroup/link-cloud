@@ -5,6 +5,9 @@ namespace LantanaGroup.Automation.Generation.ResourceFactories;
 
 public static class LocationFactory
 {
+    public const string IdentifierSystem = "http://example.org/fhir/sid/location";
+    public const string RoleCodeSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode";
+
     /// <summary>Generate a Location using well-known type codes (HOSP, ICU, ER, HU).</summary>
     public static Location Generate(string id, string typeCode, string name, string managingOrgId, string? partOfId = null) =>
         Create(id, typeCode, name, managingOrgId, partOfId);
@@ -31,7 +34,7 @@ public static class LocationFactory
             Alias = new List<string> { "Alias, " + name },
             Identifier =
             [
-                new Identifier { System = "http://example.org/fhir/sid/location", Value = id }
+                new Identifier { System = IdentifierSystem, Value = id }
             ],
             Type =
             [
@@ -39,7 +42,7 @@ public static class LocationFactory
                 {
                     Coding =
                     [
-                        new Coding("http://terminology.hl7.org/CodeSystem/v3-RoleCode", typeCode, name),
+                        new Coding(RoleCodeSystem, typeCode, name),
                         new Coding("https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html", hslocCode, hslocDisplay)
                     ]
                 }

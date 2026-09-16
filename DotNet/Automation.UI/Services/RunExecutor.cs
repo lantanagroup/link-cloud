@@ -206,6 +206,7 @@ internal sealed class RunExecutor
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
             var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
+            var hslocMappingRunValidator = services.GetRequiredService<HslocMappingRunValidator>();
             var normalizationSuiteApplicationValidator = new NormalizationSuiteApplicationValidator(output);
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
@@ -449,7 +450,7 @@ internal sealed class RunExecutor
                 output, facilityId, measureIds, cancellationToken);
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution, patientIds);
             normalizationResolution = normalizationSetup.Resolution;
             var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
             await FacilitySetupHelper.EnsureQueryPlansAsync(
@@ -934,6 +935,12 @@ internal sealed class RunExecutor
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
+
+            var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
+                string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            await RunValidator("HSLOC MAPPING RUN VALIDATION", () =>
+                hslocMappingRunValidator.ValidateAllAsync(facilityId, hslocMapEnabled, patientIds));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));
@@ -1592,6 +1599,7 @@ internal sealed class RunExecutor
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
         services.AddTransient<NormalizationDatabaseValidator>();
+        services.AddTransient<HslocMappingRunValidator>();
         services.AddTransient<TenantDatabaseValidator>();
         services.AddTransient<ValidationResultsValidator>();
         services.AddTransient<PipelineSnapshot>();
@@ -1712,7 +1720,8 @@ internal sealed class RunExecutor
         string facilityId,
         Guid? suiteId,
         CancellationToken cancellationToken,
-        NormalizationSuiteResolution? preResolved = null)
+        NormalizationSuiteResolution? preResolved = null,
+        IReadOnlyList<string>? generatedPatientIds = null)
     {
         static string[] GetPlannedResourceTypes(NormalizationOperationDefinition planned)
             => planned.ResourceTypes
@@ -1830,8 +1839,14 @@ internal sealed class RunExecutor
                     }).ToList();
                     break;
                 case "CodeMap":
-                    apiOp.FhirPath = opDef.CodeMapFhirPath;
-                    apiOp.CodeSystemMaps = opDef.CodeSystemMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
+                case "HSLOCMap":
+                    var codeMaps = string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        ? HslocAutomationMaps.Merge(opDef.CodeSystemMaps, generatedPatientIds)
+                        : opDef.CodeSystemMaps;
+                    apiOp.FhirPath = string.IsNullOrWhiteSpace(opDef.CodeMapFhirPath)
+                        ? (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase) ? "type" : opDef.CodeMapFhirPath)
+                        : opDef.CodeMapFhirPath;
+                    apiOp.CodeSystemMaps = codeMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
                     {
                         SourceSystem = csm.SourceSystem,
                         TargetSystem = csm.TargetSystem,
@@ -1839,6 +1854,12 @@ internal sealed class RunExecutor
                             kvp => kvp.Key,
                             kvp => new CreateNormalizationCodeMapEntryApiModel { Code = kvp.Value.Code, Display = kvp.Value.Display })
                     }).ToList();
+                    if (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        && (apiOp.CodeSystemMaps.Count == 0 || apiOp.CodeSystemMaps.All(m => m.CodeMaps.Count == 0)))
+                    {
+                        throw new InvalidOperationException(
+                            $"HSLOCMap operation '{opDef.Name}' has no CodeSystemMaps. Mapping cannot run.");
+                    }
                     break;
                 case "RemoveExtensions":
                     apiOp.ExtensionUrls = [.. (opDef.ExtensionUrls ?? [])
