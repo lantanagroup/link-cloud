@@ -852,14 +852,23 @@
    the label text when the field is `required`) - shown, not hidden. */
 .nhsn-facility-info .k-label svg {
   display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 3px;
   vertical-align: top;
+  align-self: flex-start;
 }
 
 .nhsn-link__content .k-form-field:has(.k-form-hint) .k-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* The flex row's own `gap` already spaces the asterisk from the label text -
+   the block-layout `margin-left` above would double up with it here. */
+.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label svg {
+  margin-left: 0;
 }
 
 .nhsn-link__content .k-form-field:has(.k-form-hint) .k-label::after {
@@ -1036,36 +1045,52 @@
   pointer-events: none;
 }
 
-.nhsn-link__upload-field input[type="file"] {
-  display: block;
-  width: 100%;
-  max-width: 420px;
-  padding: 0.4rem;
-  border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 8px;
-  background: var(--kendo-color-app-surface, #ffffff);
-  color: var(--kendo-color-app-text, #1f2328);
-  font-size: 14px;
+.nhsn-link__upload-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.nhsn-link__upload-field input[type="file"]::file-selector-button {
-  margin-right: 0.75rem;
-  padding: 0.45rem 0.85rem;
-  border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 8px;
+.nhsn-link__upload-choose-button {
+  flex: 0 0 auto;
   background: var(--kendo-color-surface, #f7f9fc);
   color: var(--kendo-color-app-text, #1f2328);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.nhsn-link__upload-field input[type="file"]::file-selector-button:hover {
+.nhsn-link__upload-choose-button:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__upload-field input[type="file"]:disabled {
+.nhsn-link__upload-choose-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.nhsn-link__upload-filename {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 14px;
+}
+
+/* The native file input is visually hidden - never `display: none`, which
+   some browsers refuse to `.click()` on - and triggered from the "Choose
+   File" button instead, so only that button and the filename text show. */
+.nhsn-link__upload-native-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .nhsn-link__status-message {

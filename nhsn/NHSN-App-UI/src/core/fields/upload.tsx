@@ -21,7 +21,7 @@ export function DownloadLinkButton({
   hint,
   disabled
 }: DownloadLinkButtonProps) {
-  const {t} = useTranslation('onboarding');
+ // const {t} = useTranslation('onboarding');
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string>();
 

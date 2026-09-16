@@ -116,8 +116,11 @@
    the label text when the field is `required`) - shown, not hidden. */
 .report-generate .k-label svg {
   display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 3px;
   vertical-align: top;
+  align-self: flex-start;
 }
 
 .report-generate .k-input {
@@ -312,12 +315,11 @@
   font-weight: 600;
 }
 
-.report-generate .nhsn-link__upload-field input[type="file"] {
+.report-generate .nhsn-link__upload-choose-button {
+  padding: 0.35rem 0.65rem;
   font-size: 13px;
-  padding: 0.3rem;
 }
 
-.report-generate .nhsn-link__upload-field input[type="file"]::file-selector-button {
-  padding: 0.35rem 0.65rem;
+.report-generate .nhsn-link__upload-filename {
   font-size: 13px;
 }
