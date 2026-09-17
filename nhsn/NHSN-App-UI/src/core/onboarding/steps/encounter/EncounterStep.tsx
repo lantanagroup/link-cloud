@@ -353,7 +353,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   })}
                 </p>
 
-                <div className="encounter-table-scroll">
+                <div className="encounter-table-scroll" tabIndex={0}>
                   <table className="encounter-table">
                     <thead>
                       <tr>
@@ -374,16 +374,8 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                         filteredReferenceRows.map(row => (
                           <tr
                             key={row.key}
-                            tabIndex={0}
                             className={row.key === selectedKey ? 'encounter-row encounter-row--selected' : 'encounter-row'}
-                            aria-selected={row.key === selectedKey}
-                            onClick={() => setSelectedKey(row.key)}
-                            onKeyDown={event => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                setSelectedKey(row.key);
-                              }
-                            }}>
+                            onClick={() => setSelectedKey(row.key)}>
                             <td>
                               <span
                                 className={`encounter-system-badge encounter-system-badge-${systemBadgeVariant(row.system)}`}

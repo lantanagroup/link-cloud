@@ -1858,6 +1858,12 @@
   border-radius: 8px;
 }
 
+.nhsn-link__table-scroll:focus,
+.nhsn-link__table-scroll:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
 .nhsn-link__table {
   width: 100%;
   border-collapse: collapse;

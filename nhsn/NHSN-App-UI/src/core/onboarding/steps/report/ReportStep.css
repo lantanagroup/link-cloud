@@ -256,6 +256,12 @@
   margin-bottom: 12px;
 }
 
+.report-generate .report-patient-scroll:focus,
+.report-generate .report-patient-scroll:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
 .report-generate .report-patient-scroll table {
   width: 100%;
   border-collapse: collapse;

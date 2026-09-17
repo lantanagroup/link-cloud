@@ -85,7 +85,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
       <p className="nhsn-link__subtitle">{t('onboarding:reportingPlan.subtitle')}</p>
 
       {hasSchedule ? (
-        <div className="nhsn-link__reporting-plan-table-scroll">
+        <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={0}>
           <table className="nhsn-link__reporting-plan-table">
             <thead>
               <tr>
