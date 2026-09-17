@@ -52,6 +52,24 @@ button[color="warn"] {
   text-align: right;
 }
 
+.awaiting-dqm-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-left: 4px solid #fb8c00;
+  background-color: rgba(251, 140, 0, 0.08);
+}
+
+.awaiting-dqm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #ef6c00;
+  font-style: italic;
+}
+
 .no-data-message {
   display: flex;
   align-items: center;
