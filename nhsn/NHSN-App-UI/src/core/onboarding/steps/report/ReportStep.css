@@ -244,8 +244,8 @@
 }
 
 .report-generate .report-source-btn:focus-visible {
-  outline: 2px solid var(--report-blue);
-  outline-offset: 2px;
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
 .report-generate .report-patient-scroll {
@@ -295,6 +295,11 @@
   font-size: 13px;
   color: var(--report-gray-600);
   margin: 0 0 12px;
+}
+
+.report-generate .form-hint:empty {
+  display: none;
+  margin: 0;
 }
 
 .report-generate .nhsn-link__download-field {

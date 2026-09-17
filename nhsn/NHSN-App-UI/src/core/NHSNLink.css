@@ -113,6 +113,7 @@
 .nhsn-link__nav-title {
   margin: 0 0 0.75rem 0;
   font-size: 1.5rem;
+  font-weight: 700;
   color: #ffffff;
 }
 
@@ -289,6 +290,11 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.nhsn-link__step-button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+}
+
 .nhsn-link__step-index {
   flex: 0 0 auto;
   display: inline-flex;
@@ -455,7 +461,12 @@
 
 .nhsn-link .k-button:focus,
 .nhsn-link .k-button.k-focus {
-  box-shadow: none;
+  box-shadow: none !important;
+}
+
+.nhsn-link .k-button:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
 .nhsn-link__step-actions .k-button:focus,
@@ -473,18 +484,11 @@
 }
 
 .nhsn-link__step-actions .k-button:focus-visible {
-  outline: none;
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
-.nhsn-link__step-actions .k-button.k-button-primary:focus-visible:not(:disabled) {
-  background: var(--kendo-color-primary-hover, #063f78);
-  border-color: var(--kendo-color-primary-hover, #063f78);
-}
 
-.nhsn-link__step-actions .k-button.k-button-base:focus-visible:not(:disabled) {
-  background: var(--kendo-color-base-hover, #eef0f3);
-  border-color: var(--kendo-color-primary, #0057b7);
-}
 
 .nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
   padding-bottom: 0;
@@ -646,6 +650,16 @@
   margin: 0 0 1rem 0;
 }
 
+.nhsn-link__form-error:empty {
+  display: none;
+  margin: 0;
+}
+
+.k-form-error:empty {
+  display: none;
+  margin: 0;
+}
+
 .nhsn-link__field {
   max-width: 420px;
   margin-bottom: 1rem;
@@ -653,24 +667,6 @@
 
 .nhsn-link .k-form-hint {
   display: none;
-  position: absolute;
-  bottom: calc(100% + 9px);
-  top: auto;
-  left: 0;
-  right: auto;
-  width: max-content;
-  max-width: 280px;
-  padding: 9px 11px;
-  background: var(--kendo-color-app-text, #1f2328);
-  color: var(--kendo-color-on-inverse, #ffffff);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-  text-align: left;
-  white-space: normal;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  z-index: 20;
 }
 
 .nhsn-link .k-form-hint::after {
@@ -721,6 +717,12 @@
   overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
+}
+
+.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll:focus,
+.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
 }
 
 .nhsn-link__reporting-plan-table {
@@ -859,7 +861,7 @@
   align-self: flex-start;
 }
 
-.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -867,11 +869,11 @@
 
 /* The flex row's own `gap` already spaces the asterisk from the label text -
    the block-layout `margin-left` above would double up with it here. */
-.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label svg {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label svg {
   margin-left: 0;
 }
 
-.nhsn-link__content .k-form-field:has(.k-form-hint) .k-label::after {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label::after {
   content: "?";
   display: inline-flex;
   align-items: center;
@@ -885,31 +887,75 @@
   font-size: 10.5px;
   font-weight: 700;
   cursor: pointer;
-  anchor-name: --field-hint-badge;
   pointer-events: auto;
 }
 
-.nhsn-link__content .k-form-field--hint-open .k-label::after {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label:has(.nhsn-link__hint-trigger)::after {
+  content: none;
+}
+
+.nhsn-link__hint-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border: none;
+  border-radius: 50%;
+  background: var(--hint-badge-bg, var(--kendo-color-border, #d0d7de));
+  color: var(--hint-badge-color, var(--kendo-color-app-text-subtle, #5a5f69));
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  pointer-events: auto;
+}
+
+.nhsn-link__step-panel .k-form-field--hint-open .nhsn-link__hint-trigger {
   background: var(--hint-badge-open-bg, var(--kendo-color-primary, #0057b7));
   color: var(--kendo-color-on-inverse, #ffffff);
 }
 
-@supports (position-anchor: --field-hint-badge) {
-  .nhsn-link__content .k-form-hint {
-    position-anchor: --field-hint-badge;
-    left: anchor(center);
-    bottom: calc(anchor(top) + 9px);
-    transform: translateX(-50%);
-  }
-
-  .nhsn-link__content .k-form-hint::after {
-    left: 50%;
-    transform: translateX(-50%);
-  }
+.nhsn-link__hint-trigger:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
-.nhsn-link__content .k-form-field--hint-open .k-form-hint,
-.nhsn-link__content .k-form-field:has(.k-form-hint):has(.k-label:hover) .k-form-hint {
+.nhsn-link__hint-trigger-bubble {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--kendo-color-app-text, #1f2328);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+}
+
+.nhsn-link__hint-trigger-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__step-panel .k-form-field--hint-open .nhsn-link__hint-trigger-bubble {
   display: block;
 }
 
@@ -1099,6 +1145,11 @@
   font-size: 0.85rem;
 }
 
+.nhsn-link__status-message:empty {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 768px) {
   .nhsn-link {
     height: auto;
@@ -1237,8 +1288,8 @@
 }
 
 .nhsn-link__tab:focus-visible {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 2px;
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
 .nhsn-link__tab:disabled {
@@ -1532,6 +1583,7 @@
   overflow-y: auto;
   box-sizing: border-box;
   padding-right: 4px;
+  padding-top: 2px;
 }
 
 .nhsn-link__repeatable-list {
@@ -1675,11 +1727,11 @@
 }
 
 .info-icon:focus-visible {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 2px;
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
-.info-icon.info-icon--open {
+.info-icon.info-icon--open:not(:focus-visible) {
   outline: none;
 }
 
@@ -1714,8 +1766,6 @@
   border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
-.info-icon:hover .tooltip-bubble,
-.info-icon:focus-visible .tooltip-bubble,
 .info-icon.info-icon--open .tooltip-bubble {
   display: block;
 }
@@ -1787,6 +1837,16 @@
 .nhsn-link__modal-actions .k-button svg {
   margin-right: 6px;
   vertical-align: -2px;
+}
+
+.nhsn-link__modal-actions .k-button:focus,
+.nhsn-link__modal-actions .k-button.k-focus {
+  box-shadow: none !important;
+}
+
+.nhsn-link__modal-actions .k-button:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 0;
 }
 
 /* ---- plain data table (pickers and reference tables) */

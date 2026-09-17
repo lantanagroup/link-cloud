@@ -36,10 +36,17 @@ export function OnboardingStepsNav() {
                 type="button"
                 className="nhsn-link__step-button"
                 disabled={!unlocked || saving}
+                aria-current={entry.id === target.stepId ? 'step' : undefined}
                 onClick={() => goTo(entry.id)}>
                 <span className="nhsn-link__step-index">{index + 1}</span>
                 <span className="nhsn-link__step-label">
                   {t(entry.labelKey)}
+                  {complete && (
+                    <span className="nhsn-link__visually-hidden">
+                      {' '}
+                      {t('common:status.stepComplete')}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

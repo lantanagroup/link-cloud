@@ -369,9 +369,9 @@ function PreQualCategoryTable({entries, onSelect, t}: {entries: CategorySummary[
         </colgroup>
         <thead>
           <tr>
-            <th>{t('onboarding:reportResults.detail.preQual.category')}</th>
-            <th>{t('onboarding:reportResults.detail.preQual.numberOfIssues')}</th>
-            <th>{t('onboarding:reportResults.detail.preQual.guidance')}</th>
+            <th scope="col">{t('onboarding:reportResults.detail.preQual.category')}</th>
+            <th scope="col">{t('onboarding:reportResults.detail.preQual.numberOfIssues')}</th>
+            <th scope="col">{t('onboarding:reportResults.detail.preQual.guidance')}</th>
           </tr>
         </thead>
         <tbody>
@@ -758,9 +758,9 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
             </colgroup>
             <thead>
               <tr>
-                <th>{t('onboarding:reportResults.detail.preQual.message')}</th>
-                <th>{t('onboarding:reportResults.detail.preQual.expression')}</th>
-                <th>{t('onboarding:reportResults.detail.preQual.location')}</th>
+                <th scope="col">{t('onboarding:reportResults.detail.preQual.message')}</th>
+                <th scope="col">{t('onboarding:reportResults.detail.preQual.expression')}</th>
+                <th scope="col">{t('onboarding:reportResults.detail.preQual.location')}</th>
               </tr>
             </thead>
             <tbody>

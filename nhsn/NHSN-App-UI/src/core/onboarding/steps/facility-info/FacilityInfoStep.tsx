@@ -154,11 +154,9 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
         />
       </div>
 
-      {validationError && (
-        <p className="nhsn-link__form-error" role="alert">
-          {validationError}
-        </p>
-      )}
+      <p className="nhsn-link__form-error" role="alert">
+        {validationError}
+      </p>
 
       <StepActions saving={saving}>
         <Button variant="secondary" onClick={onBack} disabled={saving}>

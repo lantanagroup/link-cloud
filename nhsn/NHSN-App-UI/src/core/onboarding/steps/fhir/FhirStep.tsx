@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, InfoTooltip, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
+import {Button, InfoTooltip, NewTabAnnouncement, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
@@ -211,6 +211,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
             {t('onboarding:fhirServerInfo.subtitlePrefix')}{' '}
             <a href="https://hl7.org/fhir/R4/summary.html" target="_blank" rel="noreferrer">
               {t('onboarding:fhirServerInfo.subtitleFhirLinkText')}
+              <NewTabAnnouncement />
             </a>{' '}
             {t('onboarding:fhirServerInfo.subtitleSuffix')}
           </p>
@@ -229,26 +230,35 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
           {jwksInstructionsKey && (
             <>
-              <div className="section-title">{t('onboarding:fhirServerInfo.authenticationSectionTitle')}</div>
+              <div className="section-title" id="fhir-jwks-section-title">
+                {t('onboarding:fhirServerInfo.authenticationSectionTitle')}
+              </div>
               <div className="instructions-box">
-                <p>{t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}</p>
+                <p id="fhir-jwks-instructions-desc">
+                  {t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}
+                </p>
                 <a
                   className="download-link"
                   href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
                   target="_blank"
-                  rel="noopener">
+                  rel="noopener"
+                  aria-describedby="fhir-jwks-section-title fhir-jwks-instructions-desc">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 3v12" />
                     <path d="M7 10l5 5 5-5" />
                     <path d="M5 21h14" />
                   </svg>
                   {t('onboarding:fhirServerInfo.fields.downloadPdfInstructions')}
+                  <NewTabAnnouncement />
                 </a>
               </div>
             </>
           )}
 
-          <div className="section-title">{t('onboarding:fhirServerInfo.throttleSectionTitle')}</div>
+          <div className="section-title" id="fhir-throttle-section-title">
+            {t('onboarding:fhirServerInfo.throttleSectionTitle')}
+          </div>
+          <div role="group" aria-labelledby="fhir-throttle-section-title">
           <div className="triplet">
             <NumberField
               id="maxConcurrentRequests"
@@ -321,9 +331,10 @@ export function FhirStep({onNext, onBack}: StepProps) {
               }}
               onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime')} />
           </div>
+          </div>
 
-          <div className="form-group">
-            <label>
+          <div className="form-group" role="group" aria-labelledby="fhir-lag-duration-label">
+            <label id="fhir-lag-duration-label">
               {t('onboarding:fhirServerInfo.fields.lagLabel')}
               <RequiredAsterisk />
               <InfoTooltip
@@ -390,18 +401,16 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   refreshErrors();
                 }} />
             </div>
-            {touched.lagDays && touched.lagHours && touched.lagMinutes && errors.lagDuration && (
-              <p className="k-form-error" role="alert">
-                {t(errors.lagDuration)}
-              </p>
-            )}
+            <p className="k-form-error" role="alert">
+              {touched.lagDays && touched.lagHours && touched.lagMinutes && errors.lagDuration
+                ? t(errors.lagDuration)
+                : null}
+            </p>
           </div>
 
-          {validationError && (
-            <p className="nhsn-link__form-error" role="alert">
-              {validationError}
-            </p>
-          )}
+          <p className="nhsn-link__form-error" role="alert">
+            {validationError}
+          </p>
 
           {(testing || testResult) && (
             <div className="fhir-test-result" role="status">

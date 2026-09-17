@@ -75,19 +75,22 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
         disabled={uploading || saving}
       />
 
-      {uploading && <p className="nhsn-link__status-message">{t('onboarding:manualUpload.reading')}</p>}
-      {!uploading && importSummary && (
-        <p className="nhsn-link__status-message">
-          {t('onboarding:manualUpload.imported', {
-            imported: importSummary.imported,
-            total: importSummary.total,
-            fileName: importSummary.fileName
-          })}
-        </p>
-      )}
+      <p className="nhsn-link__status-message" role="status" aria-live="polite">
+        {uploading
+          ? t('onboarding:manualUpload.reading')
+          : importSummary &&
+            t('onboarding:manualUpload.imported', {
+              imported: importSummary.imported,
+              total: importSummary.total,
+              fileName: importSummary.fileName
+            })}
+      </p>
+      <p className="nhsn-link__visually-hidden" role="alert">
+        {error}
+      </p>
       {error && (
         <MessageContainer type="error" showIcon>
-          <span role="alert">{error}</span>
+          <span>{error}</span>
         </MessageContainer>
       )}
 

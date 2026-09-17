@@ -99,9 +99,13 @@
   },
   "status": {
     "saving": "Saving…",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "stepComplete": "(completed)"
   },
   "errors": {
     "unexpected": "Something went wrong. Please try again."
+  },
+  "a11y": {
+    "opensInNewTab": "(opens in a new tab)"
   }
 }

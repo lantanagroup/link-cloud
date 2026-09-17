@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {useId} from 'react';
+import {NewTabAnnouncement} from '../fields';
 
 export interface InstructionsDownloadProps {
   /** From `api.getJwksInstructionsUrl(vendor)` or `api.getLocationOrgResolutionUrl()`. */
@@ -11,10 +12,18 @@ export interface InstructionsDownloadProps {
 
 /** Bordered instructions box + download link, matching `FhirStep.tsx`'s JWKS pattern. Opens in a new tab. */
 export function InstructionsDownload({href, description, linkText}: InstructionsDownloadProps) {
+  const descriptionId = useId();
   return (
     <div className="nhsn-link__instructions">
-      <p className="nhsn-link__instructions-text">{description}</p>
-      <a className="nhsn-link__document-link" href={href} target="_blank" rel="noopener">
+      <p className="nhsn-link__instructions-text" id={descriptionId}>
+        {description}
+      </p>
+      <a
+        className="nhsn-link__document-link"
+        href={href}
+        target="_blank"
+        rel="noopener"
+        aria-describedby={descriptionId}>
         <svg
           width="16"
           height="16"
@@ -30,6 +39,7 @@ export function InstructionsDownload({href, description, linkText}: Instructions
           <path d="M5 21h14" />
         </svg>
         {linkText}
+        <NewTabAnnouncement />
       </a>
     </div>
   );

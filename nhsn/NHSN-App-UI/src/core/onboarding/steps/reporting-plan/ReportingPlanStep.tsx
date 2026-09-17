@@ -89,9 +89,9 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
           <table className="nhsn-link__reporting-plan-table">
             <thead>
               <tr>
-                <th>{t('onboarding:reportingPlan.columns.month')}</th>
-                <th>{t('onboarding:reportingPlan.columns.year')}</th>
-                <th>{t('onboarding:reportingPlan.columns.measures')}</th>
+                <th scope="col">{t('onboarding:reportingPlan.columns.month')}</th>
+                <th scope="col">{t('onboarding:reportingPlan.columns.year')}</th>
+                <th scope="col">{t('onboarding:reportingPlan.columns.measures')}</th>
               </tr>
             </thead>
             <tbody>

@@ -455,7 +455,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
         <table>
           <thead>
             <tr>
-              <th>{t("onboarding:census.epic.columns.patientId")}</th>
+              <th scope="col">{t("onboarding:census.epic.columns.patientId")}</th>
             </tr>
           </thead>
           <tbody>
@@ -493,7 +493,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
         <table>
           <thead>
             <tr>
-              <th>{t("onboarding:census.cerner.columns.patientId")}</th>
+              <th scope="col">{t("onboarding:census.cerner.columns.patientId")}</th>
             </tr>
           </thead>
           <tbody>
@@ -509,8 +509,8 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   );
 
   const frequencySection = (
-    <div className="form-group">
-      <label className="census-field-label" htmlFor="census-frequency-hours">
+    <div className="form-group" role="group" aria-labelledby="census-frequency-label">
+      <label className="census-field-label" id="census-frequency-label" htmlFor="census-frequency-hours">
         {t("onboarding:census.fields.frequencyLabel")}
         <RequiredAsterisk />
       </label>
@@ -538,11 +538,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
           onBlur={() => refreshFieldError("acquisitionFrequency")}
         />
       </div>
-      {errors.acquisitionFrequency && (
-        <p className="nhsn-link__form-error">
-          {t(errors.acquisitionFrequency)}
-        </p>
-      )}
+      <p className="nhsn-link__form-error" role="alert">
+        {errors.acquisitionFrequency ? t(errors.acquisitionFrequency) : null}
+      </p>
     </div>
   );
 
@@ -557,10 +555,10 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
             {acquisition === "PatientList" && (
               <>
-                <h2 className="census-section-heading">
+                <h2 className="census-section-heading" id="census-epic-section-title">
                   {t("onboarding:census.epic.sectionTitle")}
                 </h2>
-                <p className="subtitle">
+                <p className="subtitle" id="census-epic-subtitle">
                   {t("onboarding:census.epic.subtitle")}
                 </p>
 
@@ -614,9 +612,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                           <ViewResultsIcon />
                         </button>
                       </div>
-                      {state?.error && (
-                        <p className="nhsn-link__form-error">{state.error}</p>
-                      )}
+                      <p className="nhsn-link__form-error" role="alert">{state?.error}</p>
                     </div>
                   );
                 })}
@@ -644,7 +640,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
             {acquisition === "Sftp" && (
               <>
-                <div className="section-title">
+                <div className="section-title" id="census-cerner-section-title">
                   {t("onboarding:census.cerner.sectionTitle")}
                 </div>
 
@@ -746,21 +742,24 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   )}
                 </div>
 
-                {connectionResult && (
-                  <p
-                    className={
-                      connectionResult.success
-                        ? "census-test-success"
-                        : "nhsn-link__form-error"
-                    }>
-                    {connectionResult.success
-                      ? t("onboarding:census.cerner.testSuccess")
-                      : t("onboarding:census.cerner.testFailure")}
-                    {connectionResult.detail
-                      ? ` ${connectionResult.detail}`
-                      : null}
-                  </p>
-                )}
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={`census-connection-status${
+                    connectionResult
+                      ? connectionResult.success
+                        ? " census-test-success"
+                        : " nhsn-link__form-error"
+                      : ""
+                  }`}>
+                  {!testingConnection && connectionResult
+                    ? `${
+                        connectionResult.success
+                          ? t("onboarding:census.cerner.testSuccess")
+                          : t("onboarding:census.cerner.testFailure")
+                      }${connectionResult.detail ? ` ${connectionResult.detail}` : ""}`
+                    : null}
+                </p>
 
                 {sftpFiles !== null && (
                   <>
@@ -811,11 +810,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
               onChange={handleAckChange}
             />
 
-            {validationMessage && (
-              <p className="nhsn-link__form-error" role="alert">
-                {validationMessage}
-              </p>
-            )}
+            <p className="nhsn-link__form-error" role="alert">
+              {validationMessage}
+            </p>
           </div>
 
           <StepActions saving={saving}>

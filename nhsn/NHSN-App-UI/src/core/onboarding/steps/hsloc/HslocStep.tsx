@@ -6,6 +6,7 @@ import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/cont
 import {
   Button,
   FieldLabel,
+  NewTabAnnouncement,
   NHSNLoadingIndicator,
   PageHeader,
   RepeatableList,
@@ -270,6 +271,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
           target="_blank"
           rel="noreferrer">
           {t('onboarding:hsloc.subtitleLinkText')}
+          <NewTabAnnouncement />
         </a>
         {t('onboarding:hsloc.subtitleSuffix')}
       </p>
@@ -420,7 +422,15 @@ export function HslocStep({onNext, onBack}: StepProps) {
                         <tr
                           key={row.code}
                           className={`nhsn-link__hsloc-row${row.code === selectedCode ? ' nhsn-link__hsloc-row--selected' : ''}`}
-                          onClick={() => setSelectedCode(row.code)}>
+                          tabIndex={0}
+                          aria-selected={row.code === selectedCode}
+                          onClick={() => setSelectedCode(row.code)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setSelectedCode(row.code);
+                            }
+                          }}>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.category}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.type}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.code}</td>

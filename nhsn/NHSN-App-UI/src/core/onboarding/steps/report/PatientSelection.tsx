@@ -214,7 +214,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     if (state.error) {
       return (
         <MessageContainer type="error" showIcon>
-          <span role="alert">{state.error}</span>
+          <span>{state.error}</span>
         </MessageContainer>
       );
     }
@@ -404,15 +404,20 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
               accept=".csv"
               disabled={disabled || atLimit}
               onSelect={file => void handleCsv(file)} />
-            {csvStatus && (
-              <p className="form-hint" role="status">
-                {csvStatus}
-              </p>
-            )}
+            <p className="form-hint" role="status">
+              {csvStatus}
+            </p>
           </div>
         )}
 
-        {tab === 'previous' && <div className="report-tab-body">{renderCensus('previous', previous)}</div>}
+        {tab === 'previous' && (
+          <div className="report-tab-body">
+            <p className="nhsn-link__visually-hidden" role="alert">
+              {previous.error}
+            </p>
+            {renderCensus('previous', previous)}
+          </div>
+        )}
 
         {tab === 'new-pull' && (
           <div className="report-tab-body">
@@ -425,17 +430,18 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
                 {t('onboarding:report.patients.newPull.run')}
               </Button>
             )}
+            <p className="nhsn-link__visually-hidden" role="alert">
+              {newPull.error}
+            </p>
             {renderCensus('new-pull', newPull)}
           </div>
         )}
       </Tabs>
 
       {atLimit && <p className="form-hint">{t('onboarding:report.patients.messages.limitReached')}</p>}
-      {error && (
-        <p className="k-form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <p className="k-form-error" role="alert">
+        {error}
+      </p>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
-import {Button, NHSNLoadingIndicator, PageHeader, Select, StepActions, TextField} from '../../../fields';
+import {Button, NewTabAnnouncement, NHSNLoadingIndicator, PageHeader, Select, StepActions, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
@@ -244,44 +244,49 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               t={t}
               i18nKey="onboarding:encounter.subtitle"
               components={{
-                uscore: <a href="https://hl7.org/fhir/us/core/STU6.1/index.html" target="_blank" rel="noreferrer" />,
-                encounters: <a href="https://www.hl7.org/fhir/R4/encounter.html" target="_blank" rel="noreferrer" />,
+                uscore: (
+                  <a
+                    href="https://hl7.org/fhir/us/core/STU6.1/index.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-describedby="encounter-uscore-link-hint"
+                  />
+                ),
+                encounters: (
+                  <a
+                    href="https://www.hl7.org/fhir/R4/encounter.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-describedby="encounter-encounters-link-hint"
+                  />
+                ),
                 valueset: (
                   <a
                     href="https://hl7.org/fhir/us/core/STU6.1/ValueSet-us-core-encounter-type.html"
                     target="_blank"
                     rel="noreferrer"
+                    aria-describedby="encounter-valueset-link-hint"
                   />
                 )
               }}
             />
+            <NewTabAnnouncement id="encounter-uscore-link-hint" />
+            <NewTabAnnouncement id="encounter-encounters-link-hint" />
+            <NewTabAnnouncement id="encounter-valueset-link-hint" />
           </p>
 
-          <div className="btn-group" role="tablist" aria-label={t('onboarding:encounter.title')}>
-            <button
-              type="button"
-              role="tab"
-              id="encounter-tab-mapping"
-              aria-selected={activeTab === 'mapping'}
-              aria-controls="encounter-panel-mapping"
-              className={activeTab === 'mapping' ? 'tab-btn tab-btn--active' : 'tab-btn'}
-              onClick={() => setActiveTab('mapping')}>
-              {t('onboarding:encounter.tabs.mapping')}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="encounter-tab-reference"
-              aria-selected={activeTab === 'reference'}
-              aria-controls="encounter-panel-reference"
-              className={activeTab === 'reference' ? 'tab-btn tab-btn--active' : 'tab-btn'}
-              onClick={() => setActiveTab('reference')}>
-              {t('onboarding:encounter.tabs.reference')}
-            </button>
-          </div>
+          <Tabs<'mapping' | 'reference'>
+            label={t('onboarding:encounter.title')}
+            tabs={[
+              {id: 'mapping', label: t('onboarding:encounter.tabs.mapping')},
+              {id: 'reference', label: t('onboarding:encounter.tabs.reference')}
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
 
           {activeTab === 'mapping' && (
-            <div id="encounter-panel-mapping" role="tabpanel" aria-labelledby="encounter-tab-mapping">
+            <div>
               <div className="form-group">
                 <span className="section-label">
                   {t('onboarding:encounter.fields.codeSystemsLabel')}
@@ -313,11 +318,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
           )}
 
           {activeTab === 'reference' && (
-            <div
-              id="encounter-panel-reference"
-              role="tabpanel"
-              aria-labelledby="encounter-tab-reference"
-              className="encounter-reference-layout">
+            <div className="encounter-reference-layout">
               <div className="encounter-reference-main">
                 <TextField
                   id="encounterSearch"
@@ -552,6 +553,7 @@ interface MappingRowProps {
 
 function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: MappingRowProps) {
   const {t} = useTranslation('onboarding');
+  const incompleteHintId = `encounter-row-hint-${row.rowKey}`;
   const selected = referenceCodes.find(code => code.system === row.targetSystem && code.code === row.targetCode);
   const [query, setQuery] = useState(selected ? referenceLabel(selected) : '');
   const [open, setOpen] = useState(false);
@@ -626,6 +628,7 @@ function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: Mappi
       <input
         type="text"
         aria-label={t('encounter.fields.localCodeLabel')}
+        aria-describedby={incomplete ? incompleteHintId : undefined}
         placeholder={t('encounter.fields.localCodePlaceholder') ?? ''}
         value={row.localValue}
         onChange={event => onChange({localValue: event.target.value})} />
@@ -635,6 +638,7 @@ function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: Mappi
           type="text"
           role="combobox"
           aria-label={t('encounter.fields.targetCodeLabel')}
+          aria-describedby={incomplete ? incompleteHintId : undefined}
           aria-expanded={open}
           aria-controls={listboxId}
           aria-autocomplete="list"
@@ -688,7 +692,11 @@ function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: Mappi
         )}
       </div>
 
-      {incomplete && <span className="encounter-row-hint">{t('encounter.fields.incompleteRowHint')}</span>}
+      {incomplete && (
+        <span id={incompleteHintId} className="encounter-row-hint">
+          {t('encounter.fields.incompleteRowHint')}
+        </span>
+      )}
 
       <Button
         variant="secondary"

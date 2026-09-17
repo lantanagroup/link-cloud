@@ -68,9 +68,12 @@ export function CompleteStep(_props: StepProps) {
       <PageHeader title={t('onboarding:complete.title')} />
       <p className="nhsn-link__subtitle">{t('onboarding:complete.subtitle')}</p>
 
+      <p className="nhsn-link__visually-hidden" role="alert">
+        {error}
+      </p>
       {error && (
         <MessageContainer type="error" showIcon>
-          <span role="alert">{error}</span>
+          <span>{error}</span>
         </MessageContainer>
       )}
 
