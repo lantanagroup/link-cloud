@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// mapped, a facility enrolled in it is scheduled for nothing.
         /// <para>
         /// The dQM is verified against MeasureEval before the row is written, so a mapping cannot name
-        /// a measure Link could not evaluate. A mapping is unique on measure and dQM.
+        /// a measure Link could not evaluate. A measure has at most one mapping.
         /// </para>
         /// </remarks>
         /// <param name="request">
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="201">The created mapping, with a Location header pointing at it.</response>
         /// <response code="400">
         /// A required field is missing or too long, the dQM is not present in MeasureEval, or a mapping
-        /// for that measure and dQM already exists.
+        /// for that measure already exists.
         /// </response>
         /// <response code="502">
         /// MeasureEval could not be reached or answered with an error, so the dQM could not be
@@ -154,6 +154,14 @@ namespace LantanaGroup.Link.DMRP.Controllers
             try
             {
                 var entity = ToEntity(request);
+
+                if (string.IsNullOrWhiteSpace(entity.DQM))
+                {
+                    return BadRequest(
+                        "A dQM is required. A measure mapping without one is only recorded by the DMRP sync, "
+                        + "for a measure DMRP reported that Link cannot yet schedule.");
+                }
+
                 if (!await DqmExistsAsync(entity.DQM, cancellationToken))
                 {
                     return BadRequest($"DQM '{entity.DQM}' was not found in MeasureEval.");
@@ -165,7 +173,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             {
                 return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
                 {
-                    ["measure"] = ["A measure mapping for this measure and dQM already exists."]
+                    ["measure"] = ["A measure mapping for this measure already exists."]
                 }));
             }
             catch (ApplicationException)
@@ -208,7 +216,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="202">The updated mapping.</response>
         /// <response code="400">
         /// The body's id does not match the URL, a required field is missing or too long, the dQM is
-        /// not present in MeasureEval, or the change would collide with an existing measure and dQM
+        /// not present in MeasureEval, or the change would collide with an existing measure
         /// pair.
         /// </response>
         /// <response code="404">No measure mapping has that Id.</response>
@@ -238,6 +246,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 var entity = ToEntity(request);
                 entity.Id = id;
 
+                if (string.IsNullOrWhiteSpace(entity.DQM))
+                {
+                    return BadRequest(
+                        "A dQM is required. Completing a measure the DMRP sync recorded means setting its dQM, "
+                        + "not clearing it.");
+                }
+
                 if (!await DqmExistsAsync(entity.DQM, cancellationToken))
                 {
                     return BadRequest($"DQM '{entity.DQM}' was not found in MeasureEval.");
@@ -249,7 +264,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             {
                 return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
                 {
-                    ["measure"] = ["A measure mapping for this measure and dQM already exists."]
+                    ["measure"] = ["A measure mapping for this measure already exists."]
                 }));
             }
             catch (ApplicationException ex)

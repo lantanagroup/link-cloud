@@ -1,10 +1,22 @@
 using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DMRP.Business
 {
+    /// <summary>
+    /// The measure mapping a measure resolved to, and whether that mapping names a dQM.
+    /// </summary>
+    /// <remarks>
+    /// Every measure resolves to a row now, because the sync records one for a measure it cannot map.
+    /// So "unmapped" stopped meaning "no row" and started meaning "a row with no dQM", and the two
+    /// have to be told apart: the plan links to the row either way, but only a row with a dQM
+    /// schedules anything.
+    /// </remarks>
+    internal sealed record MeasureMappingRef(string Id, bool HasDqm);
+
     /// <summary>
     /// What one facility's sync did.
     /// </summary>
@@ -126,7 +138,7 @@ namespace LantanaGroup.Link.DMRP.Business
 
         private async Task<DmrpSyncResult> ReconcileAsync(string facilityId, int month, int year,
             IReadOnlyList<DmrpReportingPlanEntry> entries,
-            IReadOnlyDictionary<string, string?> mappings,
+            IReadOnlyDictionary<string, MeasureMappingRef> mappings,
             List<FacilityReportingPlan> inserted,
             CancellationToken cancellationToken)
         {
@@ -164,9 +176,11 @@ namespace LantanaGroup.Link.DMRP.Business
 
             foreach (var entry in entries)
             {
-                mappings.TryGetValue(entry.Measure, out var mappingId);
+                mappings.TryGetValue(entry.Measure, out var mapping);
 
-                if (mappingId is null)
+                // Counted on the dQM, not on the row: the sync records a mapping for every measure it
+                // sees, so a missing row no longer means a measure Link cannot schedule.
+                if (mapping is null || !mapping.HasDqm)
                 {
                     unmapped++;
                 }
@@ -192,7 +206,7 @@ namespace LantanaGroup.Link.DMRP.Business
                         FacilityId = facilityId,
                         Component = entry.Component,
                         Measure = entry.Measure,
-                        MeasureMappingId = mappingId,
+                        MeasureMappingId = mapping?.Id,
                         ReportingMonth = entry.ReportingMonth,
                         ReportingYear = entry.ReportingYear,
                         IsReporting = true
@@ -211,9 +225,13 @@ namespace LantanaGroup.Link.DMRP.Business
                 // A measure mapped since the last sync fills in here. The reverse is not done: a
                 // mapping is not cleared because this run could not resolve it, since that would
                 // undo an admin's work on the strength of a lookup.
-                if (row.MeasureMappingId is null && mappingId is not null)
+                // Only ever fills a gap. Completing a measure sets the dQM on the row the sync
+                // already recorded, so the id a plan points at does not change and the facilities
+                // enrolled in that measure pick the dQM up without being touched. This is here for
+                // rows written before the sync recorded mappings of its own, which have no id at all.
+                if (row.MeasureMappingId is null && mapping is not null)
                 {
-                    row.MeasureMappingId = mappingId;
+                    row.MeasureMappingId = mapping.Id;
                 }
 
                 // Deliberately not marked modified: the rows are tracked, so change detection picks
@@ -278,18 +296,92 @@ namespace LantanaGroup.Link.DMRP.Business
         /// collation would ever reveal. Reading the whole table to do it is affordable because it
         /// is a configuration table an admin curates, sized in tens of rows.
         /// </remarks>
-        private async Task<Dictionary<string, string?>> ResolveMappingsAsync(
+        /// <summary>
+        /// The measure mapping id for every measure in the response, recording one for any measure
+        /// Link has no mapping for.
+        /// </summary>
+        /// <remarks>
+        /// The measure mappings table is the source of truth for what Link can schedule, so a measure
+        /// DMRP reports belongs in it whether or not anyone has mapped it to a dQM yet. Recording it
+        /// with no dQM puts it in front of the administrator who can complete it, on the page they
+        /// already maintain, rather than leaving it visible only as an absence. Nothing schedules
+        /// against a mapping with no dQM, so an incomplete row changes no reporting behaviour.
+        /// </remarks>
+        private async Task<Dictionary<string, MeasureMappingRef>> ResolveMappingsAsync(
             IReadOnlyList<DmrpReportingPlanEntry> entries, CancellationToken cancellationToken)
         {
             var measures = entries.Select(e => e.Measure).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            var byMeasure = await ReadMappingsAsync(measures, cancellationToken);
+
+            var missing = measures.Where(measure => !byMeasure.ContainsKey(measure)).ToList();
+
+            if (missing.Count == 0)
+            {
+                return byMeasure;
+            }
+
+            var recorded = new List<MeasureMapping>(missing.Count);
+
+            foreach (var measure in missing)
+            {
+                // Frequency stays Adhoc rather than becoming nullable: it already means "belongs to no
+                // reporting frequency", which is exactly what a measure with no dQM schedules.
+                var placeholder = new MeasureMapping
+                {
+                    Measure = measure,
+                    DQM = null,
+                    Frequency = Frequency.Adhoc
+                };
+
+                await _measureMappings.AddAsync(placeholder, cancellationToken);
+
+                recorded.Add(placeholder);
+                byMeasure[measure] = new MeasureMappingRef(placeholder.Id, HasDqm: false);
+            }
+
+            try
+            {
+                // Saved on its own rather than with the reporting plans: a mapping is worth keeping
+                // whatever becomes of this run's plans, and a lost race here says nothing about them.
+                await _measureMappings.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception exception) when (DuplicateMeasureMapping.Matches(exception))
+            {
+                _logger.LogInformation(exception,
+                    "A concurrent sync recorded a measure mapping first; reading back what it wrote.");
+
+                // Removing an entity that is still Added detaches it rather than scheduling a delete,
+                // which leaves the context clean for the read below.
+                foreach (var placeholder in recorded)
+                {
+                    _measureMappings.Remove(placeholder);
+                }
+
+                return await ReadMappingsAsync(measures, cancellationToken);
+            }
+
+            _logger.LogInformation(
+                "Recorded {Count} measure(s) DMRP reported that Link has no dQM for: {Measures}. "
+                + "They are on the measure mappings page awaiting a dQM and schedule nothing until one is set.",
+                missing.Count, string.Join(", ", missing.Select(measure => measure.SanitizeForLog())));
+
+            return byMeasure;
+        }
+
+        private async Task<Dictionary<string, MeasureMappingRef>> ReadMappingsAsync(
+            IReadOnlySet<string> measures, CancellationToken cancellationToken)
+        {
             var candidates = await _measureMappings.GetAllAsync(cancellationToken);
 
-            var byMeasure = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var byMeasure = new Dictionary<string, MeasureMappingRef>(StringComparer.OrdinalIgnoreCase);
 
+            // At most one row per measure, enforced by the unique index, so there is nothing to
+            // choose between: whatever is there is the mapping, complete or not.
             foreach (var mapping in candidates.Where(m => measures.Contains(m.Measure)))
             {
-                byMeasure.TryAdd(mapping.Measure, mapping.Id);
+                byMeasure[mapping.Measure] =
+                    new MeasureMappingRef(mapping.Id, HasDqm: !string.IsNullOrWhiteSpace(mapping.DQM));
             }
 
             return byMeasure;

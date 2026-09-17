@@ -308,7 +308,7 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task Sync_RecordsAMeasureWithNoMappingAndLeavesItUnmapped()
+        public async Task Sync_RecordsAMeasureMappingForAMeasureLinkCannotMapYet()
         {
             using var context = CreateContext();
 
@@ -319,9 +319,60 @@ namespace UnitTests.DMRP
             Assert.Equal(1, result.Recorded);
             Assert.Equal(1, result.Unmapped);
 
+            // The measure mappings table is the source of truth for what Link can schedule, so the
+            // measure belongs in it even before anyone supplies a dQM.
+            var mapping = await context.MeasureMappings.SingleAsync();
+            Assert.Equal("UNMAPPED", mapping.Measure);
+            Assert.Null(mapping.DQM);
+            Assert.Equal(Frequency.Adhoc, mapping.Frequency);
+
             var plan = await context.FacilityReportingPlans.SingleAsync();
             Assert.Equal("UNMAPPED", plan.Measure);
-            Assert.Null(plan.MeasureMappingId);
+            Assert.Equal(mapping.Id, plan.MeasureMappingId);
+        }
+
+        /// <summary>
+        /// The sync runs on every refresh. Recording the measure again each time would fill the
+        /// measure mappings page with repeats of the one row the admin is meant to complete.
+        /// </summary>
+        [Fact]
+        public async Task Sync_RecordsAMeasureItCannotMapOnlyOnce()
+        {
+            using var context = CreateContext();
+
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            Assert.Equal(1, await context.MeasureMappings.CountAsync());
+        }
+
+        /// <summary>
+        /// Completing a measure sets the dQM on the row the sync recorded, so the facilities already
+        /// enrolled in it start reporting without their plans being touched. This is the whole reason
+        /// the measure is recorded rather than merely counted.
+        /// </summary>
+        [Fact]
+        public async Task Sync_CountsAMeasureAsMappedOnceItsDqmIsSupplied()
+        {
+            using var context = CreateContext();
+
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            var recorded = await context.MeasureMappings.SingleAsync();
+            var planBefore = await context.FacilityReportingPlans.SingleAsync();
+
+            // What an administrator does on the measure mappings page: complete the row, not add one.
+            recorded.DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
+            recorded.Frequency = Frequency.Monthly;
+            await context.SaveChangesAsync();
+
+            var result = await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            Assert.Equal(0, result.Unmapped);
+
+            var planAfter = await context.FacilityReportingPlans.SingleAsync();
+            Assert.Equal(planBefore.MeasureMappingId, planAfter.MeasureMappingId);
+            Assert.Equal(recorded.Id, planAfter.MeasureMappingId);
         }
 
         [Fact]

@@ -225,7 +225,7 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateMeasureMapping_WithDuplicateMeasureAndDqm_ReturnsMeasureValidationProblem()
+    public async Task CreateMeasureMapping_WithDuplicateMeasure_ReturnsMeasureValidationProblem()
     {
         var measure = $"Duplicate Measure {Guid.NewGuid()}";
         const string dqm = "Duplicate DQM";
@@ -248,7 +248,7 @@ public class MeasureMappingsControllerTests : IDisposable
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
         var problemDetails = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
-        Assert.Equal("A measure mapping for this measure and dQM already exists.", problemDetails.Errors["measure"].Single());
+        Assert.Equal("A measure mapping for this measure already exists.", problemDetails.Errors["measure"].Single());
     }
 
     [Fact]
@@ -342,7 +342,7 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateMeasureMapping_WithDuplicateMeasureAndDqm_ReturnsMeasureValidationProblem()
+    public async Task UpdateMeasureMapping_WithDuplicateMeasure_ReturnsMeasureValidationProblem()
     {
         var original = Assert.IsType<MeasureMappingModel>(((CreatedResult)await _controller.CreateMeasureMapping(new MeasureMappingModel
         {
@@ -369,7 +369,7 @@ public class MeasureMappingsControllerTests : IDisposable
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
         var problemDetails = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
-        Assert.Equal("A measure mapping for this measure and dQM already exists.", problemDetails.Errors["measure"].Single());
+        Assert.Equal("A measure mapping for this measure already exists.", problemDetails.Errors["measure"].Single());
     }
 
     [Fact]
@@ -411,7 +411,12 @@ public class MeasureMappingsControllerTests : IDisposable
     [Fact]
     public async Task UpdateMeasureMapping_MismatchedId_ReturnsBadRequest()
     {
-        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel(), CancellationToken.None);
+        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
         var created = (MeasureMappingModel)((CreatedResult)createResult).Value!;
 
         var result = await _controller.UpdateMeasureMapping(created.Id!,
@@ -423,7 +428,12 @@ public class MeasureMappingsControllerTests : IDisposable
     [Fact]
     public async Task DeleteMeasureMapping_ThenGet_ReturnsNotFound()
     {
-        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel(), CancellationToken.None);
+        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
         var created = (MeasureMappingModel)((CreatedResult)createResult).Value!;
 
         var deleteResult = await _controller.DeleteMeasureMapping(created.Id!, CancellationToken.None);

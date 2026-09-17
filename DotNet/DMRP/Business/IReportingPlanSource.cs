@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.DMRP.Business
     /// is the mapping's, so an enrollment waiting to be mapped has none -- naming one would put a
     /// cadence nobody chose on the facility's look-ahead.
     /// </param>
-    public sealed record ReportingPlanEntry(string Measure, string DQM, Frequency? Frequency);
+    public sealed record ReportingPlanEntry(string Measure, string? DQM, Frequency? Frequency);
 
     /// <summary>
     /// Where a facility's reporting plan for a period comes from.
