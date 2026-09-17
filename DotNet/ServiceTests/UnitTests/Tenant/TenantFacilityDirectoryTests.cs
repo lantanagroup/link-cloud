@@ -79,6 +79,28 @@ public class TenantFacilityDirectoryTests : IDisposable
         facilities.Should().ContainSingle().Which.Should().Be(new ScheduledFacility("1", "America/Chicago"));
     }
 
+    [Fact]
+    public async Task Facilities_in_a_zone_include_every_active_survivor()
+    {
+        await using var context = CreateContext();
+        context.Facilities.AddRange(
+            Facility("1", "America/Chicago"),
+            Facility("2", "America/Chicago"),
+            Facility("3", "America/Chicago", deleted: true),
+            Facility("4", "America/New_York"));
+        await context.SaveChangesAsync();
+
+        var directory = new TenantFacilityDirectory(new EntityRepository<Facility, TenantDbContext>(context));
+
+        var facilities = await directory.GetActiveInTimeZoneAsync("America/Chicago");
+
+        facilities.Should().BeEquivalentTo(
+        [
+            new ScheduledFacility("1", "America/Chicago"),
+            new ScheduledFacility("2", "America/Chicago")
+        ]);
+    }
+
     /// <summary>
     /// Deliberately different from #1918's <c>TenantFacilityTimeZoneSource</c>, which did not exclude
     /// soft-deleted facilities. A deleted facility should not anchor the nightly job's reporting period.
@@ -95,5 +117,79 @@ public class TenantFacilityDirectoryTests : IDisposable
         var timeZone = await directory.GetTimeZoneAsync("GUAM");
 
         timeZone.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetTimeZoneAsync_returns_the_facilitys_stored_timezone()
+    {
+        await using var context = CreateContext();
+        context.Facilities.Add(Facility("MAJURO", "Pacific/Majuro"));
+        await context.SaveChangesAsync();
+
+        var directory = new TenantFacilityDirectory(new EntityRepository<Facility, TenantDbContext>(context));
+
+        var timeZone = await directory.GetTimeZoneAsync("MAJURO");
+
+        timeZone.Should().Be("Pacific/Majuro");
+    }
+
+    [Fact]
+    public async Task GetTimeZoneAsync_returns_only_the_requested_facilitys_timezone()
+    {
+        await using var context = CreateContext();
+        context.Facilities.AddRange(
+            Facility("MAJURO", "Pacific/Majuro"),
+            Facility("PAGO-PAGO", "Pacific/Pago_Pago"));
+        await context.SaveChangesAsync();
+
+        var directory = new TenantFacilityDirectory(new EntityRepository<Facility, TenantDbContext>(context));
+
+        var timeZone = await directory.GetTimeZoneAsync("PAGO-PAGO");
+
+        timeZone.Should().Be("Pacific/Pago_Pago");
+    }
+
+    /// <summary>
+    /// Null is the module's signal that Link has no such facility, which the reads treat as an
+    /// ordinary empty answer and log quietly.
+    /// </summary>
+    [Fact]
+    public async Task GetTimeZoneAsync_returns_null_for_an_id_no_facility_has()
+    {
+        await using var context = CreateContext();
+        context.Facilities.Add(Facility("MAJURO", "Pacific/Majuro"));
+        await context.SaveChangesAsync();
+
+        var directory = new TenantFacilityDirectory(new EntityRepository<Facility, TenantDbContext>(context));
+
+        var timeZone = await directory.GetTimeZoneAsync("NO-SUCH-FACILITY");
+
+        timeZone.Should().BeNull();
+    }
+
+    /// <summary>
+    /// A blank timezone on a facility that exists is a data problem the module warns about. Collapsing
+    /// it to null would disguise it as a facility that does not exist, and the warning would never fire.
+    /// </summary>
+    [Fact]
+    public async Task GetTimeZoneAsync_returns_a_blank_timezone_as_blank_rather_than_null()
+    {
+        await using var context = CreateContext();
+        context.Facilities.Add(Facility("BLANK", ""));
+        await context.SaveChangesAsync();
+
+        var directory = new TenantFacilityDirectory(new EntityRepository<Facility, TenantDbContext>(context));
+
+        var timeZone = await directory.GetTimeZoneAsync("BLANK");
+
+        timeZone.Should().Be(string.Empty);
+    }
+
+    [Fact]
+    public void Constructor_refuses_a_missing_repository()
+    {
+        var act = () => new TenantFacilityDirectory(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("facilities");
     }
 }
