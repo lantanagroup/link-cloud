@@ -35,12 +35,31 @@ cat > "$nuget_cfg" <<'EOF'
 </configuration>
 EOF
 
+# Checkout lives at $ROOT/.thetis, so MSBuild would otherwise import
+# link-cloud's Directory.Packages.props (CPM) and fail Engine restore with
+# NU1008 (PackageReference Version is forbidden under CPM). Only write this
+# sentinel into a Thetis tree that sits under this repo.
+case "$THETIS" in
+  "$ROOT"/*)
+    if [[ ! -f "$THETIS/Directory.Packages.props" ]]; then
+      cat > "$THETIS/Directory.Packages.props" <<'EOF'
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
+EOF
+    fi
+    ;;
+esac
+
 pack() {
   dotnet pack "$1" \
     --configuration Release \
     --configfile "$nuget_cfg" \
     -p:Version="$VERSION" \
     -p:TargetFrameworks=net8.0 \
+    -p:ManagePackageVersionsCentrally=false \
     --output "$OUT"
 }
 
