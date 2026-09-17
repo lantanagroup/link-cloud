@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Services;
@@ -33,6 +34,13 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
     public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model)
     {
+        var operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId);
+        var operation = await _database.Operations.GetAsync(operationResourceType.OperationId);
+        if (operation.OperationType == OperationType.HSLOCMap.ToString())
+        {
+            throw new InvalidOperationException("HSLOC Map operations cannot be assigned to vendors.");
+        }
+
         await _vendorVersionResolver.ResolveAsync([model.VendorVersionId]);
 
         var preset = await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset

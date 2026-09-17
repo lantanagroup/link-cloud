@@ -72,6 +72,7 @@ import Papa from 'papaparse';
   styleUrls: ['./code-map.component.scss']
 })
 export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
+  private readonly hslocUrl = 'https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html';
 
   @ViewChild('errorDiv') errorDiv!: ElementRef;
   @ViewChild(MatAutocompleteTrigger) trigger!: MatAutocompleteTrigger;
@@ -364,7 +365,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
         const csMapGroup = this.fb.group({
           id: [csMap.id],
           sourceSystem: [csMap.SourceSystem, Validators.required],
-          targetSystem: [csMap.TargetSystem, Validators.required],
+          targetSystem: [{value: this.isHSLOCMap ? this.hslocUrl : csMap.TargetSystem, disabled: this.isHSLOCMap}, Validators.required],
           codeMaps: this.fb.array([], AtLeastOneConditionValidator),
         });
         // push one code map
@@ -391,7 +392,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   addCodeSystemMap(): void {
     const codeSystemMapGroup = this.fb.group({
       sourceSystem: ['', Validators.required],
-      targetSystem: ['', Validators.required],
+      targetSystem: [{value: this.isHSLOCMap ? this.hslocUrl : '', disabled: this.isHSLOCMap}, Validators.required],
       codeMaps: this.fb.array([
         this.fb.group({
           key: ['', Validators.required],
@@ -450,7 +451,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
       return {
         SourceSystem: fg.get('sourceSystem')?.value,
-        TargetSystem: fg.get('targetSystem')?.value,
+        TargetSystem: this.isHSLOCMap ? this.hslocUrl : fg.get('targetSystem')?.value,
         CodeMaps: codeMaps,
       };
     });
