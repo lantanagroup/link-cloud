@@ -279,6 +279,7 @@
                                 <option value="CopyLocationAliasToTypeIteratively">CopyLocationAliasToTypeIteratively</option>
                                 <option value="ConditionalTransform">ConditionalTransform</option>
                                 <option value="CodeMap">CodeMap</option>
+                                <option value="HSLOCMap">HSLOCMap</option>
                                 <option value="RemoveExtensions">RemoveExtensions</option>
                             </select>
                         </div>
@@ -316,10 +317,15 @@
                             <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddCondition"><i class="bi bi-plus-lg me-1"></i>Add Condition</button>
                         </div>
 
-                        @* --- CodeMap fields --- *@
+                        <div class="col-12 op-field op-field-HSLOCMap">
+                            <p class="small text-muted mb-0">HSLOCMap copies Location identifier and alias (including partOf ancestors) onto type, then applies Code System Maps. Target system must be the NHSN HSLOC URL. Do not map a parent hospital identifier if children partOf that hospital.</p>
+                        </div>
+
+                        @* --- CodeMap / HSLOCMap fields --- *@
                         <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label" for="OpCodeMapFhirPath">FhirPath</label>
                             <input class="form-control" id="OpCodeMapFhirPath" />
+                            <div class="form-text op-field op-field-HSLOCMap">HSLOCMap always maps Location.type after copying identifier and alias onto type. This path cannot be changed.</div>
                         </div>
                         <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label">Code System Maps</label>
@@ -534,14 +540,72 @@
     function showOpModal() { showCrudModal(opModal, opBackdrop, hideOpModal); }
     function hideOpModal() { hideCrudModal(opModal, opBackdrop); }
 
+    const hslocMapUiDefaults = {
+        fhirPath: 'type',
+        resourceType: 'Location',
+        roleCodeSystem: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode',
+        hslocUrl: 'https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html',
+        roleCodeMaps: {
+            ICU: { code: '1025-6', display: 'Trauma Critical Care' },
+            ER: { code: '1108-0', display: 'Emergency Department' },
+            HU: { code: '1099-1', display: 'Adult Step Down Unit' },
+            HOSP: { code: '1060-3', display: 'Medical Ward' },
+            OF: { code: '1160-1', display: 'Urgent Care Center' }
+        }
+    };
+
     function toggleOpFields() {
         const t = document.getElementById('OpType').value;
         document.querySelectorAll('.op-field').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.op-field-' + t).forEach(el => el.style.display = '');
+        const fieldTypes = t === 'HSLOCMap' ? ['HSLOCMap', 'CodeMap'] : [t];
+        fieldTypes.forEach(ft => {
+            document.querySelectorAll('.op-field-' + ft).forEach(el => el.style.display = '');
+        });
 
         const copyIterativeVisible = t === 'CopyLocationAliasToTypeIteratively';
         document.getElementById('OpCopyIterativeMaxIterationsWrap').style.display = copyIterativeVisible ? '' : 'none';
         document.getElementById('OpCopyIterativeSplitOnCommaWrap').style.display = copyIterativeVisible ? 'flex' : 'none';
+
+        const fhirPath = document.getElementById('OpCodeMapFhirPath');
+        fhirPath.readOnly = t === 'HSLOCMap';
+        if (t === 'HSLOCMap') {
+            fhirPath.value = hslocMapUiDefaults.fhirPath;
+            applyHslocMapDefaultsIfEmpty();
+        }
+    }
+
+    function applyHslocMapDefaultsIfEmpty() {
+        const resourceTypes = document.getElementById('OpResourceTypes');
+        if (!(resourceTypes.value || '').trim())
+            resourceTypes.value = hslocMapUiDefaults.resourceType;
+
+        const fhirPath = document.getElementById('OpCodeMapFhirPath');
+        if (!(fhirPath.value || '').trim())
+            fhirPath.value = hslocMapUiDefaults.fhirPath;
+
+        const json = (document.getElementById('OpCodeSystemMaps').value || '').trim();
+        const hasCards = document.querySelectorAll('#opCodeSystemMapRows .code-system-map-card').length > 0;
+        if (hasCards || !isEmptyCodeSystemMapsJson(json))
+            return;
+
+        const defaultMaps = [{
+            sourceSystem: hslocMapUiDefaults.roleCodeSystem,
+            targetSystem: hslocMapUiDefaults.hslocUrl,
+            codeMaps: hslocMapUiDefaults.roleCodeMaps
+        }];
+        document.getElementById('OpCodeSystemMaps').value = JSON.stringify(defaultMaps, null, 2);
+        setCodeSystemMapCards(defaultMaps);
+    }
+
+    function isEmptyCodeSystemMapsJson(json) {
+        if (!json)
+            return true;
+        try {
+            const parsed = JSON.parse(json);
+            return Array.isArray(parsed) && parsed.length === 0;
+        } catch {
+            return false;
+        }
     }
 
     document.getElementById('OpType').addEventListener('change', toggleOpFields);
@@ -791,19 +855,34 @@
 
         const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
         const codeSystemMaps = codeSystemMapsFromCards ?? parseCodeSystemMapsOrError();
+        const operationType = document.getElementById('OpType').value;
+        const resourceTypes = document.getElementById('OpResourceTypes').value.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (operationType === 'HSLOCMap') {
+            if (resourceTypes.length !== 1 || resourceTypes[0] !== 'Location')
+                throw new Error('HSLOCMap operations must target only the Location resource type.');
+            if (!codeSystemMaps || codeSystemMaps.length === 0)
+                throw new Error('HSLOCMap requires at least one Code System Map.');
+            codeSystemMaps.forEach((m, i) => {
+                if ((m.targetSystem || '').trim() !== hslocMapUiDefaults.hslocUrl)
+                    throw new Error(`Code System Map #${i + 1} target system must be ${hslocMapUiDefaults.hslocUrl}.`);
+            });
+        }
 
         return {
             id: document.getElementById('OpId').value || crypto.randomUUID(),
             name: document.getElementById('OpName').value,
-            operationType: document.getElementById('OpType').value,
+            operationType: operationType,
             description: document.getElementById('OpDescription').value,
-            resourceTypes: document.getElementById('OpResourceTypes').value.split(',').map(s => s.trim()).filter(Boolean),
+            resourceTypes: resourceTypes,
             sourceFhirPath: document.getElementById('OpSourceFhirPath').value || null,
             targetFhirPath: document.getElementById('OpTargetFhirPath').value || null,
             conditionTargetFhirPath: document.getElementById('OpCondTargetFhirPath').value || null,
             conditionTargetValue: document.getElementById('OpCondTargetValue').value || null,
             conditions: conditions,
-            codeMapFhirPath: document.getElementById('OpCodeMapFhirPath').value || null,
+            codeMapFhirPath: operationType === 'HSLOCMap'
+                ? hslocMapUiDefaults.fhirPath
+                : (document.getElementById('OpCodeMapFhirPath').value || '').trim() || null,
             codeSystemMaps: codeSystemMaps,
             extensionUrls: document.getElementById('OpExtensionUrls').value.split('\n').map(s => s.trim()).filter(Boolean),
             maxIterations: parseInt(document.getElementById('OpMaxIterations').value || '15', 10),
