@@ -42,8 +42,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     public Task<LinkApiResponse> GetFhirListConfigurationAsync(
         string facilityId,
+        bool includePatients = false,
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
+            .SetQueryParam("includePatients", includePatients ? "true" : null)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirListConfigurationAsync(

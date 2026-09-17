@@ -326,6 +326,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
+        services.AddTransient<IEhrPatientListService, EhrPatientListService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
