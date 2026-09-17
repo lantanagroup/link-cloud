@@ -249,7 +249,8 @@ public static class ApiEndPointLibrary
         [NormalizationSteps.MappingDelete204] = new EndpointMeta("Deletes an HSLOC mapping by id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
         [NormalizationSteps.MappingDelete400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping delete with an empty id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
         [NormalizationSteps.MappingDeleteFacility204] = new EndpointMeta("Deletes HSLOC mappings for a facility.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
-        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}")
+        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.HslocGet200] = new EndpointMeta("Returns the NHSN HSLOC code set seeded for mapping.", "GET /api/normalization/HSLOC")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -523,6 +524,7 @@ public static class ApiEndPointLibrary
         public const string MappingDelete400EmptyId = "MAPPING DELETE → 400 (empty id)";
         public const string MappingDeleteFacility204 = "MAPPING DELETE FACILITY → 204";
         public const string MappingDeleteFacility400EmptyFacility = "MAPPING DELETE FACILITY → 400 (empty facility)";
+        public const string HslocGet200 = "HSLOC GET → 200";
     }
 
     public static class QueryDispatchSteps

@@ -213,6 +213,7 @@ internal sealed class RunExecutor
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
             var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
+            var hslocMappingRunValidator = services.GetRequiredService<HslocMappingRunValidator>();
             var normalizationSuiteApplicationValidator = new NormalizationSuiteApplicationValidator(output);
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
@@ -662,7 +663,7 @@ internal sealed class RunExecutor
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution, patientIds);
             normalizationResolution = normalizationSetup.Resolution;
             var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
             await FacilitySetupHelper.EnsureQueryPlansAsync(
@@ -1124,29 +1125,56 @@ internal sealed class RunExecutor
                     .ToList();
             }
 
-            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
-            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+            var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
+                string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            var hslocSettleTimeout = hslocMapEnabled ? TimeSpan.FromSeconds(90) : TimeSpan.Zero;
 
-            var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
-                normalizationResolution,
-                runtimeNormalizationSequences,
-                normalizationSummaryLogs);
-            NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
-            try
+            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", async () =>
             {
-                await _snapshotStore.SetDomainAsync(
-                    state.RunId,
-                    NormalizationEvidenceSnapshot.Domain,
-                    normalizationEvidence,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-            }
+                var deadline = hslocMapEnabled
+                    ? DateTimeOffset.UtcNow.Add(hslocSettleTimeout)
+                    : DateTimeOffset.UtcNow;
+                while (true)
+                {
+                    var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+                    output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
-            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
-                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
+                    var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
+                        normalizationResolution,
+                        runtimeNormalizationSequences,
+                        normalizationSummaryLogs);
+                    NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
+                    try
+                    {
+                        await _snapshotStore.SetDomainAsync(
+                            state.RunId,
+                            NormalizationEvidenceSnapshot.Domain,
+                            normalizationEvidence,
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        await normalizationSuiteApplicationValidator.ValidateAllAsync(
+                            internalAbsResources, normalizationResolution, normalizationSummaryLogs);
+                        return;
+                    }
+                    catch (InvalidOperationException ex) when (hslocMapEnabled && DateTimeOffset.UtcNow < deadline)
+                    {
+                        output.WriteLine($"[Normalization Suite] HSLOCMap Loki evidence not ready ({ex.Message}). Retrying scrape.");
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    }
+                }
+            });
+
+            await RunValidator("HSLOC MAPPING RUN VALIDATION", () =>
+                hslocMappingRunValidator.ValidateAllAsync(
+                    facilityId, hslocMapEnabled, patientIds, cancellationToken, hslocSettleTimeout));
 
             if (state.Options.EnableDmrp)
             {
@@ -1275,7 +1303,6 @@ internal sealed class RunExecutor
         {
             output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
             _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
-            throw;
         }
     }
 
@@ -1879,6 +1906,7 @@ internal sealed class RunExecutor
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
         services.AddTransient<NormalizationDatabaseValidator>();
+        services.AddTransient<HslocMappingRunValidator>();
         services.AddTransient<TenantDatabaseValidator>();
         services.AddTransient<ValidationResultsValidator>();
         services.AddTransient<PipelineSnapshot>();
@@ -2055,7 +2083,8 @@ internal sealed class RunExecutor
         string facilityId,
         Guid? suiteId,
         CancellationToken cancellationToken,
-        NormalizationSuiteResolution? preResolved = null)
+        NormalizationSuiteResolution? preResolved = null,
+        IReadOnlyList<string>? generatedPatientIds = null)
     {
         static string[] GetPlannedResourceTypes(NormalizationOperationDefinition planned)
             => planned.ResourceTypes
@@ -2173,8 +2202,14 @@ internal sealed class RunExecutor
                     }).ToList();
                     break;
                 case "CodeMap":
-                    apiOp.FhirPath = opDef.CodeMapFhirPath;
-                    apiOp.CodeSystemMaps = opDef.CodeSystemMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
+                case "HSLOCMap":
+                    var codeMaps = string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        ? HslocAutomationMaps.Merge(opDef.CodeSystemMaps, generatedPatientIds)
+                        : opDef.CodeSystemMaps;
+                    apiOp.FhirPath = string.IsNullOrWhiteSpace(opDef.CodeMapFhirPath)
+                        ? (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase) ? "type" : opDef.CodeMapFhirPath)
+                        : opDef.CodeMapFhirPath;
+                    apiOp.CodeSystemMaps = codeMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
                     {
                         SourceSystem = csm.SourceSystem,
                         TargetSystem = csm.TargetSystem,
@@ -2182,6 +2217,12 @@ internal sealed class RunExecutor
                             kvp => kvp.Key,
                             kvp => new CreateNormalizationCodeMapEntryApiModel { Code = kvp.Value.Code, Display = kvp.Value.Display })
                     }).ToList();
+                    if (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        && (apiOp.CodeSystemMaps.Count == 0 || apiOp.CodeSystemMaps.All(m => m.CodeMaps.Count == 0)))
+                    {
+                        throw new InvalidOperationException(
+                            $"HSLOCMap operation '{opDef.Name}' has no CodeSystemMaps. Mapping cannot run.");
+                    }
                     break;
                 case "RemoveExtensions":
                     apiOp.ExtensionUrls = [.. (opDef.ExtensionUrls ?? [])
