@@ -375,16 +375,13 @@ public class RunMetricsSnapshotServiceTests
         metrics.Verify(m => m.IncrementSnapshotMissing(), Times.Never);
         prom.Verify(p => p.QueryScalarAsync(
             It.Is<string>(q => q.Contains("increase(", StringComparison.Ordinal)
-                && q.Contains("duration_milliseconds_count", StringComparison.Ordinal)),
-            It.IsAny<DateTimeOffset>(),
-            It.IsAny<CancellationToken>()), Times.Never);
-        prom.Verify(p => p.QueryScalarAsync(
-            It.Is<string>(q => q.StartsWith("sum(link_data_acq_query_duration_milliseconds_count{", StringComparison.Ordinal)),
+                && q.Contains("link_data_acq_query_duration_milliseconds_count{", StringComparison.Ordinal)),
             It.IsAny<DateTimeOffset>(),
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         prom.Verify(p => p.QueryScalarAsync(
-            It.Is<string>(q => q.Contains("histogram_quantile(0.95, sum by (le) (link_data_acq_query_duration_milliseconds_bucket{", StringComparison.Ordinal)
-                && !q.Contains("[", StringComparison.Ordinal)),
+            It.Is<string>(q => q.Contains("histogram_quantile(0.95", StringComparison.Ordinal)
+                && q.Contains("increase(", StringComparison.Ordinal)
+                && q.Contains("link_data_acq_query_duration_milliseconds_bucket{", StringComparison.Ordinal)),
             It.IsAny<DateTimeOffset>(),
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
