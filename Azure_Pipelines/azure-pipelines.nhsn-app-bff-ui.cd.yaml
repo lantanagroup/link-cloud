@@ -32,7 +32,7 @@ variables:
   value: 'nhsn/NHSN-App-UI/NHSN-App-UI.esproj'
 
 - name: registry-repo-name
-  value: 'link-nhsn-app-bff-ui'
+  value: 'link-nhsn-app-ui'
 
 - name: dockerPath
   value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI/Dockerfile'
