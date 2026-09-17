@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
@@ -151,7 +152,9 @@ namespace Tenant
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
             builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
-            builder.Services.AddScoped<IFacilityTimeZoneSource, TenantFacilityTimeZoneSource>();
+            builder.Services.AddScoped<TenantFacilityDirectory>();
+            builder.Services.AddScoped<IFacilityTimeZoneSource>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+            builder.Services.AddScoped<IFacilityDirectory>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
 
             // The facility endpoints resolve this rather than calling the manager, so the DMRP module
             // can put its own behavior in front of it when enabled.

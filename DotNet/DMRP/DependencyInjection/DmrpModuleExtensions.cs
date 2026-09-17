@@ -4,6 +4,7 @@ using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -104,8 +105,15 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                 throw new InvalidOperationException(
                     $"The host application must register an {nameof(IFacilityTimeZoneSource)} before calling " +
                     $"{nameof(AddDmrpModule)}. " +
-                    $"The module needs to know the timezone of a facility to resolve its reporting period, " + 
+                    $"The module needs to know the timezone of a facility to resolve its reporting period, " +
                     "which is the month the facility is in by its own timezone, not UTC.");
+            }
+
+            if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityDirectory)))
+            {
+                throw new InvalidOperationException(
+                    $"The host must register an {nameof(IFacilityDirectory)} before calling {nameof(AddDmrpModule)}; "
+                    + "the nightly scheduling job enumerates facilities through it.");
             }
 
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what

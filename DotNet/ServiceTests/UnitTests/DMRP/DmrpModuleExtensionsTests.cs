@@ -4,6 +4,7 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -40,7 +41,10 @@ namespace UnitTests.DMRP
 
             // Stands in for what the real host registers before it adds the module.
             builder.Services.AddScoped<IFacilityOperations, HostFacilityOperations>();
-            builder.Services.AddSingleton(Mock.Of<IFacilityTimeZoneSource>());
+
+            var facilityDirectory = Mock.Of<IFacilityDirectory>();
+            builder.Services.AddSingleton(facilityDirectory);
+            builder.Services.AddSingleton<IFacilityTimeZoneSource>(facilityDirectory);
 
             return builder;
         }
@@ -204,6 +208,24 @@ namespace UnitTests.DMRP
                 builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
 
             Assert.Contains(nameof(IFacilityTimeZoneSource), exception.Message);
+        }
+
+        /// <summary>
+        /// Without a facility directory the nightly job would have no way to enumerate facilities.
+        /// Fail at startup instead of leaving the job to fail silently every time it fires.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_throws_when_the_host_registers_no_facility_directory()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityDirectory>();
+
+            var mvcBuilder = builder.Services.AddControllers();
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+
+            Assert.Contains(nameof(IFacilityDirectory), exception.Message);
         }
 
         /// <summary>

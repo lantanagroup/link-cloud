@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -27,11 +28,13 @@ namespace IntegrationTests.DMRP
         public Mock<IFacilityExistence> FacilityExistenceMock { get; } = new();
 
         /// <summary>
-        /// Stands in for the host's record of where each facility is. Defaults to UTC for every facility,
-        /// so a test that does not care about timezones is anchored exactly as it was before the reads
-        /// took the facility's timezone into account.
+        /// Stands in for the host's directory of facilities - both where a single one is, and which
+        /// ones exist by timezone for the nightly job. Defaults every facility to UTC, so a test that
+        /// does not care about timezones is anchored exactly as it was before the reads took the
+        /// facility's timezone into account. Registered for both <see cref="IFacilityTimeZoneSource"/>
+        /// and <see cref="IFacilityDirectory"/>, since the latter extends the former.
         /// </summary>
-        public Mock<IFacilityTimeZoneSource> FacilityTimeZoneSourceMock { get; } = new();
+        public Mock<IFacilityDirectory> FacilityDirectoryMock { get; } = new();
 
         /// <summary>
         /// Stands in for the host's facility operations, which the module puts its own behavior in front
@@ -99,10 +102,11 @@ namespace IntegrationTests.DMRP
             });
 
             ResetFacilityExistence();
-            ResetFacilityTimeZoneSource();
+            ResetFacilityDirectory();
 
             builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
-            builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityTimeZoneSourceMock.Object);
+            builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityDirectoryMock.Object);
+            builder.Services.AddSingleton<IFacilityDirectory>(FacilityDirectoryMock.Object);
 
             // The module puts its own behavior in front of the host's facility operations rather than
             // supplying them, so the fixture stands in for the host here as it does for the facility
@@ -145,11 +149,11 @@ namespace IntegrationTests.DMRP
         /// Restores the default "every facility is in UTC" stub, dropping any setup a test added to the
         /// shared mock.
         /// </summary>
-        public void ResetFacilityTimeZoneSource()
+        public void ResetFacilityDirectory()
         {
-            FacilityTimeZoneSourceMock.Reset();
+            FacilityDirectoryMock.Reset();
 
-            FacilityTimeZoneSourceMock
+            FacilityDirectoryMock
                 .Setup(s => s.GetTimeZoneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync("UTC");
         }
