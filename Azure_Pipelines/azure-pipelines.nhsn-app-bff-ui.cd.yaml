@@ -85,13 +85,21 @@ steps:
       echo "GIT_COMMIT: ${GIT_COMMIT}"
       echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-# Install NPM dependencies
-- task: Npm@1
-  displayName: 'npm install'
+# Copy into Packages Folder
+- task: Bash@3
+  displayName: 'Copy reactCorePackage in Packages Folder'
   inputs:
-    command: 'custom'
-    workingDir: '$(workingDir)'
-    customCommand: 'install $(reactCorePackage)'
+    targetType: 'inline'
+    script: |
+      cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/nhsn-react-core-2.4.1.tgz"
+
+# # Install NPM dependencies
+# - task: Npm@1
+#   displayName: 'npm install'
+#   inputs:
+#     command: 'custom'
+#     workingDir: '$(workingDir)'
+#     customCommand: 'install $(reactCorePackage)'
 
 # Build NHSN App UI
 - task: Npm@1
