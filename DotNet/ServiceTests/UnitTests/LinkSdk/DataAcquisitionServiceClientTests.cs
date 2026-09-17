@@ -185,6 +185,24 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("/api/data/acquisition-logs/report/rpt-2", request.Path);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ValidateFhirServerConnectionAsync_CallsExpectedEndpoint()
+    {
+        using var server = new OneShotServer("{\"isConnected\":true}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ValidateFhirServerConnectionAsync("http://fhir.test/r4");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/connectionValidation/$validate", request.Path);
+        Assert.Contains("fhirServerUrl=", request.Query);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.IsConnected);
+        Assert.Null(result.Body.ErrorMessage);
+    }
+
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)
     {
         var serviceRegistry = Options.Create(new ServiceRegistry

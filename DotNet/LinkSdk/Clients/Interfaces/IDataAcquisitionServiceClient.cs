@@ -58,4 +58,12 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates connectivity to a FHIR server using only its base URL, without requiring an
+    /// existing facility configuration.
+    /// </summary>
+    Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
+        string fhirServerUrl,
+        CancellationToken cancellationToken = default);
 }
