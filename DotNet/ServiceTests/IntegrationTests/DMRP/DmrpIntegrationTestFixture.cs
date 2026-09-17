@@ -71,6 +71,18 @@ namespace IntegrationTests.DMRP
                 _mock.RestoreAsync(facility, cancellationToken);
         }
 
+        /// <summary>
+        /// The real <see cref="IDmrpReportingPlanSync"/> talks to the DMRP API over HTTP, which this
+        /// fixture has no server for. A facility create now refreshes from DMRP before deriving its
+        /// schedule, so every create needs a sync that succeeds without reaching out; the schedule
+        /// tests here care about rows already seeded in the database, not about what a sync would add.
+        /// </summary>
+        private sealed class NoOpReportingPlanSync : IDmrpReportingPlanSync
+        {
+            public Task<DmrpSyncResult> SyncAsync(string facilityId, int month, int year,
+                CancellationToken cancellationToken = default) => Task.FromResult(DmrpSyncResult.Nothing);
+        }
+
         private readonly WebApplication _host;
         private readonly string _dbPath;
 
@@ -122,6 +134,9 @@ namespace IntegrationTests.DMRP
             {
                 throw new InvalidOperationException("The DMRP module did not register; the fixture cannot resolve its services.");
             }
+
+            // Registered after the module so it overrides the real, HTTP-backed sync the module wired up.
+            builder.Services.AddScoped<IDmrpReportingPlanSync, NoOpReportingPlanSync>();
 
             builder.Services.AddLogging();
 

@@ -1,6 +1,7 @@
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -35,6 +36,8 @@ namespace LantanaGroup.Link.DMRP.Business
         private readonly IEntityRepository<FacilityReportingPlan> _reportingPlanRepository;
 
         private readonly IFacilityReportingPeriodResolver _facilityReportingPeriodResolver;
+        private readonly IDmrpReportingPlanSync _sync;
+        private readonly IDmrpNightlyJobReconciler _reconciler;
 
         public DmrpFacilityOperations(ILogger<DmrpFacilityOperations> logger,
             IFacilityOperations hostImplementation,
@@ -42,7 +45,9 @@ namespace LantanaGroup.Link.DMRP.Business
             IReportingPlanScheduleProjector scheduleProjector,
             IFacilityReportingPlanManager reportingPlanManager,
             IEntityRepository<FacilityReportingPlan> reportingPlanRepository,
-            IFacilityReportingPeriodResolver facilityReportingPeriodResolver)
+            IFacilityReportingPeriodResolver facilityReportingPeriodResolver,
+            IDmrpReportingPlanSync sync,
+            IDmrpNightlyJobReconciler reconciler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hostImplementation = hostImplementation ?? throw new ArgumentNullException(nameof(hostImplementation));
@@ -51,6 +56,8 @@ namespace LantanaGroup.Link.DMRP.Business
             _reportingPlanManager = reportingPlanManager ?? throw new ArgumentNullException(nameof(reportingPlanManager));
             _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
             _facilityReportingPeriodResolver = facilityReportingPeriodResolver ?? throw new ArgumentNullException(nameof(facilityReportingPeriodResolver));
+            _sync = sync ?? throw new ArgumentNullException(nameof(sync));
+            _reconciler = reconciler ?? throw new ArgumentNullException(nameof(reconciler));
         }
 
         public async Task CreateAsync(FacilityModel facility, CancellationToken cancellationToken = default)
@@ -59,9 +66,21 @@ namespace LantanaGroup.Link.DMRP.Business
 
             RejectCallerSuppliedSchedule(facility);
 
+            // A facility onboarded mid-month must not be dark until the next month end: ask DMRP now.
+            // Fail closed - an admin who sees the 502 can retry; a facility silently created with no
+            // plans would report nothing for weeks. Rows written before a refused host create are
+            // benign: they are keyed on the id and the next successful create reconciles them.
+            if (!string.IsNullOrWhiteSpace(facility.FacilityId))
+            {
+                var period = _facilityReportingPeriodResolver.Resolve(facility.FacilityId, facility.TimeZone);
+                await _sync.SyncAsync(facility.FacilityId, period.Month, period.Year, cancellationToken);
+            }
+
             facility.ScheduledReports = await BuildScheduleAsync(facility, cancellationToken);
 
             await _hostImplementation.CreateAsync(facility, cancellationToken);
+
+            await EnsureZoneJobAsync(facility, cancellationToken);
         }
 
         public async Task UpdateAsync(FacilityModel existingFacility, FacilityModel updatedFacility,
@@ -77,6 +96,8 @@ namespace LantanaGroup.Link.DMRP.Business
             updatedFacility.ScheduledReports = await BuildScheduleAsync(updatedFacility, cancellationToken);
 
             await _hostImplementation.UpdateAsync(existingFacility, updatedFacility, cancellationToken);
+
+            await EnsureZoneJobAsync(updatedFacility, cancellationToken);
         }
 
         /// <summary>
@@ -145,8 +166,21 @@ namespace LantanaGroup.Link.DMRP.Business
         public Task SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default) =>
             _hostImplementation.SoftDeleteAsync(facilityId, cancellationToken);
 
-        public Task RestoreAsync(FacilityModel facility, CancellationToken cancellationToken = default) =>
-            _hostImplementation.RestoreAsync(facility, cancellationToken);
+        public async Task RestoreAsync(FacilityModel facility, CancellationToken cancellationToken = default)
+        {
+            await _hostImplementation.RestoreAsync(facility, cancellationToken);
+
+            await EnsureZoneJobAsync(facility, cancellationToken);
+        }
+
+        /// <summary>
+        /// The nightly job is per timezone, so a save only has to make sure the zone it names has
+        /// one. Idempotent and cheap; enrollment changes never touch Quartz.
+        /// </summary>
+        private Task EnsureZoneJobAsync(FacilityModel facility, CancellationToken cancellationToken) =>
+            string.IsNullOrWhiteSpace(facility.TimeZone)
+                ? Task.CompletedTask
+                : _reconciler.EnsureZoneJobAsync(facility.TimeZone, cancellationToken);
 
         /// <summary>
         /// Turns the facility's enrolled measures into the schedule the host stores, grouping the dQMs
