@@ -52,4 +52,7 @@ public interface IReportingService
 
     /// <summary>Records whether this report's accuracy is acknowledged. Append-only -- a new attestation row, never an edit of a prior one.</summary>
     Task RecordReportAccuracyAcknowledgementAsync(string reportId, bool accepted, string statementKey, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads Validation's real per-patient FHIR validation issues for this report, categorized.</summary>
+    Task<IReadOnlyList<PreQualIssue>> GetPatientPreQualResultsAsync(string reportId, string patientId, CancellationToken cancellationToken = default);
 }

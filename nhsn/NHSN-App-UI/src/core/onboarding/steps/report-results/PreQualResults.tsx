@@ -1,233 +1,10 @@
 import React, {useMemo, useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
-import type {ReportingStatus} from '../../../api/contracts';
-import {Button, Modal} from '../../../fields';
+import {useApiClient} from '../../../api/ApiClientContext';
+import type {PreQualIssue, ReportingStatus} from '../../../api/contracts';
+import {Button, MessageContainer, Modal, NHSNLoadingIndicator} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
-
-/**
- * The onboarding POC's "Pre-Qual Validation Results" popup (PREQUAL_CATEGORIES /
- * PREQUAL_MESSAGES / PREQUAL_RESULTS_POOL in index.html), reproduced with a smaller hand-picked
- * issue pool. Report/Validation has no per-patient Pre-Qual result endpoint wired up to this BFF
- * yet -- ReportGateway.ToPatientEntry only ever approximates HasPreQualResults from
- * ReportingStatus -- so results here are deterministic, patient/measure-seeded placeholders built
- * to unblock this UI ahead of that integration. Categories and guidance text are taken as-is from
- * the POC's own fixture; delete this once Validation exposes real per-patient results.
- */
-interface PreQualCategory {
-  title: string;
-  acceptable: boolean;
-  guidance: string;
-}
-
-const PREQUAL_CATEGORIES: PreQualCategory[] = [
-  {
-    title: 'Unknown Extension',
-    acceptable: true,
-    guidance:
-      'Internal: Systems are allowed to include extensions (additional data). Extensions that do not modify the meaning of the data (modifierExtensions) can be safely ignored. This is not a modifierExtension.'
-  },
-  {
-    title: 'Unable to Validate Measure (Measure not found)',
-    acceptable: false,
-    guidance:
-      'Internal: This appears to be an issue in the validation process and should be resolved within NHSNLink as it may be hiding other issues.'
-  },
-  {
-    title: 'No Codes From an Extensible Binding ValueSet',
-    acceptable: true,
-    guidance:
-      'External: The code provided is not part of the extensible ValueSet, which if it is a concept that is part of the measure, is a problem that needs to be resolved.'
-  },
-  {
-    title: 'Additional Data Beyond NHSN Specification',
-    acceptable: true,
-    guidance: 'External: No impact to normal operation. Recommend reviewing during onboarding and initial testing.'
-  },
-  {
-    title: 'Unknown Code System',
-    acceptable: true,
-    guidance:
-      "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')"
-  },
-  {
-    title: 'Invalid Code in Required ValueSet',
-    acceptable: false,
-    guidance: 'External: The code is not part of the required ValueSet. This may cause issues with measure calculation.'
-  },
-  {
-    title: 'Unknown Local Code',
-    acceptable: true,
-    guidance: 'External: The code is not recognized to be part of the ValueSet.'
-  },
-  {
-    title: 'FHIR Standard Recommendations and Best Practices',
-    acceptable: true,
-    guidance:
-      'External: While it is encouraged to follow FHIR standards and best practices for interoperability, resolutions to these issues are not required for reporting to NHSN.'
-  },
-  {
-    title: 'Does Not Match Preferred ValueSet',
-    acceptable: true,
-    guidance:
-      'External: This could be indicative of a problem if the data element is part of the measure and would not enable the resource to be included in the measure calculation appropriately.'
-  },
-  {
-    title: 'Missing Coverage Type',
-    acceptable: true,
-    guidance:
-      'External: Coverage.class.type (when present), is required to exist. However, NHSN has deemed this missing concept acceptable to report to NHSN.'
-  }
-];
-
-interface PreQualIssueTemplate {
-  categoryIndex: number;
-  message: string;
-  expression: string;
-  location: string;
-}
-
-const PREQUAL_ISSUE_POOL: PreQualIssueTemplate[] = [
-  {
-    categoryIndex: 0,
-    message: "Extension url 'http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData' is not valid (invalid Version '5.0')",
-    expression: "Bundle.entry[0].resource.ofType(MeasureReport).extension[1][url='http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData']",
-    location: '17:44'
-  },
-  {
-    categoryIndex: 0,
-    message: "Extension url 'http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData' is not valid (invalid Version '5.0')",
-    expression: "Bundle.entry[0].resource.ofType(MeasureReport).extension[2][url='http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData']",
-    location: '25:0'
-  },
-  {
-    categoryIndex: 2,
-    message:
-      "None of the codings provided are in the value set 'US Core Vital Signs ValueSet' (http://hl7.org/fhir/us/core/ValueSet/us-core-vital-signs|6.1.0), and a coding should come from this value set unless it has no suitable code (codes = http://loinc.org#55284-4)",
-    expression: 'Bundle.entry[3].resource.ofType(Observation).code.coding[0]',
-    location: '112:8'
-  },
-  {
-    categoryIndex: 4,
-    message:
-      "None of the codings provided are in the value set 'LOINC Codes' (http://hl7.org/fhir/ValueSet/observation-codes|4.0.1), and a coding should come from this value set unless it has no suitable code (codes = http://loinc.org#8480-6)",
-    expression: 'Bundle.entry[4].resource.ofType(Observation).code.coding[1]',
-    location: '118:15'
-  },
-  {
-    categoryIndex: 4,
-    message:
-      "None of the codings provided are in the value set 'Observation Interpretation Codes' (http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1), and a coding should come from this value set unless it has no suitable code (codes = http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation#N)",
-    expression: 'Bundle.entry[4].resource.ofType(Observation).interpretation[0].coding[0]',
-    location: '119:20'
-  },
-  {
-    categoryIndex: 5,
-    message: "The code is not part of the required ValueSet 'US Core Condition Codes' (http://hl7.org/fhir/us/core/ValueSet/us-core-condition-code|6.1.0)",
-    expression: 'Bundle.entry[6].resource.ofType(Condition).code.coding[0]',
-    location: '203:22'
-  },
-  {
-    categoryIndex: 5,
-    message: "The code is not part of the required ValueSet 'US Core Condition Codes' (http://hl7.org/fhir/us/core/ValueSet/us-core-condition-code|6.1.0)",
-    expression: 'Bundle.entry[7].resource.ofType(Condition).code.coding[0]',
-    location: '214:2'
-  },
-  {
-    categoryIndex: 6,
-    message: 'The code is not recognized to be part of the ValueSet.',
-    expression: 'Bundle.entry[2].resource.ofType(Encounter).type[0].coding[0]',
-    location: '88:4'
-  },
-  {
-    categoryIndex: 7,
-    message: 'Best practice recommendation: a Patient resource SHOULD have a narrative.',
-    expression: 'Bundle.entry[0].resource.ofType(Patient)',
-    location: '3:0'
-  },
-  {
-    categoryIndex: 8,
-    message: "Coding does not match the preferred ValueSet 'US Core Observation Category'.",
-    expression: 'Bundle.entry[5].resource.ofType(Observation).category[0].coding[0]',
-    location: '132:10'
-  },
-  {
-    categoryIndex: 9,
-    message: 'Coverage.class.type is not present.',
-    expression: 'Bundle.entry[8].resource.ofType(Coverage).class[0]',
-    location: '241:0'
-  },
-  {
-    categoryIndex: 1,
-    message:
-      "The Measure 'http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation|1.0.0-dev' could not be resolved, so no validation can be performed against the Measure",
-    expression: 'Bundle.entry[0].resource.ofType(MeasureReport).measure',
-    location: '5:0'
-  }
-];
-
-export interface PreQualIssue {
-  category: PreQualCategory;
-  message: string;
-  expression: string;
-  location: string;
-}
-
-// String hash + LCG, matching the seeding style already used in ReportResultsStep (measureColor,
-// demoDisplayReportingStatus) -- stable per patient/measure so the popup doesn't reshuffle on
-// re-render, without needing a real per-patient result to seed from.
-function hashString(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
-function pickDeterministic<T>(items: T[], count: number, seed: number): T[] {
-  if (items.length === 0) {
-    return [];
-  }
-  const target = Math.min(count, items.length);
-  const used = new Set<number>();
-  const result: T[] = [];
-  let cursor = seed;
-  while (result.length < target) {
-    cursor = (cursor * 1103515245 + 12345) >>> 0;
-    const index = cursor % items.length;
-    if (!used.has(index)) {
-      used.add(index);
-      result.push(items[index]);
-    }
-  }
-  return result;
-}
-
-// A Passed Validation patient must never surface an Unacceptable-category issue -- the same hard
-// guarantee the POC's getPreQualRowsFor() enforces regardless of how the issue pool was seeded.
-export function preQualIssuesFor(patientId: string, measureName: string | undefined, reportingStatus: ReportingStatus): PreQualIssue[] {
-  if (reportingStatus !== 'PassedValidation' && reportingStatus !== 'FailedValidation') {
-    return [];
-  }
-
-  const seed = hashString(`${patientId}|${measureName ?? ''}`);
-  const acceptableTemplates = PREQUAL_ISSUE_POOL.filter(template => PREQUAL_CATEGORIES[template.categoryIndex].acceptable);
-  const unacceptableTemplates = PREQUAL_ISSUE_POOL.filter(template => !PREQUAL_CATEGORIES[template.categoryIndex].acceptable);
-
-  const acceptableCount = 3 + (seed % 5);
-  const selected = pickDeterministic(acceptableTemplates, acceptableCount, seed);
-
-  if (reportingStatus === 'FailedValidation') {
-    const unacceptableCount = 1 + (seed % 2);
-    selected.push(...pickDeterministic(unacceptableTemplates, unacceptableCount, seed + 1));
-  }
-
-  return selected.map(template => ({
-    category: PREQUAL_CATEGORIES[template.categoryIndex],
-    message: template.message,
-    expression: template.expression,
-    location: template.location
-  }));
-}
 
 interface CategoryCount {
   title: string;
@@ -703,15 +480,28 @@ export interface PreQualResultsModalProps {
 
 export function PreQualResultsModal({open, onClose, patientId, measureName, reportingStatus, reportId}: PreQualResultsModalProps) {
   const {t} = useTranslation(['onboarding', 'common']);
+  const api = useApiClient();
   const {notifyError} = useNotifications();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const issues = useMemo(() => preQualIssuesFor(patientId, measureName, reportingStatus), [patientId, measureName, reportingStatus]);
+  const {
+    data: issues = [],
+    isLoading,
+    error: queryError
+  } = useQuery({
+    queryKey: ['preQualResults', reportId, patientId],
+    queryFn: () => api.getPatientPreQualResults(reportId, patientId),
+    enabled: open
+  });
+  const loadError = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : t('onboarding:reportResults.messages.loadError')
+    : null;
+
   const chartCounts = useMemo(() => categoryCounts(issues), [issues]);
   const unacceptableSummary = useMemo(() => summarizeByCategory(issues, false), [issues]);
   const acceptableSummary = useMemo(() => summarizeByCategory(issues, true), [issues]);
-  // PassedValidation patients never carry unacceptable issues (see preQualIssuesFor), but the
-  // section is hidden by status too so it doesn't flash empty before disappearing.
   const showUnacceptableSection = reportingStatus !== 'PassedValidation';
 
   function handleClose() {
@@ -791,23 +581,38 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
       }>
       <p className="nhsn-link__subtitle">{t('onboarding:reportResults.detail.preQual.subtitle', {patientId, measure: measureName ?? ''})}</p>
 
-      <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.preQual.issuesSummary')}</h3>
-      <IssuesSummaryChart counts={chartCounts} />
+      {isLoading && <NHSNLoadingIndicator />}
+      {!isLoading && loadError && (
+        <MessageContainer type="error" showIcon>
+          <span role="alert">{loadError}</span>
+        </MessageContainer>
+      )}
 
-      {showUnacceptableSection && (
+      {!isLoading && !loadError && (
         <>
-          <h3 className="nhsn-link__report-results-detail-section-title">
-            {t('onboarding:reportResults.detail.preQual.unacceptableCategories')}
-          </h3>
-          <PreQualCategoryTable entries={unacceptableSummary} onSelect={setSelectedCategory} t={t} />
+          <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.preQual.issuesSummary')}</h3>
+          {chartCounts.length > 0 ? (
+            <IssuesSummaryChart counts={chartCounts} />
+          ) : (
+            <p>{t('onboarding:reportResults.detail.preQual.noIssues')}</p>
+          )}
+
+          {showUnacceptableSection && (
+            <>
+              <h3 className="nhsn-link__report-results-detail-section-title">
+                {t('onboarding:reportResults.detail.preQual.unacceptableCategories')}
+              </h3>
+              <PreQualCategoryTable entries={unacceptableSummary} onSelect={setSelectedCategory} t={t} />
+            </>
+          )}
+
+          <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.preQual.acceptableCategories')}</h3>
+          <PreQualCategoryTable entries={acceptableSummary} onSelect={setSelectedCategory} t={t} />
         </>
       )}
 
-      <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.preQual.acceptableCategories')}</h3>
-      <PreQualCategoryTable entries={acceptableSummary} onSelect={setSelectedCategory} t={t} />
-
       <div className="nhsn-link__report-results-patient-detail-actions">
-        <Button variant="secondary" onClick={handleDownload}>
+        <Button variant="secondary" onClick={handleDownload} disabled={isLoading || Boolean(loadError)}>
           <DownloadIcon />
           {t('onboarding:reportResults.detail.preQual.downloadResults')}
         </Button>

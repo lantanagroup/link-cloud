@@ -342,6 +342,21 @@ export interface QueryPlan {
   planJson: string;
 }
 
+/** A real Validation category an issue was classified under -- see PreQualIssue. */
+export interface PreQualCategory {
+  title: string;
+  acceptable: boolean;
+  guidance: string;
+}
+
+/** One real FHIR validation issue Validation recorded for a patient, from its own results. */
+export interface PreQualIssue {
+  category: PreQualCategory;
+  message: string;
+  expression: string;
+  location: string;
+}
+
 /** Link's per-entry reporting-status vocabulary, as the Report Details patient table sees it. */
 export type ReportingStatus =
   | 'PatientIdentified'

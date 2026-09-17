@@ -9,6 +9,7 @@ import type {
   ConnectionResult,
   EncounterCode,
   EncounterCodeDetail,
+  EncounterMapping,
   FhirConfig,
   HslocCode,
   HslocMapping,
@@ -21,6 +22,7 @@ import type {
   PageRequest,
   PatientIdentifier,
   PatientPipeline,
+  PreQualIssue,
   QueryPlan,
   AcquisitionLogEntry,
   ReportDetail,
@@ -101,6 +103,8 @@ export interface ApiClient {
   getLocationCandidates(method: LocationMethod): Promise<LocationCandidate[]>;
   getHslocMappings(): Promise<HslocMapping[]>;
   saveHslocMappings(mappings: HslocMapping[]): Promise<void>;
+  getEncounterMappings(): Promise<EncounterMapping[]>;
+  saveEncounterMappings(mappings: EncounterMapping[]): Promise<void>;
 
   // mrn intake — normalized server-side, mirrored into the draft
   getMrnIntake(): Promise<MrnIntake | null>;
@@ -113,6 +117,7 @@ export interface ApiClient {
   getReport(reportId: string): Promise<ReportDetail>;
   getReportPatients(reportId: string): Promise<ReportPatientEntry[]>;
   getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence>;
+  getPatientPreQualResults(reportId: string, patientId: string): Promise<PreQualIssue[]>;
   getPatientStatuses(reportId: string): Promise<PatientPipeline[]>;
   getQueryPlan(reportId: string): Promise<QueryPlan>;
   getAcquisitionLogs(reportId: string): Promise<AcquisitionLogEntry[]>;

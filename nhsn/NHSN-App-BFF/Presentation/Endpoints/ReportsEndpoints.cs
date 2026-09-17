@@ -271,6 +271,22 @@ public class ReportsEndpoints : IApi
                 operation.Description = "Append-only -- records a new attestation row rather than editing a prior one.";
                 return operation;
             });
+
+        group.MapGet("/{reportId}/patients/{patientId}/pre-qual-results", async (
+                string reportId,
+                string patientId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await service.GetPatientPreQualResultsAsync(reportId, patientId, cancellationToken)))
+            .WithName("GetPatientPreQualResults")
+            .Produces<IReadOnlyList<PreQualIssue>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Real per-patient FHIR validation issues for this report, from Validation's own results.";
+                operation.Description = "Each issue carries the real Validation category it was classified under (or \"Uncategorized\" if none), including whether that category is considered acceptable. An empty list when Validation has not recorded any issues for this patient.";
+                return operation;
+            });
     }
 
     private static Dictionary<string, string[]> Validate(ReportRequest request)

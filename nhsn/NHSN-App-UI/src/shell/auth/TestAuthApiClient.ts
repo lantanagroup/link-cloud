@@ -50,6 +50,8 @@ export class TestAuthApiClient implements ApiClient {
     this.inner.getLocationCandidates(m);
   getHslocMappings = () => this.inner.getHslocMappings();
   saveHslocMappings: ApiClient['saveHslocMappings'] = m => this.inner.saveHslocMappings(m);
+  getEncounterMappings = () => this.inner.getEncounterMappings();
+  saveEncounterMappings: ApiClient['saveEncounterMappings'] = m => this.inner.saveEncounterMappings(m);
 
   getMrnIntake = () => this.inner.getMrnIntake();
   saveMrnIntake: ApiClient['saveMrnIntake'] = i => this.inner.saveMrnIntake(i);
@@ -61,6 +63,8 @@ export class TestAuthApiClient implements ApiClient {
   getReportPatients: ApiClient['getReportPatients'] = id => this.inner.getReportPatients(id);
   getPatientMappingEvidence: ApiClient['getPatientMappingEvidence'] = (reportId, patientId) =>
     this.inner.getPatientMappingEvidence(reportId, patientId);
+  getPatientPreQualResults: ApiClient['getPatientPreQualResults'] = (reportId, patientId) =>
+    this.inner.getPatientPreQualResults(reportId, patientId);
   getPatientStatuses: ApiClient['getPatientStatuses'] = id => this.inner.getPatientStatuses(id);
   getQueryPlan: ApiClient['getQueryPlan'] = id => this.inner.getQueryPlan(id);
   getAcquisitionLogs: ApiClient['getAcquisitionLogs'] = id => this.inner.getAcquisitionLogs(id);

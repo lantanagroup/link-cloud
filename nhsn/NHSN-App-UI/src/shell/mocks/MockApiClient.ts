@@ -336,6 +336,15 @@ export class MockApiClient implements ApiClient {
     await tick();
   }
 
+  async getEncounterMappings(): Promise<C.EncounterMapping[]> {
+    await tick();
+    return [];
+  }
+
+  async saveEncounterMappings(): Promise<void> {
+    await tick();
+  }
+
   // ------------------------------------------------------------ mrn intake
 
   async getMrnIntake(): Promise<C.MrnIntake | null> {
@@ -399,6 +408,11 @@ export class MockApiClient implements ApiClient {
         {sourceSystem: 'Location.identifier', targetSystem: 'HSLOC', mappedCount: 0, unmappedCount: 1, failureCount: 0, unmappedCodes: ['UNMAPPED-LOC-0']}
       ]
     };
+  }
+
+  async getPatientPreQualResults(): Promise<C.PreQualIssue[]> {
+    await tick();
+    return [];
   }
 
   async getReportPatients(): Promise<C.ReportPatientEntry[]> {

@@ -34,10 +34,12 @@ public static class LinkGatewayRegistration
         services.AddScoped<IFhirConfigurationGateway, FhirConfigurationGateway>();
         services.AddScoped<IOrganizationLocationConfigurationGateway, OrganizationLocationConfigurationGateway>();
         services.AddSingleton<INormalizationRawClient, NormalizationRawClient>();
+        services.AddSingleton<IValidationRawClient, ValidationRawClient>();
         services.AddScoped<ICensusConfigurationGateway, CensusConfigurationGateway>();
         services.AddScoped<IQueryDispatchGateway, QueryDispatchGateway>();
         services.AddScoped<IReportGateway, ReportGateway>();
         services.AddScoped<IDataAcquisitionGateway, DataAcquisitionGateway>();
+        services.AddScoped<IValidationGateway, ValidationGateway>();
         services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
         services.AddScoped<ISftpFileGateway, SftpFileGateway>();
         services.AddScoped<ISftpConfigurationGateway, SftpConfigurationGateway>();
