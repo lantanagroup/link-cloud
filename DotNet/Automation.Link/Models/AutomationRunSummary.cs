@@ -19,5 +19,9 @@ public class AutomationRunSummary
     public string? FacilityId { get; set; }
     public string? ReportId { get; set; }
     public string? RunConfigurationJson { get; set; }
+    public Guid? GeneratedTemplateCacheVersionId { get; set; }
+    public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    public string? GeneratedTemplateCacheScenarioKey { get; set; }
+    public string? GeneratedTemplateSetHash { get; set; }
     public IReadOnlyList<string> Logs { get; set; } = [];
 }

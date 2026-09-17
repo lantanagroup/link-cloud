@@ -26,7 +26,7 @@ import {
 import {PaginationMetadata} from "../../../../models/pagination-metadata.model";
 import {Subject} from "rxjs";
 import {MatButton, MatIconButton} from "@angular/material/button";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {IOperationSequenceModel} from "../../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {MatIcon} from "@angular/material/icon";
 import {MatTooltip} from "@angular/material/tooltip";
@@ -192,7 +192,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
 
         sequences.forEach(seq => {
           seq.vendorPresets?.forEach((preset) => {
-            const vendorId = preset.vendorVersion?.vendor?.id;
+            const vendorId = preset.vendorVersion?.vendorId;
             if (vendorId) {
               usedVendorIds.add(vendorId);
             }
@@ -252,7 +252,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
         const usedVendorIds = new Set<string>();
         allSequences.forEach(seq => {
           seq.vendorPresets?.forEach(preset => {
-            const vendorId = preset.vendorVersion?.vendor?.id;
+            const vendorId = preset.vendorVersion?.vendorId;
             if (vendorId) {
               usedVendorIds.add(vendorId);
             }
@@ -299,7 +299,7 @@ export class OperationsSequenceComponent implements OnInit, OnDestroy {
       }
 
       seq.vendorPresets?.forEach(preset => {
-        const vendorId = preset.vendorVersion?.vendor?.id;
+        const vendorId = preset.vendorVersion?.vendorId;
         if (vendorId) {
           usedVendorIds.add(vendorId);
         }

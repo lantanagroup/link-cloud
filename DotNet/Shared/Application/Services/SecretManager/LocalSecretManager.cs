@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
     /// <summary>
     /// Local secret manager for development environments.
     /// Stores secrets in an encrypted JSON file using Data Protection API.
+    /// Falls back to environment variables for secrets not found in the JSON file.
     /// Secrets are loaded into memory on startup for fast access.
     /// </summary>
     public class LocalSecretManager : ISecretManager
@@ -23,6 +24,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 
         private const string ProtectorPurpose = "LocalSecretManager.Secrets.v1";
         private const string SecretsFileName = "link-local-secrets.enc";
+        private const string EnvironmentVariablePrefix = "LocalSecretManager__";
         private readonly JsonSerializerOptions _jsonSerializerOptions = new() { WriteIndented = false };
 
         public LocalSecretManager(
@@ -51,6 +53,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         public Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken)
         {
             var secret = _values.GetValueOrDefault(secretName);
+            if (secret == null)
+            {
+                secret = Environment.GetEnvironmentVariable(EnvironmentVariablePrefix + secretName);
+            }
             return Task.FromResult(secret);
         }
 

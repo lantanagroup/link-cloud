@@ -128,7 +128,7 @@ public class PipelineDataReader
     public record FhirQueryInfo(List<string> ResourceTypes);
 
     public record OperationInfo(string? Id, string? OperationType, string? Name, string? OperationJson, bool IsDisabled, List<string> ResourceTypes);
-    public record OperationSequenceInfo(string? Id, int? Sequence, string? OperationType, string? ResourceType);
+    public record OperationSequenceInfo(string? Id, int? Sequence, string? OperationType, string? ResourceType, string? OperationName);
 
     public record FacilityScheduledReports(string[] Monthly, string[] Daily, string[] Weekly);
     public record FacilityInfo(string FacilityId, string? FacilityName, string? TimeZone, bool IsDeleted, DateTime? CreateDate, FacilityScheduledReports? ScheduledReports);
@@ -466,7 +466,8 @@ public class PipelineDataReader
             s.Id.ToString(),
             s.Sequence,
             s.OperationResourceType?.Operation?.OperationType,
-            s.OperationResourceType?.Resource?.ResourceName)).ToList();
+            s.OperationResourceType?.Resource?.ResourceName,
+            s.OperationResourceType?.Operation?.Name)).ToList();
     }
 
     public async Task<FacilityInfo?> GetFacilityAsync(string facilityId)

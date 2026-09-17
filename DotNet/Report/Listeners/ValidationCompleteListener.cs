@@ -1,9 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using Hl7.Fhir.Support;
-using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
@@ -15,11 +11,10 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
-using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
-using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -157,7 +152,6 @@ namespace LantanaGroup.Link.Report.Listeners
             using var scope = _serviceScopeFactory.CreateScope();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
-            var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
 
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
@@ -185,39 +179,15 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
-            if (!value.IsValid)
-            {
-                var operationOutcome = GetOperationOutcome();
-
-                var serializer = new FhirJsonSerializer();
-                string json = serializer.SerializeToString(operationOutcome);
-
-                await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
-            }
-
+            // Validation is the sole writer of the pre-qualification OperationOutcome
+            // (pre-qualification.write-pre-qual-operation-outcome). Report only records
+            // the validation result and forwards the patient payload for submission.
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
             reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
 
             await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
             await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
-        }
-
-        private static OperationOutcome GetOperationOutcome()
-        {
-            OperationOutcome operationOutcome = new()
-            {
-                Id = Guid.NewGuid().ToString()
-            };
-
-            operationOutcome.AddIssue(new OperationOutcome.IssueComponent
-            {
-                Severity = OperationOutcome.IssueSeverity.Error,
-                Code = OperationOutcome.IssueType.Invalid,
-                Diagnostics = "Patient has failed Validation"
-            });
-
-            return operationOutcome;
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

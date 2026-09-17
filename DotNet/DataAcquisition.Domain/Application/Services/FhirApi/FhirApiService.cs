@@ -153,7 +153,7 @@ public class FhirApiService : IFhirApiService
 
             await UpdateResourceMappingsAsync(log, [resource], cancellationToken);
 
-            AddResourceToCache(new ResourceAcquired
+            await AddResourceToCacheAsync(new ResourceAcquired
             {
                 Resource = resource,
                 ResourceType = resource.TypeName,
@@ -161,7 +161,7 @@ public class FhirApiService : IFhirApiService
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-            }, log.CorrelationId);
+            }, log.CorrelationId, cancellationToken);
 
             return resourceIds;
         }
@@ -328,7 +328,7 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var resource in resources)
                 {
-                    AddResourceToCache(new ResourceAcquired
+                    await AddResourceToCacheAsync(new ResourceAcquired
                     {
                         Resource = resource,
                         ResourceType = resource.TypeName,
@@ -336,7 +336,7 @@ public class FhirApiService : IFhirApiService
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-                    }, log.CorrelationId);
+                    }, log.CorrelationId, cancellationToken);
                 }
             }
 
@@ -433,13 +433,13 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)
+    private async Task AddResourceToCacheAsync(ResourceAcquired resourceAcquired, string correlationId, CancellationToken cancellationToken)
     {
         if (resourceAcquired.Resource is DomainResource domainResource
             && !string.IsNullOrWhiteSpace(resourceAcquired.ResourceType)
             && Enum.TryParse<ResourceType>(resourceAcquired.ResourceType, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+            await _resourceCache.UpdateCorrelationCacheAsync($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType, cancellationToken);
         }
     }
 

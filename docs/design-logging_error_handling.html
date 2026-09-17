@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,7 +497,7 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h2 id="setting-up-serilog" class="content-heading">Setting up SeriLog <a id="setting-up-serilog" href="#setting-up-serilog" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up SeriLog"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="setting-up-serilog" class="content-heading">Setting up SeriLog <a href="#setting-up-serilog" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Setting up SeriLog"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To set up SeriLog to capture the desired logging information you will need to have the following NuGet packages installed:</p>
 <ul>
 <li><a href="https://www.nuget.org/packages/Serilog.AspNetCore">Serilog AspNetCore</a>
@@ -593,7 +595,7 @@ Log.Logger = new LoggerConfiguration()
     }
   }
 </code></pre>
-<h2 id="adding-problem-details" class="content-heading">Adding Problem Details <a id="adding-problem-details" href="#adding-problem-details" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding Problem Details"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="adding-problem-details" class="content-heading">Adding Problem Details <a href="#adding-problem-details" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding Problem Details"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Problem details is an attempt at an industry standard to carry machine readable details of errors in a HTTP response to avoid the need to define new error response formats for HTTP APIs.</p>
 <p><a href="https://datatracker.ietf.org/doc/html/rfc7807">RFC-7807</a></p>
 <p>This can be accomplished by using the .NET <a href="https://learn.microsoft.com/en-us/aspnet/core/web-api/handle-errors?view=aspnetcore-7.0#problem-details-service">problem details service</a>.</p>
@@ -648,7 +650,7 @@ else
     throw;
 }
 </code></pre>
-<h2 id="logging-ids" class="content-heading">Logging Ids <a id="logging-ids" href="#logging-ids" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging Ids"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="logging-ids" class="content-heading">Logging Ids <a href="#logging-ids" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging Ids"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The AuditLoggingIds.GetItem in the above _logger.LogError method is a new option in .NET that allows you to assign a Logging Id to log types. In the example above it will give the log an id of 1002 from the following static class.</p>
 <pre><code class="language-csharp">public static class AuditLoggingIds 
 {
@@ -667,7 +669,7 @@ else
 </code></pre>
 <p>This can allow for finding specific log types by the id and will show up in logs as follows:</p>
 <p><img src="/images/find_log_types_by_id.png" alt="" /></p>
-<h2 id="userscope-middleware" class="content-heading">UserScope Middleware <a id="userscope-middleware" href="#userscope-middleware" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UserScope Middleware"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="userscope-middleware" class="content-heading">UserScope Middleware <a href="#userscope-middleware" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UserScope Middleware"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The LantanaGroup.Link.Shared.Application.Middleware middleware has been added to the shared project. This middleware will capture the username as well as the id of the user if an authenticated user is present in the .NET HttpContext.User.Identity object. This object will be populated based on if/how you have authentication enabled. For more information about enabled authentication see TBD.</p>
 <p>This scoped user information will automatically be added to any logs created. To add the middleware simply add the following in the SetupMiddleware method in the service startup (Program.cs):</p>
 <pre><code class="language-csharp">app.UseRouting();
@@ -679,7 +681,7 @@ app.UseEndpoints(endpoints =&gt; endpoints.MapControllers());
 </code></pre>
 <p>This middlware should come after app.UseAuthentication(). When this is added the following will be included in a scope within your logs.</p>
 <p><img src="/images/scope_message_in_logs.png" alt="" /></p>
-<h2 id="adding-data-to-exceptions" class="content-heading">Adding data to exceptions <a id="adding-data-to-exceptions" href="#adding-data-to-exceptions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding data to exceptions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="adding-data-to-exceptions" class="content-heading">Adding data to exceptions <a href="#adding-data-to-exceptions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Adding data to exceptions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>For additional context, you may add some additional data about the issue that caused the exception to be thrown as follows:</p>
 <pre><code class="language-csharp">catch (NullReferenceException ex)
 {
@@ -692,7 +694,7 @@ app.UseEndpoints(endpoints =&gt; endpoints.MapControllers());
 <p>The <code>exception.Data.Add()</code> method will add this information in the following locations:</p>
 <p><img src="/images/extra_data_in_exception.png" alt="" /></p>
 <p>Additional information about .NET logging can be found <a href="https://learn.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-7.0">here</a>.</p>
-<h2 id="loggermessage-attribute" class="content-heading">LoggerMessage Attribute <a id="loggermessage-attribute" href="#loggermessage-attribute" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: LoggerMessage Attribute"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="loggermessage-attribute" class="content-heading">LoggerMessage Attribute <a href="#loggermessage-attribute" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: LoggerMessage Attribute"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Introduced in .NET 6, the <a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/logger-message-generator">LoggerMessage</a> allows for performant logging.</p>
 <pre><code class="language-csharp">public static partial class Logging
 {
@@ -706,7 +708,7 @@ app.UseEndpoints(endpoints =&gt; endpoints.MapControllers());
 </code></pre>
 <p>The <code>LogProperties</code> attribute, requires .NET 8, will include all of the properties of the object in your log.</p>
 <p><img src="/images/log_extra_audit_event_properties.png" alt="" /></p>
-<h2 id="kafka-consumer-error-handling" class="content-heading">Kafka Consumer Error Handling <a id="kafka-consumer-error-handling" href="#kafka-consumer-error-handling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Error Handling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="kafka-consumer-error-handling-dotnet-services" class="content-heading">Kafka Consumer Error Handling — Dotnet Services <a href="#kafka-consumer-error-handling-dotnet-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Error Handling &#x2014; Dotnet Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>When consuming an event that cannot be deserialized, the consumer should catch the error through a ConsumeException. In the catch, the service should do the following:</p>
 <ul>
 <li>Create an audit event to trace that an error occurred.</li>
@@ -800,6 +802,441 @@ catch (ConsumeException e)
 
   classDef final fill:#d4af37,stroke:#333,color:white;
 </pre>
+<h2 id="kafka-consumer-error-handling-java-services" class="content-heading">Kafka Consumer Error Handling — Java Services <a href="#kafka-consumer-error-handling-java-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Error Handling &#x2014; Java Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>How the Link Java services — <strong>MeasureEval</strong> and <strong>Validation</strong> — handle failures while
+consuming Kafka messages: what gets retried, what gets dead-lettered, on what schedule, and how
+to observe and test all of it. The mechanism is shared; each service plugs in its own topics.</p>
+<p>This page is self-contained — it assumes familiarity with Kafka basics (topics, consumers,
+offsets) but nothing about the Link codebase.</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Consumed topics (each with <code>-Retry</code>/<code>-Error</code> companions)</th>
+<th>Downstream event on success</th>
+<th>Per-message side resources</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MeasureEval</td>
+<td><code>ResourcesNormalized</code>, <code>EvaluationRequested</code></td>
+<td><code>MeasureReportGenerated</code></td>
+<td>Resource cache (Redis/blob) — released only on success or terminal failure</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td><code>ReadyForValidation</code></td>
+<td><code>ValidationComplete</code></td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-problem-being-solved" class="content-heading">The problem being solved <a href="#the-problem-being-solved" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: The problem being solved"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Link services communicate through Kafka: for example, when patient data has been normalized, a
+<code>ResourcesNormalized</code> message tells MeasureEval to evaluate the patient against a measure.
+Processing such a message can fail for two very different reasons:</p>
+<ul>
+<li><strong>Transient failures</strong> — a dependency is briefly down (MongoDB, Redis, blob storage, another
+service). The same message would succeed if simply tried again a bit later.</li>
+<li><strong>Permanent failures (&quot;poison&quot; messages)</strong> — the message content itself is bad (malformed
+JSON, an unparseable FHIR resource, a validation error). Retrying can never succeed.</li>
+</ul>
+<p>Without deliberate handling, the first kind loses real patient data over a 30-second network
+blip, and the second kind can jam a consumer forever, re-failing on the same message. The
+design below retries transient failures automatically on a fixed schedule and moves permanent
+failures aside — into an <em>error topic</em> — where they are preserved for investigation instead of
+blocking everything behind them.</p>
+<h3 id="what-happens-when-a-message-fails" class="content-heading">What happens when a message fails <a href="#what-happens-when-a-message-fails" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What happens when a message fails"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Each consumed topic has two companion topics, created alongside it:</p>
+<ul>
+<li><strong><code>&lt;Topic&gt;-Retry</code></strong> — a holding area for messages awaiting another attempt. A dedicated
+listener re-reads them, waits until the message's scheduled due-time, and feeds it back
+through the exact same processing logic.</li>
+<li><strong><code>&lt;Topic&gt;-Error</code></strong> — the <em>dead-letter topic</em>. Messages that will never be retried again end
+up here, preserved with their original content and headers. Nothing consumes this topic; it
+is an archive for humans (and a future replay tool).</li>
+</ul>
+<pre class="mermaid">flowchart LR
+  Main["ResourcesNormalized&lt;br>(main topic)"] --> Consumer["Consumer&lt;br>(processing logic)"]
+  Consumer -->|success| Ack["done — offset committed"]
+  Consumer -->|failure| Decide{"classify the&lt;br>failure"}
+  Decide -->|"transient +&lt;br>attempts left"| Retry["ResourcesNormalized-Retry"]
+  Decide -->|"poison, or attempts&lt;br>exhausted, or retries disabled"| Error["ResourcesNormalized-Error&lt;br>(dead letter)"]
+  Retry -->|"after the backoff delay"| Consumer
+
+  classDef error fill:#f8d7da,stroke:#c00,color:#000;
+  class Error error;
+</pre>
+<p>Step by step, when processing throws an exception:</p>
+<ol>
+<li>The failure is <strong>classified</strong> (see the next section): can a retry ever help?</li>
+<li><strong>Transient, attempts remaining</strong> → the message is republished to <code>-Retry</code>, stamped with its
+attempt count and an absolute &quot;not before&quot; timestamp (now + the configured delay). The retry
+listener redelivers it after that delay and the full processing logic runs again.</li>
+<li><strong>Poison, attempts exhausted, or retries disabled</strong> → the message is republished to
+<code>-Error</code>. This is terminal: it will never be redelivered automatically.</li>
+<li>Only after the republish <strong>succeeds</strong> is the original message acknowledged. If the service
+crashes mid-flight — or the republish itself fails — the offset stays uncommitted and Kafka
+redelivers the original message. <strong>A message is never silently lost.</strong></li>
+</ol>
+<p>One special case: a message whose <em>bytes can't even be deserialized</em> fails before the
+processing logic runs at all. Such messages skip the retry ladder (deserialization can never
+succeed on retry) and go straight to <code>-Error</code>.</p>
+<p>The diagram uses MeasureEval's <code>ResourcesNormalized</code> as the example; the flow is identical for
+its <code>EvaluationRequested</code> topic and for Validation's <code>ReadyForValidation</code>
+(<code>ReadyForValidation-Retry</code> / <code>ReadyForValidation-Error</code>).</p>
+<p>One operational prerequisite: the <code>-Retry</code> and <code>-Error</code> topics are <strong>not auto-created</strong> — they
+must exist in the broker (they are part of the standard topic provisioning). In a fresh
+environment where they are missing, failed messages have nowhere to go.</p>
+<h3 id="transient-vs-poison-how-failures-are-classified" class="content-heading">Transient vs poison: how failures are classified <a href="#transient-vs-poison-how-failures-are-classified" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Transient vs poison: how failures are classified"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>When</th>
+<th>Where the message goes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Retry</strong></td>
+<td>Any exception <em>not</em> classified as poison, with attempts remaining</td>
+<td><code>-Retry</code>, redelivered after the scheduled delay</td>
+</tr>
+<tr>
+<td><strong>Dead-letter: poison</strong></td>
+<td>The exception (anywhere in its cause chain) is a content problem that can never succeed — in both services: FHIR parse errors, validation errors, message-format and deserialization errors</td>
+<td><code>-Error</code>, immediately, without burning retry attempts</td>
+</tr>
+<tr>
+<td><strong>Dead-letter: exhausted</strong></td>
+<td>All attempts used up</td>
+<td><code>-Error</code></td>
+</tr>
+<tr>
+<td><strong>Dead-letter: disabled</strong></td>
+<td>Retries are turned off by configuration</td>
+<td><code>-Error</code> on the first failure</td>
+</tr>
+</tbody>
+</table>
+<p>The default is deliberately <em>retry</em>: anything not on the service's explicit poison list —
+including infrastructure outages like &quot;cannot connect to Redis&quot; — is treated as transient.
+The flip side of that rule for developers: processing code must let such exceptions <strong>escape
+unhandled</strong>. Catching and swallowing a Redis outage would not prevent the failure — it would
+convert it into a silently wrong result (e.g. evaluating an empty patient bundle and reporting
+a false &quot;not reportable&quot;) with no retry and no dead letter.</p>
+<h3 id="the-retry-schedule" class="content-heading">The retry schedule <a href="#the-retry-schedule" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: The retry schedule"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The delays come from configuration (next section). Both services deploy the same schedule:</p>
+<table>
+<thead>
+<tr>
+<th>Attempt</th>
+<th>Delay before it</th>
+<th>Elapsed since first failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 (original)</td>
+<td>—</td>
+<td>0</td>
+</tr>
+<tr>
+<td>2</td>
+<td>20 s</td>
+<td>~20 s</td>
+</tr>
+<tr>
+<td>3</td>
+<td>60 s</td>
+<td>~1 min 20 s</td>
+</tr>
+<tr>
+<td>4 (last)</td>
+<td>120 s</td>
+<td>~3 min 20 s</td>
+</tr>
+<tr>
+<td>dead letter</td>
+<td>—</td>
+<td>~3 min 20 s</td>
+</tr>
+</tbody>
+</table>
+<p>So a dependency outage shorter than ~3.5 minutes self-heals with no data loss and no manual
+action: whichever attempt lands after the dependency returns completes the real work, produces
+the normal downstream event, and the message never reaches <code>-Error</code>.</p>
+<h3 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Two properties control everything; both live under <code>spring.kafka.retry</code> (in
+<code>application.yml</code>, overridable per environment via Azure App Configuration):</p>
+<pre><code class="language-yaml">spring:
+  kafka:
+    retry:
+      consumer-retry-duration: [PT20S, PT60S, PT120S]  # ISO-8601 durations
+      disable-retry-consumer: false
+</code></pre>
+<ul>
+<li><code>consumer-retry-duration</code> is the single source of truth for both <strong>how many</strong> retries happen
+and <strong>when</strong>: N entries mean N retries (N+1 total attempts), and entry K is the delay before
+retry K. An empty list means the first failure dead-letters. This mirrors the .NET services'
+<code>ConsumerSettings:ConsumerRetryDuration</code>, so both stacks are tuned the same way.</li>
+<li><code>disable-retry-consumer: true</code> sends every failure straight to <code>-Error</code> and doesn't start the
+retry listener at all.</li>
+<li>Changing depth, timing, or turning retries off is a <strong>configuration change and a restart</strong> —
+no code change.</li>
+</ul>
+<h3 id="guarantees-and-their-consequences" class="content-heading">Guarantees — and their consequences <a href="#guarantees-and-their-consequences" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Guarantees &#x2014; and their consequences"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>At-least-once delivery.</strong> A message is acknowledged only after it has been fully processed
+<em>or</em> durably parked in <code>-Retry</code>/<code>-Error</code>. The trade-off: a crash or restart at the wrong
+moment can deliver a message <strong>twice</strong>. This is by design (the alternative is losing it), and
+it means duplicate downstream events (e.g. two <code>MeasureReportGenerated</code> for one input) are
+possible and expected under failure conditions — downstream consumers must tolerate them.</li>
+<li><strong>Dead letters are terminal today.</strong> Nothing consumes <code>-Error</code>; there is no automatic replay.
+Recovering a dead-lettered message is currently a manual operation. (A cross-service replay
+capability is a known future work item.)</li>
+<li><strong>Cached data survives retries.</strong> Messages like <code>ResourcesNormalized</code> don't carry the patient
+data themselves — it sits in a shared resource cache (Redis / blob storage) keyed by
+correlation id. The rule: <strong>a failed attempt must leave the cache untouched</strong>, because the
+retry needs it. The cache is released at exactly two moments — successful processing, or
+<em>after</em> the message is durably dead-lettered — never in between. Validation carries no
+per-message side resources, so it has no cleanup step at all.</li>
+<li><strong>Dependency clients fail fast on the consumer path.</strong> Blob-storage clients used during
+message processing are capped at 2 quick tries (~10 s) instead of the SDK default of ~3
+minutes of hidden internal retrying. One system owns retries — the visible, configurable
+Kafka ladder — so outages surface in seconds and the schedule above is the real schedule.</li>
+</ul>
+<h3 id="for-qa-what-to-expect-and-how-to-verify" class="content-heading">For QA: what to expect and how to verify <a href="#for-qa-what-to-expect-and-how-to-verify" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: For QA: what to expect and how to verify"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h4 id="expected-behavior-by-scenario" class="content-heading">Expected behavior by scenario <a href="#expected-behavior-by-scenario" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Expected behavior by scenario"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Expected behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Malformed / poison message</td>
+<td>Goes to <code>-Error</code> immediately (no retry attempts); normal traffic continues unaffected</td>
+</tr>
+<tr>
+<td>Dependency down briefly (&lt; ~3.5 min)</td>
+<td>Retry ladder runs (20 s / 60 s / 120 s); once the dependency is restored, the next attempt succeeds and produces the normal downstream event; <code>-Error</code> stays empty</td>
+</tr>
+<tr>
+<td>Dependency down past the ladder (~3.5 min+)</td>
+<td>Message lands in <code>-Error</code> after 4 attempts; downstream event is <strong>not</strong> produced</td>
+</tr>
+<tr>
+<td>Service restarted mid-ladder</td>
+<td>Message is redelivered and continues; a duplicate downstream event is possible and acceptable</td>
+</tr>
+<tr>
+<td>Retries disabled via config</td>
+<td>First failure goes straight to <code>-Error</code></td>
+</tr>
+</tbody>
+</table>
+<p>Which dependency outages actually trigger the ladder differs per service — the ladder only
+engages when a failure makes processing <em>throw</em>, and each service has different hard
+dependencies:</p>
+<ul>
+<li><strong>MeasureEval</strong> retries on: Redis down (its resource cache is a hard dependency), MongoDB
+down, blob storage (Azurite locally) down. Data-only triggers, needing no infrastructure
+change: an <code>EvaluationRequested</code> referencing a nonexistent previous report, or an unknown
+measure id.</li>
+<li><strong>Validation</strong> retries on: blob storage down while the message carries a valid <code>payloadUri</code>,
+or its SQL Server database down (Validation has no MongoDB dependency).</li>
+<li><strong>Validation trap:</strong> stopping <strong>Redis</strong> does <em>not</em> produce retries in Validation. Its Redis
+layer is a read-through cache whose errors are deliberately swallowed and treated as cache
+misses — processing continues against the backing store. Expect warning logs and a degraded
+health check, not <code>-Retry</code> traffic. This is correct behavior, not a bug.</li>
+</ul>
+<h4 id="what-to-observe" class="content-heading">What to observe <a href="#what-to-observe" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What to observe"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Three signals tell the whole story per test message:</p>
+<ol>
+<li><strong>Service logs</strong> — each retry hop and each dead-letter decision is logged. Against local
+docker-compose (<code>link-measureeval</code> / <code>link-validation</code>):
+<pre><code class="language-bash">docker logs link-measureeval -f | grep -E &quot;Retry attempt|Max retry|Cache cleanup&quot;
+docker logs link-validation  -f | grep -E &quot;Retry attempt|Max retry&quot;
+</code></pre>
+</li>
+<li><strong>The <code>-Error</code> topic offset</strong> — did the dead-letter count go up? (Substitute
+<code>ReadyForValidation-Error</code> when testing Validation.)
+<pre><code class="language-bash">docker exec kafka-broker /opt/bitnami/kafka/bin/kafka-get-offsets.sh \
+  --bootstrap-server kafka_b:9092 --command-config /tmp/client.properties \
+  --topic ResourcesNormalized-Error
+</code></pre>
+</li>
+<li><strong>The downstream event</strong> — <code>MeasureReportGenerated</code> (MeasureEval) / <code>ValidationComplete</code>
+(Validation) must appear on success and <em>only</em> on success.</li>
+</ol>
+<h4 id="inducing-failures-stopping-dependency-containers" class="content-heading">Inducing failures: stopping dependency containers <a href="#inducing-failures-stopping-dependency-containers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Inducing failures: stopping dependency containers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>With the docker-compose stack running, use the levers from the list above:
+<code>docker stop mongo</code> (MeasureEval), <code>docker stop mssql</code> (Validation), <code>docker stop azurite</code>
+(MeasureEval's resource cache; Validation's payload reads), <code>docker stop redis_cache</code>
+(MeasureEval only — see the Validation trap above). Restart the dependency mid-ladder to
+verify recovery.</p>
+<p><code>docker stop</code> and <code>docker pause</code> are two different scenarios, and both are worth running:
+<strong>stop</strong> gives connection-refused (fast, clean failures); <strong>pause</strong> gives a TCP black hole —
+connections hang until a timeout fires — which exercises the configured timeout bounds (the
+2 s Redis command timeout, Mongo's <code>serverSelectionTimeoutMS</code>) and is closer to a real
+network outage.</p>
+<h4 id="inducing-failures-breaking-configuration" class="content-heading">Inducing failures: breaking configuration <a href="#inducing-failures-breaking-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Inducing failures: breaking configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>Config-based faults complement container stops: they model real misconfiguration incidents,
+and they target one service without disturbing other consumers of the same dependency.</p>
+<p><strong>Mechanics (local docker-compose):</strong> add or override the property in the service's
+<code>environment:</code> block in <code>docker-compose.yml</code>, in dotted form exactly like the existing
+entries (e.g. <code>spring.data.mongodb.uri: ...</code>), then recreate the service with
+<code>docker compose up -d measureeval</code> (or <code>validation</code>). In deployed environments the same
+property paths go into Azure App Configuration plus a service restart.</p>
+<p><strong>The golden rule:</strong> a broken config only exercises the retry ladder if the service still
+<strong>boots</strong> and the failure happens at message-processing time. Some breakages fail at startup
+instead — a crashed or never-healthy container runs no consumers and produces zero retries,
+which reads like a failed test when it's really a failed setup. The traps are flagged below.</p>
+<p>MeasureEval:</p>
+<table>
+<thead>
+<tr>
+<th>Lever</th>
+<th>Property to break</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Redis port</td>
+<td><code>spring.data.redis.port: 6380</code> (valid but unused port)</td>
+<td>✅ Boots fine; every cache read throws at processing time → ladder. Use a valid-but-dead port — an out-of-range value like <code>66666</code> fails property binding and <strong>kills startup</strong></td>
+</tr>
+<tr>
+<td>Redis password</td>
+<td><code>spring.data.redis.password: wrong</code></td>
+<td>✅ Runtime (the client connects lazily) — auth failure at first cache read → ladder</td>
+</tr>
+<tr>
+<td>Mongo credentials</td>
+<td><code>spring.data.mongodb.uri: mongodb://linkuser:wrongpass@mongo:27017/link-measureeval?authSource=admin&amp;serverSelectionTimeoutMS=4000</code></td>
+<td>✅ Runtime — every Mongo access fails with <code>AuthenticationFailed</code> (error 18) → ladder. Works even though the local compose Mongo has <strong>no auth enabled</strong>: the server still validates the SCRAM handshake against its user catalog, and the user doesn't exist</td>
+</tr>
+<tr>
+<td>Mongo unreachable</td>
+<td>dead port in the URI, e.g. <code>mongodb://mongo:27018/...?serverSelectionTimeoutMS=4000</code></td>
+<td>✅ Runtime; equivalent to stopping Mongo but scoped to this one service</td>
+</tr>
+<tr>
+<td>Blob container</td>
+<td><code>resource-cache.blob-storage.blob-container-name: no-such-container</code></td>
+<td>✅ Runtime — cache blob reads 404 (<code>ContainerNotFound</code>) → ladder; the fail-fast client (2 tries, 10 s cap) surfaces it in seconds. Breaking the account <em>key</em> inside the connection string gives the 403 variant</td>
+</tr>
+</tbody>
+</table>
+<p>Mongo URI rules that make or break the test: keep the URI <strong>well-formed</strong> (a malformed one —
+e.g. a port inside an <code>+srv</code> URI — is a <strong>startup crash</strong>, not a runtime failure), and always
+keep <code>serverSelectionTimeoutMS=4000</code> — the driver's default is 30 s of server selection per
+attempt, which stalls every rung and makes the ladder look hung.</p>
+<p>Validation:</p>
+<table>
+<thead>
+<tr>
+<th>Lever</th>
+<th>Property to break</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SQL Server password</td>
+<td><code>spring.datasource.password: wrong</code></td>
+<td>❌ <strong>Startup killer, not a lever</strong> — Hibernate opens a connection during boot (<code>ddl-auto: update</code>), so the container never becomes healthy and no consumer runs. For DB-driven retries, break the DB <em>after</em> startup: <code>docker stop mssql</code> or <code>docker pause mssql</code></td>
+</tr>
+<tr>
+<td>Blob container</td>
+<td><code>internal-blob-storage.blob-container-name: no-such-container</code></td>
+<td>✅ Runtime — the report-payload read fails (for messages with a valid <code>payloadUri</code>) → ladder</td>
+</tr>
+<tr>
+<td>Redis (any breakage)</td>
+<td>port, password, or stopped</td>
+<td>❌ Deliberately <strong>no retries</strong> — see the Validation trap above (cache errors are swallowed as misses)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Config faults are sticky — know which command heals them.</strong> A container keeps the
+environment it was <strong>created</strong> with: reverting <code>docker-compose.yml</code> does not change the
+running service, so the fault stays live until the container is recreated. The two commands
+do opposite things:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker restart link-measureeval</code></td>
+<td><strong>Keeps</strong> the injected fault (restart preserves the container's env)</td>
+</tr>
+<tr>
+<td><code>docker compose up -d measureeval</code></td>
+<td><strong>Removes</strong> it (recreates the container from the current file) — this is also the &quot;dependency restored mid-ladder&quot; recovery step; the in-flight message is parked in <code>-Retry</code> and survives the recreation</td>
+</tr>
+</tbody>
+</table>
+<p>Two observation caveats while a config fault is live: the container may show <strong>unhealthy</strong>
+purely from its health-check probes hitting the broken dependency — that is not ladder
+traffic, and the resulting log noise (on HTTP threads) is not retry activity. Ladder behavior
+only appears once a message is actually consumed, so always produce a test record and watch
+for the <code>Retry attempt</code> log lines.</p>
+<h4 id="producing-test-records" class="content-heading">Producing test records <a href="#producing-test-records" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Producing test records"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>A poison message is any record whose value isn't valid JSON for the topic's type. To produce
+test records, use the Kafka console producer inside the broker container from <strong>Git Bash, not
+PowerShell</strong> (PowerShell pipes prepend a byte-order mark that corrupts the message key):</p>
+<pre><code class="language-bash">printf '%s\n' '{&quot;facilityId&quot;:&quot;MyFacility&quot;,&quot;patientId&quot;:&quot;p1&quot;}|{&quot;queryType&quot;:&quot;INITIAL&quot;,...}' |
+  MSYS_NO_PATHCONV=1 docker exec -i kafka-broker \
+  /opt/bitnami/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server kafka_b:9092 --producer.config /tmp/client.properties \
+  --topic ResourcesNormalized --property parse.key=true --property 'key.separator=|'
+</code></pre>
+<h3 id="for-developers-how-it-s-built-and-how-to-adopt-it" class="content-heading">For developers: how it's built and how to adopt it <a href="#for-developers-how-it-s-built-and-how-to-adopt-it" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: For developers: how it&#x27;s built and how to adopt it"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The mechanism lives in the shared Java module and is service-agnostic; each service plugs in
+its own topics and its own poison list.</p>
+<p>Background on <em>why</em> it's hand-rolled: these services process messages on a background executor
+(long-running CQL evaluation would otherwise exceed Kafka's poll interval and trigger consumer
+rebalancing). Exceptions therefore surface on the executor thread, which Spring Kafka's native
+retry machinery cannot see — so the services own the retry <em>policy</em> (classification, attempt
+counting, schedule, destination) and reuse Spring only for the retry <em>plumbing</em> (the listener
+that delays <code>-Retry</code> redeliveries).</p>
+<table>
+<thead>
+<tr>
+<th>Shared component</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AbstractAsyncConsumer</code></td>
+<td>Executor hand-off; ack on success, route-then-ack on failure</td>
+</tr>
+<tr>
+<td><code>RetryTopicRecoverer</code></td>
+<td>Makes the routing decision, stamps attempt/due-time headers, publishes</td>
+</tr>
+<tr>
+<td><code>RetryTopicRecovererFactory</code></td>
+<td>Assembles the above; takes the service's poison set and an optional terminal-cleanup hook as parameters</td>
+</tr>
+<tr>
+<td><code>KafkaRetryConfig</code></td>
+<td>Binds the two <code>spring.kafka.retry</code> properties; derives attempt count and per-attempt delay</td>
+</tr>
+</tbody>
+</table>
 
         
     </div>
@@ -807,7 +1244,7 @@ catch (ConsumeException e)
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nlogging_error_handling_384115D7["Design: Logging & Error Handling"]</pre>
+nlogging_error_handling_678F2E14["Design: Logging & Error Handling"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
