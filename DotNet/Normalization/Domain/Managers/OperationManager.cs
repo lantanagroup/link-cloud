@@ -5,6 +5,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Services;
+using LantanaGroup.Link.Normalization.Application.Operations;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
@@ -17,8 +18,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
     public interface IOperationManager
     {
-        Task<TaskResult> CreateOperation(CreateOperationModel model);
-        Task<TaskResult> UpdateOperation(UpdateOperationModel model);
+        Task<TaskResult> CreateOperation(CreateOperationModel model, CancellationToken cancellationToken = default);
+        Task<TaskResult> UpdateOperation(UpdateOperationModel model, CancellationToken cancellationToken = default);
         Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel);
         Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorVersionIds);
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources);
@@ -35,8 +36,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly IResourceQueries _resourceQueries;
         private readonly IVendorVersionResolver _vendorVersionResolver;
+        private readonly IHSLOCQueries _hslocQueries;
 
-        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager, IVendorVersionResolver vendorVersionResolver)
+        public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager, IVendorVersionResolver vendorVersionResolver, IHSLOCQueries hslocQueries)
         {
             _database = database;
             _operationQueries = operationQueries;
@@ -44,9 +46,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _resourceQueries = resourceQueries;
             _resourceManager = resourceManager;
             _vendorVersionResolver = vendorVersionResolver;
+            _hslocQueries = hslocQueries;
         }
 
-        public async Task<TaskResult> CreateOperation(CreateOperationModel model)
+        public async Task<TaskResult> CreateOperation(CreateOperationModel model, CancellationToken cancellationToken = default)
         {
             TaskResult taskResult = new();
             try
@@ -61,7 +64,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor Version IDs, but not both.");
                 }
 
-                var result = await OperationServiceHelper.ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes);
+                if (model.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
+                    await _database.Operations.AnyAsync(operation => operation.FacilityId == model.FacilityId && operation.OperationType == "HSLOCMap"))
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = "Only one HSLOC Map operation is allowed per facility.";
+                    return taskResult;
+                }
+
+                var result = await ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes, cancellationToken);
 
                 if (!result.IsValid)
                 {
@@ -102,7 +114,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             return taskResult;
         }
 
-        public async Task<TaskResult> UpdateOperation(UpdateOperationModel model)
+        public async Task<TaskResult> UpdateOperation(UpdateOperationModel model, CancellationToken cancellationToken = default)
         {
             TaskResult taskResult = new();
             try
@@ -141,9 +153,18 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 #endregion
 
                 var operation = await _database.Operations.GetAsync(model.Id);
+                if (operation.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
+                    await _database.Operations.AnyAsync(existing => existing.FacilityId == model.FacilityId && existing.OperationType == "HSLOCMap" && existing.Id != model.Id))
+                {
+                    taskResult.IsSuccess = false;
+                    taskResult.ObjectResult = null;
+                    taskResult.ErrorMessage = "Only one HSLOC Map operation is allowed per facility.";
+                    return taskResult;
+                }
+
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
 
-                var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
+                var result = await ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes, cancellationToken);
 
                 if (!result.IsValid)
                 {
@@ -176,6 +197,30 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             return taskResult;
+        }
+
+        private async Task<(bool IsValid, string? ErrorMessage)> ValidateOperation(
+            string operationType, string operationJson, List<string> resourceTypes, CancellationToken cancellationToken)
+        {
+            var result = await OperationServiceHelper.ValidateOperation(operationType, operationJson, resourceTypes);
+            if (!result.IsValid || operationType != nameof(OperationType.HSLOCMap))
+                return result;
+
+            //additional validation for HSLOCMap operations: all target codes must match active HSLOC codes
+            var operation = OperationHelper.GetOperation(operationType, operationJson) as HSLOCMapOperation;
+            if(operation == null) return result;
+            
+            var targetCodes = operation.CodeSystemMaps.SelectMany(map => map.CodeMaps.Values)
+                .Select(map => map.Code).Distinct(StringComparer.Ordinal).ToList();
+            if (targetCodes.Count == 0)
+                return result;
+
+            var activeCodes = (await _hslocQueries.GetAll(false, cancellationToken))
+                .Select(row => row.HSLOCCode).ToHashSet(StringComparer.Ordinal);
+            var invalidCodes = targetCodes.Where(code => !activeCodes.Contains(code)).ToList();
+            return invalidCodes.Count == 0
+                ? result
+                : (false, $"HSLOCMap target codes must match active HSLOC codes. Invalid codes: {string.Join(", ", invalidCodes)}.");
         }
 
         public async Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorVersionIds)
