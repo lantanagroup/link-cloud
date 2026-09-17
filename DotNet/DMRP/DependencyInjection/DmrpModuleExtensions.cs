@@ -98,6 +98,9 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             builder.Services.AddScoped<IFacilityReportingPeriodResolver, FacilityReportingPeriodResolver>();
             builder.Services.AddScoped<IFacilityReportingPlanLookAhead, FacilityReportingPlanLookAhead>();
 
+            builder.Services.AddSingleton<IDmrpSchedulingMetrics, DmrpSchedulingMetrics>();
+            builder.Services.AddTransient<DmrpNightlyJob>();
+
             builder.Services.TryAddSingleton(TimeProvider.System);
 
             if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityTimeZoneSource)))
