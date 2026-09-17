@@ -65,6 +65,68 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                     b.ToTable("Acknowledgements", (string)null);
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.MrnIntakeOptionSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LabelKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("OptionGroup")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OptionGroup", "Value")
+                        .IsUnique();
+
+                    b.ToTable("MrnIntakeOptionSets", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.MrnIntakeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("IntakeJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("UpdatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .IsUnique();
+
+                    b.ToTable("MrnIntakeRecords", (string)null);
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.NhsnFacility", b =>
                 {
                     b.Property<Guid>("Id")
@@ -165,6 +227,32 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.OnboardingCommit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .IsUnique();
+
+                    b.ToTable("OnboardingCommits", (string)null);
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.OnboardingDraft", b =>

@@ -356,11 +356,54 @@ export class MockApiClient implements ApiClient {
     await tick();
   }
 
+  async getMrnIntakeOptions(): Promise<C.MrnIntakeOptions> {
+    await tick();
+    return {
+      multipleMrnTypes: [
+        {value: 'empi', labelKey: 'onboarding:mrnIntake.multipleMrn.types.empi'},
+        {value: 'legacy', labelKey: 'onboarding:mrnIntake.multipleMrn.types.legacy'},
+        {value: 'facility', labelKey: 'onboarding:mrnIntake.multipleMrn.types.facility'},
+        {value: 'visit', labelKey: 'onboarding:mrnIntake.multipleMrn.types.visit'},
+        {value: 'other', labelKey: 'onboarding:mrnIntake.multipleMrn.types.other'}
+      ],
+      varianceTypes: [
+        {value: 'facility', labelKey: 'onboarding:mrnIntake.variance.types.facility'},
+        {value: 'campus', labelKey: 'onboarding:mrnIntake.variance.types.campus'},
+        {value: 'setting', labelKey: 'onboarding:mrnIntake.variance.types.setting'},
+        {value: 'ehr_instance', labelKey: 'onboarding:mrnIntake.variance.types.ehrInstance'},
+        {value: 'other', labelKey: 'onboarding:mrnIntake.variance.types.other'}
+      ],
+      changeTypes: [
+        {value: 'merge', labelKey: 'onboarding:mrnIntake.changes.types.merge'},
+        {value: 'transfer', labelKey: 'onboarding:mrnIntake.changes.types.transfer'},
+        {value: 'correction', labelKey: 'onboarding:mrnIntake.changes.types.correction'},
+        {value: 'other', labelKey: 'onboarding:mrnIntake.changes.types.other'}
+      ]
+    };
+  }
+
   async getPatientIdentifiers(): Promise<C.PatientIdentifier[]> {
     await tick();
-    return ids(3).map(patientId => ({
+    // Two identifiers per patient - an enterprise MPI id (fully populated) and a legacy MRN
+    // (missing use/assigner/period, so the "N/A" rendering is exercisable) - deliberately not
+    // every field on every element, matching how a real EHR's identifiers rarely agree on shape.
+    return ids(3).map((patientId, index) => ({
       patientId,
-      elements: [{system: 'http://example.invalid/mrn', value: `SIM-${patientId}`, type: 'MR'}]
+      elements: [
+        {
+          value: `MPI-${1000 + index}`,
+          type: 'MR (Medical record number)',
+          system: 'http://example.invalid/fhir/identifier/empi',
+          use: 'usual',
+          assigner: this.facilityName,
+          periodStart: '2019-01-01'
+        },
+        {
+          value: `SIM-${patientId}`,
+          type: 'MR (Medical record number)',
+          system: 'http://example.invalid/fhir/identifier/legacy-mrn'
+        }
+      ]
     }));
   }
 

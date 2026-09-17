@@ -122,5 +122,42 @@ public class OnboardingEndpoints : IApi
                     "400 when the facility has not chosen a vendor yet.";
                 return operation;
             });
+
+        group.MapPost("/completion", async (
+                IOnboardingCompletionService completionService,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await completionService.CompleteAsync(cancellationToken);
+                return Results.Ok(result);
+            })
+            .WithName("CompleteOnboarding")
+            .Produces<CommitResultResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Finalizes the facility's enrollment.";
+                operation.Description =
+                    "The completion fan-out: arms the facility's Census acquisition job and confirms " +
+                    "every other Link service onboarding touches holds the configuration this facility " +
+                    "saved. Always returns 200 with a per-service status, even when a stage is " +
+                    "pending or failed — the facility is marked onboarded only once every stage " +
+                    "reports committed; a failed attempt leaves the prior configuration untouched " +
+                    "and can be retried.";
+                return operation;
+            });
+
+        group.MapGet("/completion", async (
+                IOnboardingCompletionService completionService,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await completionService.GetCommitStateAsync(cancellationToken)))
+            .WithName("GetOnboardingCompletionState")
+            .Produces<CommitResultResponse?>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "The facility's last completion attempt.";
+                operation.Description = "Null before Complete Enrollment has been clicked.";
+                return operation;
+            });
     }
 }

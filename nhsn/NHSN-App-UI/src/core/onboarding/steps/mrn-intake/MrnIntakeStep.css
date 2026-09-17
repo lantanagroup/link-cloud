@@ -1,0 +1,96 @@
+/*
+ * Only what has no shared equivalent lives here: the checkbox-group layout for
+ * the step's several "select all that apply" questions, the patient table's
+ * link-styled row button (a real <button>, not a clickable <tr>, so the table
+ * stays keyboard-operable), and the identifier detail cards shown inside the
+ * patient modal. Tabs, field groups, the table's base look, RepeatableList and
+ * the modal itself all come from the shared classes in NHSNLink.css's
+ * "shared step blocks" section, same as every other step.
+ */
+
+.nhsn-link__mrn-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nhsn-link__mrn-patient-table-scroll {
+  max-height: 320px;
+}
+
+/* A real button so the patient table stays keyboard-operable, styled to read as the POC's link. */
+.nhsn-link__mrn-patient-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kendo-color-primary, #0057b7);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nhsn-link__mrn-patient-button:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__mrn-identifier-card {
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--kendo-color-surface, #f7f9fc);
+}
+
+.nhsn-link__mrn-identifier-card-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+.nhsn-link__mrn-id-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--kendo-color-border, #d0d7de);
+}
+
+.nhsn-link__mrn-id-field:first-of-type {
+  border-top: none;
+}
+
+.nhsn-link__mrn-id-field-label {
+  flex: 0 0 100px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.nhsn-link__mrn-id-field-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.nhsn-link__mrn-na {
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-style: italic;
+}
+
+.nhsn-link__mrn-id-rule-action,
+.nhsn-link__mrn-id-rule-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.nhsn-link__mrn-id-rule-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kendo-color-success, #157347);
+}

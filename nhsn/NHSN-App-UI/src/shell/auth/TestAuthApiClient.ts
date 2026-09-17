@@ -56,6 +56,7 @@ export class TestAuthApiClient implements ApiClient {
   getMrnIntake = () => this.inner.getMrnIntake();
   saveMrnIntake: ApiClient['saveMrnIntake'] = i => this.inner.saveMrnIntake(i);
   getPatientIdentifiers = () => this.inner.getPatientIdentifiers();
+  getMrnIntakeOptions = () => this.inner.getMrnIntakeOptions();
 
   requestReport: ApiClient['requestReport'] = r => this.inner.requestReport(r);
   listReports: ApiClient['listReports'] = p => this.inner.listReports(p);

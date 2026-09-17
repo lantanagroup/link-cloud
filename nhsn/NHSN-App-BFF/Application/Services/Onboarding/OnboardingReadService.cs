@@ -40,6 +40,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
     private readonly IEncounterMappingService _encounterMappingService;
     private readonly IHslocMappingService _hslocMappingService;
     private readonly IPatientListGateway _patientListGateway;
+    private readonly IMrnIntakeService _mrnIntakeService;
+    private readonly IOnboardingCompletionService _completionService;
     private readonly OnboardingReadSettings _settings;
     private readonly ILogger<OnboardingReadService> _logger;
 
@@ -58,6 +60,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         IEncounterMappingService encounterMappingService,
         IHslocMappingService hslocMappingService,
         IPatientListGateway patientListGateway,
+        IMrnIntakeService mrnIntakeService,
+        IOnboardingCompletionService completionService,
         IOptions<OnboardingReadSettings> settings,
         ILogger<OnboardingReadService> logger)
     {
@@ -75,6 +79,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         _encounterMappingService = encounterMappingService;
         _hslocMappingService = hslocMappingService;
         _patientListGateway = patientListGateway;
+        _mrnIntakeService = mrnIntakeService;
+        _completionService = completionService;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -139,7 +145,10 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var hslocMappingsTask = ReadSectionAsync<IReadOnlyList<HslocMapping>?>("hsloc", "Normalization",
             async ct => await _hslocMappingService.GetAsync(ct), overall.Token, cancellationToken);
 
-        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, patientListIdsTask, reportTask, locationOrgTask, encounterMappingsTask, hslocMappingsTask);
+        var mrnIntakeTask = ReadSectionAsync("mrnIntake", "Bff",
+            async ct => await _mrnIntakeService.GetAsync(ct), overall.Token, cancellationToken);
+
+        await Task.WhenAll(facilityInfoTask, fhirTask, censusTask, lagDurationTask, sftpConfigTask, hasCredentialsTask, patientListIdsTask, reportTask, locationOrgTask, encounterMappingsTask, hslocMappingsTask, mrnIntakeTask);
 
         var facilityInfo = await facilityInfoTask;
         var fhir = await fhirTask;
@@ -152,6 +161,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var locationOrg = await locationOrgTask;
         var encounterMappings = await encounterMappingsTask;
         var hslocMappings = await hslocMappingsTask;
+        var mrnIntake = await mrnIntakeTask;
 
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
@@ -160,13 +170,16 @@ public sealed class OnboardingReadService : IOnboardingReadService
         sources.Add(locationOrg.Source);
         sources.Add(encounterMappings.Source);
         sources.Add(hslocMappings.Source);
+        sources.Add(mrnIntake.Source);
+
+        var commitState = await _completionService.GetCommitStateAsync(cancellationToken);
 
         return new DraftEnvelopeResponse
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
                 censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, patientListIds.Value, report.Value,
-                locationOrg.Value, encounterMappings.Value, hslocMappings.Value),
-            CommitState = null, // Populated once the completion fan-out exists.
+                locationOrg.Value, encounterMappings.Value, hslocMappings.Value, mrnIntake.Value),
+            CommitState = commitState,
             Sources = sources
         };
     }
@@ -185,7 +198,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
         ReportScheduleSummary? report,
         LocationOrgSection? locationOrg,
         IReadOnlyList<EncounterMapping>? encounterMappings,
-        IReadOnlyList<HslocMapping>? hslocMappings) => new()
+        IReadOnlyList<HslocMapping>? hslocMappings,
+        MrnIntakeResponse? mrnIntake) => new()
         {
             SchemaVersion = DraftSchema.CurrentVersion,
             CurrentStepId = facility?.CurrentStepId,
@@ -254,7 +268,9 @@ public sealed class OnboardingReadService : IOnboardingReadService
                 LatestStatus = stored.State.ReportResults.LatestStatus
             },
 
-            ReportingPlan = new ReportingPlanSection { Reviewed = stored.State.ReportingPlan.Reviewed }
+            ReportingPlan = new ReportingPlanSection { Reviewed = stored.State.ReportingPlan.Reviewed },
+
+            MrnIntake = mrnIntake
         };
 
     // Runs one section's read under its own deadline, converting any failure into a status rather

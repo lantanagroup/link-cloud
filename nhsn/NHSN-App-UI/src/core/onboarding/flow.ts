@@ -4,6 +4,7 @@ import {parseHoursMinutesDuration} from '../shared/duration';
 import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
 import {CENSUS_LIST_KEYS} from './steps/census/validate';
+import {isMrnIntakeComplete} from './steps/mrn-intake/validate';
 import {isReportComplete} from './steps/report/validate';
 import {WelcomeStep} from './steps/welcome/WelcomeStep';
 
@@ -136,7 +137,7 @@ export const STEPS: Step[] = [
     id: 'mrn-intake',
     labelKey: 'onboarding:steps.mrnIntake',
     Component: lazyStep(() => import('./steps/mrn-intake/MrnIntakeStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: draft => isMrnIntakeComplete(draft.mrnIntake)
   },
   {
     id: 'complete',
