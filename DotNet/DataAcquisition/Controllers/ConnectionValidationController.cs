@@ -165,6 +165,10 @@ public class ConnectionValidationController : Controller
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "Unable to connect to FHIR server {FhirServerUrl}", sanitizedFhirServerUrl.SanitizeForLog());
             return Problem($"Unable to connect to the provided FHIR server URL.\nerrorMessage: {ex.Message}", statusCode: StatusCodes.Status502BadGateway);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "An exception occurred in ValidateFhirServerConnection");
