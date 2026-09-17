@@ -77,12 +77,13 @@ jobs:
 
       - name: Build services with cache
         run: |
+          umask 077
+          printf '%s' "$AZURE_ARTIFACTS_PAT" > "${RUNNER_TEMP}/feed_accesstoken"
           docker buildx bake --file docker-compose.yml \
             --set *.cache-from=type=gha,scope=e2e-docker \
             --set *.cache-to=type=gha,scope=e2e-docker \
             --set *.output=type=docker \
-            --set automation-ui.secrets.feed_accesstoken=env://AZURE_ARTIFACTS_PAT \
-            --set mock-fhir-server.secrets.feed_accesstoken=env://AZURE_ARTIFACTS_PAT
+            --secret id=feed_accesstoken,src="${RUNNER_TEMP}/feed_accesstoken"
 
       - name: Start services
         run: docker compose up --no-build -d
